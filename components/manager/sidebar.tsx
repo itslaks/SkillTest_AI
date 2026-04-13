@@ -53,7 +53,7 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
             <Sparkles className="w-5 h-5 text-primary-foreground" />
           </div>
-          {!collapsed && <span className="font-bold text-lg">AssessHub</span>}
+          {!collapsed && <span className="font-bold text-lg">SkillTest</span>}
         </div>
 
         {/* Navigation */}

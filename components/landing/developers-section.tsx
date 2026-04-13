@@ -1,80 +1,82 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Copy, Check } from "lucide-react";
+import { Copy, Check, FileSpreadsheet, PlusCircle, BarChart, Users } from "lucide-react";
 
-const codeExamples = [
+const managerCapabilities = [
   {
-    label: "Install",
-    code: `npm install @optimus/sdk
+    label: "Step 1: Import",
+    code: `// Manager uploads Excel
+const employeeList = [
+  { name: "John Doe", email: "john@company.com", domain: "Tech" },
+  { name: "Jane Smith", email: "jane@company.com", domain: "HR" }
+]
 
-# or
-yarn add @optimus/sdk
-pnpm add @optimus/sdk`,
+// System auto-categorizes by domain`,
   },
   {
-    label: "Initialize",
-    code: `import { Optimus } from '@optimus/sdk'
+    label: "Step 2: Quiz",
+    code: `// Define Quiz Parameters
+const quizSettings = {
+  topic: "React Advanced",
+  difficulty: "Hard",
+  numQuestions: 20,
+  feedbackLink: "https://forms.gle/xyz"
+}
 
-const optimus = new Optimus({
-  apiKey: process.env.OPTIMUS_KEY
-})`,
+// AI generates MCQ questions`,
   },
   {
-    label: "Deploy",
-    code: `const app = await optimus.deploy({
-  name: 'my-app',
-  region: 'auto',
-  scaling: {
-    min: 1,
-    max: 100
-  }
-})
+    label: "Step 3: Analyze",
+    code: `// View Dynamic Leaderboard
+const leaderboard = getLeaderboard(quizId);
 
-console.log('Live at:', app.url)`,
+// Export to Excel
+exportToExcel(leaderboard);
+// (Includes Name, Score, Time, Rank)`,
   },
 ];
 
-const features = [
+const managerFeatures = [
   { 
-    title: "TypeScript native", 
-    description: "Full type safety with auto-generated types."
+    title: "Excel Workflow", 
+    description: "Upload employees and download results in seconds."
   },
   { 
-    title: "Zero config", 
-    description: "Sensible defaults that just work."
+    title: "AI Question Bank", 
+    description: "Automatically generate high-quality MCQs by topic."
   },
   { 
-    title: "Edge-ready", 
-    description: "Runs anywhere: Node, Deno, Bun, browsers."
+    title: "Role Management", 
+    description: "Full control over employee access and domains."
   },
   { 
-    title: "12KB gzipped", 
-    description: "Lightweight with zero dependencies."
+    title: "Instant Reports", 
+    description: "Real-time analytics and time-based rankings."
   },
 ];
 
 const codeAnimationStyles = `
-  .dev-code-line {
+  .manager-code-line {
     opacity: 0;
     transform: translateX(-8px);
-    animation: devLineReveal 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    animation: managerLineReveal 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   }
   
-  @keyframes devLineReveal {
+  @keyframes managerLineReveal {
     to {
       opacity: 1;
       transform: translateX(0);
     }
   }
   
-  .dev-code-char {
+  .manager-code-char {
     opacity: 0;
     filter: blur(8px);
-    animation: devCharReveal 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    animation: managerCharReveal 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   }
   
-  @keyframes devCharReveal {
+  @keyframes managerCharReveal {
     to {
       opacity: 1;
       filter: blur(0);
@@ -84,15 +86,8 @@ const codeAnimationStyles = `
 
 export function DevelopersSection() {
   const [activeTab, setActiveTab] = useState(0);
-  const [copied, setCopied] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(codeExamples[activeTab].code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -107,7 +102,7 @@ export function DevelopersSection() {
   }, []);
 
   return (
-    <section id="developers" ref={sectionRef} className="relative py-24 lg:py-32 overflow-hidden">
+    <section id="managers" ref={sectionRef} className="relative py-24 lg:py-32 overflow-hidden">
       <style dangerouslySetInnerHTML={{ __html: codeAnimationStyles }} />
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
         <div className="grid lg:grid-cols-2 gap-16 lg:gap-24 items-start">
@@ -119,21 +114,20 @@ export function DevelopersSection() {
           >
             <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-6">
               <span className="w-8 h-px bg-foreground/30" />
-              For developers
+              For Managers
             </span>
             <h2 className="text-4xl lg:text-6xl font-display tracking-tight mb-8">
-              Built by devs.
+              Complete control.
               <br />
-              <span className="text-muted-foreground">For devs.</span>
+              <span className="text-muted-foreground">Effortless workflow.</span>
             </h2>
             <p className="text-xl text-muted-foreground mb-12 leading-relaxed">
-              A thoughtfully designed SDK that gets out of your way. 
-              Ship faster with intuitive APIs and exceptional documentation.
+              SkillTest provides managers with a unified workspace to manage employees, create advanced assessments, and extract actionable insights.
             </p>
             
             {/* Features */}
             <div className="grid grid-cols-2 gap-6">
-              {features.map((feature, index) => (
+              {managerFeatures.map((feature, index) => (
                 <div
                   key={feature.title}
                   className={`transition-all duration-500 ${
@@ -148,18 +142,18 @@ export function DevelopersSection() {
             </div>
           </div>
           
-          {/* Right: Code block */}
+          {/* Right: Code/Process block */}
           <div
             className={`lg:sticky lg:top-32 transition-all duration-700 delay-200 ${
               isVisible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-8"
             }`}
           >
-            <div className="border border-foreground/10">
+            <div className="border border-foreground/10 h-full">
               {/* Tabs */}
-              <div className="flex items-center border-b border-foreground/10">
-                {codeExamples.map((example, idx) => (
+              <div className="flex items-center border-b border-foreground/10 bg-foreground/[0.02]">
+                {managerCapabilities.map((item, idx) => (
                   <button
-                    key={example.label}
+                    key={item.label}
                     type="button"
                     onClick={() => setActiveTab(idx)}
                     className={`px-6 py-4 text-sm font-mono transition-colors relative ${
@@ -168,41 +162,28 @@ export function DevelopersSection() {
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    {example.label}
+                    {item.label}
                     {activeTab === idx && (
                       <span className="absolute bottom-0 left-0 right-0 h-px bg-foreground" />
                     )}
                   </button>
                 ))}
-                <div className="flex-1" />
-                <button
-                  type="button"
-                  onClick={handleCopy}
-                  className="px-4 py-4 text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label="Copy code"
-                >
-                  {copied ? (
-                    <Check className="w-4 h-4 text-green-600" />
-                  ) : (
-                    <Copy className="w-4 h-4" />
-                  )}
-                </button>
               </div>
               
-              {/* Code content */}
-              <div className="p-8 font-mono text-sm bg-foreground/[0.01] min-h-[220px]">
+              {/* Process content */}
+              <div className="p-8 font-mono text-sm bg-foreground/[0.01] min-h-[280px]">
                 <pre className="text-foreground/80">
-                  {codeExamples[activeTab].code.split('\n').map((line, lineIndex) => (
+                  {managerCapabilities[activeTab].code.split('\n').map((line, lineIndex) => (
                     <div 
                       key={`${activeTab}-${lineIndex}`} 
-                      className="leading-loose dev-code-line"
+                      className="leading-loose manager-code-line"
                       style={{ animationDelay: `${lineIndex * 80}ms` }}
                     >
                       <span className="inline-flex">
                         {line.split('').map((char, charIndex) => (
                           <span
                             key={`${activeTab}-${lineIndex}-${charIndex}`}
-                            className="dev-code-char"
+                            className="manager-code-char"
                             style={{
                               animationDelay: `${lineIndex * 80 + charIndex * 15}ms`,
                             }}
@@ -215,17 +196,26 @@ export function DevelopersSection() {
                   ))}
                 </pre>
               </div>
-            </div>
-            
-            {/* Links */}
-            <div className="mt-6 flex items-center gap-6 text-sm">
-              <a href="#" className="text-foreground hover:underline underline-offset-4">
-                Read the docs
-              </a>
-              <span className="text-foreground/20">|</span>
-              <a href="#" className="text-muted-foreground hover:text-foreground">
-                View on GitHub
-              </a>
+
+              {/* Action Icons Bar */}
+              <div className="px-6 py-4 border-t border-foreground/10 flex items-center justify-around text-muted-foreground">
+                 <div className="flex flex-col items-center gap-1">
+                   <FileSpreadsheet className="h-5 w-5" />
+                   <span className="text-[10px] uppercase font-mono tracking-tighter">Excel</span>
+                 </div>
+                 <div className="flex flex-col items-center gap-1">
+                   <PlusCircle className="h-5 w-5" />
+                   <span className="text-[10px] uppercase font-mono tracking-tighter">Create</span>
+                 </div>
+                 <div className="flex flex-col items-center gap-1">
+                   <Users className="h-5 w-5" />
+                   <span className="text-[10px] uppercase font-mono tracking-tighter">Team</span>
+                 </div>
+                 <div className="flex flex-col items-center gap-1">
+                   <BarChart className="h-5 w-5" />
+                   <span className="text-[10px] uppercase font-mono tracking-tighter">Report</span>
+                 </div>
+              </div>
             </div>
           </div>
         </div>

@@ -4,32 +4,32 @@ import { useEffect, useState } from "react";
 
 const testimonials = [
   {
-    quote: "Optimus transformed our deployment pipeline. What used to take hours now happens in seconds.",
+    quote: "SkillTest transformed our quarterly assessments. The AI question generation saves us hours of manual work.",
     author: "Sarah Chen",
-    role: "CTO",
-    company: "Meridian Labs",
-    metric: "10x faster deployments",
+    role: "L&D Manager",
+    company: "Global Tech Solutions",
+    metric: "85% more engagement",
   },
   {
-    quote: "The developer experience is unmatched. Our team's productivity has never been higher.",
+    quote: "The gamified approach makes testing fun. Our employees actually look forward to taking these quizzes.",
     author: "Marcus Webb",
-    role: "Engineering Lead",
-    company: "Flux Systems",
-    metric: "40% more features shipped",
+    role: "HR Director",
+    company: "Pulse Dynamics",
+    metric: "40% higher test scores",
   },
   {
-    quote: "Finally, infrastructure that scales with our ambition. Zero downtime since we switched.",
+    quote: "The Excel reporting and time-based tie-breaking make leadership ranking incredibly fair and data-driven.",
     author: "Elena Rodriguez",
-    role: "VP Engineering",
-    company: "Beacon AI",
-    metric: "99.99% uptime",
+    role: "Talent Acquisition",
+    company: "Future Scale",
+    metric: "Zero manual data entry",
   },
   {
-    quote: "The integrations are seamless. We connected our entire stack in a single afternoon.",
+    quote: "Finally, an assessment platform that doesn't feel like a chore. The badges and streaks are a huge hit.",
     author: "James Liu",
-    role: "Founder",
-    company: "Prism Analytics",
-    metric: "50+ integrations used",
+    role: "CTO",
+    company: "Cloud Bridge",
+    metric: "2.5x more active users",
   },
 ];
 
@@ -56,7 +56,7 @@ export function TestimonialsSection() {
         {/* Section Label */}
         <div className="flex items-center gap-4 mb-16">
           <span className="font-mono text-xs tracking-widest text-muted-foreground uppercase">
-            What people say
+            What managers say
           </span>
           <div className="flex-1 h-px bg-foreground/10" />
           <span className="font-mono text-xs text-muted-foreground">
@@ -138,7 +138,7 @@ export function TestimonialsSection() {
         {/* Company Logos Marquee Label */}
         <div className="mt-24 pt-12 border-t border-foreground/10">
           <p className="font-mono text-xs tracking-widest text-muted-foreground uppercase mb-8 text-center">
-            Trusted by forward-thinking teams
+            Trusted by modern HR teams
           </p>
         </div>
       </div>
@@ -148,7 +148,7 @@ export function TestimonialsSection() {
         <div className="flex gap-16 items-center marquee">
           {[...Array(2)].map((_, setIdx) => (
             <div key={setIdx} className="flex gap-16 items-center shrink-0">
-              {["Meridian Labs", "Flux Systems", "Beacon AI", "Prism Analytics", "Nova Tech", "Quantum Corp", "Atlas Digital", "Vertex Labs"].map(
+              {["Global Tech", "Pulse Dynamics", "Future Scale", "Cloud Bridge", "Nova Corp", "Quantum HR", "Atlas Learning", "Vertex Systems"].map(
                 (company) => (
                   <span
                     key={`${setIdx}-${company}`}

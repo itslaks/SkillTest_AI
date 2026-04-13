@@ -163,42 +163,86 @@ export function QuizEditor({ quiz: initialQuiz, questions: initialQuestions }: Q
             <Textarea value={quiz.description || ''} onChange={e => handleQuizChange('description', e.target.value)} />
           </div>
 
-          <div className="grid gap-4 md:grid-cols-4">
-            <div className="space-y-2">
-              <Label>Difficulty</Label>
-              <select
-                className="w-full rounded-md border px-3 py-2 text-sm bg-background"
-                value={quiz.difficulty}
-                onChange={e => handleQuizChange('difficulty', e.target.value)}
-              >
+          <div className="grid gap-6 md:grid-cols-4 items-end">
+            <div className="md:col-span-4 space-y-3">
+              <Label className="text-base font-bold">Difficulty Level</Label>
+              <div className="flex flex-wrap gap-2">
                 {DIFFICULTIES.map(d => (
-                  <option key={d} value={d}>{d.charAt(0).toUpperCase() + d.slice(1)}</option>
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => handleQuizChange('difficulty', d)}
+                    className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all border-2 ${
+                      quiz.difficulty === d
+                        ? 'bg-foreground text-background border-foreground shadow-lg scale-105'
+                        : 'bg-background text-muted-foreground border-foreground/10 hover:border-foreground/30'
+                    }`}
+                  >
+                    {d.toUpperCase()}
+                  </button>
                 ))}
-              </select>
+              </div>
+              <p className="text-xs text-muted-foreground italic">
+                Choose a priority level for question generation (50% will come from this level).
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="font-bold">Time Limit (min)</Label>
+              <Input 
+                type="number" 
+                className="rounded-xl h-12"
+                value={quiz.time_limit_minutes} 
+                onChange={e => handleQuizChange('time_limit_minutes', parseInt(e.target.value) || 0)} 
+              />
             </div>
             <div className="space-y-2">
-              <Label>Time Limit (min)</Label>
-              <Input type="number" value={quiz.time_limit_minutes} onChange={e => handleQuizChange('time_limit_minutes', parseInt(e.target.value) || 0)} />
+              <Label className="font-bold">Question Count</Label>
+              <Input 
+                type="number" 
+                className="rounded-xl h-12"
+                value={quiz.question_count} 
+                onChange={e => handleQuizChange('question_count', parseInt(e.target.value) || 0)} 
+              />
             </div>
-            <div className="space-y-2">
-              <Label>Question Count</Label>
-              <Input type="number" value={quiz.question_count} onChange={e => handleQuizChange('question_count', parseInt(e.target.value) || 0)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Passing Score (%)</Label>
-              <Input type="number" value={quiz.passing_score} onChange={e => handleQuizChange('passing_score', parseInt(e.target.value) || 0)} />
+            <div className="space-y-2 md:col-span-2">
+              <Label className="font-bold">Passing Score (%)</Label>
+              <Input 
+                type="number" 
+                className="rounded-xl h-12"
+                value={quiz.passing_score} 
+                onChange={e => handleQuizChange('passing_score', parseInt(e.target.value) || 0)} 
+              />
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>Feedback Form URL (optional)</Label>
-            <Input value={quiz.feedback_form_url || ''} onChange={e => handleQuizChange('feedback_form_url', e.target.value)} placeholder="https://forms.google.com/..." />
+          <div className="space-y-3 p-4 bg-primary/5 rounded-2xl border border-primary/10">
+            <Label className="text-base font-bold flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-primary" />
+              Mandatory Feedback Form URL
+            </Label>
+            <Input 
+              className="h-12 rounded-xl border-primary/20 bg-background focus-visible:ring-primary"
+              value={quiz.feedback_form_url || ''} 
+              onChange={e => handleQuizChange('feedback_form_url', e.target.value)} 
+              placeholder="e.g. https://forms.google.com/..." 
+            />
+            <p className="text-xs text-muted-foreground">
+              Employees will be required to click this link after completing the quiz to exit.
+            </p>
           </div>
 
-          <Button onClick={handleSaveQuiz} disabled={isPending}>
-            {isPending ? <Spinner className="mr-2" /> : <Save className="mr-2 h-4 w-4" />}
-            Save Quiz Details
-          </Button>
+          <div className="pt-4">
+            <Button 
+              onClick={handleSaveQuiz} 
+              disabled={isPending}
+              size="lg"
+              className="w-full md:w-auto rounded-full px-12 h-14 bg-foreground text-background font-bold hover:scale-[1.02] transition-transform"
+            >
+              {isPending ? <Spinner className="mr-2" /> : <Save className="mr-2 h-5 w-5" />}
+              Save All Quiz Changes
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

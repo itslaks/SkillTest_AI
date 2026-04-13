@@ -12,7 +12,6 @@ function AnimatedCounter({ end, suffix = "", prefix = "" }: { end: number; suffi
       ([entry]) => {
         if (entry.isIntersecting && !hasAnimated) {
           setHasAnimated(true);
-          let start = 0;
           const duration = 2000;
           const startTime = performance.now();
 
@@ -46,37 +45,38 @@ function AnimatedCounter({ end, suffix = "", prefix = "" }: { end: number; suffi
 
 const metrics = [
   { 
-    value: 2847392, 
-    suffix: "", 
+    value: 500, 
+    suffix: "+", 
     prefix: "",
-    label: "API requests today",
+    label: "Quizzes created",
   },
   { 
-    value: 99, 
-    suffix: ".99%", 
+    value: 12, 
+    suffix: "K+", 
     prefix: "",
-    label: "Uptime this quarter",
+    label: "Employees assessed",
   },
   { 
-    value: 23, 
-    suffix: "ms", 
+    value: 98, 
+    suffix: "%", 
     prefix: "",
-    label: "Average response time",
+    label: "Completion rate",
   },
   { 
-    value: 184, 
-    suffix: "", 
+    value: 45, 
+    suffix: "+", 
     prefix: "",
-    label: "Countries served",
+    label: "Badges & rewards",
   },
 ];
 
 export function MetricsSection() {
-  const [time, setTime] = useState(new Date());
+  const [time, setTime] = useState<Date | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
+    setTime(new Date());
     const interval = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(interval);
   }, []);
@@ -94,21 +94,21 @@ export function MetricsSection() {
   }, []);
 
   return (
-    <section id="studio" ref={sectionRef} className="relative py-24 lg:py-32 border-y border-foreground/10">
+    <section id="why-skilltest" ref={sectionRef} className="relative py-24 lg:py-32 border-y border-foreground/10">
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8 mb-16 lg:mb-24">
           <div>
             <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-6">
               <span className="w-8 h-px bg-foreground/30" />
-              Live metrics
+              Platform metrics
             </span>
             <h2
               className={`text-4xl lg:text-6xl font-display tracking-tight transition-all duration-700 ${
                 isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
               }`}
             >
-              Performance you
+              Impact you
               <br />
               can measure.
             </h2>
@@ -119,7 +119,7 @@ export function MetricsSection() {
               Live
             </span>
             <span className="text-foreground/30">|</span>
-            <span>{time.toLocaleTimeString()}</span>
+            <span>{time ? time.toLocaleTimeString() : '\u00A0'}</span>
           </div>
         </div>
         

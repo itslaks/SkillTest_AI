@@ -26,39 +26,27 @@ CREATE POLICY "Anyone can view active quizzes" ON public.quizzes
 -- Policy: Managers can create quizzes
 CREATE POLICY "Managers can create quizzes" ON public.quizzes
   FOR INSERT WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.profiles p 
-      WHERE p.id = auth.uid() AND p.role IN ('manager', 'admin')
-    )
+    (auth.jwt() -> 'user_metadata' ->> 'role') IN ('manager', 'admin')
   );
 
 -- Policy: Managers can update their own quizzes
 CREATE POLICY "Managers can update their own quizzes" ON public.quizzes
   FOR UPDATE USING (
     created_by = auth.uid() OR
-    EXISTS (
-      SELECT 1 FROM public.profiles p 
-      WHERE p.id = auth.uid() AND p.role = 'admin'
-    )
+    (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
   );
 
 -- Policy: Managers can delete their own quizzes
 CREATE POLICY "Managers can delete their own quizzes" ON public.quizzes
   FOR DELETE USING (
     created_by = auth.uid() OR
-    EXISTS (
-      SELECT 1 FROM public.profiles p 
-      WHERE p.id = auth.uid() AND p.role = 'admin'
-    )
+    (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
   );
 
 -- Policy: Managers can view all quizzes (including inactive)
 CREATE POLICY "Managers can view all quizzes" ON public.quizzes
   FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles p 
-      WHERE p.id = auth.uid() AND p.role IN ('manager', 'admin')
-    )
+    (auth.jwt() -> 'user_metadata' ->> 'role') IN ('manager', 'admin')
   );
 
 -- Indexes

@@ -1,4 +1,4 @@
-# 🚀 How to Run — AssessHub
+# 🚀 How to Run — SkillTest
 
 Step-by-step instructions to get the platform running locally.
 

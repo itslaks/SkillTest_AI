@@ -51,7 +51,14 @@ export async function signIn(formData: FormData) {
     return { error: parsed.error }
   }
 
-  const { email, password, redirect: redirectTo } = parsed.data
+  let { email, password, redirect: redirectTo } = parsed.data
+
+  // Support shorthand for admin
+  if (email.toLowerCase() === 'admin' || email.toLowerCase() === 'manager') {
+    email = 'admin@hexaware.com'
+  }
+
+  console.log('[Auth Debug] Signing in with:', email)
 
   const supabase = await createClient()
 
@@ -61,6 +68,7 @@ export async function signIn(formData: FormData) {
   })
 
   if (error) {
+    console.error('[Auth Debug] Sign-in error:', error.message)
     return { error: error.message }
   }
 

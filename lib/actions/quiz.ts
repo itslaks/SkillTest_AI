@@ -24,6 +24,7 @@ export async function createQuiz(input: CreateQuizInput) {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
   if (authError || !user) {
+    console.error('Quiz creation failed: Not authenticated', authError)
     return { error: 'Not authenticated' }
   }
 
@@ -37,9 +38,11 @@ export async function createQuiz(input: CreateQuizInput) {
     .single()
 
   if (error) {
+    console.error('Quiz creation database error:', error.message, error.details)
     return { error: error.message }
   }
 
+  console.log('Quiz created successfully:', data.id)
   revalidatePath('/manager/quizzes', 'layout')
   return { data }
 }

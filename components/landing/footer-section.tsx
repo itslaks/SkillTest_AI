@@ -1,115 +1,104 @@
 "use client";
 
-import { ArrowUpRight } from "lucide-react";
-import { AnimatedWave } from "./animated-wave";
+import Link from "next/link";
+import { Github, Twitter, Linkedin, Sparkles } from "lucide-react";
 
-const footerLinks = {
-  Product: [
-    { name: "Features", href: "#features" },
-    { name: "How it works", href: "#how-it-works" },
-    { name: "Pricing", href: "#pricing" },
-    { name: "Integrations", href: "#integrations" },
-  ],
-  Developers: [
-    { name: "Documentation", href: "#developers" },
-    { name: "API Reference", href: "#" },
-    { name: "SDK", href: "#developers" },
-    { name: "Status", href: "#" },
-  ],
-  Company: [
-    { name: "About", href: "#" },
-    { name: "Blog", href: "#" },
-    { name: "Careers", href: "#", badge: "Hiring" },
-    { name: "Contact", href: "#" },
-  ],
-  Legal: [
-    { name: "Privacy", href: "#" },
-    { name: "Terms", href: "#" },
-    { name: "Security", href: "#security" },
-  ],
-};
-
-const socialLinks = [
-  { name: "Twitter", href: "#" },
-  { name: "GitHub", href: "#" },
-  { name: "LinkedIn", href: "#" },
+const footerLinks = [
+  {
+    title: "Platform",
+    links: [
+      { name: "Features", href: "#features" },
+      { name: "How it works", href: "#how-it-works" },
+      { name: "Gamification", href: "#gamification" },
+      { name: "Security", href: "#security" },
+    ],
+  },
+  {
+    title: "Resources",
+    links: [
+      { name: "Documentation", href: "#" },
+      { name: "Manager Guide", href: "#" },
+      { name: "Employee FAQ", href: "#" },
+      { name: "API Reference", href: "#" },
+    ],
+  },
+  {
+    title: "Company",
+    links: [
+      { name: "About Us", href: "#" },
+      { name: "Privacy Policy", href: "#" },
+      { name: "Terms of Service", href: "#" },
+      { name: "Contact", href: "#" },
+    ],
+  },
 ];
 
 export function FooterSection() {
   return (
-    <footer className="relative border-t border-foreground/10">
-      {/* Animated wave background */}
-      <div className="absolute inset-0 h-64 opacity-20 pointer-events-none overflow-hidden">
-        <AnimatedWave />
-      </div>
-      
-      <div className="relative z-10 max-w-[1400px] mx-auto px-6 lg:px-12">
-        {/* Main Footer */}
-        <div className="py-16 lg:py-24">
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-12 lg:gap-8">
-            {/* Brand Column */}
-            <div className="col-span-2">
-              <a href="#" className="inline-flex items-center gap-2 mb-6">
-                <span className="text-2xl font-display">Optimus</span>
-                <span className="text-xs text-muted-foreground font-mono">TM</span>
+    <footer className="bg-background pt-24 pb-12 border-t border-foreground/10">
+      <div className="max-w-7xl mx-auto px-6 lg:px-12">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-12 lg:gap-8 mb-24">
+          {/* Brand */}
+          <div className="col-span-2">
+            <Link href="/" className="inline-flex items-center gap-2 mb-6 group">
+              <div className="w-10 h-10 rounded-lg bg-foreground flex items-center justify-center transition-transform group-hover:rotate-12">
+                <Sparkles className="w-6 h-6 text-background" />
+              </div>
+              <span className="text-2xl font-bold">SkillTest</span>
+            </Link>
+            <p className="text-muted-foreground max-w-xs mb-8">
+              The gamified employee assessment platform for the modern enterprise.
+            </p>
+            <div className="flex gap-4">
+              <a href="#" className="p-2 border border-foreground/10 hover:border-foreground/30 transition-colors">
+                <Twitter className="w-5 h-5 text-muted-foreground hover:text-foreground" />
               </a>
-
-              <p className="text-muted-foreground leading-relaxed mb-8 max-w-xs">
-                The platform for teams who ship. Build, deploy, and scale with unprecedented velocity.
-              </p>
-
-              {/* Social Links */}
-              <div className="flex gap-6">
-                {socialLinks.map((link) => (
-                  <a
-                    key={link.name}
-                    href={link.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 group"
-                  >
-                    {link.name}
-                    <ArrowUpRight className="w-3 h-3 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
-                  </a>
-                ))}
-              </div>
+              <a href="#" className="p-2 border border-foreground/10 hover:border-foreground/30 transition-colors">
+                <Linkedin className="w-5 h-5 text-muted-foreground hover:text-foreground" />
+              </a>
+              <a href="#" className="p-2 border border-foreground/10 hover:border-foreground/30 transition-colors">
+                <Github className="w-5 h-5 text-muted-foreground hover:text-foreground" />
+              </a>
             </div>
-
-            {/* Link Columns */}
-            {Object.entries(footerLinks).map(([title, links]) => (
-              <div key={title}>
-                <h3 className="text-sm font-medium mb-6">{title}</h3>
-                <ul className="space-y-4">
-                  {links.map((link) => (
-                    <li key={link.name}>
-                      <a
-                        href={link.href}
-                        className="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-2"
-                      >
-                        {link.name}
-                        {"badge" in link && link.badge && (
-                          <span className="text-xs px-2 py-0.5 bg-foreground text-background rounded-full">
-                            {link.badge}
-                          </span>
-                        )}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
           </div>
+
+          {/* Links */}
+          {footerLinks.map((column) => (
+            <div key={column.title} className="col-span-1">
+              <h4 className="font-display text-sm uppercase tracking-widest text-foreground font-bold mb-6">
+                {column.title}
+              </h4>
+              <ul className="space-y-4">
+                {column.links.map((link) => (
+                  <li key={link.name}>
+                    <Link
+                      href={link.href}
+                      className="text-muted-foreground hover:text-foreground transition-colors text-sm"
+                    >
+                      {link.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
 
-        {/* Bottom Bar */}
-        <div className="py-8 border-t border-foreground/10 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-muted-foreground">
-            2025 Optimus. All rights reserved.
+        {/* Bottom */}
+        <div className="flex flex-col md:flex-row items-center justify-between pt-12 border-t border-foreground/10 gap-8">
+          <p className="text-muted-foreground text-sm font-mono">
+            © 2025 SkillTest. All rights reserved.
           </p>
-
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <span className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-green-500" />
-              All systems operational
-            </span>
+          <div className="flex gap-8">
+            <Link href="#" className="text-xs text-muted-foreground hover:text-foreground font-mono">
+              Privacy
+            </Link>
+            <Link href="#" className="text-xs text-muted-foreground hover:text-foreground font-mono">
+              Terms
+            </Link>
+            <Link href="#" className="text-xs text-muted-foreground hover:text-foreground font-mono">
+              Cookies
+            </Link>
           </div>
         </div>
       </div>

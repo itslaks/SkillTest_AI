@@ -2,18 +2,17 @@
 
 import { useEffect, useState, useRef } from "react";
 
-const locations = [
-  { city: "San Francisco", region: "US West", latency: "12ms" },
-  { city: "New York", region: "US East", latency: "18ms" },
-  { city: "London", region: "Europe", latency: "24ms" },
-  { city: "Tokyo", region: "Asia Pacific", latency: "32ms" },
-  { city: "Sydney", region: "Oceania", latency: "45ms" },
-  { city: "Sao Paulo", region: "South America", latency: "38ms" },
+const difficultyLevels = [
+  { level: "Easy", distribution: "10%", description: "Fundamental concepts", color: "bg-green-500" },
+  { level: "Medium", distribution: "10%", description: "Applied knowledge", color: "bg-blue-500" },
+  { level: "Hard", distribution: "10%", description: "Complex problem-solving", color: "bg-amber-500" },
+  { level: "Advanced", distribution: "10%", description: "Expert-level reasoning", color: "bg-orange-500" },
+  { level: "Hardcore", distribution: "10%", description: "Master-level challenges", color: "bg-red-500" },
 ];
 
 export function InfrastructureSection() {
   const [isVisible, setIsVisible] = useState(false);
-  const [activeLocation, setActiveLocation] = useState(0);
+  const [activeLevel, setActiveLevel] = useState(2);
   const sectionRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -30,7 +29,7 @@ export function InfrastructureSection() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setActiveLocation((prev) => (prev + 1) % locations.length);
+      setActiveLevel((prev) => (prev + 1) % difficultyLevels.length);
     }, 2000);
     return () => clearInterval(interval);
   }, []);
@@ -47,36 +46,37 @@ export function InfrastructureSection() {
           >
             <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-6">
               <span className="w-8 h-px bg-foreground/30" />
-              Infrastructure
+              Assessment Engine
             </span>
             <h2 className="text-4xl lg:text-6xl font-display tracking-tight mb-8">
-              Global by
+              Smart difficulty
               <br />
-              default.
+              distribution.
             </h2>
             <p className="text-xl text-muted-foreground leading-relaxed mb-12">
-              Deploy once, run everywhere. Our edge network spans 17 data centers 
-              across 6 continents, delivering sub-50ms latency to 99% of the world.
+              When a manager selects a difficulty level, 50% of questions come from that tier. 
+              The remaining 50% is evenly distributed (10% each) across all other levels — 
+              ensuring a well-rounded, fair assessment.
             </p>
 
             {/* Stats */}
             <div className="grid grid-cols-3 gap-8">
               <div>
-                <div className="text-4xl lg:text-5xl font-display mb-2">17</div>
-                <div className="text-sm text-muted-foreground">Data centers</div>
+                <div className="text-4xl lg:text-5xl font-display mb-2">50%</div>
+                <div className="text-sm text-muted-foreground">Selected level</div>
               </div>
               <div>
-                <div className="text-4xl lg:text-5xl font-display mb-2">99.99%</div>
-                <div className="text-sm text-muted-foreground">Uptime SLA</div>
+                <div className="text-4xl lg:text-5xl font-display mb-2">10%</div>
+                <div className="text-sm text-muted-foreground">Each other level</div>
               </div>
               <div>
-                <div className="text-4xl lg:text-5xl font-display mb-2">&lt;50ms</div>
-                <div className="text-sm text-muted-foreground">Global latency</div>
+                <div className="text-4xl lg:text-5xl font-display mb-2">5</div>
+                <div className="text-sm text-muted-foreground">Difficulty tiers</div>
               </div>
             </div>
           </div>
 
-          {/* Right: Location list */}
+          {/* Right: Difficulty levels */}
           <div
             className={`transition-all duration-700 delay-200 ${
               isVisible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-8"
@@ -85,34 +85,38 @@ export function InfrastructureSection() {
             <div className="border border-foreground/10">
               {/* Header */}
               <div className="px-6 py-4 border-b border-foreground/10 flex items-center justify-between">
-                <span className="text-sm font-mono text-muted-foreground">Edge Network</span>
+                <span className="text-sm font-mono text-muted-foreground">Difficulty Distribution</span>
                 <span className="flex items-center gap-2 text-xs font-mono text-green-600">
                   <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                  All operational
+                  AI-Powered
                 </span>
               </div>
 
-              {/* Locations */}
+              {/* Difficulty levels */}
               <div>
-                {locations.map((location, index) => (
+                {difficultyLevels.map((item, index) => (
                   <div
-                    key={location.city}
+                    key={item.level}
                     className={`px-6 py-5 border-b border-foreground/5 last:border-b-0 flex items-center justify-between transition-all duration-300 ${
-                      activeLocation === index ? "bg-foreground/[0.02]" : ""
+                      activeLevel === index ? "bg-foreground/[0.02]" : ""
                     }`}
                   >
                     <div className="flex items-center gap-4">
                       <span 
-                        className={`w-2 h-2 rounded-full transition-colors duration-300 ${
-                          activeLocation === index ? "bg-foreground" : "bg-foreground/20"
+                        className={`w-3 h-3 rounded-full transition-all duration-300 ${item.color} ${
+                          activeLevel === index ? "scale-125" : "scale-100 opacity-60"
                         }`}
                       />
                       <div>
-                        <div className="font-medium">{location.city}</div>
-                        <div className="text-sm text-muted-foreground">{location.region}</div>
+                        <div className="font-medium">{item.level}</div>
+                        <div className="text-sm text-muted-foreground">{item.description}</div>
                       </div>
                     </div>
-                    <span className="font-mono text-sm text-muted-foreground">{location.latency}</span>
+                    <span className={`font-mono text-sm transition-all duration-300 ${
+                      activeLevel === index ? "text-foreground font-bold text-base" : "text-muted-foreground"
+                    }`}>
+                      {activeLevel === index ? "50%" : item.distribution}
+                    </span>
                   </div>
                 ))}
               </div>

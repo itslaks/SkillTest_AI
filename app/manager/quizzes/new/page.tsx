@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -40,7 +40,7 @@ export default function NewQuizPage() {
   const [questionCount, setQuestionCount] = useState(10)
   const [topic, setTopic] = useState('')
 
-  const distribution = getDistribution(difficulty, questionCount)
+  const distribution = useMemo(() => getDistribution(difficulty, questionCount), [difficulty, questionCount])
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()

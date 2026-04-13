@@ -5,38 +5,21 @@ import { useEffect, useRef, useState } from "react";
 const steps = [
   {
     number: "I",
-    title: "Connect your tools",
-    description: "Integrate with your existing stack in minutes. We support 200+ data sources out of the box.",
-    code: `import { optimus } from '@optimus/core'
-
-optimus.connect({
-  source: 'your-database',
-  sync: true
-})`,
+    title: "Upload your team",
+    description: "Managers upload an Excel file with employee email, name, and domain. The system automatically categorizes employees based on their domain.",
+    detail: "Supported columns:\n• Employee Email\n• Full Name\n• Domain / Department\n\nAuto-categorization enabled",
   },
   {
     number: "II",
-    title: "Build your workflow",
-    description: "Design powerful automations with our visual builder or write code directly.",
-    code: `optimus.workflow('process', {
-  trigger: 'event',
-  actions: [
-    'validate',
-    'transform', 
-    'deliver'
-  ]
-})`,
+    title: "Create a quiz",
+    description: "Define the topic, select a difficulty level, set the number of questions, and attach a feedback form link. AI dynamically generates MCQs.",
+    detail: "Quiz Configuration:\n• Topic & Description\n• Difficulty Level\n• Question Count\n• Feedback Form URL\n• Time Limit (minutes)",
   },
   {
     number: "III",
-    title: "Ship to production",
-    description: "Deploy globally with zero configuration. Your app goes live in under 30 seconds.",
-    code: `optimus.deploy({
-  target: 'production',
-  regions: 'auto'
-})
-
-// Deployed to 12 regions`,
+    title: "Assess & rank",
+    description: "Employees take the test through a smooth, gamified interface. Scores are calculated automatically and a dynamic leaderboard is generated.",
+    detail: "After Completion:\n• Auto-scored results\n• Time-based tie-breaking\n• Dynamic leaderboard\n• Excel export available\n• Feedback form shown",
   },
 ];
 
@@ -88,7 +71,7 @@ export function HowItWorksSection() {
         <div className="mb-16 lg:mb-24">
           <span className="inline-flex items-center gap-3 text-sm font-mono text-background/50 mb-6">
             <span className="w-8 h-px bg-background/30" />
-            Process
+            How It Works
           </span>
           <h2
             className={`text-4xl lg:text-6xl font-display tracking-tight transition-all duration-700 ${
@@ -97,7 +80,7 @@ export function HowItWorksSection() {
           >
             Three steps.
             <br />
-            <span className="text-background/50">Infinite possibilities.</span>
+            <span className="text-background/50">Complete assessments.</span>
           </h2>
         </div>
 
@@ -141,7 +124,7 @@ export function HowItWorksSection() {
             ))}
           </div>
 
-          {/* Code display */}
+          {/* Detail display */}
           <div className="lg:sticky lg:top-32 self-start">
             <div className="border border-background/10 overflow-hidden">
               {/* Window header */}
@@ -151,13 +134,13 @@ export function HowItWorksSection() {
                   <div className="w-3 h-3 rounded-full bg-background/20" />
                   <div className="w-3 h-3 rounded-full bg-background/20" />
                 </div>
-                <span className="text-xs font-mono text-background/40">workflow.ts</span>
+                <span className="text-xs font-mono text-background/40">skilltest.config</span>
               </div>
 
-              {/* Code content */}
+              {/* Content */}
               <div className="p-8 font-mono text-sm min-h-[280px]">
                 <pre className="text-background/70">
-                  {steps[activeStep].code.split('\n').map((line, lineIndex) => (
+                  {steps[activeStep].detail.split('\n').map((line, lineIndex) => (
                     <div 
                       key={`${activeStep}-${lineIndex}`} 
                       className="leading-loose code-line-reveal"
@@ -165,7 +148,6 @@ export function HowItWorksSection() {
                         animationDelay: `${lineIndex * 80}ms`,
                       }}
                     >
-                      <span className="text-background/20 select-none w-8 inline-block">{lineIndex + 1}</span>
                       <span className="inline-flex">
                         {line.split('').map((char, charIndex) => (
                           <span

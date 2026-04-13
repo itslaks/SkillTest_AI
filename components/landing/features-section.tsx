@@ -5,35 +5,35 @@ import { useEffect, useRef, useState } from "react";
 const features = [
   {
     number: "01",
-    title: "Instant Deployment",
-    description: "Push to production in seconds. Our edge network ensures your applications load instantly, anywhere in the world.",
-    visual: "deploy",
-  },
-  {
-    number: "02",
-    title: "AI-Native Workflows",
-    description: "Build intelligent applications with built-in AI capabilities. From inference to training, everything scales automatically.",
+    title: "AI-Powered Questions",
+    description: "Dynamically generate MCQs with smart difficulty distribution — 50% from your chosen level, the remaining 50% evenly spread across easy, medium, hard, advanced, and hardcore tiers.",
     visual: "ai",
   },
   {
+    number: "02",
+    title: "Gamified Experience",
+    description: "Keep employees engaged with countdown timers, streak bonuses, point systems, animated badges, progress indicators, and instant feedback after every answer.",
+    visual: "deploy",
+  },
+  {
     number: "03",
-    title: "Real-time Collaboration",
-    description: "Work together seamlessly. Live preview, instant feedback, and version control that actually makes sense.",
+    title: "Smart Leaderboard",
+    description: "Dynamic rankings generated based on participant count. Ties are broken by completion time, ensuring fair and precise scoring for every assessment.",
     visual: "collab",
   },
   {
     number: "04",
-    title: "Enterprise Security",
-    description: "Bank-grade encryption, SOC 2 compliance, and granular access controls. Your data stays yours.",
+    title: "Excel Import & Export",
+    description: "Managers upload employee lists via Excel (email, name, domain) and download complete leaderboards with employee ID, score, and completion time.",
     visual: "security",
   },
 ];
 
-function DeployVisual() {
+function QuizVisual() {
   return (
     <svg viewBox="0 0 200 160" className="w-full h-full">
       <defs>
-        <clipPath id="deployClip">
+        <clipPath id="quizClip">
           <rect x="30" y="20" width="140" height="120" rx="4" />
         </clipPath>
       </defs>
@@ -41,8 +41,8 @@ function DeployVisual() {
       {/* Container */}
       <rect x="30" y="20" width="140" height="120" rx="4" fill="none" stroke="currentColor" strokeWidth="2" />
       
-      {/* Animated bars */}
-      <g clipPath="url(#deployClip)">
+      {/* Animated bars representing questions */}
+      <g clipPath="url(#quizClip)">
         {[0, 1, 2, 3, 4, 5].map((i) => (
           <rect
             key={i}
@@ -92,14 +92,16 @@ function AIVisual() {
       {[0, 1, 2, 3, 4, 5].map((i) => {
         const angle = (i * 60) * (Math.PI / 180);
         const radius = 50;
+        const cx = (100 + Math.cos(angle) * radius).toFixed(6);
+        const cy = (80 + Math.sin(angle) * radius).toFixed(6);
         return (
           <g key={i}>
             {/* Connection line */}
             <line
               x1="100"
               y1="80"
-              x2={100 + Math.cos(angle) * radius}
-              y2={80 + Math.sin(angle) * radius}
+              x2={cx}
+              y2={cy}
               stroke="currentColor"
               strokeWidth="1"
               opacity="0.3"
@@ -115,8 +117,8 @@ function AIVisual() {
             
             {/* Outer node */}
             <circle
-              cx={100 + Math.cos(angle) * radius}
-              cy={80 + Math.sin(angle) * radius}
+              cx={cx}
+              cy={cy}
               r="6"
               fill="none"
               stroke="currentColor"
@@ -143,20 +145,20 @@ function AIVisual() {
   );
 }
 
-function CollabVisual() {
+function LeaderboardVisual() {
   return (
     <svg viewBox="0 0 200 160" className="w-full h-full">
       {/* User A */}
       <g>
         <rect x="30" y="50" width="50" height="60" rx="4" fill="none" stroke="currentColor" strokeWidth="2" />
-        <text x="55" y="85" textAnchor="middle" fontSize="20" fontFamily="monospace" fill="currentColor">A</text>
+        <text x="55" y="85" textAnchor="middle" fontSize="20" fontFamily="monospace" fill="currentColor">1</text>
         <circle cx="55" cy="35" r="12" fill="none" stroke="currentColor" strokeWidth="2" />
       </g>
       
       {/* User B */}
       <g>
         <rect x="120" y="50" width="50" height="60" rx="4" fill="none" stroke="currentColor" strokeWidth="2" />
-        <text x="145" y="85" textAnchor="middle" fontSize="20" fontFamily="monospace" fill="currentColor">B</text>
+        <text x="145" y="85" textAnchor="middle" fontSize="20" fontFamily="monospace" fill="currentColor">2</text>
         <circle cx="145" cy="35" r="12" fill="none" stroke="currentColor" strokeWidth="2" />
       </g>
       
@@ -165,15 +167,7 @@ function CollabVisual() {
         <animate attributeName="stroke-dashoffset" values="0;-8" dur="0.5s" repeatCount="indefinite" />
       </line>
       
-      {/* Data packet */}
-      <circle r="4" fill="currentColor">
-        <animateMotion dur="1.5s" repeatCount="indefinite">
-          <mpath href="#dataPath" />
-        </animateMotion>
-      </circle>
-      <path id="dataPath" d="M 80 80 L 120 80" fill="none" />
-      
-      {/* Sync indicator */}
+      {/* Trophy */}
       <g transform="translate(100, 130)">
         <circle r="6" fill="none" stroke="currentColor" strokeWidth="2">
           <animate attributeName="r" values="6;10;6" dur="1s" repeatCount="indefinite" />
@@ -184,10 +178,10 @@ function CollabVisual() {
   );
 }
 
-function SecurityVisual() {
+function ExcelVisual() {
   return (
     <svg viewBox="0 0 200 160" className="w-full h-full">
-      {/* Shield */}
+      {/* Shield / Document */}
       <path
         d="M 100 20 L 150 40 L 150 90 Q 150 130 100 145 Q 50 130 50 90 L 50 40 Z"
         fill="none"
@@ -195,7 +189,7 @@ function SecurityVisual() {
         strokeWidth="2"
       />
       
-      {/* Inner shield */}
+      {/* Inner */}
       <path
         d="M 100 35 L 135 50 L 135 85 Q 135 115 100 128 Q 65 115 65 85 L 65 50 Z"
         fill="currentColor"
@@ -204,19 +198,11 @@ function SecurityVisual() {
         <animate attributeName="opacity" values="0.1;0.2;0.1" dur="2s" repeatCount="indefinite" />
       </path>
       
-      {/* Lock icon */}
-      <rect x="85" y="70" width="30" height="25" rx="3" fill="currentColor" />
-      <path
-        d="M 90 70 L 90 60 Q 90 50 100 50 Q 110 50 110 60 L 110 70"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
-      
-      {/* Keyhole */}
-      <circle cx="100" cy="80" r="4" fill="white" />
-      <rect x="98" y="82" width="4" height="8" fill="white" />
+      {/* Excel icon lines */}
+      <line x1="80" y1="65" x2="120" y2="65" stroke="currentColor" strokeWidth="2" />
+      <line x1="80" y1="80" x2="120" y2="80" stroke="currentColor" strokeWidth="2" />
+      <line x1="80" y1="95" x2="120" y2="95" stroke="currentColor" strokeWidth="2" />
+      <line x1="100" y1="55" x2="100" y2="105" stroke="currentColor" strokeWidth="2" />
       
       {/* Scan lines */}
       <line x1="60" y1="60" x2="140" y2="60" stroke="currentColor" strokeWidth="1" opacity="0">
@@ -231,15 +217,15 @@ function SecurityVisual() {
 function AnimatedVisual({ type }: { type: string }) {
   switch (type) {
     case "deploy":
-      return <DeployVisual />;
+      return <QuizVisual />;
     case "ai":
       return <AIVisual />;
     case "collab":
-      return <CollabVisual />;
+      return <LeaderboardVisual />;
     case "security":
-      return <SecurityVisual />;
+      return <ExcelVisual />;
     default:
-      return <DeployVisual />;
+      return <QuizVisual />;
   }
 }
 
@@ -323,16 +309,16 @@ export function FeaturesSection() {
         <div className="mb-16 lg:mb-24">
           <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-6">
             <span className="w-8 h-px bg-foreground/30" />
-            Capabilities
+            Platform Features
           </span>
           <h2
             className={`text-4xl lg:text-6xl font-display tracking-tight transition-all duration-700 ${
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             }`}
           >
-            Everything you need.
+            Everything you need
             <br />
-            <span className="text-muted-foreground">Nothing you don&apos;t.</span>
+            <span className="text-muted-foreground">to assess your team.</span>
           </h2>
         </div>
 

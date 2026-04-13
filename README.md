@@ -1,4 +1,4 @@
-# 🎯 AssessHub — Gamified Employee Assessment Platform
+# 🎯 SkillTest — Gamified Employee Assessment Platform
 
 A **web-based, highly interactive and gamified employee assessment platform** built with Next.js 16, Supabase, and AI-powered question generation.
 

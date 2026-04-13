@@ -21,9 +21,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'AssessHub - Employee Assessment Platform',
-  description: 'Create, manage, and analyze employee assessments with AI-powered question generation and gamification.',
-  generator: 'v0.app',
+  title: 'SkillTest - Gamified Employee Assessment Platform',
+  description: 'A highly interactive and gamified employee assessment platform with AI-powered MCQ generation, dynamic leaderboards, and Excel-based reporting.',
 }
 
 export default function RootLayout({

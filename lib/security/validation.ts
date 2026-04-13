@@ -85,7 +85,7 @@ export const signUpSchema = z
 
 export const signInSchema = z
   .object({
-    email: safeEmail,
+    email: safeEmail.or(sanitizedString(MAX_LEN)),
     password: safePassword,
     redirect: z
       .string()

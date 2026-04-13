@@ -65,7 +65,7 @@ function LoginContent() {
             <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
               <Sparkles className="w-6 h-6 text-primary-foreground" />
             </div>
-            <span className="text-2xl font-bold">AssessHub</span>
+            <span className="text-2xl font-bold">SkillTest</span>
           </Link>
           <h1 className="text-3xl font-bold tracking-tight">Welcome back</h1>
           <p className="text-muted-foreground mt-2">Sign in to your account to continue</p>
@@ -96,7 +96,7 @@ function LoginContent() {
                         <Input
                           id="email"
                           name="email"
-                          type="email"
+                          type="text"
                           placeholder="you@company.com"
                           required
                           className="pl-10"
@@ -162,7 +162,7 @@ function LoginContent() {
                           <Input
                             id="magic-email"
                             name="email"
-                            type="email"
+                            type="text"
                             placeholder="you@company.com"
                             required
                             className="pl-10"

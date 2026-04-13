@@ -6,27 +6,27 @@ import { Shield, Lock, Eye, FileCheck } from "lucide-react";
 const securityFeatures = [
   {
     icon: Shield,
-    title: "SOC 2 Type II",
-    description: "Independently audited security controls with continuous monitoring.",
+    title: "Data Privacy",
+    description: "Employee assessment results and personal data are encrypted and protected.",
   },
   {
     icon: Lock,
-    title: "End-to-end encryption",
-    description: "AES-256 encryption for data at rest and TLS 1.3 in transit.",
+    title: "Secure Access",
+    description: "Multi-layered authentication ensures only authorized managers can access reports.",
   },
   {
     icon: Eye,
-    title: "Zero-trust architecture",
-    description: "Every request is authenticated and authorized. No exceptions.",
+    title: "Audit Logs",
+    description: "Every action—from quiz creation to score modification—is tracked and logged.",
   },
   {
     icon: FileCheck,
-    title: "GDPR & HIPAA",
-    description: "Full compliance with data protection and healthcare regulations.",
+    title: "Compliance Ready",
+    description: "Built with standard data protection policies to keep your corporate data safe.",
   },
 ];
 
-const certifications = ["SOC 2", "ISO 27001", "HIPAA", "GDPR", "CCPA"];
+const highlights = ["Enterprise Grade", "Encrypted Data", "Privacy Focused", "Audit-Ready", "Secure Auth"];
 
 export function SecuritySection() {
   const [isVisible, setIsVisible] = useState(false);
@@ -56,29 +56,28 @@ export function SecuritySection() {
           >
             <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-6">
               <span className="w-8 h-px bg-foreground/30" />
-              Security
+              Security & Privacy
             </span>
             <h2 className="text-4xl lg:text-6xl font-display tracking-tight mb-8">
-              Trust is
+              Your data is
               <br />
-              non-negotiable.
+              safe with us.
             </h2>
             <p className="text-xl text-muted-foreground leading-relaxed mb-12">
-              Enterprise-grade security isn&apos;t optional. It&apos;s built into every layer 
-              of our platform, from infrastructure to application.
+              Corporate assessment data is sensitive. SkillTest is built with enterprise-grade security at every layer, ensuring your team&apos;s results stay private.
             </p>
 
-            {/* Certifications */}
+            {/* Highlights */}
             <div className="flex flex-wrap gap-3">
-              {certifications.map((cert, index) => (
+              {highlights.map((item, index) => (
                 <span
-                  key={cert}
+                  key={item}
                   className={`px-4 py-2 border border-foreground/10 text-sm font-mono transition-all duration-500 ${
                     isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
                   }`}
                   style={{ transitionDelay: `${index * 50 + 200}ms` }}
                 >
-                  {cert}
+                  {item}
                 </span>
               ))}
             </div>

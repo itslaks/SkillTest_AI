@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import { AnimatedSphere } from "./animated-sphere";
+import Link from "next/link";
 
-const words = ["create", "build", "scale", "ship"];
+const words = ["assess", "challenge", "rank", "grow"];
 
 export function HeroSection() {
   const [isVisible, setIsVisible] = useState(false);
@@ -64,7 +65,7 @@ export function HeroSection() {
         >
           <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground">
             <span className="w-8 h-px bg-foreground/30" />
-            The platform for modern teams
+            Gamified employee assessment platform
           </span>
         </div>
         
@@ -108,8 +109,8 @@ export function HeroSection() {
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             }`}
           >
-            Your toolkit to stop configuring and start innovating. 
-            Securely build, deploy, and scale the best experiences.
+            AI-powered MCQ generation, dynamic leaderboards, and gamified assessments. 
+            Upload your team, create quizzes, and watch engagement soar.
           </p>
           
           {/* CTAs */}
@@ -121,16 +122,20 @@ export function HeroSection() {
             <Button 
               size="lg" 
               className="bg-foreground hover:bg-foreground/90 text-background px-8 h-14 text-base rounded-full group"
+              asChild
             >
-              Start free trial
-              <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
+              <Link href="/auth/sign-up">
+                Get Started
+                <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
+              </Link>
             </Button>
             <Button 
               size="lg" 
               variant="outline" 
               className="h-14 px-8 text-base rounded-full border-foreground/20 hover:bg-foreground/5"
+              asChild
             >
-              Watch demo
+              <Link href="/auth/login">Sign In</Link>
             </Button>
           </div>
         </div>
@@ -147,10 +152,10 @@ export function HeroSection() {
           {[...Array(2)].map((_, i) => (
             <div key={i} className="flex gap-16">
               {[
-                { value: "20 days", label: "saved on builds", company: "NETFLIX" },
-                { value: "98%", label: "faster deployment", company: "STRIPE" },
-                { value: "300%", label: "throughput increase", company: "LINEAR" },
-                { value: "6x", label: "faster to ship", company: "NOTION" },
+                { value: "5 Levels", label: "difficulty tiers", company: "EASY → HARDCORE" },
+                { value: "50/50", label: "smart question split", company: "AI-POWERED" },
+                { value: "∞", label: "quiz possibilities", company: "DYNAMIC MCQ" },
+                { value: "Live", label: "leaderboard rankings", company: "REAL-TIME" },
               ].map((stat) => (
                 <div key={`${stat.company}-${i}`} className="flex items-baseline gap-4">
                   <span className="text-4xl lg:text-5xl font-display">{stat.value}</span>

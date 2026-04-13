@@ -49,19 +49,16 @@ export async function GET(
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // Build Excel data
+  // Build Excel data matching specific user request:
+  // s.no, Email, name, score, completion time
   const rows = (attempts || []).map((a: any, i: number) => ({
-    'Rank': i + 1,
-    'Employee ID': a.profiles?.employee_id || 'N/A',
-    'Name': a.profiles?.full_name || 'Unknown',
+    's.no': i + 1,
     'Email': a.profiles?.email || '',
-    'Department': a.profiles?.department || '',
-    'Score (%)': a.score,
-    'Correct Answers': a.correct_answers,
-    'Total Questions': a.total_questions,
-    'Time Taken (seconds)': a.time_taken_seconds,
-    'Time Taken (formatted)': formatTime(a.time_taken_seconds),
-    'Completed At': a.completed_at ? new Date(a.completed_at).toLocaleString() : '',
+    'name': a.profiles?.full_name || 'Unknown',
+    'score (%)': a.score,
+    'completion time': formatTime(a.time_taken_seconds),
+    // Optional/Secondary info can be further down or removed
+    'Employee ID': a.profiles?.employee_id || 'N/A',
   }))
 
   const wb = XLSX.utils.book_new()
@@ -69,8 +66,7 @@ export async function GET(
 
   // Set column widths
   ws['!cols'] = [
-    { wch: 6 }, { wch: 15 }, { wch: 25 }, { wch: 30 }, { wch: 20 },
-    { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 18 }, { wch: 22 },
+    { wch: 6 },  { wch: 30 }, { wch: 25 }, { wch: 12 }, { wch: 18 }, { wch: 15 }
   ]
 
   XLSX.utils.book_append_sheet(wb, ws, 'Leaderboard')

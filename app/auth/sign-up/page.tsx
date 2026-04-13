@@ -35,7 +35,7 @@ export default function SignUpPage() {
             <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
               <Sparkles className="w-6 h-6 text-primary-foreground" />
             </div>
-            <span className="text-2xl font-bold">AssessHub</span>
+            <span className="text-2xl font-bold">SkillTest</span>
           </Link>
           <h1 className="text-3xl font-bold tracking-tight">Create an account</h1>
           <p className="text-muted-foreground mt-2">Get started with your employee assessments</p>
