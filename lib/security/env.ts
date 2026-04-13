@@ -56,12 +56,18 @@ export function getSupabaseServiceRoleKey(): string {
  * Returns the site URL, falling back to localhost in development.
  */
 export function getSiteUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : 'http://localhost:3000'
-  )
+  // 1. Check for manual override (e.g., in production)
+  if (process.env.NEXT_PUBLIC_SITE_URL && !process.env.NEXT_PUBLIC_SITE_URL.includes('localhost')) {
+    return process.env.NEXT_PUBLIC_SITE_URL
+  }
+
+  // 2. Check for Vercel deployment URL
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`
+  }
+
+  // 3. Fallback to localhost for development
+  return process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
 }
 
 /**

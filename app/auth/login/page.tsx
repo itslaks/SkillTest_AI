@@ -9,8 +9,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { FieldGroup, Field, FieldLabel, FieldMessage } from '@/components/ui/field'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Spinner } from '@/components/ui/spinner'
-import { signIn, signInWithMagicLink } from '@/lib/actions/auth'
-import { Mail, Lock, Sparkles } from 'lucide-react'
+import { signIn, signInWithMagicLink, resendVerificationEmail } from '@/lib/actions/auth'
+import { Mail, Lock, Sparkles, AlertCircle, CheckCircle2 } from 'lucide-react'
 
 export default function LoginPage() {
   return (
@@ -25,12 +25,19 @@ export default function LoginPage() {
 function LoginContent() {
   const [error, setError] = useState<string | null>(null)
   const [magicLinkSent, setMagicLinkSent] = useState(false)
+  const [resendSuccess, setResendSuccess] = useState(false)
+  const [resendLoading, setResendLoading] = useState(false)
   const [isPending, startTransition] = useTransition()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirect')
+  const [email, setEmail] = useState('')
 
   async function handlePasswordLogin(formData: FormData) {
     setError(null)
+    setResendSuccess(false)
+    const emailValue = formData.get('email') as string
+    setEmail(emailValue)
+
     if (redirectTo) {
       formData.append('redirect', redirectTo)
     }
@@ -44,6 +51,7 @@ function LoginContent() {
 
   async function handleMagicLink(formData: FormData) {
     setError(null)
+    setResendSuccess(false)
     if (redirectTo) {
       formData.append('redirect', redirectTo)
     }
@@ -55,6 +63,26 @@ function LoginContent() {
         setMagicLinkSent(true)
       }
     })
+  }
+
+  async function handleResendEmail() {
+    if (!email) return
+    setResendLoading(true)
+    setError(null)
+    
+    try {
+      const result = await resendVerificationEmail(email)
+      if (result.error) {
+        setError(result.error)
+      } else {
+        setResendSuccess(true)
+        setError(null)
+      }
+    } catch (err) {
+      setError('Failed to resend verification email')
+    } finally {
+      setResendLoading(false)
+    }
   }
 
   return (
@@ -84,8 +112,27 @@ function LoginContent() {
               <form action={handlePasswordLogin}>
                 <CardContent className="space-y-4">
                   {error && (
-                    <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
-                      {error}
+                    <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md flex gap-2 items-start">
+                      <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                      <div className="flex flex-col gap-2">
+                        <span>{error}</span>
+                        {error.toLowerCase().includes('confirm') && (
+                          <Button 
+                            variant="link" 
+                            className="p-0 h-auto text-destructive underline justify-start font-medium"
+                            onClick={handleResendEmail}
+                            disabled={resendLoading}
+                          >
+                            {resendLoading ? 'Sending...' : 'Resend verification email'}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {resendSuccess && (
+                    <div className="p-3 text-sm text-green-600 bg-green-50 rounded-md flex gap-2 items-start dark:bg-green-900/10 dark:text-green-400">
+                      <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
+                      <span>Verification email sent! Please check your inbox.</span>
                     </div>
                   )}
                   <FieldGroup>

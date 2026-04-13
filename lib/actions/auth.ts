@@ -41,7 +41,7 @@ export async function signUp(formData: FormData) {
     return { error: error.message }
   }
 
-  redirect('/auth/sign-up-success')
+  redirect(`/auth/sign-up-success?email=${encodeURIComponent(email)}`)
 }
 
 export async function signIn(formData: FormData) {
@@ -166,6 +166,23 @@ export async function updateProfile(formData: FormData) {
       updated_at: new Date().toISOString(),
     })
     .eq('id', user.id)
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  return { success: true }
+}
+export async function resendVerificationEmail(email: string) {
+  const supabase = await createClient()
+
+  const { error } = await supabase.auth.resend({
+    type: 'signup',
+    email,
+    options: {
+      emailRedirectTo: getAuthRedirectUrl(),
+    },
+  })
 
   if (error) {
     return { error: error.message }
