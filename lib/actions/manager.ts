@@ -158,17 +158,35 @@ export async function assignQuizToEmployees(quizId: string, employeeIds: string[
     assigned_by: user.id,
   }))
 
-  // Upsert to avoid duplicates
-  const { data, error } = await supabase
-    .from('quiz_assignments')
-    .upsert(rows, { onConflict: 'quiz_id,user_id', ignoreDuplicates: true })
-    .select()
+  // Insert assignments one by one to handle duplicates gracefully
+  let successCount = 0
+  const errors: string[] = []
 
-  if (error) return { error: error.message }
+  for (const row of rows) {
+    const { error } = await supabase
+      .from('quiz_assignments')
+      .insert(row)
+
+    if (error) {
+      // Duplicate (unique constraint violation) is fine — count as success
+      if (error.code === '23505') {
+        successCount++
+      } else {
+        errors.push(`${row.user_id}: ${error.message}`)
+      }
+    } else {
+      successCount++
+    }
+  }
 
   revalidatePath('/manager/quizzes', 'layout')
   revalidatePath('/manager/employees', 'layout')
-  return { data, assigned: rows.length }
+
+  if (errors.length > 0) {
+    return { error: `Assigned ${successCount}/${rows.length}. Errors: ${errors.join('; ')}` }
+  }
+
+  return { data: true, assigned: successCount }
 }
 
 // ─── Unassign a quiz from an employee ─────────────────────────────────

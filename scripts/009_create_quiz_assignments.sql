@@ -25,9 +25,10 @@ CREATE POLICY "Managers can view assignments for their quizzes" ON public.quiz_a
     )
   );
 
--- Policy: Managers can create assignments
+-- Policy: Managers can create assignments (assigned_by must be the current user)
 CREATE POLICY "Managers can create assignments" ON public.quiz_assignments
   FOR INSERT WITH CHECK (
+    assigned_by = auth.uid() AND
     EXISTS (
       SELECT 1 FROM public.profiles p
       WHERE p.id = auth.uid() AND p.role IN ('manager', 'admin')

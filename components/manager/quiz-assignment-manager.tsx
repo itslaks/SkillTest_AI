@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -50,11 +51,12 @@ interface QuizAssignmentManagerProps {
 }
 
 export function QuizAssignmentManager({ quizzes, employees, assignments }: QuizAssignmentManagerProps) {
-  const [selectedQuiz, setSelectedQuiz] = useState<string>('')
+  const [selectedQuiz, setSelectedQuiz] = useState<string>(quizzes.length > 0 ? quizzes[0].id : '')
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([])
   const [isOpen, setIsOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const { toast } = useToast()
+  const router = useRouter()
 
   // Get assigned employee IDs for the selected quiz
   const assignedForQuiz = assignments
@@ -94,6 +96,7 @@ export function QuizAssignmentManager({ quizzes, employees, assignments }: QuizA
         })
         setSelectedEmployees([])
         setIsOpen(false)
+        router.refresh()
       }
     })
   }
@@ -105,6 +108,7 @@ export function QuizAssignmentManager({ quizzes, employees, assignments }: QuizA
         toast({ title: 'Error', description: result.error, variant: 'destructive' })
       } else {
         toast({ title: 'Unassigned', description: 'Quiz unassigned from employee.' })
+        router.refresh()
       }
     })
   }
