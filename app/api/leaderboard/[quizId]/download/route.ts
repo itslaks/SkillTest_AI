@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
 
@@ -26,15 +26,18 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
   }
 
+  // Use admin client to bypass RLS for data fetching
+  const adminClient = createAdminClient()
+
   // Get quiz info
-  const { data: quiz } = await supabase
+  const { data: quiz } = await adminClient
     .from('quizzes')
     .select('title')
     .eq('id', quizId)
     .single()
 
-  // Get leaderboard data
-  const { data: attempts, error } = await supabase
+  // Get leaderboard data with admin client (bypasses RLS)
+  const { data: attempts, error } = await adminClient
     .from('quiz_attempts')
     .select(`
       *,

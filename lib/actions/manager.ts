@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
 // ─── Import employees from parsed Excel data ─────────────────────────
@@ -83,7 +83,10 @@ export async function getEmployees() {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { error: 'Not authenticated', data: [] }
 
-  const { data: employees, error } = await supabase
+  // Use admin client to bypass RLS and get all employees with stats
+  const adminClient = createAdminClient()
+
+  const { data: employees, error } = await adminClient
     .from('profiles')
     .select('*, user_stats(*)')
     .eq('role', 'employee')
@@ -99,7 +102,10 @@ export async function getEmployeesByDomain() {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { error: 'Not authenticated', data: {} }
 
-  const { data: employees, error } = await supabase
+  // Use admin client to bypass RLS
+  const adminClient = createAdminClient()
+
+  const { data: employees, error } = await adminClient
     .from('profiles')
     .select('*')
     .eq('role', 'employee')

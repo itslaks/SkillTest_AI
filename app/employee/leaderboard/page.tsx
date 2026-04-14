@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Trophy, Medal, Flame, Star, Crown } from 'lucide-react'
@@ -7,8 +7,11 @@ export default async function LeaderboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
+  // Use admin client to bypass RLS for leaderboard data
+  const adminClient = createAdminClient()
+
   // Get global leaderboard from user_stats
-  const { data: leaderboard } = await supabase
+  const { data: leaderboard } = await adminClient
     .from('user_stats')
     .select('*, profiles:user_id(full_name, email, avatar_url, department, employee_id)')
     .order('total_points', { ascending: false })

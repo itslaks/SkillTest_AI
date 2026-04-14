@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { uuidSchema, submitQuizSchema } from '@/lib/security/validation'
 import type { SubmitQuizInput, LeaderboardEntry } from '@/lib/types/database'
@@ -210,9 +210,10 @@ export async function getQuizLeaderboard(quizId: string) {
   const idResult = uuidSchema.safeParse(quizId)
   if (!idResult.success) return { error: 'Invalid quiz ID' }
 
-  const supabase = await createClient()
+  // Use admin client to bypass RLS for leaderboard data
+  const adminClient = createAdminClient()
 
-  const { data: attempts, error } = await supabase
+  const { data: attempts, error } = await adminClient
     .from('quiz_attempts')
     .select(`
       *,

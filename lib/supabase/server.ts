@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
-import { getSupabaseUrl, getSupabaseAnonKey } from '@/lib/security/env'
+import { getSupabaseUrl, getSupabaseAnonKey, getSupabaseServiceRoleKey } from '@/lib/security/env'
 
 /**
  * Especially important if using Fluid compute: Don't put this client in a
@@ -31,5 +32,17 @@ export async function createClient() {
         },
       },
     },
+  )
+}
+
+/**
+ * Creates an admin client that bypasses RLS.
+ * USE WITH CAUTION - only for admin/manager operations that need to read all data.
+ * Always verify user permissions before using this client!
+ */
+export function createAdminClient() {
+  return createSupabaseClient(
+    getSupabaseUrl(),
+    getSupabaseServiceRoleKey()
   )
 }
