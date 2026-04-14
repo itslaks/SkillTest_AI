@@ -153,7 +153,7 @@ export function HeroSection() {
             <div key={i} className="flex gap-16">
               {[
                 { value: "5 Levels", label: "difficulty tiers", company: "EASY → HARDCORE" },
-                { value: "50/50", label: "smart question split", company: "AI-POWERED" },
+                { value: "70/30", label: "smart question split", company: "AI-POWERED" },
                 { value: "∞", label: "quiz possibilities", company: "DYNAMIC MCQ" },
                 { value: "Live", label: "leaderboard rankings", company: "REAL-TIME" },
               ].map((stat) => (

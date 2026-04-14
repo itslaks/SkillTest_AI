@@ -43,8 +43,8 @@ export default function SignUpPage() {
         <Card>
           <form action={handleSignUp}>
             <CardHeader>
-              <CardTitle>Sign Up</CardTitle>
-              <CardDescription>Fill in your details to create your account</CardDescription>
+              <CardTitle>Employee Registration</CardTitle>
+              <CardDescription>Enter your details to create your assessment account</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {error && (
@@ -61,25 +61,26 @@ export default function SignUpPage() {
                       id="fullName"
                       name="fullName"
                       type="text"
-                      placeholder="John Doe"
+                      placeholder="Your full name"
                       required
                       className="pl-10"
                     />
                   </div>
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="email">Email</FieldLabel>
+                  <FieldLabel htmlFor="email">Work Email</FieldLabel>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       id="email"
                       name="email"
                       type="email"
-                      placeholder="you@company.com"
+                      placeholder="yourname@company.com"
                       required
                       className="pl-10"
                     />
                   </div>
+                  <FieldMessage>Use your official work email address</FieldMessage>
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="password">Password</FieldLabel>
@@ -89,23 +90,23 @@ export default function SignUpPage() {
                       id="password"
                       name="password"
                       type="password"
-                      placeholder="Create a strong password"
+                      placeholder="Create a secure password"
                       required
                       minLength={6}
                       className="pl-10"
                     />
                   </div>
-                  <FieldMessage>At least 6 characters</FieldMessage>
+                  <FieldMessage>Minimum 6 characters with letters and numbers</FieldMessage>
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="department">Department (Optional)</FieldLabel>
+                  <FieldLabel htmlFor="department">Department <span className="text-muted-foreground font-normal">(Optional)</span></FieldLabel>
                   <div className="relative">
                     <Building className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       id="department"
                       name="department"
                       type="text"
-                      placeholder="Engineering, Sales, etc."
+                      placeholder="e.g., Engineering, Marketing, HR"
                       className="pl-10"
                     />
                   </div>

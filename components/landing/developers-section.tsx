@@ -8,8 +8,8 @@ const managerCapabilities = [
     label: "Step 1: Import",
     code: `// Manager uploads Excel
 const employeeList = [
-  { name: "John Doe", email: "john@company.com", domain: "Tech" },
-  { name: "Jane Smith", email: "jane@company.com", domain: "HR" }
+  { name: "Amit Sharma", email: "amit.sharma@yourcompany.com", domain: "Tech" },
+  { name: "Neha Patel", email: "neha.patel@yourcompany.com", domain: "HR" }
 ]
 
 // System auto-categorizes by domain`,

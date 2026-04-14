@@ -6,7 +6,7 @@ const features = [
   {
     number: "01",
     title: "AI-Powered Questions",
-    description: "Dynamically generate MCQs with smart difficulty distribution — 50% from your chosen level, the remaining 50% evenly spread across easy, medium, hard, advanced, and hardcore tiers.",
+    description: "Dynamically generate MCQs with intelligent difficulty distribution — 70% from your chosen level, with the remaining 30% spread across adjacent difficulty tiers for comprehensive assessment.",
     visual: "ai",
   },
   {
