@@ -35,7 +35,7 @@ export async function GET(
     // Get leaderboard data - fetch attempts first
     const { data: attempts, error: attemptsError } = await dataClient
       .from('quiz_attempts')
-      .select('id, user_id, score, time_taken_seconds, completed_at')
+      .select('id, user_id, score, correct_answers, total_questions, time_taken_seconds, points_earned, completed_at')
       .eq('quiz_id', quizId)
       .eq('status', 'completed')
       .order('score', { ascending: false })
@@ -66,17 +66,23 @@ export async function GET(
       }
     }
 
-    // Build Excel data
+    // Build Excel data with full details
     const rows = (attempts || []).map((a: any, i: number) => {
       const profile = profilesMap[a.user_id] || {}
+      const mins = Math.floor((a.time_taken_seconds || 0) / 60)
+      const secs = (a.time_taken_seconds || 0) % 60
       return {
-        'S.No': i + 1,
+        'Rank': i + 1,
+        'Employee Name': profile.full_name || 'Unknown',
         'Email': profile.email || 'N/A',
-        'Name': profile.full_name || 'Unknown',
-        'Score (%)': a.score || 0,
-        'Completion Time': formatTime(a.time_taken_seconds),
         'Employee ID': profile.employee_id || 'N/A',
         'Department': profile.department || 'N/A',
+        'Score (%)': a.score || 0,
+        'Correct Answers': a.correct_answers || 0,
+        'Total Questions': a.total_questions || 0,
+        'Completion Time': `${mins}m ${secs}s`,
+        'Points Earned': a.points_earned || 0,
+        'Completed At': a.completed_at ? new Date(a.completed_at).toLocaleString() : 'N/A',
       }
     })
 
@@ -85,13 +91,23 @@ export async function GET(
 
     // Set column widths
     ws['!cols'] = [
-      { wch: 6 },  { wch: 30 }, { wch: 25 }, { wch: 12 }, { wch: 18 }, { wch: 15 }, { wch: 20 }
+      { wch: 6 },  // Rank
+      { wch: 25 }, // Name
+      { wch: 30 }, // Email
+      { wch: 15 }, // Employee ID
+      { wch: 20 }, // Department
+      { wch: 12 }, // Score
+      { wch: 16 }, // Correct Answers
+      { wch: 16 }, // Total Questions
+      { wch: 18 }, // Time
+      { wch: 14 }, // Points
+      { wch: 22 }, // Completed At
     ]
 
-    XLSX.utils.book_append_sheet(wb, ws, 'Leaderboard')
+    XLSX.utils.book_append_sheet(wb, ws, 'Quiz Report')
     const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
 
-    const filename = `leaderboard-${quiz?.title?.replace(/[^a-zA-Z0-9]/g, '-') || quizId}.xlsx`
+    const filename = `quiz-report-${quiz?.title?.replace(/[^a-zA-Z0-9]/g, '-') || quizId}.xlsx`
 
     return new NextResponse(buffer, {
       headers: {

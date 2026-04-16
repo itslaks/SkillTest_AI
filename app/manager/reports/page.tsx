@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
+import { requireManager } from '@/lib/rbac'
 import { getQuizStats, getQuizzes } from '@/lib/actions/quiz'
 import { getEmployees } from '@/lib/actions/manager'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -20,9 +20,9 @@ import {
 } from 'lucide-react'
 
 export default async function ManagerReportsPage() {
+  const { userId } = await requireManager()
+
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/auth/login')
 
   const [statsRes, quizzesRes, employeesRes] = await Promise.all([
     getQuizStats(),
@@ -167,91 +167,104 @@ export default async function ManagerReportsPage() {
         </Card>
       </div>
 
-      {/* Per-Quiz Performance */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      {/* Per-Quiz Reports - individual cards with download */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold flex items-center gap-2">
             <BarChart3 className="h-5 w-5" />
-            Quiz Performance
-          </CardTitle>
-          <CardDescription>Breakdown by individual quiz</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {quizzes.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">No quizzes created yet.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/50">
-                    <th className="text-left p-3 font-medium">Quiz</th>
-                    <th className="text-left p-3 font-medium">Difficulty</th>
-                    <th className="text-left p-3 font-medium">Attempts</th>
-                    <th className="text-left p-3 font-medium">Avg Score</th>
-                    <th className="text-left p-3 font-medium">Pass Rate</th>
-                    <th className="text-left p-3 font-medium">Status</th>
-                    <th className="text-left p-3 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {quizzes.map((quiz: any) => {
-                    const data = quizAttemptData[quiz.id]
-                    return (
-                      <tr key={quiz.id} className="border-b hover:bg-muted/30 transition-colors">
-                        <td className="p-3 font-medium">{quiz.title}</td>
-                        <td className="p-3">
-                          <Badge variant="outline" className="text-xs">{quiz.difficulty}</Badge>
-                        </td>
-                        <td className="p-3">{data?.attempts || 0}</td>
-                        <td className="p-3">
-                          {data ? (
-                            <span className={data.avgScore >= (quiz.passing_score || 70) ? 'text-green-600' : 'text-red-500'}>
-                              {data.avgScore}%
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </td>
-                        <td className="p-3">
-                          {data ? (
-                            <div className="flex items-center gap-2">
-                              <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
-                                <div
-                                  className={`h-full rounded-full ${data.passRate >= 70 ? 'bg-green-500' : data.passRate >= 40 ? 'bg-yellow-500' : 'bg-red-500'}`}
-                                  style={{ width: `${data.passRate}%` }}
-                                />
-                              </div>
-                              <span className="text-xs">{data.passRate}%</span>
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </td>
-                        <td className="p-3">
-                          <Badge variant={quiz.is_active ? 'default' : 'secondary'} className="text-xs">
-                            {quiz.is_active ? 'Active' : 'Inactive'}
-                          </Badge>
-                        </td>
-                        <td className="p-3">
-                          {data && data.attempts > 0 ? (
-                            <Button variant="ghost" size="sm" asChild className="h-8 px-2">
-                              <a href={`/api/leaderboard/${quiz.id}/download`} download>
-                                <Download className="h-4 w-4" />
-                              </a>
-                            </Button>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            Per-Quiz Reports
+          </h2>
+          <p className="text-sm text-muted-foreground">Download individual Excel reports for each quiz</p>
+        </div>
+
+        {quizzes.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <FileQuestion className="h-12 w-12 mx-auto text-muted-foreground opacity-40 mb-3" />
+              <p className="text-muted-foreground">No quizzes created yet.</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {quizzes.map((quiz: any) => {
+              const data = quizAttemptData[quiz.id]
+              const hasAttempts = data && data.attempts > 0
+              const difficultyColors: Record<string, string> = {
+                easy: 'bg-green-100 text-green-700 border-green-200',
+                medium: 'bg-blue-100 text-blue-700 border-blue-200',
+                hard: 'bg-amber-100 text-amber-700 border-amber-200',
+                advanced: 'bg-orange-100 text-orange-700 border-orange-200',
+                hardcore: 'bg-red-100 text-red-700 border-red-200',
+              }
+              return (
+                <Card key={quiz.id} className="flex flex-col">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-base truncate">{quiz.title}</CardTitle>
+                        <CardDescription className="truncate mt-0.5">{quiz.topic}</CardDescription>
+                      </div>
+                      <Badge variant="outline" className={`shrink-0 text-xs ${difficultyColors[quiz.difficulty] || ''}`}>
+                        {quiz.difficulty}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="flex-1 space-y-3">
+                    {/* Stats row */}
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="p-2 bg-muted/60 rounded-lg">
+                        <p className="text-lg font-bold">{data?.attempts || 0}</p>
+                        <p className="text-[10px] text-muted-foreground">Attempts</p>
+                      </div>
+                      <div className="p-2 bg-muted/60 rounded-lg">
+                        <p className={`text-lg font-bold ${hasAttempts ? (data.avgScore >= (quiz.passing_score || 70) ? 'text-green-600' : 'text-red-500') : ''}`}>
+                          {hasAttempts ? `${data.avgScore}%` : '—'}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">Avg Score</p>
+                      </div>
+                      <div className="p-2 bg-muted/60 rounded-lg">
+                        <p className={`text-lg font-bold ${hasAttempts ? (data.passRate >= 70 ? 'text-green-600' : data.passRate >= 40 ? 'text-amber-600' : 'text-red-500') : ''}`}>
+                          {hasAttempts ? `${data.passRate}%` : '—'}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">Pass Rate</p>
+                      </div>
+                    </div>
+
+                    {/* Pass rate bar */}
+                    {hasAttempts && (
+                      <div className="space-y-1">
+                        <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${data.passRate >= 70 ? 'bg-green-500' : data.passRate >= 40 ? 'bg-amber-500' : 'bg-red-500'}`}
+                            style={{ width: `${data.passRate}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Status + Download */}
+                    <div className="flex items-center justify-between pt-1">
+                      <Badge variant={quiz.is_active ? 'default' : 'secondary'} className="text-xs">
+                        {quiz.is_active ? '● Active' : '○ Inactive'}
+                      </Badge>
+                      {hasAttempts ? (
+                        <Button size="sm" variant="outline" asChild className="h-8 gap-1.5 text-xs font-semibold border-blue-300 text-blue-700 hover:bg-blue-50">
+                          <a href={`/api/leaderboard/${quiz.id}/download`} download>
+                            <Download className="h-3.5 w-3.5" />
+                            Download Report
+                          </a>
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">No data yet</span>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Domain Distribution */}
       <div className="grid gap-4 md:grid-cols-2">
