@@ -13,6 +13,10 @@ import {
   XCircle,
   Sparkles,
   BarChart3,
+  Trophy,
+  Brain,
+  Upload,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { getQuizStats } from '@/lib/actions/quiz'
 
@@ -147,7 +151,7 @@ export default async function ManagerDashboard() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
         <Link href="/manager/quizzes" className="group">
           <Card className="h-full hover:shadow-lg hover:border-primary/50 transition-all cursor-pointer">
             <CardContent className="pt-6 flex items-center gap-4">
@@ -156,7 +160,7 @@ export default async function ManagerDashboard() {
               </div>
               <div>
                 <h3 className="font-semibold group-hover:text-primary transition-colors">Manage Quizzes</h3>
-                <p className="text-sm text-muted-foreground">View and edit your assessments</p>
+                <p className="text-sm text-muted-foreground">View and edit assessments</p>
               </div>
               <ArrowRight className="ml-auto h-5 w-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
             </CardContent>
@@ -170,21 +174,49 @@ export default async function ManagerDashboard() {
               </div>
               <div>
                 <h3 className="font-semibold group-hover:text-primary transition-colors">Employees</h3>
-                <p className="text-sm text-muted-foreground">Import and assign quizzes</p>
+                <p className="text-sm text-muted-foreground">Import and assign</p>
               </div>
               <ArrowRight className="ml-auto h-5 w-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/manager/leaderboard" className="group">
+          <Card className="h-full hover:shadow-lg hover:border-yellow-500/50 transition-all cursor-pointer border-yellow-200/50">
+            <CardContent className="pt-6 flex items-center gap-4">
+              <div className="p-3 rounded-xl bg-yellow-500/10 group-hover:bg-yellow-500/20 transition-colors">
+                <Trophy className="h-6 w-6 text-yellow-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold group-hover:text-yellow-600 transition-colors">Leaderboard</h3>
+                <p className="text-sm text-muted-foreground">Rankings & scores</p>
+              </div>
+              <ArrowRight className="ml-auto h-5 w-5 text-muted-foreground group-hover:text-yellow-600 group-hover:translate-x-1 transition-all" />
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/manager/analytics" className="group">
+          <Card className="h-full hover:shadow-lg hover:border-purple-500/50 transition-all cursor-pointer border-purple-200/50">
+            <CardContent className="pt-6 flex items-center gap-4">
+              <div className="p-3 rounded-xl bg-purple-500/10 group-hover:bg-purple-500/20 transition-colors">
+                <Brain className="h-6 w-6 text-purple-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold group-hover:text-purple-600 transition-colors">Analytics & AI</h3>
+                <p className="text-sm text-muted-foreground">Import & analyze</p>
+              </div>
+              <ArrowRight className="ml-auto h-5 w-5 text-muted-foreground group-hover:text-purple-600 group-hover:translate-x-1 transition-all" />
             </CardContent>
           </Card>
         </Link>
         <Link href="/manager/reports" className="group">
           <Card className="h-full hover:shadow-lg hover:border-primary/50 transition-all cursor-pointer">
             <CardContent className="pt-6 flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-purple-500/10 group-hover:bg-purple-500/20 transition-colors">
-                <BarChart3 className="h-6 w-6 text-purple-600" />
+              <div className="p-3 rounded-xl bg-orange-500/10 group-hover:bg-orange-500/20 transition-colors">
+                <BarChart3 className="h-6 w-6 text-orange-600" />
               </div>
               <div>
                 <h3 className="font-semibold group-hover:text-primary transition-colors">Reports</h3>
-                <p className="text-sm text-muted-foreground">Analytics and exports</p>
+                <p className="text-sm text-muted-foreground">Detailed analytics</p>
               </div>
               <ArrowRight className="ml-auto h-5 w-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
             </CardContent>

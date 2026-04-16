@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { updateQuiz, updateQuestion, deleteQuestion, createQuestion } from '@/lib/actions/quiz'
 import type { Quiz, Question, DifficultyLevel, CreateQuestionInput } from '@/lib/types/database'
-import { Save, Trash2, Plus, CheckCircle2, XCircle, ChevronDown, ChevronUp } from 'lucide-react'
+import { Save, Trash2, Plus, CheckCircle2, XCircle, ChevronDown, ChevronUp, Clock } from 'lucide-react'
 import { ContentQuestionGenerator } from './content-question-generator'
 import { QuizImporter } from './quiz-importer'
 
@@ -231,6 +231,37 @@ export function QuizEditor({ quiz: initialQuiz, questions: initialQuestions }: Q
             />
             <p className="text-xs text-muted-foreground">
               Employees will be required to click this link after completing the quiz to exit.
+            </p>
+          </div>
+
+          {/* Quiz Scheduling */}
+          <div className="space-y-3 p-4 bg-blue-500/5 rounded-2xl border border-blue-500/10">
+            <Label className="text-base font-bold flex items-center gap-2">
+              <Clock className="h-5 w-5 text-blue-500" />
+              Quiz Scheduling
+            </Label>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label className="text-sm">Start Date & Time</Label>
+                <Input 
+                  type="datetime-local"
+                  className="h-12 rounded-xl"
+                  value={quiz.starts_at ? new Date(quiz.starts_at).toISOString().slice(0, 16) : ''} 
+                  onChange={e => handleQuizChange('starts_at', e.target.value ? new Date(e.target.value).toISOString() : null)} 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm">End Date & Time (Deadline)</Label>
+                <Input 
+                  type="datetime-local"
+                  className="h-12 rounded-xl"
+                  value={quiz.ends_at ? new Date(quiz.ends_at).toISOString().slice(0, 16) : ''} 
+                  onChange={e => handleQuizChange('ends_at', e.target.value ? new Date(e.target.value).toISOString() : null)} 
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Set a deadline for the quiz. After the end date, you can import assessment data for AI analysis.
             </p>
           </div>
 

@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import { Plus, FileQuestion, MoreHorizontal, Pencil, Trash2, Eye, Power, Upload } from 'lucide-react'
+import { Plus, FileQuestion, MoreHorizontal, Pencil, Trash2, Eye, Power, Upload, Trophy, FileSpreadsheet } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,6 +46,12 @@ export default async function QuizzesPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/manager/leaderboard">
+              <Trophy className="mr-2 h-4 w-4" />
+              Leaderboards
+            </Link>
+          </Button>
           <Button asChild>
             <Link href="/manager/quizzes/new">
               <Plus className="mr-2 h-4 w-4" />
@@ -55,17 +61,39 @@ export default async function QuizzesPage() {
         </div>
       </div>
 
-      {/* Info about importing */}
-      <Card className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 border-amber-200 dark:border-amber-800">
-        <CardContent className="pt-4 pb-4">
-          <div className="flex items-center gap-3">
-            <Upload className="h-5 w-5 text-amber-600" />
-            <p className="text-sm text-amber-800 dark:text-amber-200">
-              <strong>Tip:</strong> You can import questions from Excel when editing a quiz. Create a quiz first, then use the &ldquo;Import Questions from Excel&rdquo; feature in the quiz editor.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Quick Actions Cards */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 border-amber-200 dark:border-amber-800">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30">
+                <Upload className="h-5 w-5 text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-medium text-amber-800 dark:text-amber-200">Import Questions from Excel</h3>
+                <p className="text-sm text-amber-700/80 dark:text-amber-300/80">
+                  Create a quiz first, then use the &ldquo;Import Questions&rdquo; feature in the quiz editor.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-r from-purple-50 to-violet-50 dark:from-purple-950/20 dark:to-violet-950/20 border-purple-200 dark:border-purple-800">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30">
+                <FileSpreadsheet className="h-5 w-5 text-purple-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-medium text-purple-800 dark:text-purple-200">Analyze Assessment Data</h3>
+                <p className="text-sm text-purple-700/80 dark:text-purple-300/80">
+                  Go to <Link href="/manager/analytics" className="underline font-medium">Analytics & AI</Link> to import CSV results and chat with AI.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {quizzes && quizzes.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

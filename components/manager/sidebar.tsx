@@ -14,6 +14,8 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  Trophy,
+  Brain,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -28,6 +30,8 @@ const navigation = [
   { name: 'Dashboard', href: '/manager', icon: LayoutDashboard },
   { name: 'Quizzes', href: '/manager/quizzes', icon: FileQuestion },
   { name: 'Employees', href: '/manager/employees', icon: Users },
+  { name: 'Leaderboard', href: '/manager/leaderboard', icon: Trophy },
+  { name: 'Analytics & AI', href: '/manager/analytics', icon: Brain },
   { name: 'Reports', href: '/manager/reports', icon: BarChart3 },
   { name: 'Settings', href: '/manager/settings', icon: Settings },
 ]

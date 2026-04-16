@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
-import { Clock, FileQuestion, CheckCircle2, ArrowRight } from 'lucide-react'
+import { Clock, FileQuestion, CheckCircle2, ArrowRight, Trophy } from 'lucide-react'
 
 const difficultyColors: Record<string, string> = {
   easy: 'bg-green-100 text-green-700',
@@ -82,7 +82,7 @@ export default async function EmployeeQuizzesPage() {
 
 function QuizCard({ quiz, status }: { quiz: any; status: string }) {
   return (
-    <Card className={`relative overflow-hidden transition-all hover:shadow-md ${status === 'completed' ? 'opacity-80' : ''}`}>
+    <Card className={`relative overflow-hidden transition-all hover:shadow-md ${status === 'completed' ? 'opacity-90' : ''}`}>
       {status === 'completed' && (
         <div className="absolute top-3 right-3">
           <span className={`text-lg font-bold ${(quiz.attemptScore || 0) >= 70 ? 'text-green-600' : 'text-amber-600'}`}>
@@ -114,12 +114,21 @@ function QuizCard({ quiz, status }: { quiz: any; status: string }) {
           </span>
         </div>
 
-        <Button className="w-full" variant={status === 'completed' ? 'outline' : 'default'} asChild>
-          <Link href={status === 'completed' ? `/employee/quizzes/${quiz.id}/results` : `/employee/quizzes/${quiz.id}`}>
-            {status === 'completed' ? 'View Results' : status === 'in_progress' ? 'Continue Quiz' : 'Start Quiz'}
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button className="flex-1" variant={status === 'completed' ? 'outline' : 'default'} asChild>
+            <Link href={status === 'completed' ? `/employee/quizzes/${quiz.id}/results` : `/employee/quizzes/${quiz.id}`}>
+              {status === 'completed' ? 'View Results' : status === 'in_progress' ? 'Continue Quiz' : 'Start Quiz'}
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          </Button>
+          {status === 'completed' && (
+            <Button variant="secondary" size="icon" asChild title="View Leaderboard">
+              <Link href={`/employee/quizzes/${quiz.id}/leaderboard`}>
+                <Trophy className="h-4 w-4 text-yellow-600" />
+              </Link>
+            </Button>
+          )}
+        </div>
       </CardContent>
     </Card>
   )

@@ -6,12 +6,13 @@ import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import {
   ArrowLeft, Download, Users, Clock, Trophy, CheckCircle2, XCircle,
-  FileQuestion, Pencil, ClipboardList,
+  FileQuestion, Pencil, ClipboardList, Brain,
 } from 'lucide-react'
 import { getQuizLeaderboard } from '@/lib/actions/employee'
 import { getQuizAssignments, getEmployees } from '@/lib/actions/manager'
 import { QuizToggleActive } from '@/components/manager/quiz-toggle-active'
 import { QuizAssignmentManager } from '@/components/manager/quiz-assignment-manager'
+import { AssessmentAnalyzer } from '@/components/manager/assessment-analyzer'
 
 const difficultyColors: Record<string, string> = {
   easy: 'bg-green-100 text-green-700',
@@ -189,6 +190,9 @@ export default async function QuizDetailPage({ params }: { params: Promise<{ id:
           )}
         </CardContent>
       </Card>
+
+      {/* Assessment Data Analyzer */}
+      <AssessmentAnalyzer quizId={quizId} quizTitle={quiz.title} />
 
       {/* Questions Section */}
       <Card>

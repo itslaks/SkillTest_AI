@@ -141,6 +141,8 @@ export const createQuizSchema = z
     question_count: z.number().int().min(1).max(500),
     passing_score: z.number().int().min(0).max(100),
     feedback_form_url: optionalSafeUrl,
+    starts_at: z.string().datetime().optional().nullable().or(z.literal('').transform(() => null)),
+    ends_at: z.string().datetime().optional().nullable().or(z.literal('').transform(() => null)),
   })
   .strict()
 

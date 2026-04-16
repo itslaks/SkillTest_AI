@@ -1,0 +1,6 @@
+question_text,option_a,option_b,option_c,option_d,correct_answer,difficulty,explanation
+"What is Git?","A version control system","A programming language","A database","An operating system",A,easy,"Git is a distributed version control system for tracking changes in source code."
+"What command creates a new Git repository?","git init","git start","git create","git new",A,easy,"git init initializes a new Git repository in the current directory."
+"Which command stages changes for commit?","git stage","git add","git commit","git push",B,easy,"git add stages changes to be included in the next commit."
+"What does 'git clone' do?","Deletes a repository","Creates a copy of a repository","Merges branches","Creates a new branch",B,medium,"git clone creates a local copy of a remote repository."
+"What is a Git branch?","A copy of the entire repository","A lightweight movable pointer to commits","A backup of your files","A remote server",B,medium,"A branch in Git is a lightweight movable pointer that points to a specific commit."

@@ -157,6 +157,66 @@ export interface EmployeeImportRecord {
   error_log: any[] | null
   created_at: string
 }
+
+// Assessment Import types
+export interface AssessmentImport {
+  id: string
+  quiz_id: string | null
+  uploaded_by: string
+  file_name: string
+  total_records: number
+  status: 'processing' | 'completed' | 'failed'
+  created_at: string
+  updated_at: string
+}
+
+export interface AssessmentResult {
+  id: string
+  import_id: string
+  quiz_id: string | null
+  candidate_id: string | null
+  candidate_name: string
+  candidate_email: string
+  test_id: string | null
+  test_name: string | null
+  test_status: string | null
+  test_score: number
+  candidate_score: number
+  negative_points: number
+  percentage: number
+  performance_category: string | null
+  percentile: number
+  total_questions: number
+  answered: number
+  not_answered: number
+  correct: number
+  wrong: number
+  test_duration_minutes: number
+  time_taken_minutes: number
+  proctoring_flag: string | null
+  window_violation: number
+  time_violation_seconds: number
+  candidate_feedback: string | null
+  created_at: string
+}
+
+export interface AIChatSession {
+  id: string
+  user_id: string
+  quiz_id: string | null
+  title: string
+  created_at: string
+  updated_at: string
+}
+
+export interface AIChatMessage {
+  id: string
+  session_id: string
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  created_at: string
+}
+
 export interface CreateQuizInput {
   title: string
   description?: string
@@ -166,6 +226,8 @@ export interface CreateQuizInput {
   question_count: number
   passing_score?: number
   feedback_form_url?: string
+  starts_at?: string | null
+  ends_at?: string | null
 }
 
 export interface CreateQuestionInput {
