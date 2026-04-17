@@ -22,8 +22,10 @@ const difficultyColors: Record<string, string> = {
   hardcore: 'bg-red-100 text-red-700',
 }
 
-export default async function QuizDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function QuizDetailPage({ params, searchParams }: { params: Promise<{ id: string }>, searchParams: Promise<{ assign?: string }> }) {
   const { id: quizId } = await params
+  const { assign } = await searchParams
+  const autoOpenAssign = assign === '1'
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -158,6 +160,7 @@ export default async function QuizDetailPage({ params }: { params: Promise<{ id:
           department: e.department,
         }))}
         assignments={assignmentData || []}
+        autoOpen={autoOpenAssign}
       />
 
       {/* Leaderboard Section */}

@@ -134,7 +134,13 @@ export async function getImportHistory() {
 export async function assignQuizToEmployees(quizId: string, employeeIds: string[]) {
   const { userId } = await requireManager()
 
-  const supabase = await createClient()
+  // Use admin client to bypass RLS which can cause infinite recursion on profiles policy
+  let supabase: any
+  try {
+    supabase = createAdminClient()
+  } catch {
+    supabase = await createClient()
+  }
 
   // Build assignment rows
   const rows = employeeIds.map((empId) => ({

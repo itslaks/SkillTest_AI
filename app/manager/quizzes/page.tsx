@@ -1,15 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import { Plus, FileQuestion, MoreHorizontal, Pencil, Trash2, Eye, Power, Upload, Trophy, FileSpreadsheet, FileText, Sparkles } from 'lucide-react'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { Plus, FileQuestion, Pencil, Upload, Trophy, Download, Users, Clock, CheckCircle2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { QuizToggleActive } from '@/components/manager/quiz-toggle-active'
 import { QuizDeleteButton } from '@/components/manager/quiz-delete-button'
@@ -20,16 +12,12 @@ export default async function QuizzesPage() {
 
   const { data: quizzes } = await supabase
     .from('quizzes')
-    .select(`
-      *,
-      questions(count),
-      quiz_attempts(count)
-    `)
+    .select(`*, questions(count), quiz_attempts(count)`)
     .eq('created_by', user?.id)
     .order('created_at', { ascending: false })
 
   const difficultyColors: Record<string, string> = {
-    easy: 'bg-green-100 text-green-700',
+    easy: 'bg-emerald-100 text-emerald-700',
     medium: 'bg-blue-100 text-blue-700',
     hard: 'bg-amber-100 text-amber-700',
     advanced: 'bg-orange-100 text-orange-700',
@@ -40,178 +28,104 @@ export default async function QuizzesPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Quizzes</h1>
-          <p className="text-muted-foreground">
-            Create and manage your employee assessments
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">Quizzes</h1>
+          <p className="text-sm text-muted-foreground mt-1">Create, assign, and download reports in a few clicks</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" asChild>
+          <Button variant="outline" size="sm" className="rounded-xl h-9" asChild>
             <Link href="/manager/leaderboard">
-              <Trophy className="mr-2 h-4 w-4" />
-              Leaderboards
+              <Trophy className="mr-2 h-4 w-4" />Leaderboards
             </Link>
           </Button>
-          <Button asChild>
+          <Button size="sm" className="rounded-xl h-9 bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 border-0" asChild>
             <Link href="/manager/quizzes/new">
-              <Plus className="mr-2 h-4 w-4" />
-              Create Quiz
+              <Plus className="mr-2 h-4 w-4" />Create Quiz
             </Link>
           </Button>
         </div>
-      </div>
-
-      {/* Quick Actions Cards - Upload Features */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/20 dark:to-purple-950/20 border-violet-200 dark:border-violet-800">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-violet-100 dark:bg-violet-900/30">
-                <FileText className="h-5 w-5 text-violet-600" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-medium text-violet-800 dark:text-violet-200">PDF/DOCX Upload</h3>
-                <p className="text-sm text-violet-700/80 dark:text-violet-300/80">
-                  Create a quiz, then click &quot;Edit Quiz&quot; to upload PDF/DOCX and generate questions with AI.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 border-amber-200 dark:border-amber-800">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30">
-                <Upload className="h-5 w-5 text-amber-600" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-medium text-amber-800 dark:text-amber-200">Excel Import</h3>
-                <p className="text-sm text-amber-700/80 dark:text-amber-300/80">
-                  Import questions from Excel (.xlsx) in the quiz editor.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-gradient-to-r from-purple-50 to-violet-50 dark:from-purple-950/20 dark:to-violet-950/20 border-purple-200 dark:border-purple-800">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30">
-                <Sparkles className="h-5 w-5 text-purple-600" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-medium text-purple-800 dark:text-purple-200">AI Analytics</h3>
-                <p className="text-sm text-purple-700/80 dark:text-purple-300/80">
-                  <Link href="/manager/analytics" className="underline font-medium">Analytics & AI</Link> to analyze results.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {quizzes && quizzes.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {quizzes.map((quiz: any) => (
-            <Card key={quiz.id} className="relative">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0 pr-2">
-                    <CardTitle className="text-lg truncate">{quiz.title}</CardTitle>
-                    <CardDescription className="line-clamp-2 mt-1">
-                      {quiz.description || 'No description'}
-                    </CardDescription>
+            <div key={quiz.id} className="rounded-2xl bg-white border border-border/60 shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-shadow">
+              <div className="p-5 flex-1">
+                <div className="flex items-start justify-between gap-2 mb-3">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-base truncate">{quiz.title}</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{quiz.description || quiz.topic}</p>
                   </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem asChild>
-                        <Link href={`/manager/quizzes/${quiz.id}`}>
-                          <Eye className="mr-2 h-4 w-4" />
-                          View Details
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link href={`/manager/quizzes/${quiz.id}/edit`}>
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Edit Quiz
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link href={`/manager/quizzes/${quiz.id}/edit#upload`}>
-                          <Upload className="mr-2 h-4 w-4" />
-                          Upload Questions
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <QuizDeleteButton quizId={quiz.id} quizTitle={quiz.title} />
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="secondary" className={difficultyColors[quiz.difficulty]}>
-                    {quiz.difficulty}
-                  </Badge>
-                  <Badge variant="outline">{quiz.topic}</Badge>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-2 text-center text-sm">
-                  <div className="p-2 rounded-lg bg-muted">
-                    <p className="font-semibold">{quiz.questions?.[0]?.count || 0}</p>
-                    <p className="text-muted-foreground text-xs">Questions</p>
-                  </div>
-                  <div className="p-2 rounded-lg bg-muted">
-                    <p className="font-semibold">{quiz.time_limit_minutes}</p>
-                    <p className="text-muted-foreground text-xs">Minutes</p>
-                  </div>
-                  <div className="p-2 rounded-lg bg-muted">
-                    <p className="font-semibold">{quiz.quiz_attempts?.[0]?.count || 0}</p>
-                    <p className="text-muted-foreground text-xs">Attempts</p>
-                  </div>
+                  <QuizDeleteButton quizId={quiz.id} quizTitle={quiz.title} />
                 </div>
 
-                <div className="flex items-center justify-between pt-2 border-t">
-                  <QuizToggleActive quizId={quiz.id} isActive={quiz.is_active} />
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/manager/quizzes/${quiz.id}/edit#upload`}>
-                        <Upload className="mr-1 h-3 w-3" />
-                        Upload
-                      </Link>
-                    </Button>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/manager/quizzes/${quiz.id}`}>
-                        Manage
-                      </Link>
-                    </Button>
+                <div className="flex flex-wrap gap-1.5 mb-4">
+                  <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${difficultyColors[quiz.difficulty] || 'bg-gray-100 text-gray-700'}`}>{quiz.difficulty}</span>
+                  <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">{quiz.topic}</span>
+                  {quiz.is_active ? (
+                    <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">Active</span>
+                  ) : (
+                    <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-muted text-muted-foreground">Inactive</span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-center mb-4">
+                  <div className="rounded-xl bg-[#f9f9fb] p-2.5 border border-border/40">
+                    <p className="text-base font-bold text-blue-600">{quiz.questions?.[0]?.count || 0}</p>
+                    <p className="text-[10px] text-muted-foreground">Questions</p>
+                  </div>
+                  <div className="rounded-xl bg-[#f9f9fb] p-2.5 border border-border/40">
+                    <p className="text-base font-bold text-amber-600">{quiz.time_limit_minutes}m</p>
+                    <p className="text-[10px] text-muted-foreground">Time Limit</p>
+                  </div>
+                  <div className="rounded-xl bg-[#f9f9fb] p-2.5 border border-border/40">
+                    <p className="text-base font-bold text-violet-600">{quiz.quiz_attempts?.[0]?.count || 0}</p>
+                    <p className="text-[10px] text-muted-foreground">Attempts</p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+
+              {/* Quick action footer */}
+              <div className="border-t border-border/50 bg-muted/20 px-4 py-3 flex items-center gap-2">
+                <QuizToggleActive quizId={quiz.id} isActive={quiz.is_active} />
+                <div className="flex-1" />
+                <Button variant="outline" size="sm" className="h-8 rounded-xl text-xs" asChild>
+                  <Link href={`/manager/quizzes/${quiz.id}/edit`}>
+                    <Pencil className="h-3 w-3 mr-1" />Edit
+                  </Link>
+                </Button>
+                <Button size="sm" className="h-8 rounded-xl text-xs bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 border-0" asChild>
+                  <Link href={`/manager/quizzes/${quiz.id}?assign=1`}>
+                    <Users className="h-3 w-3 mr-1" />Assign
+                  </Link>
+                </Button>
+                {(quiz.quiz_attempts?.[0]?.count || 0) > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 rounded-xl text-xs"
+                    onClick={() => {}}
+                    asChild
+                  >
+                    <a href={`/api/leaderboard/${quiz.id}/download`} target="_blank">
+                      <Download className="h-3 w-3 mr-1" />Report
+                    </a>
+                  </Button>
+                )}
+              </div>
+            </div>
           ))}
         </div>
       ) : (
-        <Card className="py-12">
-          <CardContent className="text-center">
-            <FileQuestion className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-            <h3 className="text-xl font-semibold mb-2">No quizzes yet</h3>
-            <p className="text-muted-foreground mb-4">
-              Create your first quiz to start assessing your employees
-            </p>
-            <Button asChild>
-              <Link href="/manager/quizzes/new">
-                <Plus className="mr-2 h-4 w-4" />
-                Create Your First Quiz
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="rounded-2xl bg-white border border-border/60 shadow-sm py-16 text-center">
+          <FileQuestion className="h-14 w-14 mx-auto mb-4 text-muted-foreground opacity-30" />
+          <h3 className="text-lg font-semibold mb-2">No quizzes yet</h3>
+          <p className="text-sm text-muted-foreground mb-5">Create your first quiz to start assessing employees</p>
+          <Button className="rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 border-0" asChild>
+            <Link href="/manager/quizzes/new">
+              <Plus className="mr-2 h-4 w-4" />Create Your First Quiz
+            </Link>
+          </Button>
+        </div>
       )}
     </div>
   )

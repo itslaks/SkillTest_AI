@@ -186,7 +186,7 @@ export default function NewQuizPage() {
           setIsGenerating(false)
         }
       }
-      router.push('/manager/quizzes')
+      router.push(`/manager/quizzes/${quizId}?assign=1`)
     })
   }
 
