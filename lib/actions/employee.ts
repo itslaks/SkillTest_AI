@@ -201,12 +201,11 @@ export async function getQuizForAttempt(quizId: string) {
 
   if (quizError || !quiz) return { error: 'Quiz not found or not active' }
 
-  // Get approved questions
+  // Get all questions for the quiz
   const { data: questions, error: questionsError } = await adminClient
     .from('questions')
     .select('*')
     .eq('quiz_id', idResult.data)
-    .eq('is_approved', true)
     .order('order_index', { ascending: true })
 
   if (questionsError) return { error: questionsError.message }

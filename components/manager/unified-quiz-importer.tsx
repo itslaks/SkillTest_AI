@@ -244,7 +244,6 @@ export function UnifiedQuizImporter({
         ],
         difficulty: q.difficulty || quizDifficulty,
         explanation: q.explanation || undefined,
-        status: 'approved' as const,
         order_index: i,
       }
     })

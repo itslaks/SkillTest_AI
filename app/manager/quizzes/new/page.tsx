@@ -169,7 +169,6 @@ export default function NewQuizPage() {
             ],
             difficulty: (q.difficulty || difficulty) as DifficultyLevel,
             explanation: q.explanation || undefined,
-            status: 'approved' as const,
           }))
           await bulkCreateQuestions(questionInputs)
         }

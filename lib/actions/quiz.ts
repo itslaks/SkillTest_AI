@@ -286,22 +286,6 @@ export async function deleteQuestion(id: string) {
   return { success: true }
 }
 
-export async function approveQuestion(id: string) {
-  const idResult = uuidSchema.safeParse(id)
-  if (!idResult.success) {
-    return { error: 'Invalid question ID' }
-  }
-  return updateQuestion(idResult.data, { status: 'approved' })
-}
-
-export async function rejectQuestion(id: string) {
-  const idResult = uuidSchema.safeParse(id)
-  if (!idResult.success) {
-    return { error: 'Invalid question ID' }
-  }
-  return updateQuestion(idResult.data, { status: 'rejected' })
-}
-
 export async function bulkCreateQuestions(questions: CreateQuestionInput[]) {
   // Validate the entire batch
   const parsed = bulkCreateQuestionsSchema.safeParse(questions)
@@ -309,9 +293,6 @@ export async function bulkCreateQuestions(questions: CreateQuestionInput[]) {
     const firstError = parsed.error.issues[0]
     return { error: `${firstError.path.join('.')}: ${firstError.message}` }
   }
-
-  // Auto-approve all AI-generated questions
-  const questionsWithApprovedStatus = parsed.data.map(q => ({ ...q, status: 'approved', is_approved: true }))
 
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -322,7 +303,7 @@ export async function bulkCreateQuestions(questions: CreateQuestionInput[]) {
 
   const { data, error } = await supabase
     .from('questions')
-    .insert(questionsWithApprovedStatus)
+    .insert(parsed.data)
     .select()
 
   if (error) {

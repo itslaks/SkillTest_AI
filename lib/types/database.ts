@@ -2,8 +2,6 @@ export type UserRole = 'employee' | 'manager' | 'admin'
 
 export type DifficultyLevel = 'easy' | 'medium' | 'hard' | 'advanced' | 'hardcore'
 
-export type QuestionStatus = 'pending' | 'approved' | 'rejected'
-
 export type AttemptStatus = 'in_progress' | 'completed' | 'abandoned'
 
 export interface Profile {
@@ -47,9 +45,7 @@ export interface Question {
   correct_option_index: number
   difficulty: DifficultyLevel
   explanation: string | null
-  status: QuestionStatus
   is_ai_generated: boolean
-  is_approved: boolean
   order_index: number | null
   created_at: string
   updated_at: string
@@ -238,9 +234,7 @@ export interface CreateQuestionInput {
   difficulty: DifficultyLevel
   explanation?: string
   is_ai_generated?: boolean
-  is_approved?: boolean
   order_index?: number
-  status?: QuestionStatus
 }
 
 export interface SubmitQuizInput {

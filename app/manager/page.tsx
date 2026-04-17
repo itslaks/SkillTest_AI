@@ -20,7 +20,6 @@ import {
   FileSpreadsheet,
 } from 'lucide-react'
 import { getQuizStats } from '@/lib/actions/quiz'
-import { PendingQuestionActions } from '@/components/manager/pending-question-actions'
 
 export default async function ManagerDashboard() {
   const { userId } = await requireManager()
@@ -40,15 +39,6 @@ export default async function ManagerDashboard() {
     .from('quizzes')
     .select('*, questions(count)')
     .eq('created_by', userId)
-    .order('created_at', { ascending: false })
-    .limit(5)
-
-  // Get pending questions
-  const { data: pendingQuestions } = await supabase
-    .from('questions')
-    .select('*, quizzes!inner(title, created_by)')
-    .eq('status', 'pending')
-    .eq('quizzes.created_by', userId)
     .order('created_at', { ascending: false })
     .limit(5)
 
@@ -306,41 +296,6 @@ export default async function ManagerDashboard() {
           </CardContent>
         </Card>
 
-        {/* Pending Questions for Approval */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Pending Approval</CardTitle>
-              <CardDescription>AI-generated questions awaiting review</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {pendingQuestions && pendingQuestions.length > 0 ? (
-              <div className="space-y-4">
-                {pendingQuestions.map((question: any) => (
-                  <div 
-                    key={question.id} 
-                    className="p-3 rounded-lg border"
-                  >
-                    <p className="text-sm font-medium line-clamp-2">{question.question_text}</p>
-                    <div className="flex items-center justify-between mt-2">
-                      <span className="text-xs text-muted-foreground">
-                        {question.quizzes?.title}
-                      </span>
-                      <PendingQuestionActions questionId={question.id} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <CheckCircle2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No pending questions</p>
-                <p className="text-sm">All questions have been reviewed</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </div>
 
       {/* Recent Activity */}

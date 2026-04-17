@@ -117,7 +117,6 @@ export function QuizEditor({ quiz: initialQuiz, questions: initialQuestions }: Q
           { text: 'Option D', isCorrect: false },
         ],
         difficulty: quiz.difficulty,
-        status: 'pending',
       }
       const res = await createQuestion(newQ)
       if (res.error) {
@@ -313,9 +312,6 @@ export function QuizEditor({ quiz: initialQuiz, questions: initialQuestions }: Q
                   <span className="text-sm font-medium text-muted-foreground">Q{qi + 1}</span>
                   <span className="text-sm font-medium line-clamp-1">{q.question_text}</span>
                   <Badge variant="outline" className="text-[10px]">{q.difficulty}</Badge>
-                  <Badge variant={q.status === 'approved' ? 'default' : q.status === 'rejected' ? 'destructive' : 'secondary'} className="text-[10px]">
-                    {q.status}
-                  </Badge>
                 </div>
                 {expandedQuestion === q.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               </button>

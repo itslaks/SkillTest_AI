@@ -97,7 +97,6 @@ export async function POST(request: NextRequest) {
     difficulty: q.difficulty,
     explanation: q.explanation || null,
     is_ai_generated: true,
-    is_approved: true,
     order_index: i,
   }))
 

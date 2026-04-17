@@ -129,8 +129,6 @@ const difficultyLevelSchema = z.enum([
   'hardcore',
 ])
 
-const questionStatusSchema = z.enum(['pending', 'approved', 'rejected'])
-
 export const createQuizSchema = z
   .object({
     title: sanitizedString(200),
@@ -160,9 +158,7 @@ export const createQuestionSchema = z
     difficulty: difficultyLevelSchema,
     explanation: sanitizedString(MAX_LEN).optional().nullable().or(z.literal('').transform(() => null)),
     is_ai_generated: z.boolean().optional().default(false),
-    is_approved: z.boolean().optional().default(true),
     order_index: z.number().int().min(0).optional(),
-    status: questionStatusSchema.optional(),
   })
   .strict()
 
