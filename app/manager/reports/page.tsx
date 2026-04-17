@@ -217,11 +217,7 @@ export default async function ManagerReportsPage() {
                       <Badge variant={quiz.is_active ? 'default' : 'secondary'} className="text-xs">
                         {quiz.is_active ? '● Active' : '○ Inactive'}
                       </Badge>
-                      {hasAttempts ? (
-                        <DownloadReportButton quizId={quiz.id} quizTitle={quiz.title} />
-                      ) : (
-                        <span className="text-xs text-muted-foreground">No data yet</span>
-                      )}
+                      <DownloadReportButton quizId={quiz.id} quizTitle={quiz.title} />
                     </div>
                   </CardContent>
                 </Card>

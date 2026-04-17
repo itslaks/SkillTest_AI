@@ -229,11 +229,11 @@ export function AssessmentAnalyzer({ quizId, quizTitle }: AssessmentAnalyzerProp
               <Upload className="h-4 w-4" />
               Upload
             </TabsTrigger>
-            <TabsTrigger value="analyze" className="flex items-center gap-1" disabled={records.length === 0}>
+            <TabsTrigger value="analyze" className="flex items-center gap-1">
               <BarChart3 className="h-4 w-4" />
               Analyze
             </TabsTrigger>
-            <TabsTrigger value="chat" className="flex items-center gap-1" disabled={records.length === 0}>
+            <TabsTrigger value="chat" className="flex items-center gap-1">
               <MessageSquare className="h-4 w-4" />
               AI Chat
             </TabsTrigger>
