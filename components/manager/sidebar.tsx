@@ -9,7 +9,6 @@ import {
   FileQuestion,
   Users,
   BarChart3,
-  Settings,
   Sparkles,
   LogOut,
   ChevronLeft,
@@ -33,7 +32,6 @@ const navigation = [
   { name: 'Leaderboard', href: '/manager/leaderboard', icon: Trophy },
   { name: 'Analytics & AI', href: '/manager/analytics', icon: Brain },
   { name: 'Reports', href: '/manager/reports', icon: BarChart3 },
-  { name: 'Settings', href: '/manager/settings', icon: Settings },
 ]
 
 export function ManagerSidebar({ profile }: ManagerSidebarProps) {

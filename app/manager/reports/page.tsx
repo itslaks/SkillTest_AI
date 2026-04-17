@@ -4,7 +4,6 @@ import { getQuizStats, getQuizzes } from '@/lib/actions/quiz'
 import { getEmployees } from '@/lib/actions/manager'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import {
   BarChart3,
   Users,
@@ -15,9 +14,8 @@ import {
   CheckCircle,
   XCircle,
   Target,
-  Download,
-  FileSpreadsheet,
 } from 'lucide-react'
+import { DownloadReportButton } from '@/components/manager/download-report-button'
 
 export default async function ManagerReportsPage() {
   const { userId } = await requireManager()
@@ -80,12 +78,7 @@ export default async function ManagerReportsPage() {
           <h1 className="text-2xl md:text-3xl font-bold">Reports &amp; Analytics</h1>
           <p className="text-muted-foreground mt-1">Overview of quiz performance and employee engagement</p>
         </div>
-        <Button variant="default" asChild className="bg-blue-600 hover:bg-blue-700 shadow-md">
-          <a href="/api/reports/download">
-            <FileSpreadsheet className="mr-2 h-4 w-4" />
-            Export All (Excel)
-          </a>
-        </Button>
+        <DownloadReportButton quizId="all" variant="all" />
       </div>
 
       {/* Overview Cards */}
@@ -225,12 +218,7 @@ export default async function ManagerReportsPage() {
                         {quiz.is_active ? '● Active' : '○ Inactive'}
                       </Badge>
                       {hasAttempts ? (
-                        <Button size="sm" variant="outline" asChild className="h-8 gap-1.5 text-xs font-semibold border-blue-300 text-blue-700 hover:bg-blue-50">
-                          <a href={`/api/leaderboard/${quiz.id}/download`}>
-                            <Download className="h-3.5 w-3.5" />
-                            Download Report
-                          </a>
-                        </Button>
+                        <DownloadReportButton quizId={quiz.id} quizTitle={quiz.title} />
                       ) : (
                         <span className="text-xs text-muted-foreground">No data yet</span>
                       )}
