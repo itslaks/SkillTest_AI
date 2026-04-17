@@ -66,55 +66,74 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
   const parsed = submitQuizSchema.safeParse(input)
   if (!parsed.success) {
     const firstError = parsed.error.issues[0]
+    console.error('Quiz submission validation error:', firstError)
     return { error: `${firstError.path.join('.')}: ${firstError.message}` }
   }
 
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return { error: 'Not authenticated' }
+  if (authError || !user) {
+    console.error('Quiz submission auth error:', authError)
+    return { error: 'Not authenticated' }
+  }
 
   const { quiz_id, answers, time_taken_seconds } = parsed.data
 
-  // Fetch quiz to calculate score
-  const { data: quiz } = await supabase
-    .from('quizzes')
-    .select('*, questions(*)')
-    .eq('id', quiz_id)
-    .single()
+  try {
+    // Fetch quiz to calculate score
+    const { data: quiz, error: quizError } = await supabase
+      .from('quizzes')
+      .select('*, questions(*)')
+      .eq('id', quiz_id)
+      .single()
 
-  if (!quiz) return { error: 'Quiz not found' }
+    if (quizError || !quiz) {
+      console.error('Quiz fetch error:', quizError)
+      return { error: 'Quiz not found' }
+    }
 
-  // Calculate score
-  const totalQuestions = answers.length
-  const correctAnswers = answers.filter(a => a.isCorrect).length
-  const score = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0
+    // Calculate score
+    const totalQuestions = answers.length
+    const correctAnswers = answers.filter(a => a.isCorrect).length
+    const score = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0
 
-  // Points: base 10 per correct + speed bonus
-  const speedBonus = time_taken_seconds < (quiz.time_limit_minutes * 60 * 0.5) ? 25 : 0
-  const streakBonus = correctAnswers >= totalQuestions ? 50 : 0
-  const pointsEarned = (correctAnswers * 10) + speedBonus + streakBonus
+    // Points: base 10 per correct + speed bonus
+    const speedBonus = time_taken_seconds < (quiz.time_limit_minutes * 60 * 0.5) ? 25 : 0
+    const streakBonus = correctAnswers >= totalQuestions ? 50 : 0
+    const pointsEarned = (correctAnswers * 10) + speedBonus + streakBonus
 
-  const { data, error } = await supabase
-    .from('quiz_attempts')
-    .update({
-      answers,
-      score,
-      total_questions: totalQuestions,
-      correct_answers: correctAnswers,
-      time_taken_seconds,
-      points_earned: pointsEarned,
-      status: 'completed',
-      completed_at: new Date().toISOString(),
-    })
-    .eq('quiz_id', quiz_id)
-    .eq('user_id', user.id)
-    .select()
-    .single()
+    console.log(`Quiz submission for user ${user.id}: Score ${score}%, Points ${pointsEarned}`)
 
-  if (error) return { error: error.message }
+    const { data, error } = await supabase
+      .from('quiz_attempts')
+      .update({
+        answers,
+        score,
+        total_questions: totalQuestions,
+        correct_answers: correctAnswers,
+        time_taken_seconds,
+        points_earned: pointsEarned,
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+      })
+      .eq('quiz_id', quiz_id)
+      .eq('user_id', user.id)
+      .select()
+      .single()
 
-  revalidatePath('/employee', 'layout')
-  return { data }
+    if (error) {
+      console.error('Quiz submission update error:', error)
+      return { error: error.message }
+    }
+
+    console.log(`Quiz submission successful for user ${user.id}, quiz ${quiz_id}`)
+    revalidatePath('/employee', 'layout')
+    return { data }
+
+  } catch (error) {
+    console.error('Quiz submission unexpected error:', error)
+    return { error: 'An unexpected error occurred during quiz submission' }
+  }
 }
 
 // ─── Get available quizzes for employees (only assigned ones) ─────────
@@ -213,7 +232,27 @@ export async function getQuizForAttempt(quizId: string) {
   // Shuffle questions for randomness
   const shuffled = questions ? [...questions].sort(() => Math.random() - 0.5) : []
 
-  return { data: { ...quiz, questions: shuffled } }
+  // Shuffle options for each question to prevent all answers being option A
+  const questionsWithShuffledOptions = shuffled.map(question => {
+    if (question.options && Array.isArray(question.options)) {
+      // Create a copy of options with original indices for tracking correct answer
+      const optionsWithIndex = question.options.map((option: any, index: number) => ({
+        ...option,
+        originalIndex: index
+      }))
+      
+      // Shuffle the options
+      const shuffledOptions = [...optionsWithIndex].sort(() => Math.random() - 0.5)
+      
+      return {
+        ...question,
+        options: shuffledOptions
+      }
+    }
+    return question
+  })
+
+  return { data: { ...quiz, questions: questionsWithShuffledOptions } }
 }
 
 // ─── Get leaderboard for a quiz ───────────────────────────────────────
@@ -233,9 +272,13 @@ export async function getQuizLeaderboard(quizId: string) {
     .eq('quiz_id', idResult.data)
     .eq('status', 'completed')
     .order('score', { ascending: false })
+    .order('completed_at', { ascending: true }) // Earlier completion wins for same score
     .order('time_taken_seconds', { ascending: true })
 
-  if (error) return { error: error.message, data: [] }
+  if (error) {
+    console.error('Quiz leaderboard error:', error)
+    return { error: error.message, data: [] }
+  }
 
   const leaderboard: LeaderboardEntry[] = (attempts || []).map((a: any, i: number) => ({
     user_id: a.user_id,
@@ -249,6 +292,7 @@ export async function getQuizLeaderboard(quizId: string) {
     total_questions: a.total_questions,
     time_taken_seconds: a.time_taken_seconds,
     points_earned: a.points_earned,
+    completed_at: a.completed_at,
     rank: i + 1,
   }))
 

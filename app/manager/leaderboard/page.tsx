@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { RealtimeManagerLeaderboard } from '@/components/manager/realtime-manager-leaderboard'
 import Link from 'next/link'
 import { 
   Trophy, Medal, Crown, Users, TrendingUp, Clock, 
@@ -87,38 +88,61 @@ export default async function ManagerLeaderboardPage() {
   })
 
   const cumulativeLeaderboard = Array.from(userAggregates.values())
-    .sort((a, b) => b.total_points - a.total_points)
+    .sort((a, b) => {
+      // Primary sort: by total points (descending)
+      if (b.total_points !== a.total_points) {
+        return b.total_points - a.total_points
+      }
+      // Secondary sort: by average score (descending)
+      if (b.avg_score !== a.avg_score) {
+        return b.avg_score - a.avg_score
+      }
+      // Tertiary sort: by total time (ascending - faster is better)
+      return a.total_time - b.total_time
+    })
     .map((entry, index) => ({ ...entry, rank: index + 1 }))
 
-  // Get per-quiz leaderboards
+  // Get per-quiz leaderboards with proper tiebreaking
   const quizLeaderboards: Record<string, any[]> = {}
   
   for (const quiz of quizzes || []) {
-    const { data: attempts } = await adminClient
-      .from('quiz_attempts')
-      .select(`
-        *,
-        profiles:user_id(full_name, email, employee_id, department)
-      `)
-      .eq('quiz_id', quiz.id)
-      .eq('status', 'completed')
-      .order('score', { ascending: false })
-      .order('time_taken_seconds', { ascending: true })
-      .limit(50)
+    try {
+      const { data: attempts, error } = await adminClient
+        .from('quiz_attempts')
+        .select(`
+          *,
+          profiles:user_id(full_name, email, employee_id, department)
+        `)
+        .eq('quiz_id', quiz.id)
+        .eq('status', 'completed')
+        .order('score', { ascending: false })
+        .order('completed_at', { ascending: true }) // Earlier completion wins for same score
+        .order('time_taken_seconds', { ascending: true })
+        .limit(50)
 
-    quizLeaderboards[quiz.id] = (attempts || []).map((a: any, i: number) => ({
-      rank: i + 1,
-      user_id: a.user_id,
-      full_name: a.profiles?.full_name || 'Unknown',
-      email: a.profiles?.email || '',
-      employee_id: a.profiles?.employee_id,
-      department: a.profiles?.department,
-      score: a.score,
-      correct_answers: a.correct_answers,
-      total_questions: a.total_questions,
-      time_taken_seconds: a.time_taken_seconds,
-      points_earned: a.points_earned,
-    }))
+      if (error) {
+        console.error(`Error fetching leaderboard for quiz ${quiz.id}:`, error)
+        quizLeaderboards[quiz.id] = []
+        continue
+      }
+
+      quizLeaderboards[quiz.id] = (attempts || []).map((a: any, i: number) => ({
+        rank: i + 1,
+        user_id: a.user_id,
+        full_name: a.profiles?.full_name || 'Unknown',
+        email: a.profiles?.email || '',
+        employee_id: a.profiles?.employee_id,
+        department: a.profiles?.department,
+        score: a.score,
+        correct_answers: a.correct_answers,
+        total_questions: a.total_questions,
+        time_taken_seconds: a.time_taken_seconds,
+        points_earned: a.points_earned,
+      }))
+    } catch (quizError) {
+      console.error(`Failed to fetch leaderboard for quiz ${quiz.title}:`, quizError)
+      quizLeaderboards[quiz.id] = []
+    }
   }
 
   const formatTime = (s: number) => {
@@ -222,124 +246,10 @@ export default async function ManagerLeaderboardPage() {
 
         {/* Cumulative Leaderboard */}
         <TabsContent value="cumulative">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Crown className="h-5 w-5 text-yellow-500" />
-                  Cumulative Leaderboard
-                </CardTitle>
-                <CardDescription>
-                  Overall performance across all quizzes
-                </CardDescription>
-              </div>
-              {cumulativeLeaderboard.length > 0 && (
-                <Button variant="outline" size="sm" asChild>
-                  <a href="/api/leaderboard/cumulative/download">
-                    <Download className="mr-2 h-4 w-4" />
-                    Export
-                  </a>
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent>
-              {/* Top 3 Podium */}
-              {cumulativeLeaderboard.length >= 3 && (
-                <div className="grid grid-cols-3 gap-4 max-w-2xl mx-auto mb-8">
-                  {/* 2nd Place */}
-                  <div className="flex flex-col items-center pt-8">
-                    <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-2xl mb-2 ring-2 ring-gray-300">
-                      🥈
-                    </div>
-                    <p className="font-medium text-sm text-center truncate w-full">
-                      {cumulativeLeaderboard[1].full_name}
-                    </p>
-                    <p className="text-2xl font-bold text-gray-600">{cumulativeLeaderboard[1].total_points}</p>
-                    <p className="text-xs text-muted-foreground">points</p>
-                  </div>
-
-                  {/* 1st Place */}
-                  <div className="flex flex-col items-center">
-                    <div className="w-20 h-20 rounded-full bg-yellow-100 dark:bg-yellow-900/20 flex items-center justify-center text-3xl mb-2 ring-4 ring-yellow-400 shadow-lg">
-                      🥇
-                    </div>
-                    <p className="font-semibold text-center truncate w-full">
-                      {cumulativeLeaderboard[0].full_name}
-                    </p>
-                    <p className="text-3xl font-bold text-yellow-600">{cumulativeLeaderboard[0].total_points}</p>
-                    <p className="text-xs text-muted-foreground">points</p>
-                  </div>
-
-                  {/* 3rd Place */}
-                  <div className="flex flex-col items-center pt-12">
-                    <div className="w-14 h-14 rounded-full bg-amber-100 dark:bg-amber-900/20 flex items-center justify-center text-xl mb-2 ring-2 ring-amber-400">
-                      🥉
-                    </div>
-                    <p className="font-medium text-sm text-center truncate w-full">
-                      {cumulativeLeaderboard[2].full_name}
-                    </p>
-                    <p className="text-xl font-bold text-amber-600">{cumulativeLeaderboard[2].total_points}</p>
-                    <p className="text-xs text-muted-foreground">points</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Full Leaderboard Table */}
-              <div className="space-y-2">
-                {cumulativeLeaderboard.map((entry) => (
-                  <div
-                    key={entry.user_id}
-                    className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                        entry.rank === 1 ? 'bg-yellow-100 text-yellow-700'
-                        : entry.rank === 2 ? 'bg-gray-100 text-gray-700'
-                        : entry.rank === 3 ? 'bg-amber-100 text-amber-700'
-                        : 'bg-muted text-muted-foreground'
-                      }`}>
-                        {entry.rank <= 3 ? ['🥇', '🥈', '🥉'][entry.rank - 1] : entry.rank}
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm">{entry.full_name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {entry.email} • {entry.department || 'No Dept'}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-6 text-sm">
-                      <div className="text-center">
-                        <p className="font-bold text-primary">{entry.total_points}</p>
-                        <p className="text-xs text-muted-foreground">Points</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="font-semibold">{entry.avg_score}%</p>
-                        <p className="text-xs text-muted-foreground">Avg Score</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="font-semibold">{entry.total_quizzes}</p>
-                        <p className="text-xs text-muted-foreground">Quizzes</p>
-                      </div>
-                      <div className="text-center hidden sm:block">
-                        <p className="font-semibold">{formatTime(entry.total_time)}</p>
-                        <p className="text-xs text-muted-foreground">Total Time</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                
-                {cumulativeLeaderboard.length === 0 && (
-                  <div className="text-center py-12">
-                    <Trophy className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No Data Yet</h3>
-                    <p className="text-muted-foreground">
-                      Employees will appear here after completing quizzes.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          <RealtimeManagerLeaderboard 
+            initialData={cumulativeLeaderboard}
+            managerId={userId}
+          />
         </TabsContent>
 
         {/* Per-Quiz Leaderboards */}

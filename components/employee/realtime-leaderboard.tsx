@@ -29,24 +29,51 @@ export function RealtimeLeaderboard({ initialData, currentUserId }: RealtimeLead
   useEffect(() => {
     const supabase = createClient()
 
+    const refreshLeaderboard = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('user_stats')
+          .select('*, profiles:user_id(full_name, email, department)')
+          .order('total_points', { ascending: false })
+          .order('updated_at', { ascending: true }) // Earlier completion wins for same points
+          .limit(100)
+
+        if (error) {
+          console.error('Leaderboard refresh error:', error)
+          return
+        }
+
+        if (data) {
+          setLeaderboard(data as any)
+          setLastUpdated(new Date())
+          setFlash(true)
+          setTimeout(() => setFlash(false), 1000)
+        }
+      } catch (error) {
+        console.error('Leaderboard refresh failed:', error)
+      }
+    }
+
+    // Listen to both user_stats and quiz_attempts changes for immediate updates
     const channel = supabase
       .channel('realtime-leaderboard')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'user_stats' },
         async () => {
-          // Refetch leaderboard on any user_stats change
-          const { data } = await supabase
-            .from('user_stats')
-            .select('*, profiles:user_id(full_name, email, department)')
-            .order('total_points', { ascending: false })
-            .limit(100)
-
-          if (data) {
-            setLeaderboard(data as any)
-            setLastUpdated(new Date())
-            setFlash(true)
-            setTimeout(() => setFlash(false), 1000)
+          console.log('User stats changed - refreshing leaderboard')
+          await refreshLeaderboard()
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'quiz_attempts' },
+        async (payload) => {
+          // Only refresh when quiz is completed
+          if (payload.new?.status === 'completed' && payload.old?.status !== 'completed') {
+            console.log('Quiz completed - refreshing leaderboard')
+            // Add a small delay to ensure triggers have fired
+            setTimeout(refreshLeaderboard, 500)
           }
         }
       )

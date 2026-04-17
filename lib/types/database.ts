@@ -130,6 +130,7 @@ export interface LeaderboardEntry {
   total_questions: number
   time_taken_seconds: number
   points_earned: number
+  completed_at: string
   rank: number
 }
 

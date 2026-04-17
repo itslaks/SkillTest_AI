@@ -1,6 +1,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { RealtimeLeaderboard } from '@/components/employee/realtime-leaderboard'
+import { Trophy } from 'lucide-react'
 
 export default async function LeaderboardPage() {
   const supabase = await createClient()
@@ -17,7 +18,11 @@ export default async function LeaderboardPage() {
     .order('total_points', { ascending: false })
     .limit(100)
 
-  if (leaderboardError) console.error('Leaderboard error:', leaderboardError)
+  if (leaderboardError) {
+    console.error('Leaderboard error:', leaderboardError)
+  }
+
+  console.log('Leaderboard data:', leaderboard?.length || 0, 'entries')
 
   return (
     <div className="space-y-6">
@@ -26,10 +31,24 @@ export default async function LeaderboardPage() {
         <p className="text-sm text-muted-foreground mt-1">Top performers across all assessments</p>
       </div>
 
-      <RealtimeLeaderboard
-        initialData={leaderboard || []}
-        currentUserId={user.id}
-      />
+      {leaderboard && leaderboard.length > 0 ? (
+        <RealtimeLeaderboard
+          initialData={leaderboard}
+          currentUserId={user.id}
+        />
+      ) : (
+        <div className="rounded-2xl bg-white border border-border/60 shadow-sm p-12 text-center">
+          <div className="text-muted-foreground space-y-3">
+            <div className="w-16 h-16 mx-auto bg-muted/30 rounded-full flex items-center justify-center">
+              <Trophy className="h-8 w-8 opacity-50" />
+            </div>
+            <h3 className="text-lg font-semibold">No leaderboard data yet</h3>
+            <p className="text-sm">
+              Complete some quizzes to see rankings appear here!
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
