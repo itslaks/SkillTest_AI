@@ -234,9 +234,11 @@ export default async function ManagerLeaderboardPage() {
                 </CardDescription>
               </div>
               {cumulativeLeaderboard.length > 0 && (
-                <Button variant="outline" size="sm">
-                  <Download className="mr-2 h-4 w-4" />
-                  Export
+                <Button variant="outline" size="sm" asChild>
+                  <a href="/api/leaderboard/cumulative/download">
+                    <Download className="mr-2 h-4 w-4" />
+                    Export
+                  </a>
                 </Button>
               )}
             </CardHeader>

@@ -51,19 +51,19 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex flex-col transition-all duration-300 shadow-xl',
-          'bg-[oklch(0.18_0.04_255)] text-[oklch(0.92_0.01_240)]',
+          'fixed inset-y-0 left-0 z-50 flex flex-col transition-all duration-300 shadow-xl border-r border-border/50',
+          'bg-black text-white noise-overlay',
           collapsed ? 'w-16' : 'w-64'
         )}
       >
         {/* Logo */}
-        <div className="flex h-16 items-center gap-3 px-4 border-b border-white/10">
+        <div className="flex h-16 items-center gap-3 px-4 border-b border-white/10 relative z-10">
           <button
             onClick={() => handleNavigation('/manager')}
-            className="flex items-center gap-3"
+            className="flex items-center gap-3 hover-lift"
           >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center shrink-0 shadow-lg">
-              <Sparkles className="w-5 h-5 text-white" />
+            <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shrink-0 shadow-lg">
+              <Sparkles className="w-5 h-5 text-black" />
             </div>
             {!collapsed && (
               <div>
@@ -85,16 +85,16 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
                 onClick={() => handleNavigation(item.href)}
                 title={collapsed ? item.name : undefined}
                 className={cn(
-                  'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-left',
+                  'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-left relative z-10',
                   isActive
-                    ? 'bg-blue-500/30 text-white border border-blue-400/30 shadow-sm'
-                    : 'text-white/60 hover:bg-white/10 hover:text-white'
+                    ? 'bg-white text-black shadow-sm font-semibold'
+                    : 'text-white/60 hover:bg-white/10 hover:text-white hover-lift'
                 )}
               >
-                <item.icon className={cn('h-5 w-5 shrink-0', isActive ? 'text-blue-300' : '')} />
+                <item.icon className={cn('h-5 w-5 shrink-0', isActive ? 'text-black' : '')} />
                 {!collapsed && <span>{item.name}</span>}
                 {!collapsed && isActive && (
-                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-400" />
+                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-black/50" />
                 )}
               </button>
             )
@@ -123,9 +123,9 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
             'flex items-center gap-3 p-2 rounded-lg bg-white/5',
             collapsed && 'justify-center'
           )}>
-            <Avatar className="h-9 w-9 shrink-0 ring-2 ring-blue-400/30">
+            <Avatar className="h-9 w-9 shrink-0 ring-2 ring-white/20 hover:ring-white transition-all">
               <AvatarImage src={profile?.avatar_url || undefined} />
-              <AvatarFallback className="bg-blue-500/30 text-white text-sm font-semibold">
+              <AvatarFallback className="bg-white text-black text-sm font-bold">
                 {profile?.full_name?.charAt(0) || profile?.email?.charAt(0) || 'M'}
               </AvatarFallback>
             </Avatar>

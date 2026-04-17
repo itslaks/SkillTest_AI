@@ -19,11 +19,11 @@ export default async function ManagerLayout({
     .single()
 
   return (
-    <div className="min-h-screen bg-slate-50/80">
+    <div className="min-h-screen bg-background text-foreground noise-overlay">
       <ManagerSidebar profile={profile} />
-      <div className="lg:pl-64">
+      <div className="lg:pl-64 relative z-10">
         <ManagerHeader profile={profile} />
-        <main className="p-4 md:p-6">
+        <main className="p-4 md:p-8 max-w-[1600px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
           {children}
         </main>
       </div>

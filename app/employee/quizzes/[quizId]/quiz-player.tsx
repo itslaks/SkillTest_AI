@@ -36,29 +36,31 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const totalQuestions = questions.length
   const progress = totalQuestions > 0 ? ((currentIndex + (showFeedback ? 1 : 0)) / totalQuestions) * 100 : 0
 
-  // Timer
-  useEffect(() => {
-    if (!started || finished) return
-    const interval = setInterval(() => {
-      setTimeRemaining(prev => {
-        if (prev <= 1) {
-          clearInterval(interval)
-          handleAutoSubmit()
-          return 0
-        }
-        return prev - 1
-      })
-      setTotalTime(prev => prev + 1)
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [started, finished])
-
   const handleAutoSubmit = useCallback(() => {
     if (!finished) {
       setFinished(true)
       doSubmit(answers)
     }
   }, [answers, finished])
+
+  // Timer
+  useEffect(() => {
+    if (!started || finished) return
+    const interval = setInterval(() => {
+      if (quiz.time_limit_minutes > 0) {
+        setTimeRemaining(prev => {
+          if (prev <= 1) {
+            clearInterval(interval)
+            handleAutoSubmit()
+            return 0
+          }
+          return prev - 1
+        })
+      }
+      setTotalTime(prev => prev + 1)
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [started, finished, quiz.time_limit_minutes, handleAutoSubmit])
 
   function handleStart() {
     startTransition(async () => {
@@ -149,7 +151,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
                 <p className="text-sm text-muted-foreground">Questions</p>
               </div>
               <div className="p-4 rounded-lg bg-muted">
-                <p className="text-2xl font-bold">{quiz.time_limit_minutes}</p>
+                <p className="text-2xl font-bold">{quiz.time_limit_minutes > 0 ? quiz.time_limit_minutes : '∞'}</p>
                 <p className="text-sm text-muted-foreground">Minutes</p>
               </div>
               <div className="p-4 rounded-lg bg-muted">
@@ -164,7 +166,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
                 <div>
                   <p className="font-medium text-amber-800 dark:text-amber-200">Before you begin</p>
                   <ul className="text-sm text-amber-700 dark:text-amber-300 mt-1 space-y-1">
-                    <li>• You have <strong>{quiz.time_limit_minutes} minutes</strong> to complete this quiz</li>
+                    <li>• You have <strong>{quiz.time_limit_minutes > 0 ? `${quiz.time_limit_minutes} minutes` : 'no time limit'}</strong> to complete this quiz</li>
                     <li>• Each question has <strong>instant feedback</strong></li>
                     <li>• Build <strong>streaks</strong> for bonus points</li>
                     <li>• You cannot retake this quiz once submitted</li>
@@ -202,10 +204,10 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${
-            timeRemaining < 60 ? 'bg-red-100 text-red-700 animate-pulse' : 'bg-muted'
+            quiz.time_limit_minutes > 0 && timeRemaining < 60 ? 'bg-red-100 text-red-700 animate-pulse' : 'bg-muted'
           }`}>
             <Clock className="h-4 w-4" />
-            {formatTime(timeRemaining)}
+            {quiz.time_limit_minutes > 0 ? formatTime(timeRemaining) : formatTime(totalTime)}
           </div>
 
           {streak >= 2 && (

@@ -12,8 +12,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { updateQuiz, updateQuestion, deleteQuestion, createQuestion } from '@/lib/actions/quiz'
 import type { Quiz, Question, DifficultyLevel, CreateQuestionInput } from '@/lib/types/database'
 import { Save, Trash2, Plus, CheckCircle2, XCircle, ChevronDown, ChevronUp, Clock } from 'lucide-react'
-import { ContentQuestionGenerator } from './content-question-generator'
-import { QuizImporter } from './quiz-importer'
+import { UnifiedQuizImporter } from './unified-quiz-importer'
 
 const DIFFICULTIES: DifficultyLevel[] = ['easy', 'medium', 'hard', 'advanced', 'hardcore']
 
@@ -279,26 +278,15 @@ export function QuizEditor({ quiz: initialQuiz, questions: initialQuestions }: Q
         </CardContent>
       </Card>
 
-      {/* AI Content-Based Question Generator */}
-      <ContentQuestionGenerator
-        quizId={quiz.id}
-        quizTopic={quiz.topic}
-        quizDifficulty={quiz.difficulty}
-        onQuestionsGenerated={() => {
-          // Refresh questions list
-          router.refresh()
-        }}
-      />
-
-      {/* Excel Quiz Import */}
       <div id="upload">
-      <QuizImporter
-        quizId={quiz.id}
-        quizDifficulty={quiz.difficulty}
-        onQuestionsImported={() => {
-          router.refresh()
-        }}
-      />
+        <UnifiedQuizImporter
+          quizId={quiz.id}
+          quizTopic={quiz.topic}
+          quizDifficulty={quiz.difficulty}
+          onQuestionsAdded={() => {
+            router.refresh()
+          }}
+        />
       </div>
 
       {/* Questions */}

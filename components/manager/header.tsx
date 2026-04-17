@@ -49,15 +49,15 @@ export function ManagerHeader({ profile }: ManagerHeaderProps) {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="flex items-center gap-2 h-10 px-2 rounded-lg hover:bg-muted/60">
-              <Avatar className="h-8 w-8 ring-2 ring-primary/20">
+              <Avatar className="h-8 w-8 ring-2 ring-primary/20 hover:ring-primary transition-all">
                 <AvatarImage src={profile?.avatar_url || undefined} />
-                <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
+                <AvatarFallback className="bg-black text-white text-sm font-semibold">
                   {profile?.full_name?.charAt(0) || profile?.email?.charAt(0) || 'M'}
                 </AvatarFallback>
               </Avatar>
               <div className="hidden md:block text-left">
                 <p className="text-sm font-semibold leading-none">{profile?.full_name?.split(' ')[0] || 'Manager'}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">Manager</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Administrator</p>
               </div>
             </Button>
           </DropdownMenuTrigger>
