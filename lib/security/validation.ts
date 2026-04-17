@@ -143,6 +143,7 @@ export const createQuizSchema = z
     feedback_form_url: optionalSafeUrl,
     starts_at: z.string().datetime().optional().nullable().or(z.literal('').transform(() => null)),
     ends_at: z.string().datetime().optional().nullable().or(z.literal('').transform(() => null)),
+    status: z.enum(['draft', 'active', 'archived']).optional().default('active'),
   })
   .strict()
 

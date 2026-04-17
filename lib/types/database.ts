@@ -31,6 +31,7 @@ export interface Quiz {
   passing_score: number
   feedback_form_url: string | null
   is_active: boolean
+  status: 'draft' | 'active' | 'archived'
   starts_at: string | null
   ends_at: string | null
   created_by: string

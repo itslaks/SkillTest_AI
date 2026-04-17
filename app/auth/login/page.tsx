@@ -108,6 +108,9 @@ export default function LoginPage() {
                   {showPassword ? 'Hide' : 'Show'}
                 </button>
               </div>
+              <div className="flex justify-end mt-1">
+                <Link href="/auth/reset-password" className="text-xs text-primary font-semibold hover:underline underline-offset-4">Forgot password?</Link>
+              </div>
             </div>
 
             <div className="pt-2">

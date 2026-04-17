@@ -223,3 +223,14 @@ export async function syncProfileFromUserMetadata(userId: string, userMetadata: 
     .update({ full_name: fullName, updated_at: new Date().toISOString() })
     .eq('id', userId);
 }
+
+export async function sendPasswordReset(formData: FormData) {
+  const email = formData.get('email') as string;
+  if (!email) return { error: 'Email is required' };
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: typeof window !== 'undefined' ? window.location.origin + '/auth/update-password' : undefined,
+  });
+  if (error) return { error: error.message };
+  return { success: true };
+}

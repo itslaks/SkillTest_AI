@@ -147,6 +147,7 @@ export default function NewQuizPage() {
       question_count: questionCount,
       passing_score: passingScore,
       feedback_form_url: feedbackFormUrl || undefined,
+      status: 'active', // Ensure quiz is active immediately
     }
 
     startTransition(async () => {
