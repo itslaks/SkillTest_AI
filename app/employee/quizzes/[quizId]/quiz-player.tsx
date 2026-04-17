@@ -209,7 +209,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       <div className="max-w-2xl mx-auto flex flex-col items-center justify-center min-h-[60vh] text-center">
         <XCircle className="h-16 w-16 text-red-400 mx-auto mb-4" />
         <h2 className="text-2xl font-bold mb-2">No questions available</h2>
-        <p className="text-muted-foreground">This quiz does not have any approved questions assigned. Please contact your manager.</p>
+        <p className="text-muted-foreground">This quiz does not have any questions yet. Please contact your manager.</p>
       </div>
     )
   }

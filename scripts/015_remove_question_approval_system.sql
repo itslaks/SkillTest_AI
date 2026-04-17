@@ -1,20 +1,48 @@
--- Remove approval system from questions table
--- This script removes the status and is_approved columns from questions table
--- and updates the RLS policies accordingly
+-- 015: Remove approval system from questions table (Robust Version)
+-- This script safely removes the approval system by handling dependencies in the correct order
 
--- Drop existing indexes related to approval
-DROP INDEX IF EXISTS idx_questions_is_approved;
+-- STEP 1: First, check what policies exist
+SELECT schemaname, tablename, policyname, cmd, qual 
+FROM pg_policies 
+WHERE tablename = 'questions' 
+  AND schemaname = 'public';
 
--- Remove the status and is_approved columns
-ALTER TABLE public.questions 
-DROP COLUMN IF EXISTS status,
-DROP COLUMN IF EXISTS is_approved;
+-- STEP 2: Drop all RLS policies that might reference the approval columns
+DO $$ 
+DECLARE
+    policy_record RECORD;
+BEGIN
+    -- Get all policies on the questions table that reference the columns we want to drop
+    FOR policy_record IN 
+        SELECT policyname 
+        FROM pg_policies 
+        WHERE tablename = 'questions' 
+          AND schemaname = 'public'
+          AND (qual LIKE '%is_approved%' OR qual LIKE '%status%')
+    LOOP
+        EXECUTE 'DROP POLICY IF EXISTS "' || policy_record.policyname || '" ON public.questions';
+        RAISE NOTICE 'Dropped policy: %', policy_record.policyname;
+    END LOOP;
+END $$;
 
--- Update RLS policy to remove approval filter
--- Drop the old policy
+-- STEP 3: Drop specific policies by name (backup approach)
 DROP POLICY IF EXISTS "Users can view approved questions" ON public.questions;
+DROP POLICY IF EXISTS "Users can view questions" ON public.questions;
+DROP POLICY IF EXISTS "Employees can view approved questions" ON public.questions;
 
--- Create new policy for users to view all questions for active quizzes
+-- STEP 4: Drop indexes
+DROP INDEX IF EXISTS idx_questions_is_approved;
+DROP INDEX IF EXISTS idx_questions_status;
+
+-- STEP 5: Now safely drop the columns
+ALTER TABLE public.questions 
+DROP COLUMN IF EXISTS status CASCADE,
+DROP COLUMN IF EXISTS is_approved CASCADE;
+
+-- STEP 6: Create the new simplified policy
+-- First drop if exists to ensure clean state
+DROP POLICY IF EXISTS "Users can view questions for active quizzes" ON public.questions;
+
 CREATE POLICY "Users can view questions for active quizzes" ON public.questions
   FOR SELECT USING (
     EXISTS (
@@ -23,5 +51,21 @@ CREATE POLICY "Users can view questions for active quizzes" ON public.questions
     )
   );
 
--- The manager policies remain the same as they already allow viewing all questions
--- No need to update those
+-- STEP 7: Verify the changes
+SELECT column_name, data_type 
+FROM information_schema.columns 
+WHERE table_name = 'questions' 
+  AND table_schema = 'public'
+  AND column_name IN ('status', 'is_approved');
+
+-- STEP 8: Show remaining policies
+SELECT schemaname, tablename, policyname, cmd 
+FROM pg_policies 
+WHERE tablename = 'questions' 
+  AND schemaname = 'public';
+
+-- Success message
+DO $$ 
+BEGIN
+    RAISE NOTICE 'Approval system successfully removed from questions table!';
+END $$;

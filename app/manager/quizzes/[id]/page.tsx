@@ -248,7 +248,6 @@ export default async function QuizDetailPage({ params, searchParams }: { params:
                           {q.difficulty}
                         </Badge>
                         {q.is_ai_generated && <Badge variant="outline" className="text-[10px]">AI</Badge>}
-                        {!q.is_approved && <Badge variant="destructive" className="text-[10px]">Pending</Badge>}
                       </div>
                       <p className="font-medium">{q.question_text}</p>
                       <div className="mt-2 space-y-1">

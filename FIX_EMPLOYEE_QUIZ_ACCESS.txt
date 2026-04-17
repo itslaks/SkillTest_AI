@@ -1,0 +1,86 @@
+SkillTest AI - Employee Quiz Access Fix
+========================================
+
+PROBLEM: 
+Employees see "This quiz does not have any approved questions assigned. Please contact your manager" when trying to take quizzes.
+
+ROOT CAUSE:
+The database still has the old approval system enabled with RLS policies that filter questions by approval status.
+
+SOLUTION:
+Run the SQL script below in your Supabase Dashboard → SQL Editor
+
+========================================
+SQL FIX SCRIPT (Copy and paste this):
+========================================
+
+-- SkillTest AI: Remove Question Approval System
+-- This fixes the employee quiz access issue
+
+-- Step 1: Drop old policies that filter by approval
+DROP POLICY IF EXISTS "Users can view approved questions" ON public.questions;
+DROP POLICY IF EXISTS "Users can view questions" ON public.questions;
+DROP POLICY IF EXISTS "Employees can view approved questions" ON public.questions;
+
+-- Step 2: Drop approval-related indexes  
+DROP INDEX IF EXISTS idx_questions_is_approved;
+DROP INDEX IF EXISTS idx_questions_status;
+
+-- Step 3: Remove approval columns from questions table
+ALTER TABLE public.questions 
+DROP COLUMN IF EXISTS is_approved CASCADE,
+DROP COLUMN IF EXISTS status CASCADE;
+
+-- Step 4: Create new policy that allows all questions for active quizzes
+DROP POLICY IF EXISTS "Users can view questions for active quizzes" ON public.questions;
+CREATE POLICY "Users can view questions for active quizzes" ON public.questions
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.quizzes q 
+      WHERE q.id = quiz_id AND q.is_active = true
+    )
+  );
+
+-- Verification
+SELECT 'Approval system removed! Employees can now take quizzes.' AS result;
+
+========================================
+INSTRUCTIONS:
+========================================
+
+1. Open Supabase Dashboard
+2. Go to SQL Editor  
+3. Copy the SQL script above
+4. Paste it and click "Run"
+5. You should see: "Approval system removed! Employees can now take quizzes."
+
+========================================
+WHAT THIS FIXES:
+========================================
+
+✅ Removes the approval workflow entirely
+✅ Employees can now see all questions for active quizzes  
+✅ AI-generated questions work immediately
+✅ No more "approved questions" filtering
+✅ Managers can create quizzes and employees can take them right away
+
+========================================
+TEST THE FIX:
+========================================
+
+1. Create a new quiz with questions (or use existing)
+2. Assign it to an employee  
+3. Employee logs in → goes to Quizzes
+4. Employee should now be able to take the quiz without errors!
+
+The error "This quiz does not have any approved questions assigned" should be completely gone.
+
+========================================
+ALTERNATIVE FILES:
+========================================
+
+This same fix is available in:
+- scripts/IMMEDIATE_FIX.sql  
+- scripts/015_remove_question_approval_system.sql
+
+Both contain the same database migration to remove the approval system.
