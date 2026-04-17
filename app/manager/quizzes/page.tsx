@@ -5,6 +5,7 @@ import { Plus, FileQuestion, Pencil, Upload, Trophy, Download, Users, Clock, Che
 import { Badge } from '@/components/ui/badge'
 import { QuizToggleActive } from '@/components/manager/quiz-toggle-active'
 import { QuizDeleteButton } from '@/components/manager/quiz-delete-button'
+import { QuickDeleteButton } from '@/components/manager/quick-delete-button'
 
 export default async function QuizzesPage() {
   const supabase = await createClient()
@@ -118,6 +119,11 @@ export default async function QuizzesPage() {
                     </a>
                   </Button>
                 )}
+                <QuickDeleteButton 
+                  quizId={quiz.id} 
+                  quizTitle={quiz.title}
+                  hasAttempts={(quiz.quiz_attempts?.[0]?.count || 0) > 0}
+                />
               </div>
             </div>
           ))}

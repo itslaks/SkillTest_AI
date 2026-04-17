@@ -2,10 +2,13 @@ import { getEmployees, getEmployeesByDomain, getImportHistory, getQuizzesForAssi
 import { createClient } from '@/lib/supabase/server'
 import { EmployeeImporter } from '@/components/manager/employee-importer'
 import { QuizAssignmentManager } from '@/components/manager/quiz-assignment-manager'
+import { AddEmployeeDialog } from '@/components/manager/add-employee-dialog'
+import { DeleteEmployeeButton } from '@/components/manager/delete-employee-button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Users, Building2, History, Trophy, Flame } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Users, Building2, History, Trophy, Flame, UserPlus } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export default async function ManagerEmployeesPage() {
@@ -36,9 +39,20 @@ export default async function ManagerEmployeesPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold">Employees</h1>
-        <p className="text-muted-foreground mt-1">Manage your team and import new employees</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Employees</h1>
+          <p className="text-muted-foreground mt-1">Manage your team and import new employees</p>
+        </div>
+        <div className="flex gap-2">
+          <AddEmployeeDialog />
+          <Button variant="outline" asChild>
+            <a href="/api/employees/template.xlsx" download>
+              <Trophy className="h-4 w-4 mr-2" />
+              Download Template
+            </a>
+          </Button>
+        </div>
       </div>
 
       {/* Stats overview */}
@@ -149,6 +163,7 @@ export default async function ManagerEmployeesPage() {
                         <th className="text-left p-3 font-semibold text-muted-foreground text-xs uppercase tracking-wide">Domain</th>
                         <th className="text-left p-3 font-semibold text-muted-foreground text-xs uppercase tracking-wide">Employee ID</th>
                         <th className="text-left p-3 font-semibold text-muted-foreground text-xs uppercase tracking-wide">Performance</th>
+                        <th className="text-left p-3 font-semibold text-muted-foreground text-xs uppercase tracking-wide">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -190,6 +205,14 @@ export default async function ManagerEmployeesPage() {
                               ) : (
                                 <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">No activity yet</span>
                               )}
+                            </td>
+                            <td className="p-3">
+                              <DeleteEmployeeButton
+                                employeeId={emp.id}
+                                employeeName={emp.full_name || 'Unknown'}
+                                employeeEmail={emp.email}
+                                hasQuizAttempts={stats?.tests_completed > 0}
+                              />
                             </td>
                           </tr>
                         )
