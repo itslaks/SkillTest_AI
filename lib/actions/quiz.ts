@@ -309,6 +309,9 @@ export async function bulkCreateQuestions(questions: CreateQuestionInput[]) {
     return { error: `${firstError.path.join('.')}: ${firstError.message}` }
   }
 
+  // Auto-approve all AI-generated questions
+  const questionsWithApprovedStatus = parsed.data.map(q => ({ ...q, status: 'approved', is_approved: true }))
+
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
@@ -318,7 +321,7 @@ export async function bulkCreateQuestions(questions: CreateQuestionInput[]) {
 
   const { data, error } = await supabase
     .from('questions')
-    .insert(parsed.data)
+    .insert(questionsWithApprovedStatus)
     .select()
 
   if (error) {
@@ -327,58 +330,4 @@ export async function bulkCreateQuestions(questions: CreateQuestionInput[]) {
 
   revalidatePath('/manager/quizzes', 'layout')
   return { data }
-}
-
-// Get quiz statistics for manager dashboard
-export async function getQuizStats() {
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    return { error: 'Not authenticated' }
-  }
-
-  // Get all quizzes created by manager
-  const { data: quizzes } = await supabase
-    .from('quizzes')
-    .select('id')
-    .eq('created_by', user.id)
-
-  const quizIds = quizzes?.map((q: any) => q.id) || []
-
-  // Get total attempts
-  const { count: totalAttempts } = await supabase
-    .from('quiz_attempts')
-    .select('*', { count: 'exact', head: true })
-    .in('quiz_id', quizIds)
-    .not('completed_at', 'is', null)
-
-  // Get average score
-  const { data: attempts } = await supabase
-    .from('quiz_attempts')
-    .select('score')
-    .in('quiz_id', quizIds)
-    .not('completed_at', 'is', null)
-
-  const averageScore = attempts && attempts.length > 0
-    ? Math.round(attempts.reduce((sum: number, a: any) => sum + a.score, 0) / attempts.length)
-    : 0
-
-  // Get unique employees who took quizzes
-  const { data: uniqueEmployees } = await supabase
-    .from('quiz_attempts')
-    .select('user_id')
-    .in('quiz_id', quizIds)
-    .not('completed_at', 'is', null)
-
-  const uniqueEmployeeCount = new Set(uniqueEmployees?.map((e: any) => e.user_id)).size
-
-  return {
-    data: {
-      totalQuizzes: quizzes?.length || 0,
-      totalAttempts: totalAttempts || 0,
-      averageScore,
-      uniqueEmployees: uniqueEmployeeCount,
-    }
-  }
 }
