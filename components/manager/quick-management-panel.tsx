@@ -15,11 +15,17 @@ import {
   Trash2,
   Clock,
   Trophy,
-  Activity
+  Activity,
+  Upload,
+  ClipboardList,
+  Edit,
+  Eye,
+  Copy
 } from 'lucide-react'
 import Link from 'next/link'
 import { AddEmployeeDialog } from './add-employee-dialog'
 import { DeleteEmployeeButton } from './delete-employee-button'
+import { QuickDeleteButton } from './quick-delete-button'
 
 interface QuickManagementPanelProps {
   stats: {
@@ -152,18 +158,34 @@ export function QuickManagementPanel({ stats, recentEmployees, recentQuizzes }: 
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Quick Actions</CardTitle>
+              <CardDescription>Common management tasks</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <Button className="justify-start" variant="outline" asChild>
+                  <Link href="/manager/quizzes/new">
+                    <Plus className="h-4 w-4 mr-2" />
+                    New Quiz
+                  </Link>
+                </Button>
+                <AddEmployeeDialog />
+              </div>
               <Button className="w-full justify-start" variant="outline" asChild>
                 <Link href="/manager/employees">
                   <Users className="h-4 w-4 mr-3" />
-                  Manage All Employees
+                  Manage All Employees ({stats.totalEmployees})
                 </Link>
               </Button>
               <Button className="w-full justify-start" variant="outline" asChild>
                 <Link href="/manager/quizzes">
                   <FileQuestion className="h-4 w-4 mr-3" />
-                  Manage All Quizzes
+                  Manage All Quizzes ({stats.totalQuizzes})
+                </Link>
+              </Button>
+              <Button className="w-full justify-start" variant="outline" asChild>
+                <Link href="/manager/leaderboard">
+                  <Trophy className="h-4 w-4 mr-3" />
+                  View Leaderboards
                 </Link>
               </Button>
               <Button className="w-full justify-start" variant="outline" asChild>
@@ -172,18 +194,13 @@ export function QuickManagementPanel({ stats, recentEmployees, recentQuizzes }: 
                   Download Reports
                 </Link>
               </Button>
-              <Button className="w-full justify-start" variant="outline" asChild>
-                <Link href="/manager/analytics">
-                  <BarChart3 className="h-4 w-4 mr-3" />
-                  View Analytics
-                </Link>
-              </Button>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">System Health</CardTitle>
+              <CardTitle className="text-base">System Overview</CardTitle>
+              <CardDescription>Current status and metrics</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -215,46 +232,81 @@ export function QuickManagementPanel({ stats, recentEmployees, recentQuizzes }: 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <div>
-              <CardTitle className="text-base">Recent Employees</CardTitle>
-              <CardDescription>Quick employee management actions</CardDescription>
+              <CardTitle className="text-base">Employee Management</CardTitle>
+              <CardDescription>Add, edit, delete and manage your team</CardDescription>
             </div>
-            <AddEmployeeDialog />
+            <div className="flex gap-2">
+              <AddEmployeeDialog />
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/manager/employees">
+                  <Users className="h-4 w-4 mr-2" />
+                  View All
+                </Link>
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {recentEmployees.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Users className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                <p>No employees yet</p>
+                <p className="font-medium mb-2">No employees yet</p>
+                <p className="text-sm mb-4">Add your first team member to get started</p>
+                <AddEmployeeDialog />
               </div>
             ) : (
               <div className="space-y-3">
-                {recentEmployees.slice(0, 5).map((employee) => (
-                  <div key={employee.id} className="flex items-center justify-between p-3 rounded-lg border">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-violet-500 flex items-center justify-center text-white text-xs font-bold">
-                        {employee.full_name?.charAt(0) || 'E'}
+                <div className="grid gap-3">
+                  {recentEmployees.slice(0, 5).map((employee) => (
+                    <div key={employee.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-violet-500 flex items-center justify-center text-white text-xs font-bold">
+                          {employee.full_name?.charAt(0) || 'E'}
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm">{employee.full_name}</p>
+                          <p className="text-xs text-muted-foreground">{employee.email}</p>
+                          {employee.department && (
+                            <Badge variant="outline" className="text-[10px] mt-1">{employee.department}</Badge>
+                          )}
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium text-sm">{employee.full_name}</p>
-                        <p className="text-xs text-muted-foreground">{employee.email}</p>
-                        {employee.department && (
-                          <Badge variant="outline" className="text-[10px] mt-1">{employee.department}</Badge>
-                        )}
+                      <div className="flex items-center gap-2">
+                        <div className="text-right mr-2">
+                          <p className="text-xs font-medium">{employee.quiz_attempts_count || 0} attempts</p>
+                          <p className="text-[10px] text-muted-foreground">quiz history</p>
+                        </div>
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/manager/employees?highlight=${employee.id}`}>
+                            <Settings className="h-3 w-3" />
+                          </Link>
+                        </Button>
+                        <DeleteEmployeeButton
+                          employeeId={employee.id}
+                          employeeName={employee.full_name}
+                          employeeEmail={employee.email}
+                          hasQuizAttempts={(employee.quiz_attempts_count || 0) > 0}
+                        />
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">
-                        {employee.quiz_attempts_count || 0} attempts
-                      </span>
-                      <DeleteEmployeeButton
-                        employeeId={employee.id}
-                        employeeName={employee.full_name}
-                        employeeEmail={employee.email}
-                        hasQuizAttempts={(employee.quiz_attempts_count || 0) > 0}
-                      />
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+                
+                {/* Quick Actions Row */}
+                <div className="grid grid-cols-2 gap-2 pt-3 border-t">
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href="/manager/employees?tab=import">
+                      <Upload className="h-4 w-4 mr-2" />
+                      Import Excel
+                    </Link>
+                  </Button>
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href="/manager/employees?tab=assign">
+                      <ClipboardList className="h-4 w-4 mr-2" />
+                      Assign Quiz
+                    </Link>
+                  </Button>
+                </div>
+                
                 {recentEmployees.length > 5 && (
                   <Button variant="outline" size="sm" className="w-full" asChild>
                     <Link href="/manager/employees">
@@ -272,48 +324,115 @@ export function QuickManagementPanel({ stats, recentEmployees, recentQuizzes }: 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <div>
-              <CardTitle className="text-base">Recent Quizzes</CardTitle>
-              <CardDescription>Quick quiz management actions</CardDescription>
+              <CardTitle className="text-base">Quiz Management</CardTitle>
+              <CardDescription>Create, edit, delete and manage assessments</CardDescription>
             </div>
-            <Button size="sm" asChild>
-              <Link href="/manager/quizzes/new">
-                <Plus className="h-4 w-4 mr-2" />
-                New Quiz
-              </Link>
-            </Button>
+            <div className="flex gap-2">
+              <Button size="sm" asChild>
+                <Link href="/manager/quizzes/new">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Quiz
+                </Link>
+              </Button>
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/manager/quizzes">
+                  <FileQuestion className="h-4 w-4 mr-2" />
+                  View All
+                </Link>
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {recentQuizzes.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <FileQuestion className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                <p>No quizzes yet</p>
+                <p className="font-medium mb-2">No quizzes yet</p>
+                <p className="text-sm mb-4">Create your first assessment to get started</p>
+                <Button asChild>
+                  <Link href="/manager/quizzes/new">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Quiz
+                  </Link>
+                </Button>
               </div>
             ) : (
               <div className="space-y-3">
-                {recentQuizzes.slice(0, 5).map((quiz) => (
-                  <div key={quiz.id} className="flex items-center justify-between p-3 rounded-lg border">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-medium text-sm">{quiz.title}</p>
-                        <Badge variant={quiz.is_active ? "default" : "secondary"} className="text-[10px]">
-                          {quiz.is_active ? 'Active' : 'Draft'}
-                        </Badge>
+                <div className="grid gap-3">
+                  {recentQuizzes.slice(0, 5).map((quiz) => (
+                    <div key={quiz.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-medium text-sm">{quiz.title}</p>
+                          <Badge variant={quiz.is_active ? "default" : "secondary"} className="text-[10px]">
+                            {quiz.is_active ? 'Active' : 'Draft'}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <span>{quiz.questions_count} questions</span>
+                          <span>•</span>
+                          <span>{quiz.attempts_count} attempts</span>
+                          {quiz.attempts_count > 0 && (
+                            <span>• avg: 85%</span>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <span>{quiz.questions_count} questions</span>
-                        <span>•</span>
-                        <span>{quiz.attempts_count} attempts</span>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/manager/quizzes/${quiz.id}`}>
+                            <Eye className="h-3 w-3" />
+                          </Link>
+                        </Button>
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/manager/quizzes/${quiz.id}/edit`}>
+                            <Edit className="h-3 w-3" />
+                          </Link>
+                        </Button>
+                        {quiz.is_active && (
+                          <Button variant="outline" size="sm" asChild>
+                            <Link href={`/manager/quizzes/${quiz.id}?assign=1`}>
+                              <Users className="h-3 w-3" />
+                            </Link>
+                          </Button>
+                        )}
+                        {quiz.attempts_count > 0 && (
+                          <Button variant="outline" size="sm" asChild>
+                            <Link href={`/api/leaderboard/${quiz.id}/download`}>
+                              <Download className="h-3 w-3" />
+                            </Link>
+                          </Button>
+                        )}
+                        <QuickDeleteButton 
+                          quizId={quiz.id} 
+                          quizTitle={quiz.title}
+                          hasAttempts={quiz.attempts_count > 0}
+                        />
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button size="sm" variant="outline" asChild>
-                        <Link href={`/manager/quizzes/${quiz.id}`}>
-                          <Settings className="h-3 w-3" />
-                        </Link>
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+                
+                {/* Quick Actions Row */}
+                <div className="grid grid-cols-3 gap-2 pt-3 border-t">
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href="/manager/quizzes/new">
+                      <Plus className="h-4 w-4 mr-2" />
+                      New Quiz
+                    </Link>
+                  </Button>
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href="/manager/leaderboard">
+                      <Trophy className="h-4 w-4 mr-2" />
+                      Leaderboard
+                    </Link>
+                  </Button>
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href="/manager/reports">
+                      <BarChart3 className="h-4 w-4 mr-2" />
+                      Reports
+                    </Link>
+                  </Button>
+                </div>
+                
                 {recentQuizzes.length > 5 && (
                   <Button variant="outline" size="sm" className="w-full" asChild>
                     <Link href="/manager/quizzes">

@@ -13,6 +13,7 @@ import { getQuizAssignments, getEmployees } from '@/lib/actions/manager'
 import { QuizToggleActive } from '@/components/manager/quiz-toggle-active'
 import { QuizAssignmentManager } from '@/components/manager/quiz-assignment-manager'
 import { AssessmentAnalyzer } from '@/components/manager/assessment-analyzer'
+import { QuickDeleteButton } from '@/components/manager/quick-delete-button'
 
 const difficultyColors: Record<string, string> = {
   easy: 'bg-green-100 text-green-700',
@@ -55,6 +56,13 @@ export default async function QuizDetailPage({ params, searchParams }: { params:
   const { data: assignmentData } = await getQuizAssignments(quizId)
   const { data: allEmployees } = await getEmployees()
 
+  // Get attempt count for delete button
+  const { count: attemptCount } = await supabase
+    .from('quiz_attempts')
+    .select('*', { count: 'exact', head: true })
+    .eq('quiz_id', quizId)
+    .not('completed_at', 'is', null)
+
   const formatTime = (s: number) => `${Math.floor(s / 60)}m ${s % 60}s`
 
   return (
@@ -74,6 +82,11 @@ export default async function QuizDetailPage({ params, searchParams }: { params:
               <Pencil className="mr-2 h-4 w-4" /> Edit Quiz
             </Link>
           </Button>
+          <QuickDeleteButton 
+            quizId={quiz.id} 
+            quizTitle={quiz.title}
+            hasAttempts={(attemptCount || 0) > 0}
+          />
         </div>
       </div>
 

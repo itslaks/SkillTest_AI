@@ -76,13 +76,27 @@ export async function POST(request: NextRequest) {
   const openaiKey = process.env.OPENAI_API_KEY
   const geminiKey = process.env.GOOGLE_GEMINI_API_KEY
 
+  console.log('AI API Keys available:', {
+    openai: !!openaiKey,
+    gemini: !!geminiKey
+  })
+
   if (openaiKey) {
+    console.log('Using OpenAI for question generation')
     questions = await generateWithOpenAI(openaiKey, topic, distribution)
   } else if (geminiKey) {
+    console.log('Using Gemini for question generation')  
     questions = await generateWithGemini(geminiKey, topic, distribution)
   } else {
+    console.log('No AI keys available, falling back to template generation')
     // Fallback: template-based generation
     questions = generateTemplateQuestions(topic, distribution)
+  }
+
+  console.log(`Generated ${questions.length} questions using ${openaiKey || geminiKey ? 'AI' : 'templates'}`)
+
+  if (questions.length === 0) {
+    return NextResponse.json({ error: 'Failed to generate any questions' }, { status: 500 })
   }
 
   // Insert questions into database
@@ -105,7 +119,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ data, distribution })
+  const generationMethod = openaiKey ? 'OpenAI' : geminiKey ? 'Gemini' : 'Template-based'
+  
+  return NextResponse.json({ 
+    data, 
+    distribution,
+    generated: questions.length,
+    method: generationMethod,
+    success: `Successfully generated ${questions.length} questions using ${generationMethod}`
+  })
 }
 
 function calculateDistribution(primary: DifficultyLevel, totalCount: number): Record<DifficultyLevel, number> {
@@ -187,6 +209,14 @@ Return ONLY valid JSON, no markdown code blocks.`
       })
 
       const data = await response.json()
+      
+      if (data.error) {
+        console.error(`OpenAI API error for ${diff} difficulty:`, data.error)
+        // Fall back to template for this batch
+        questions.push(...generateTemplateQuestions(topic, { [diff]: count } as any))
+        continue
+      }
+      
       const content = data.choices?.[0]?.message?.content || '[]'
       const cleanedContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
       
@@ -199,12 +229,21 @@ Return ONLY valid JSON, no markdown code blocks.`
             q.options.length === 4
           )
           .map((q: any) => ({ ...q, difficulty: diff }))
-        questions.push(...validQuestions)
+        
+        if (validQuestions.length === 0) {
+          console.warn(`No valid questions parsed from OpenAI response for ${diff} difficulty`)
+          questions.push(...generateTemplateQuestions(topic, { [diff]: count } as any))
+        } else {
+          console.log(`Generated ${validQuestions.length} ${diff} questions via OpenAI`)
+          questions.push(...validQuestions)
+        }
       } catch (parseError) {
+        console.error(`Failed to parse OpenAI response for ${diff} difficulty:`, parseError)
         // Fall back to template for this batch
         questions.push(...generateTemplateQuestions(topic, { [diff]: count } as any))
       }
     } catch (e) {
+      console.error(`OpenAI request failed for ${diff} difficulty:`, e)
       questions.push(...generateTemplateQuestions(topic, { [diff]: count } as any))
     }
   }
@@ -258,6 +297,14 @@ Return ONLY valid JSON, no markdown.`
       )
 
       const data = await response.json()
+      
+      if (data.error) {
+        console.error(`Gemini API error for ${diff} difficulty:`, data.error)
+        // Fall back to template for this batch
+        questions.push(...generateTemplateQuestions(topic, { [diff]: count } as any))
+        continue
+      }
+      
       const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]'
       const cleanedContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
       
@@ -270,11 +317,20 @@ Return ONLY valid JSON, no markdown.`
             q.options.length === 4
           )
           .map((q: any) => ({ ...q, difficulty: diff }))
-        questions.push(...validQuestions)
+        
+        if (validQuestions.length === 0) {
+          console.warn(`No valid questions parsed from Gemini response for ${diff} difficulty`)
+          questions.push(...generateTemplateQuestions(topic, { [diff]: count } as any))
+        } else {
+          console.log(`Generated ${validQuestions.length} ${diff} questions via Gemini`)
+          questions.push(...validQuestions)
+        }
       } catch (parseError) {
+        console.error(`Failed to parse Gemini response for ${diff} difficulty:`, parseError)
         questions.push(...generateTemplateQuestions(topic, { [diff]: count } as any))
       }
     } catch (e) {
+      console.error(`Gemini request failed for ${diff} difficulty:`, e)
       questions.push(...generateTemplateQuestions(topic, { [diff]: count } as any))
     }
   }

@@ -89,7 +89,10 @@ export function DeleteEmployeeButton({
                 ⚠️ This employee has quiz attempts that will also be deleted.
               </span>
             )}
-            <span className="block mt-2">This action cannot be undone.</span>
+            <span className="block mt-2 text-amber-700 font-medium">
+              📝 Note: If this employee wants to access the system again, they will need to sign up with a new account.
+            </span>
+            <span className="block mt-1">This action cannot be undone.</span>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

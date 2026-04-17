@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useMemo, useRef } from 'react'
+import { useState, useTransition, useMemo, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
+import { useToast } from '@/hooks/use-toast'
 import { createQuiz, bulkCreateQuestions } from '@/lib/actions/quiz'
 import {
   ArrowLeft, Sparkles, Wand2, Upload, FileSpreadsheet, Download,
@@ -19,6 +20,7 @@ import Link from 'next/link'
 import type { DifficultyLevel } from '@/lib/types/database'
 import { cn } from '@/lib/utils'
 import * as XLSX from 'xlsx'
+import { AISetupInstructions } from '@/components/manager/ai-setup-instructions'
 
 const ALL_DIFFICULTIES: DifficultyLevel[] = ['easy', 'medium', 'hard', 'advanced', 'hardcore']
 
@@ -66,6 +68,7 @@ interface ParsedQuestion {
 
 export default function NewQuizPage() {
   const router = useRouter()
+  const { toast } = useToast()
   const [isPending, startTransition] = useTransition()
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -95,9 +98,24 @@ export default function NewQuizPage() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [parsedQuestions, setParsedQuestions] = useState<ParsedQuestion[]>([])
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [aiAvailable, setAiAvailable] = useState<boolean | null>(null) // null = loading, true/false = available
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const distribution = useMemo(() => getDistribution(difficulty, questionCount), [difficulty, questionCount])
+
+  // Check AI availability on mount
+  useEffect(() => {
+    async function checkAIAvailability() {
+      try {
+        const response = await fetch('/api/ai-status')
+        const result = await response.json()
+        setAiAvailable(result.hasAnyAI)
+      } catch {
+        setAiAvailable(false)
+      }
+    }
+    checkAIAvailability()
+  }, [])
 
   const sectionComplete = {
     basics: !!topic && !!title,
@@ -175,14 +193,34 @@ export default function NewQuizPage() {
 
         // AI generation
         if (questionSource === 'ai' || questionSource === 'both') {
+          if (aiAvailable === false) {
+            setError('AI question generation is not available. Please configure your API keys in the .env.local file.')
+            return
+          }
+          
           setIsGenerating(true)
           try {
-            await fetch('/api/generate-questions', {
+            const response = await fetch('/api/generate-questions', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ quiz_id: quizId, topic, difficulty, count: questionCount }),
             })
-          } catch {}
+            
+            const result = await response.json()
+            
+            if (!response.ok) {
+              throw new Error(result.error || 'Failed to generate questions')
+            }
+            
+            console.log('Questions generated successfully:', result)
+            toast({
+              title: 'Questions Generated! 🎉',
+              description: result.success || `Successfully generated ${result.generated} questions using ${result.method}`,
+            })
+          } catch (error) {
+            console.error('AI question generation failed:', error)
+            setError(error instanceof Error ? error.message : 'Failed to generate AI questions')
+          }
           setIsGenerating(false)
         }
       }
@@ -492,14 +530,25 @@ export default function NewQuizPage() {
                   ))}
                 </div>
 
-                {/* AI info */}
+                {/* AI info and setup */}
                 {(questionSource === 'ai' || questionSource === 'both') && (
-                  <div className="flex items-start gap-3 p-4 rounded-xl bg-violet-50 border border-violet-100">
-                    <Sparkles className="h-5 w-5 text-violet-500 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-violet-800">AI will generate {questionCount} questions on "{topic || 'your topic'}"</p>
-                      <p className="text-xs text-violet-600 mt-0.5">Based on your difficulty settings: {Object.entries(distribution).filter(([,v]) => v > 0).map(([k,v]) => `${v} ${k}`).join(', ')}</p>
-                    </div>
+                  <div className="space-y-4">
+                    {aiAvailable === false ? (
+                      <AISetupInstructions />
+                    ) : aiAvailable === true ? (
+                      <div className="flex items-start gap-3 p-4 rounded-xl bg-violet-50 border border-violet-100">
+                        <Sparkles className="h-5 w-5 text-violet-500 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium text-violet-800">AI will generate {questionCount} questions on "{topic || 'your topic'}"</p>
+                          <p className="text-xs text-violet-600 mt-0.5">Based on your difficulty settings: {Object.entries(distribution).filter(([,v]) => v > 0).map(([k,v]) => `${v} ${k}`).join(', ')}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-start gap-3 p-4 rounded-xl bg-muted/50 border border-border">
+                        <Sparkles className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+                        <p className="text-sm text-muted-foreground">Checking AI availability...</p>
+                      </div>
+                    )}
                   </div>
                 )}
 
