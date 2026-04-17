@@ -103,7 +103,6 @@ export default async function QuizzesPage() {
                     variant="outline"
                     size="sm"
                     className="h-8 rounded-xl text-xs"
-                    onClick={() => {}}
                     asChild
                   >
                     <a href={`/api/leaderboard/${quiz.id}/download`} target="_blank">

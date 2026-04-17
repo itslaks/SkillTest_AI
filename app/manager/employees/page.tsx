@@ -77,7 +77,7 @@ export default async function ManagerEmployeesPage() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-green-700">
-                  {employees.filter((e: any) => e.user_stats?.[0]?.total_quizzes_taken > 0).length}
+                  {employees.filter((e: any) => e.user_stats?.[0]?.tests_completed > 0).length}
                 </p>
                 <p className="text-xs text-green-600/70 font-medium">Active Learners</p>
               </div>

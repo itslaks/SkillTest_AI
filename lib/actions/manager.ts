@@ -186,7 +186,11 @@ export async function unassignQuizFromEmployee(quizId: string, employeeId: strin
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { error: 'Not authenticated' }
 
-  const { error } = await supabase
+  // Use admin client to bypass RLS — assignments are created via admin client
+  let adminClient: any
+  try { adminClient = createAdminClient() } catch { adminClient = supabase }
+
+  const { error } = await adminClient
     .from('quiz_assignments')
     .delete()
     .eq('quiz_id', quizId)
@@ -205,7 +209,11 @@ export async function getQuizAssignments(quizId: string) {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { error: 'Not authenticated', data: [] }
 
-  const { data, error } = await supabase
+  // Use admin client to bypass RLS — assignments are created via admin client
+  let adminClient: any
+  try { adminClient = createAdminClient() } catch { adminClient = supabase }
+
+  const { data, error } = await adminClient
     .from('quiz_assignments')
     .select('*, profiles:user_id(id, full_name, email, employee_id, department, avatar_url)')
     .eq('quiz_id', quizId)

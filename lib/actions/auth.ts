@@ -45,6 +45,12 @@ export async function signUp(formData: FormData) {
     return { error: error.message }
   }
 
+  // After sign up, sync profile full_name if missing
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    await syncProfileFromUserMetadata(user.id, user.user_metadata);
+  }
+
   redirect(`/auth/sign-up-success?email=${encodeURIComponent(email)}`)
 }
 
@@ -198,4 +204,22 @@ export async function resendVerificationEmail(email: string) {
   }
 
   return { success: true }
+}
+
+export async function syncProfileFromUserMetadata(userId: string, userMetadata: any) {
+  const supabase = await createClient();
+  if (!userId || !userMetadata) return;
+  // Only update if profile.full_name is null or empty
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name')
+    .eq('id', userId)
+    .single();
+  if (!profile || profile.full_name) return;
+  const fullName = userMetadata.full_name || null;
+  if (!fullName) return;
+  await supabase
+    .from('profiles')
+    .update({ full_name: fullName, updated_at: new Date().toISOString() })
+    .eq('id', userId);
 }

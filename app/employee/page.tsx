@@ -17,6 +17,8 @@ export default async function EmployeeDashboard() {
     .eq('id', user?.id)
     .single()
 
+  const fullName = profile?.full_name || user?.user_metadata?.full_name || null
+
   const { data: stats } = await getEmployeeStats()
   const { data: quizzes } = await getAvailableQuizzes()
 
@@ -51,7 +53,7 @@ export default async function EmployeeDashboard() {
               Employee Dashboard
             </div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-1.5">
-              Hey, {profile?.full_name?.split(' ')[0] || 'there'} 👋
+              Hey, {fullName?.split(' ')[0] || 'there'} 👋
             </h1>
             <p className="text-white/50 text-sm md:text-base">
               Keep learning, earn badges, and climb the leaderboard!

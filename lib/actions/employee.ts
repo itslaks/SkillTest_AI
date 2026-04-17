@@ -14,8 +14,12 @@ export async function startQuizAttempt(quizId: string) {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { error: 'Not authenticated' }
 
+  // Use admin client to bypass RLS on quiz_assignments (created by manager via admin client)
+  let adminClient: any
+  try { adminClient = createAdminClient() } catch { adminClient = supabase }
+
   // Verify this quiz is assigned to the employee
-  const { data: assignment } = await supabase
+  const { data: assignment } = await adminClient
     .from('quiz_assignments')
     .select('id')
     .eq('quiz_id', idResult.data)
@@ -119,8 +123,12 @@ export async function getAvailableQuizzes() {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { error: 'Not authenticated', data: [] }
 
+  // Use admin client to bypass RLS on quiz_assignments (created by manager via admin client)
+  let adminClient: any
+  try { adminClient = createAdminClient() } catch { adminClient = supabase }
+
   // Get quiz IDs assigned to this employee
-  const { data: assignments, error: assignError } = await supabase
+  const { data: assignments, error: assignError } = await adminClient
     .from('quiz_assignments')
     .select('quiz_id')
     .eq('user_id', user.id)
@@ -133,7 +141,7 @@ export async function getAvailableQuizzes() {
   if (assignedQuizIds.length === 0) return { data: [] }
 
   // Get only active quizzes that are assigned to this employee
-  const { data: quizzes, error } = await supabase
+  const { data: quizzes, error } = await adminClient
     .from('quizzes')
     .select('*, questions(count)')
     .in('id', assignedQuizIds)
@@ -170,8 +178,12 @@ export async function getQuizForAttempt(quizId: string) {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { error: 'Not authenticated' }
 
+  // Use admin client to bypass RLS on quiz_assignments (created by manager via admin client)
+  let adminClient: any
+  try { adminClient = createAdminClient() } catch { adminClient = supabase }
+
   // Verify this quiz is assigned to the employee
-  const { data: assignment } = await supabase
+  const { data: assignment } = await adminClient
     .from('quiz_assignments')
     .select('id')
     .eq('quiz_id', idResult.data)
@@ -180,7 +192,7 @@ export async function getQuizForAttempt(quizId: string) {
 
   if (!assignment) return { error: 'This quiz has not been assigned to you' }
 
-  const { data: quiz, error: quizError } = await supabase
+  const { data: quiz, error: quizError } = await adminClient
     .from('quizzes')
     .select('*')
     .eq('id', idResult.data)
@@ -190,7 +202,7 @@ export async function getQuizForAttempt(quizId: string) {
   if (quizError || !quiz) return { error: 'Quiz not found or not active' }
 
   // Get approved questions
-  const { data: questions, error: questionsError } = await supabase
+  const { data: questions, error: questionsError } = await adminClient
     .from('questions')
     .select('*')
     .eq('quiz_id', idResult.data)

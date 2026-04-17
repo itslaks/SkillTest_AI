@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useTransition } from 'react'
+import { useState, useEffect, useCallback, useTransition, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -22,6 +22,9 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const [started, setStarted] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState<{ questionId: string; selectedOption: number; isCorrect: boolean; timeSpent: number }[]>([])
+  const answersRef = useRef(answers)
+  // Keep ref in sync with state so the timer callback always has the latest answers
+  useEffect(() => { answersRef.current = answers }, [answers])
   const [selectedOption, setSelectedOption] = useState<number | null>(null)
   const [showFeedback, setShowFeedback] = useState(false)
   const [streak, setStreak] = useState(0)
@@ -29,6 +32,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const [questionStartTime, setQuestionStartTime] = useState(0)
   const [timeRemaining, setTimeRemaining] = useState(quiz.time_limit_minutes * 60)
   const [finished, setFinished] = useState(false)
+  const finishedRef = useRef(false)
   const [submitting, setSubmitting] = useState(false)
 
   const questions = quiz.questions || []
@@ -37,11 +41,12 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const progress = totalQuestions > 0 ? ((currentIndex + (showFeedback ? 1 : 0)) / totalQuestions) * 100 : 0
 
   const handleAutoSubmit = useCallback(() => {
-    if (!finished) {
+    if (!finishedRef.current) {
+      finishedRef.current = true
       setFinished(true)
-      doSubmit(answers)
+      doSubmit(answersRef.current)
     }
-  }, [answers, finished])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Timer
   useEffect(() => {
@@ -100,6 +105,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
 
   function handleNext() {
     if (currentIndex + 1 >= totalQuestions) {
+      finishedRef.current = true
       setFinished(true)
       doSubmit([...answers])
       return

@@ -20,6 +20,7 @@ import {
   FileSpreadsheet,
 } from 'lucide-react'
 import { getQuizStats } from '@/lib/actions/quiz'
+import { PendingQuestionActions } from '@/components/manager/pending-question-actions'
 
 export default async function ManagerDashboard() {
   const { userId } = await requireManager()
@@ -326,14 +327,7 @@ export default async function ManagerDashboard() {
                       <span className="text-xs text-muted-foreground">
                         {question.quizzes?.title}
                       </span>
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="ghost" className="h-7 text-green-600">
-                          <CheckCircle2 className="h-4 w-4" />
-                        </Button>
-                        <Button size="sm" variant="ghost" className="h-7 text-destructive">
-                          <XCircle className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <PendingQuestionActions questionId={question.id} />
                     </div>
                   </div>
                 ))}

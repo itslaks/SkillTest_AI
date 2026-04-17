@@ -49,9 +49,11 @@ export default async function EmployeeLayout({
     .eq('user_id', user.id)
     .single()
 
-  const initials = profile?.full_name
-    ? profile.full_name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
-    : (profile?.email?.[0] || 'E').toUpperCase()
+  const fullName = profile?.full_name || user.user_metadata?.full_name || null
+
+  const initials = fullName
+    ? fullName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
+    : (profile?.email?.[0] || user.email?.[0] || 'E').toUpperCase()
 
   return (
     <div className="min-h-screen flex bg-[#f5f5f7]">
@@ -104,7 +106,7 @@ export default async function EmployeeLayout({
               {initials}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-white leading-none truncate">{profile?.full_name?.split(' ')[0] || 'Employee'}</p>
+              <p className="text-sm font-semibold text-white leading-none truncate">{fullName?.split(' ')[0] || 'Employee'}</p>
               <p className="text-xs text-white/30 mt-0.5 truncate">{profile?.email || ''}</p>
             </div>
           </div>
