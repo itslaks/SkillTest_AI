@@ -384,3 +384,5 @@ export async function getQuizStats() {
     }
   }
 }
+
+// Force redeploy: trivial comment for Vercel cache bust
