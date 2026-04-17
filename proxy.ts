@@ -2,14 +2,14 @@ import { updateSession } from '@/lib/supabase/proxy'
 import { type NextRequest } from 'next/server'
 
 /**
- * Middleware – handles session refresh only.
+ * Proxy – handles session refresh only.
  *
  * Rate limiting has been removed to support 1000+ concurrent users
  * without hitting in-memory per-process limits. For production-grade
  * throttling at scale, use an external solution (e.g. Cloudflare,
  * Vercel Edge Config, or Redis-backed rate limiting at the infrastructure level).
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   // ─── Session handling ───────────────────────────────────────────────
   const response = await updateSession(request)
   return response
