@@ -1,19 +1,21 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { Suspense, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { signIn } from '@/lib/actions/auth'
 import { ArrowRight, CheckCircle2, Lock, Mail, ShieldCheck, Sparkles, Zap } from 'lucide-react'
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [showPassword, setShowPassword] = useState(false)
+  const resetSuccess = searchParams.get('reset') === 'success'
 
   function handleSignIn(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -84,6 +86,12 @@ export default function LoginPage() {
           </div>
 
           <form onSubmit={handleSignIn} className="space-y-4">
+            {resetSuccess && (
+              <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>Your password was updated. Sign in with the new password you just created.</span>
+              </div>
+            )}
             {error && (
               <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
                 <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
@@ -130,5 +138,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
   )
 }

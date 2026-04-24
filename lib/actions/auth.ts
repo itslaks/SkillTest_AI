@@ -70,12 +70,18 @@ export async function signIn(formData: FormData) {
 
   const supabase = await createClient()
 
+  // Clear any stale recovery or prior local session state before fresh sign-in.
+  await supabase.auth.signOut({ scope: 'local' })
+
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   })
 
   if (error) {
+    if (/invalid login credentials/i.test(error.message)) {
+      return { error: 'Invalid email or password. If you just reset your password, wait a few seconds and try the new password again.' }
+    }
     return { error: error.message }
   }
 

@@ -37,6 +37,7 @@ export default async function ManagerLeaderboardPage() {
       total_questions,
       time_taken_seconds,
       points_earned,
+      completed_at,
       quizzes!inner(created_by),
       profiles:user_id(full_name, email, employee_id, department, avatar_url)
     `)

@@ -98,8 +98,35 @@ function UpdatePasswordForm() {
         return;
       }
 
-      setSuccess("Password updated successfully. Redirecting to sign in...");
-      setTimeout(() => router.push("/auth/login"), 1800);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      const roleQuery = user
+        ? await supabase.from("profiles").select("role").eq("id", user.id).single()
+        : { data: null as { role?: string } | null };
+
+      const nextPath =
+        roleQuery.data?.role === "manager" || roleQuery.data?.role === "admin"
+          ? "/manager"
+          : "/employee";
+
+      if (user?.email) {
+        await supabase.auth.signOut({ scope: "local" });
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: user.email,
+          password,
+        });
+
+        if (signInError) {
+          setSuccess("Password updated. Please sign in with your new password.");
+          setTimeout(() => router.push("/auth/login?reset=success"), 1800);
+          return;
+        }
+      }
+
+      setSuccess("Password updated successfully. Signing you in...");
+      setTimeout(() => router.push(nextPath), 1200);
     });
   }
 

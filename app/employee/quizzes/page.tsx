@@ -129,14 +129,12 @@ function QuizCard({ quiz, status }: { quiz: any; status: string }) {
               {status === 'completed' ? 'Open results' : status === 'in_progress' ? 'Continue quiz' : 'Start quiz'}
             </Link>
           </Button>
-          {status === 'completed' && (
-            <Button variant="outline" className="rounded-full" asChild>
-              <Link href={`/employee/quizzes/${quiz.id}/leaderboard`}>
-                <Trophy className="mr-2 h-4 w-4" />
-                Ranking
-              </Link>
-            </Button>
-          )}
+          <Button variant="outline" className="rounded-full" asChild>
+            <Link href={`/employee/quizzes/${quiz.id}/leaderboard`}>
+              <Trophy className="mr-2 h-4 w-4" />
+              Live leaderboard
+            </Link>
+          </Button>
         </div>
       </div>
 

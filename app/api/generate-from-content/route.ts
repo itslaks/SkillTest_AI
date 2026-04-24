@@ -85,6 +85,8 @@ export async function POST(request: NextRequest) {
     }, { status: 500 })
   }
 
+  questions = ensureContentQuestionCount(questions, topic || 'Provided content', content, difficulty, count)
+
   if (questions.length === 0) {
     return NextResponse.json({ 
       error: 'Failed to generate questions from the provided content. Please try with different content or check AI API configuration.' 
@@ -239,24 +241,19 @@ Return ONLY valid JSON, no markdown code blocks.`
       
       try {
         const parsed = JSON.parse(cleanedContent)
-        const validQuestions = (Array.isArray(parsed) ? parsed : [parsed])
-          .filter((q: any) => 
-            q.question_text && 
-            Array.isArray(q.options) && 
-            q.options.length === 4 &&
-            q.options.filter((o: any) => o.isCorrect).length === 1
-          )
-          .map((q: any) => ({
-            ...q,
-            difficulty: diff, // Ensure difficulty is set correctly
-          }))
+        const validQuestions = normalizeQuestions(Array.isArray(parsed) ? parsed : [parsed], diff as DifficultyLevel)
         
         questions.push(...validQuestions)
+        if (validQuestions.length < count) {
+          questions.push(...buildContentFallbackQuestions(topic || 'Provided content', truncatedContent, diff as DifficultyLevel, count - validQuestions.length))
+        }
       } catch (parseError) {
         console.error('Failed to parse OpenAI response:', parseError)
+        questions.push(...buildContentFallbackQuestions(topic || 'Provided content', truncatedContent, diff as DifficultyLevel, count))
       }
     } catch (e) {
       console.error('OpenAI generation error:', e)
+      questions.push(...buildContentFallbackQuestions(topic || 'Provided content', truncatedContent, diff as DifficultyLevel, count))
     }
   }
 
@@ -339,24 +336,19 @@ Return ONLY valid JSON, no markdown.`
 
       try {
         const parsed = JSON.parse(cleanedContent)
-        const validQuestions = (Array.isArray(parsed) ? parsed : [parsed])
-          .filter((q: any) => 
-            q.question_text && 
-            Array.isArray(q.options) && 
-            q.options.length === 4 &&
-            q.options.filter((o: any) => o.isCorrect).length === 1
-          )
-          .map((q: any) => ({
-            ...q,
-            difficulty: diff,
-          }))
+        const validQuestions = normalizeQuestions(Array.isArray(parsed) ? parsed : [parsed], diff as DifficultyLevel)
         
         questions.push(...validQuestions)
+        if (validQuestions.length < count) {
+          questions.push(...buildContentFallbackQuestions(topic || 'Provided content', truncatedContent, diff as DifficultyLevel, count - validQuestions.length))
+        }
       } catch (parseError) {
         console.error('Failed to parse Gemini response:', parseError)
+        questions.push(...buildContentFallbackQuestions(topic || 'Provided content', truncatedContent, diff as DifficultyLevel, count))
       }
     } catch (e) {
       console.error('Gemini generation error:', e)
+      questions.push(...buildContentFallbackQuestions(topic || 'Provided content', truncatedContent, diff as DifficultyLevel, count))
     }
   }
 
@@ -390,4 +382,64 @@ function shuffleOptions<T>(options: T[]) {
   }
 
   return shuffled
+}
+
+function normalizeQuestions(rawQuestions: any[], difficulty: DifficultyLevel) {
+  return rawQuestions
+    .filter((q: any) =>
+      q?.question_text &&
+      Array.isArray(q.options) &&
+      q.options.length === 4 &&
+      q.options.filter((option: any) => option?.isCorrect).length === 1
+    )
+    .map((q: any) => ({
+      question_text: q.question_text,
+      options: q.options,
+      explanation: q.explanation || null,
+      difficulty,
+    }))
+}
+
+function buildContentFallbackQuestions(topic: string, content: string, difficulty: DifficultyLevel, count: number) {
+  const sentences = content
+    .split(/[\.\n]/)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence.length > 40)
+    .slice(0, Math.max(count * 2, 4))
+
+  const fallbackPool = sentences.length > 0 ? sentences : [`Key concepts related to ${topic}`]
+
+  return Array.from({ length: count }, (_, index) => {
+    const basis = fallbackPool[index % fallbackPool.length]
+    return {
+      question_text: `Which statement best reflects this ${difficulty} insight about ${topic}: "${basis}"?`,
+      options: [
+        { text: basis, isCorrect: true },
+        { text: `An unrelated claim that conflicts with ${topic}`, isCorrect: false },
+        { text: `A vague assumption that is not supported by the provided material`, isCorrect: false },
+        { text: `A misleading shortcut that skips the main idea from the content`, isCorrect: false },
+      ],
+      explanation: `The correct option stays closest to the provided material for ${topic}.`,
+      difficulty,
+    }
+  })
+}
+
+function ensureContentQuestionCount(
+  questions: any[],
+  topic: string,
+  content: string,
+  primaryDifficulty: DifficultyLevel,
+  requestedCount: number,
+) {
+  const deduped = questions.filter((question, index, collection) => {
+    const text = String(question?.question_text || '').trim().toLowerCase()
+    return text && collection.findIndex((item) => String(item?.question_text || '').trim().toLowerCase() === text) === index
+  })
+
+  if (deduped.length < requestedCount) {
+    deduped.push(...buildContentFallbackQuestions(topic, content, primaryDifficulty, requestedCount - deduped.length))
+  }
+
+  return deduped.slice(0, requestedCount)
 }

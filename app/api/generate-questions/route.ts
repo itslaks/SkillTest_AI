@@ -95,6 +95,8 @@ export async function POST(request: NextRequest) {
     questions = generateTemplateQuestions(topic, distribution)
   }
 
+  questions = ensureQuestionCount(questions, topic, difficulty, count)
+
   console.log(`Generated ${questions.length} questions using ${openaiKey || geminiKey ? 'AI' : 'templates'}`)
 
   if (questions.length === 0) {
@@ -225,13 +227,7 @@ Return ONLY valid JSON, no markdown code blocks.`
       
       try {
         const parsed = JSON.parse(cleanedContent)
-        const validQuestions = (Array.isArray(parsed) ? parsed : [parsed])
-          .filter((q: any) => 
-            q.question_text && 
-            Array.isArray(q.options) && 
-            q.options.length === 4
-          )
-          .map((q: any) => ({ ...q, difficulty: diff }))
+        const validQuestions = normalizeQuestions(Array.isArray(parsed) ? parsed : [parsed], diff as DifficultyLevel)
         
         if (validQuestions.length === 0) {
           console.warn(`No valid questions parsed from OpenAI response for ${diff} difficulty`)
@@ -239,6 +235,9 @@ Return ONLY valid JSON, no markdown code blocks.`
         } else {
           console.log(`Generated ${validQuestions.length} ${diff} questions via OpenAI`)
           questions.push(...validQuestions)
+          if (validQuestions.length < count) {
+            questions.push(...generateTemplateQuestions(topic, { [diff]: count - validQuestions.length } as any))
+          }
         }
       } catch (parseError) {
         console.error(`Failed to parse OpenAI response for ${diff} difficulty:`, parseError)
@@ -313,13 +312,7 @@ Return ONLY valid JSON, no markdown.`
       
       try {
         const parsed = JSON.parse(cleanedContent)
-        const validQuestions = (Array.isArray(parsed) ? parsed : [parsed])
-          .filter((q: any) => 
-            q.question_text && 
-            Array.isArray(q.options) && 
-            q.options.length === 4
-          )
-          .map((q: any) => ({ ...q, difficulty: diff }))
+        const validQuestions = normalizeQuestions(Array.isArray(parsed) ? parsed : [parsed], diff as DifficultyLevel)
         
         if (validQuestions.length === 0) {
           console.warn(`No valid questions parsed from Gemini response for ${diff} difficulty`)
@@ -327,6 +320,9 @@ Return ONLY valid JSON, no markdown.`
         } else {
           console.log(`Generated ${validQuestions.length} ${diff} questions via Gemini`)
           questions.push(...validQuestions)
+          if (validQuestions.length < count) {
+            questions.push(...generateTemplateQuestions(topic, { [diff]: count - validQuestions.length } as any))
+          }
         }
       } catch (parseError) {
         console.error(`Failed to parse Gemini response for ${diff} difficulty:`, parseError)
@@ -362,6 +358,44 @@ function generateTemplateQuestions(topic: string, distribution: Record<string, n
   }
 
   return questions
+}
+
+function normalizeQuestions(rawQuestions: any[], difficulty: DifficultyLevel) {
+  return rawQuestions
+    .filter((q: any) =>
+      q?.question_text &&
+      Array.isArray(q.options) &&
+      q.options.length === 4 &&
+      q.options.filter((option: any) => option?.isCorrect).length === 1
+    )
+    .map((q: any) => ({
+      question_text: q.question_text,
+      options: q.options,
+      explanation: q.explanation || null,
+      difficulty,
+    }))
+}
+
+function ensureQuestionCount(
+  questions: any[],
+  topic: string,
+  primaryDifficulty: DifficultyLevel,
+  requestedCount: number,
+) {
+  const deduped = questions.filter((question, index, collection) => {
+    const text = String(question?.question_text || '').trim().toLowerCase()
+    return text && collection.findIndex((item) => String(item?.question_text || '').trim().toLowerCase() === text) === index
+  })
+
+  if (deduped.length < requestedCount) {
+    deduped.push(
+      ...generateTemplateQuestions(topic, {
+        [primaryDifficulty]: requestedCount - deduped.length,
+      } as Record<string, number>)
+    )
+  }
+
+  return deduped.slice(0, requestedCount)
 }
 
 function createAnswerPositionPlan(count: number) {
