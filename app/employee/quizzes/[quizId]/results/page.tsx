@@ -40,7 +40,7 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
 
   const { data: history } = await supabase
     .from('quiz_attempts')
-    .select('score, answers, completed_at, quizzes:quiz_id(topic, difficulty, created_by)')
+    .select('quiz_id, score, answers, completed_at, quizzes:quiz_id(id, topic, difficulty, created_by)')
     .eq('user_id', user.id)
     .eq('status', 'completed')
 

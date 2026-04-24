@@ -113,7 +113,7 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
 
     const { data: previousAttempts } = await supabase
       .from('quiz_attempts')
-      .select('score, answers, completed_at, quizzes:quiz_id(topic, difficulty, created_by)')
+      .select('quiz_id, score, answers, completed_at, quizzes:quiz_id(id, topic, difficulty, created_by)')
       .eq('user_id', user.id)
       .eq('status', 'completed')
 
@@ -225,7 +225,7 @@ export async function getAvailableQuizzes() {
   // Get user's attempts
   const { data: attempts } = await supabase
     .from('quiz_attempts')
-    .select('quiz_id, status, score, answers, completed_at, quizzes:quiz_id(topic, difficulty, created_by)')
+    .select('quiz_id, status, score, answers, completed_at, quizzes:quiz_id(id, topic, difficulty, created_by)')
     .eq('user_id', user.id)
 
   const { data: profile } = await supabase
@@ -321,7 +321,7 @@ export async function getQuizForAttempt(quizId: string) {
 
   const { data: previousAttempts } = await supabase
     .from('quiz_attempts')
-    .select('score, answers, completed_at, quizzes:quiz_id(topic, difficulty, created_by)')
+    .select('quiz_id, score, answers, completed_at, quizzes:quiz_id(id, topic, difficulty, created_by)')
     .eq('user_id', user.id)
     .eq('status', 'completed')
 

@@ -136,53 +136,49 @@ export default async function ManagerDashboard() {
       value: stats?.totalQuizzes || 0,
       icon: FileQuestion,
       description: 'Active assessments',
-      gradient: 'from-blue-500 to-blue-600',
-      bgGradient: 'from-blue-50 to-blue-50/50',
-      border: 'border-blue-100',
-      iconBg: 'bg-blue-500',
-      text: 'text-blue-700',
+      bgGradient: 'from-zinc-50 to-white',
+      border: 'border-zinc-200',
+      iconBg: 'bg-black',
+      text: 'text-black',
     },
     {
       title: 'Total Attempts',
       value: stats?.totalAttempts || 0,
       icon: CheckCircle2,
       description: 'Completed assessments',
-      gradient: 'from-green-500 to-emerald-600',
-      bgGradient: 'from-green-50 to-emerald-50/50',
-      border: 'border-green-100',
-      iconBg: 'bg-green-500',
-      text: 'text-green-700',
+      bgGradient: 'from-zinc-50 to-white',
+      border: 'border-zinc-200',
+      iconBg: 'bg-black',
+      text: 'text-black',
     },
     {
       title: 'Average Score',
       value: `${stats?.averageScore || 0}%`,
       icon: TrendingUp,
       description: 'Across all quizzes',
-      gradient: 'from-purple-500 to-violet-600',
-      bgGradient: 'from-purple-50 to-violet-50/50',
-      border: 'border-purple-100',
-      iconBg: 'bg-purple-500',
-      text: 'text-purple-700',
+      bgGradient: 'from-zinc-50 to-white',
+      border: 'border-zinc-200',
+      iconBg: 'bg-black',
+      text: 'text-black',
     },
     {
       title: 'Active Employees',
       value: stats?.uniqueEmployees || 0,
       icon: Users,
       description: 'Have taken quizzes',
-      gradient: 'from-orange-500 to-amber-600',
-      bgGradient: 'from-orange-50 to-amber-50/50',
-      border: 'border-orange-100',
-      iconBg: 'bg-orange-500',
-      text: 'text-orange-700',
+      bgGradient: 'from-zinc-50 to-white',
+      border: 'border-zinc-200',
+      iconBg: 'bg-black',
+      text: 'text-black',
     },
   ]
 
   return (
     <div className="space-y-8">
       {/* Welcome Section */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 p-6 md:p-8 text-white shadow-xl shadow-blue-500/20">
+      <div className="relative overflow-hidden rounded-[2rem] border border-zinc-900 bg-black p-6 md:p-8 text-white shadow-[0_40px_120px_rgba(0,0,0,0.55)]">
         <div className="absolute top-0 right-0 -mt-20 -mr-20 w-80 h-80 bg-white/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-80 h-80 bg-indigo-500/20 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-80 h-80 bg-white/5 rounded-full blur-3xl" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-3">
@@ -243,13 +239,27 @@ export default async function ManagerDashboard() {
         ))}
       </div>
 
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {[
+          'Cognitive Load Detector',
+          'Emotional State Inference',
+          'Batch DNA Fingerprint',
+          'Trainer Impact Score',
+        ].map((feature) => (
+          <div key={feature} className="rounded-[1.5rem] border border-zinc-200 bg-white p-4 shadow-sm">
+            <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">AI Surface</p>
+            <p className="mt-3 font-semibold text-black">{feature}</p>
+          </div>
+        ))}
+      </div>
+
       {/* Manager Action Center */}
       <Card className="border-border/60 shadow-sm overflow-hidden">
         <CardHeader className="bg-muted/20 border-b border-border/50">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle className="flex items-center gap-2 text-lg">
-                <Sparkles className="h-5 w-5 text-blue-600" />
+                <Sparkles className="h-5 w-5 text-black" />
                 Manager Action Center
               </CardTitle>
               <CardDescription>Important next steps based on current quiz and employee activity.</CardDescription>

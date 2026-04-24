@@ -21,7 +21,7 @@ const rankedDifficulties = Object.entries(difficultyRank)
   .sort((a, b) => a[1] - b[1])
   .map(([difficulty]) => difficulty as DifficultyLevel)
 
-type AttemptLike = {
+export type AttemptLike = {
   quiz_id: string
   user_id?: string
   score?: number | null
@@ -34,10 +34,16 @@ type AttemptLike = {
     topic?: string | null
     difficulty?: DifficultyLevel | null
     created_by?: string | null
-  } | null
+  } | Array<{
+    id?: string
+    title?: string | null
+    topic?: string | null
+    difficulty?: DifficultyLevel | null
+    created_by?: string | null
+  }> | null
 }
 
-type QuizLike = {
+export type QuizLike = {
   id: string
   title?: string | null
   topic?: string | null
@@ -45,9 +51,16 @@ type QuizLike = {
   created_by?: string | null
 }
 
-type ProfileLike = {
+export type ProfileLike = {
   id: string
   full_name?: string | null
+}
+
+function getQuizRelation(attempt: AttemptLike) {
+  if (Array.isArray(attempt.quizzes)) {
+    return attempt.quizzes[0] || null
+  }
+  return attempt.quizzes || null
 }
 
 export function clamp(value: number, min: number, max: number) {
@@ -146,7 +159,7 @@ export function computeReadinessInsight(args: {
   const { attempts, quiz, currentStreak = 0, domain, daysInTraining = 0 } = args
   const completedAttempts = attempts.filter((attempt) => typeof attempt.score === 'number')
   const topicAttempts = completedAttempts.filter(
-    (attempt) => attempt.quizzes?.topic?.toLowerCase() === quiz.topic.toLowerCase()
+    (attempt) => getQuizRelation(attempt)?.topic?.toLowerCase() === quiz.topic.toLowerCase()
   )
 
   const averageHistory = completedAttempts.length
@@ -196,7 +209,7 @@ export function buildBatchProfile(attempts: AttemptLike[]): TopicStrengthPoint[]
   const bucket = new Map<string, { totalScore: number; attempts: number; overloadCount: number }>()
 
   for (const attempt of attempts) {
-    const topic = attempt.quizzes?.topic || 'General'
+    const topic = getQuizRelation(attempt)?.topic || 'General'
     const current = bucket.get(topic) || { totalScore: 0, attempts: 0, overloadCount: 0 }
     current.totalScore += attempt.score || 0
     current.attempts += 1
@@ -227,10 +240,11 @@ export function buildTrainerImpact(args: {
   const bucket = new Map<string, { trainerId: string; trainerName: string; topic: string; totalScore: number; attempts: number }>()
 
   for (const attempt of args.attempts) {
-    const quiz = attempt.quizzes?.id ? quizMap.get(attempt.quizzes.id) : quizMap.get(attempt.quiz_id)
-    const trainerId = quiz?.created_by || attempt.quizzes?.created_by || 'unknown'
+    const relationQuiz = getQuizRelation(attempt)
+    const quiz = relationQuiz?.id ? quizMap.get(relationQuiz.id) : quizMap.get(attempt.quiz_id)
+    const trainerId = quiz?.created_by || relationQuiz?.created_by || 'unknown'
     const trainerName = profileMap.get(trainerId) || 'Unassigned Trainer'
-    const topic = quiz?.topic || attempt.quizzes?.topic || 'General'
+    const topic = quiz?.topic || relationQuiz?.topic || 'General'
     const key = `${trainerId}:${topic}`
     const current = bucket.get(key) || { trainerId, trainerName, topic, totalScore: 0, attempts: 0 }
     current.totalScore += attempt.score || 0
@@ -257,7 +271,7 @@ export function buildRetentionChecks(attempts: AttemptLike[], now = new Date()):
   const byTopic = new Map<string, AttemptLike[]>()
 
   for (const attempt of attempts) {
-    const topic = attempt.quizzes?.topic || 'General'
+    const topic = getQuizRelation(attempt)?.topic || 'General'
     const collection = byTopic.get(topic) || []
     collection.push(attempt)
     byTopic.set(topic, collection)
@@ -294,7 +308,7 @@ export function buildRetentionChecks(attempts: AttemptLike[], now = new Date()):
 
 export function getTopicAttempts(attempts: AttemptLike[], topic?: string | null) {
   if (!topic) return []
-  return attempts.filter((attempt) => attempt.quizzes?.topic?.toLowerCase() === topic.toLowerCase())
+  return attempts.filter((attempt) => getQuizRelation(attempt)?.topic?.toLowerCase() === topic.toLowerCase())
 }
 
 export function getDaysInTraining(createdAt?: string | null) {

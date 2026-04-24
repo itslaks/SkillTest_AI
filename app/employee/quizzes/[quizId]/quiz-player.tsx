@@ -30,6 +30,19 @@ interface QuizPlayerProps {
   quiz: any
 }
 
+type QuizOption = {
+  text: string
+  isCorrect: boolean
+}
+
+type QuizQuestion = {
+  id: string
+  question_text: string
+  difficulty: DifficultyLevel
+  explanation?: string | null
+  options: QuizOption[]
+}
+
 type LiveState = {
   cognitiveLoad: boolean
   panicMode: boolean
@@ -69,8 +82,8 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     message: 'System is tracking rhythm, hesitation, and topic pressure in real time.',
   })
 
-  const questions = quiz.questions || []
-  const questionMap = new Map(questions.map((question: any) => [question.id, question]))
+  const questions = (quiz.questions || []) as QuizQuestion[]
+  const questionMap = new Map<string, QuizQuestion>(questions.map((question) => [question.id, question]))
   const currentQuestion = questionMap.get(questionOrder[currentIndex])
   const totalQuestions = questions.length
   const progress = totalQuestions > 0 ? ((currentIndex + (showFeedback ? 1 : 0)) / totalQuestions) * 100 : 0
@@ -117,8 +130,8 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
 
   function buildAdaptiveOrder(targetDifficulty: DifficultyLevel) {
     const completedIds = new Set(questionOrder.slice(0, currentIndex + 1))
-    const remaining = questions.filter((question: any) => !completedIds.has(question.id))
-    remaining.sort((left: any, right: any) => {
+    const remaining = questions.filter((question) => !completedIds.has(question.id))
+    remaining.sort((left, right) => {
       const leftDistance = Math.abs(difficultyValue(left.difficulty) - difficultyValue(targetDifficulty))
       const rightDistance = Math.abs(difficultyValue(right.difficulty) - difficultyValue(targetDifficulty))
       return leftDistance - rightDistance
@@ -126,7 +139,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
 
     setQuestionOrder([
       ...questionOrder.slice(0, currentIndex + 1),
-      ...remaining.map((question: any) => question.id),
+      ...remaining.map((question) => question.id),
     ])
   }
 
@@ -387,7 +400,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
             </CardHeader>
 
             <CardContent className="space-y-3 p-6">
-              {currentQuestion?.options?.map((option: any, index: number) => {
+              {currentQuestion?.options?.map((option, index: number) => {
                 const isSelected = selectedOption === index
                 const isCorrect = option.isCorrect
                 let style = 'border-white/10 bg-white/5 hover:border-white/40'
