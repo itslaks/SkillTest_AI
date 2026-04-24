@@ -55,7 +55,7 @@ export interface QuizAttempt {
   id: string
   quiz_id: string
   user_id: string
-  answers: { questionId: string; selectedOption: number; isCorrect: boolean; timeSpent: number }[] | null
+  answers: QuizAnswer[] | null
   score: number
   total_questions: number
   correct_answers: number
@@ -264,7 +264,7 @@ export interface ParsedQuestion {
 
 export interface SubmitQuizInput {
   quiz_id: string
-  answers: { questionId: string; selectedOption: number; isCorrect: boolean; timeSpent: number }[]
+  answers: QuizAnswer[]
   time_taken_seconds: number
 }
 
@@ -272,4 +272,62 @@ export interface SubmitQuizInput {
 export interface ApiResponse<T> {
   data?: T
   error?: string
+}
+
+export interface QuizAnswer {
+  questionId: string
+  selectedOption: number
+  isCorrect: boolean
+  timeSpent: number
+  questionDifficulty?: DifficultyLevel
+  cognitiveLoadFlag?: boolean
+  panicSignal?: boolean
+  adaptiveDifficulty?: DifficultyLevel
+}
+
+export interface ReadinessInsight {
+  score: number
+  predictedScore: number
+  status: 'ready' | 'revise' | 'focus'
+  recommendation: string
+  streakBoost: number
+  historyBoost: number
+  topicAlignmentBoost: number
+  trainingDaysBoost: number
+}
+
+export interface AttemptInsight {
+  averageAnswerTime: number
+  easyQuestionOverloadCount: number
+  cognitiveLoadDetected: boolean
+  panicModeDetected: boolean
+  panicStreak: number
+  suggestedNextDifficulty: DifficultyLevel
+  antiGamingDetected: boolean
+  masterySignal: string
+}
+
+export interface TopicStrengthPoint {
+  topic: string
+  score: number
+  accuracy: number
+  overloadRate: number
+}
+
+export interface TrainerImpactPoint {
+  trainerId: string
+  trainerName: string
+  topic: string
+  impactScore: number
+  averageScore: number
+  attempts: number
+}
+
+export interface RetentionCheck {
+  topic: string
+  daysSinceLastAssessment: number
+  baselineScore: number
+  latestScore: number
+  decayDelta: number
+  status: 'healthy' | 'watch' | 'critical'
 }

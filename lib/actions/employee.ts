@@ -3,7 +3,14 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { uuidSchema, submitQuizSchema } from '@/lib/security/validation'
-import type { SubmitQuizInput, LeaderboardEntry } from '@/lib/types/database'
+import {
+  analyzeAttemptPattern,
+  buildRetentionChecks,
+  computeReadinessInsight,
+  getDaysInTraining,
+  getTopicAttempts,
+} from '@/lib/insights'
+import type { SubmitQuizInput, LeaderboardEntry, QuizAnswer } from '@/lib/types/database'
 
 // ─── Start a quiz attempt ─────────────────────────────────────────────
 export async function startQuizAttempt(quizId: string) {
@@ -80,6 +87,18 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
   const { quiz_id, answers, time_taken_seconds } = parsed.data
 
   try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('created_at')
+      .eq('id', user.id)
+      .single()
+
+    const { data: userStats } = await supabase
+      .from('user_stats')
+      .select('current_streak')
+      .eq('user_id', user.id)
+      .single()
+
     // Fetch quiz to calculate score
     const { data: quiz, error: quizError } = await supabase
       .from('quizzes')
@@ -92,22 +111,50 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
       return { error: 'Quiz not found' }
     }
 
+    const { data: previousAttempts } = await supabase
+      .from('quiz_attempts')
+      .select('score, answers, completed_at, quizzes:quiz_id(topic, difficulty, created_by)')
+      .eq('user_id', user.id)
+      .eq('status', 'completed')
+
     // Calculate score
     const totalQuestions = answers.length
     const correctAnswers = answers.filter(a => a.isCorrect).length
     const score = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0
 
+    const topicAttempts = getTopicAttempts(previousAttempts || [], quiz.topic)
+    const rawInsight = analyzeAttemptPattern(answers as QuizAnswer[], quiz.difficulty, topicAttempts)
+    const enrichedAnswers = answers.map((answer) => ({
+      ...answer,
+      questionDifficulty: answer.questionDifficulty || quiz.questions?.find((question: any) => question.id === answer.questionId)?.difficulty || quiz.difficulty,
+      cognitiveLoadFlag: answer.cognitiveLoadFlag ?? (
+        (answer.questionDifficulty || quiz.questions?.find((question: any) => question.id === answer.questionId)?.difficulty || quiz.difficulty) === 'easy'
+        && answer.timeSpent > 15
+      ),
+      panicSignal: answer.panicSignal ?? (!answer.isCorrect && answer.timeSpent <= 5),
+      adaptiveDifficulty: answer.adaptiveDifficulty || rawInsight.suggestedNextDifficulty,
+    }))
+
+    const readiness = computeReadinessInsight({
+      attempts: previousAttempts || [],
+      quiz,
+      currentStreak: userStats?.current_streak || 0,
+      daysInTraining: getDaysInTraining(profile?.created_at),
+    })
+
     // Points: base 10 per correct + speed bonus
     const speedBonus = time_taken_seconds < (quiz.time_limit_minutes * 60 * 0.5) ? 25 : 0
     const streakBonus = correctAnswers >= totalQuestions ? 50 : 0
-    const pointsEarned = (correctAnswers * 10) + speedBonus + streakBonus
+    const composureBonus = rawInsight.panicModeDetected ? 0 : 15
+    const learningPenalty = rawInsight.antiGamingDetected ? -15 : 0
+    const pointsEarned = Math.max(0, (correctAnswers * 10) + speedBonus + streakBonus + composureBonus + learningPenalty)
 
     console.log(`Quiz submission for user ${user.id}: Score ${score}%, Points ${pointsEarned}`)
 
     const { data, error } = await supabase
       .from('quiz_attempts')
       .update({
-        answers,
+        answers: enrichedAnswers,
         score,
         total_questions: totalQuestions,
         correct_answers: correctAnswers,
@@ -128,10 +175,12 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
 
     console.log(`Quiz submission successful for user ${user.id}, quiz ${quiz_id}`)
     revalidatePath('/employee', 'layout')
+    revalidatePath('/employee/quizzes')
     revalidatePath('/employee/leaderboard')
     revalidatePath(`/employee/quizzes/${quiz_id}/leaderboard`)
     revalidatePath(`/employee/quizzes/${quiz_id}/results`)
     revalidatePath('/manager/leaderboard')
+    revalidatePath('/manager/analytics')
     return { data }
 
   } catch (error) {
@@ -176,17 +225,42 @@ export async function getAvailableQuizzes() {
   // Get user's attempts
   const { data: attempts } = await supabase
     .from('quiz_attempts')
-    .select('quiz_id, status, score')
+    .select('quiz_id, status, score, answers, completed_at, quizzes:quiz_id(topic, difficulty, created_by)')
     .eq('user_id', user.id)
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('domain, created_at')
+    .eq('id', user.id)
+    .single()
+
+  const { data: userStats } = await supabase
+    .from('user_stats')
+    .select('current_streak')
+    .eq('user_id', user.id)
+    .single()
 
   const attemptMap = new Map<string, { quiz_id: string; status: string; score: number }>(
     attempts?.map((a: any) => [a.quiz_id, a]) || []
   )
 
+  const completedAttempts = (attempts || []).filter((attempt: any) => attempt.status === 'completed')
+  const retentionChecks = buildRetentionChecks(completedAttempts)
+  const retentionByTopic = new Map(retentionChecks.map((item) => [item.topic.toLowerCase(), item]))
+
   const quizzesWithStatus = quizzes?.map((q: any) => ({
     ...q,
     attemptStatus: attemptMap.get(q.id)?.status || null,
     attemptScore: attemptMap.get(q.id)?.score || null,
+    readiness: computeReadinessInsight({
+      attempts: completedAttempts,
+      quiz: q,
+      currentStreak: userStats?.current_streak || 0,
+      domain: profile?.domain || null,
+      daysInTraining: getDaysInTraining(profile?.created_at),
+    }),
+    retentionCheck: retentionByTopic.get((q.topic || '').toLowerCase()) || null,
+    challengeMode: analyzeAttemptPattern([], q.difficulty, getTopicAttempts(completedAttempts, q.topic)).antiGamingDetected,
   })) || []
 
   return { data: quizzesWithStatus }
@@ -233,6 +307,24 @@ export async function getQuizForAttempt(quizId: string) {
 
   if (questionsError) return { error: questionsError.message }
 
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('domain, created_at')
+    .eq('id', user.id)
+    .single()
+
+  const { data: userStats } = await supabase
+    .from('user_stats')
+    .select('current_streak')
+    .eq('user_id', user.id)
+    .single()
+
+  const { data: previousAttempts } = await supabase
+    .from('quiz_attempts')
+    .select('score, answers, completed_at, quizzes:quiz_id(topic, difficulty, created_by)')
+    .eq('user_id', user.id)
+    .eq('status', 'completed')
+
   // Shuffle questions for randomness
   const shuffled = questions ? [...questions].sort(() => Math.random() - 0.5) : []
 
@@ -256,7 +348,29 @@ export async function getQuizForAttempt(quizId: string) {
     return question
   })
 
-  return { data: { ...quiz, questions: questionsWithShuffledOptions } }
+  const topicAttempts = getTopicAttempts(previousAttempts || [], quiz.topic)
+  const readiness = computeReadinessInsight({
+    attempts: previousAttempts || [],
+    quiz,
+    currentStreak: userStats?.current_streak || 0,
+    domain: profile?.domain || null,
+    daysInTraining: getDaysInTraining(profile?.created_at),
+  })
+  const retentionCheck = buildRetentionChecks(topicAttempts).find((item) => item.topic.toLowerCase() === (quiz.topic || '').toLowerCase()) || null
+  const pattern = analyzeAttemptPattern([], quiz.difficulty, topicAttempts)
+
+  return {
+    data: {
+      ...quiz,
+      questions: questionsWithShuffledOptions,
+      insights: {
+        readiness,
+        retentionCheck,
+        antiGamingDetected: pattern.antiGamingDetected,
+        suggestedNextDifficulty: pattern.suggestedNextDifficulty,
+      },
+    },
+  }
 }
 
 // ─── Get leaderboard for a quiz ───────────────────────────────────────
@@ -322,17 +436,20 @@ export async function getEmployeeStats() {
 
   const { data: recentAttempts } = await supabase
     .from('quiz_attempts')
-    .select('*, quizzes(title, topic)')
+    .select('*, quizzes(title, topic, difficulty, created_by)')
     .eq('user_id', user.id)
     .eq('status', 'completed')
     .order('completed_at', { ascending: false })
     .limit(10)
+
+  const retentionChecks = buildRetentionChecks(recentAttempts || [])
 
   return {
     data: {
       stats: stats || { total_points: 0, current_streak: 0, longest_streak: 0, tests_completed: 0, average_score: 0 },
       badges: badges || [],
       recentAttempts: recentAttempts || [],
+      retentionChecks,
     }
   }
 }

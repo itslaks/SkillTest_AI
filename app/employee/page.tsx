@@ -1,16 +1,24 @@
 import { getEmployeeStats, getAvailableQuizzes } from '@/lib/actions/employee'
 import { createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { ReadinessMeter } from '@/components/insights/readiness-meter'
+import { MonochromeOrb } from '@/components/insights/monochrome-orb'
 import Link from 'next/link'
 import {
-  Trophy, Flame, Target, Star, ArrowRight, FileQuestion, Clock, Award, Sparkles, CheckCircle2,
+  ArrowRight,
+  Award,
+  Brain,
+  FileQuestion,
+  Flame,
+  ShieldAlert,
+  Star,
+  Trophy,
 } from 'lucide-react'
 
 export default async function EmployeeDashboard() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('full_name')
@@ -18,253 +26,139 @@ export default async function EmployeeDashboard() {
     .single()
 
   const fullName = profile?.full_name || user?.user_metadata?.full_name || null
-
   const { data: stats } = await getEmployeeStats()
   const { data: quizzes } = await getAvailableQuizzes()
 
-  const activeQuizzes = quizzes?.filter((q: any) => !q.attemptStatus || q.attemptStatus === 'in_progress') || []
-  const completedQuizzes = quizzes?.filter((q: any) => q.attemptStatus === 'completed') || []
-  const inProgressQuiz = activeQuizzes.find((q: any) => q.attemptStatus === 'in_progress')
-  const nextQuiz = inProgressQuiz || activeQuizzes[0]
-  const latestAttempt = stats?.recentAttempts?.[0]
-  const nextAction = nextQuiz
-    ? {
-        title: inProgressQuiz ? 'Continue your quiz' : 'Start your next quiz',
-        description: inProgressQuiz
-          ? `${inProgressQuiz.title} is waiting where you left off.`
-          : `${nextQuiz.title} is ready for you.`,
-        href: `/employee/quizzes/${nextQuiz.id}`,
-        cta: inProgressQuiz ? 'Continue' : 'Start quiz',
-        icon: FileQuestion,
-        tone: 'blue',
-      }
-    : latestAttempt
-      ? {
-          title: 'Review your latest ranking',
-          description: `${latestAttempt.quizzes?.title || 'Your latest quiz'} is complete. Check where you stand.`,
-          href: `/employee/quizzes/${latestAttempt.quiz_id}/leaderboard`,
-          cta: 'View leaderboard',
-          icon: Trophy,
-          tone: 'amber',
-        }
-      : {
-          title: 'No quiz assigned yet',
-          description: 'Your manager has not assigned a quiz. Check back later or explore your badges.',
-          href: '/employee/badges',
-          cta: 'View badges',
-          icon: Award,
-          tone: 'pink',
-        }
+  const openQuizzes = quizzes?.filter((quiz: any) => quiz.attemptStatus !== 'completed') || []
+  const nextQuiz = openQuizzes[0]
+  const retentionRisk = stats?.retentionChecks?.find((item: any) => item.daysSinceLastAssessment >= 14)
 
   const statCards = [
-    { title: 'Total Points', value: stats?.stats?.total_points || 0, suffix: '', icon: Star, color: 'text-amber-600', bg: 'bg-amber-50', iconBg: 'bg-amber-500/10', iconColor: 'text-amber-500' },
-    { title: 'Day Streak', value: stats?.stats?.current_streak || 0, suffix: ' days', icon: Flame, color: 'text-orange-600', bg: 'bg-orange-50', iconBg: 'bg-orange-500/10', iconColor: 'text-orange-500' },
-    { title: 'Quizzes Done', value: stats?.stats?.tests_completed || 0, suffix: '', icon: Target, color: 'text-emerald-600', bg: 'bg-emerald-50', iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-500' },
-    { title: 'Avg Score', value: Math.round(stats?.stats?.average_score || 0), suffix: '%', icon: Trophy, color: 'text-blue-600', bg: 'bg-blue-50', iconBg: 'bg-blue-500/10', iconColor: 'text-blue-500' },
+    { title: 'Points', value: stats?.stats?.total_points || 0, icon: Star },
+    { title: 'Streak', value: stats?.stats?.current_streak || 0, icon: Flame },
+    { title: 'Completed', value: stats?.stats?.tests_completed || 0, icon: Trophy },
+    { title: 'Badges', value: stats?.badges?.length || 0, icon: Award },
   ]
 
-  const difficultyColors: Record<string, string> = {
-    easy: 'bg-emerald-100 text-emerald-700',
-    medium: 'bg-blue-100 text-blue-700',
-    hard: 'bg-amber-100 text-amber-700',
-    advanced: 'bg-orange-100 text-orange-700',
-    hardcore: 'bg-red-100 text-red-700',
-  }
-
   return (
-    <div className="space-y-6">
-      {/* Welcome banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-[#0f0f10] p-6 md:p-8 text-white">
-        <div className="absolute top-0 left-0 w-64 h-64 bg-blue-600/15 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
-        <div className="absolute bottom-0 right-0 w-64 h-64 bg-violet-600/15 rounded-full blur-3xl translate-x-1/2 translate-y-1/2" />
-        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-8">
+      <section className="relative overflow-hidden rounded-[2rem] border border-zinc-900 bg-black p-6 text-white shadow-[0_40px_120px_rgba(0,0,0,0.5)] md:p-8">
+        <div className="absolute right-4 top-4 hidden md:block">
+          <MonochromeOrb />
+        </div>
+        <div className="relative z-10 grid gap-6 md:grid-cols-[1.1fr_0.9fr]">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/10 text-xs font-semibold tracking-wide uppercase mb-3">
-              <Sparkles className="h-3.5 w-3.5 text-blue-400" />
-              Employee Dashboard
-            </div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-1.5">
-              Hey, {fullName?.split(' ')[0] || 'there'} 👋
+            <p className="text-[10px] uppercase tracking-[0.35em] text-zinc-500">Employee Intelligence Console</p>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight md:text-5xl">
+              Welcome back, {fullName?.split(' ')[0] || 'there'}
             </h1>
-            <p className="text-white/50 text-sm md:text-base">
-              Keep learning, earn badges, and climb the leaderboard!
+            <p className="mt-4 max-w-2xl text-sm leading-relaxed text-zinc-400">
+              Your dashboard now forecasts readiness, tracks knowledge decay, and adapts every assessment around how you respond.
             </p>
-          </div>
-          <Button asChild className="bg-white text-[#0f0f10] hover:bg-white/90 font-semibold shrink-0 rounded-xl h-11 px-5">
-            <Link href="/employee/quizzes">
-              <FileQuestion className="mr-2 h-4 w-4" />Take a Quiz
-            </Link>
-          </Button>
-        </div>
-      </div>
 
-      {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {statCards.map((stat) => (
-          <div key={stat.title} className={`rounded-2xl p-5 border border-border/60 bg-white shadow-sm`}>
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-medium text-muted-foreground">{stat.title}</p>
-              <div className={`w-8 h-8 rounded-xl ${stat.iconBg} flex items-center justify-center`}>
-                <stat.icon className={`h-4 w-4 ${stat.iconColor}`} />
-              </div>
-            </div>
-            <p className={`text-2xl font-bold ${stat.color}`}>
-              {stat.value}<span className="text-sm font-normal text-muted-foreground">{stat.suffix}</span>
-            </p>
-          </div>
-        ))}
-      </div>
-
-      {/* Next best step */}
-      <div className="rounded-2xl bg-white border border-border/60 shadow-sm overflow-hidden">
-        <div className="p-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-4">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
-              nextAction.tone === 'blue' ? 'bg-blue-50 text-blue-600'
-              : nextAction.tone === 'amber' ? 'bg-amber-50 text-amber-600'
-              : 'bg-pink-50 text-pink-600'
-            }`}>
-              <nextAction.icon className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Next Best Step</p>
-              <h2 className="font-bold text-lg">{nextAction.title}</h2>
-              <p className="text-sm text-muted-foreground mt-1">{nextAction.description}</p>
-            </div>
-          </div>
-          <Button className="rounded-xl shrink-0" asChild>
-            <Link href={nextAction.href}>
-              {nextAction.cta} <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
-        {completedQuizzes.length > 0 && (
-          <div className="border-t border-border/50 bg-muted/20 px-5 py-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-            You can revisit leaderboards for {completedQuizzes.length} completed quiz{completedQuizzes.length === 1 ? '' : 'zes'} anytime.
-          </div>
-        )}
-      </div>
-
-      {/* Quick nav cards */}
-      <div className="grid gap-4 md:grid-cols-3">
-        { [
-          { href: '/employee/quizzes', icon: FileQuestion, label: 'Take Quizzes', desc: `${activeQuizzes.length} available`, iconBg: 'bg-violet-500/10', iconColor: 'text-violet-500' },
-          { href: '/employee/leaderboard', icon: Trophy, label: 'Leaderboard', desc: 'See rankings', iconBg: 'bg-amber-500/10', iconColor: 'text-amber-500' },
-          { href: '/employee/badges', icon: Award, label: 'Badges', desc: `${stats?.badges?.length || 0} earned`, iconBg: 'bg-pink-500/10', iconColor: 'text-pink-500' },
-        ].map(item => (
-          <Link key={item.href} href={item.href} className="group flex items-center gap-4 p-5 rounded-2xl bg-white border border-border/60 shadow-sm hover:shadow-md hover:border-primary/30 transition-all">
-            <div className={`w-11 h-11 rounded-xl ${item.iconBg} flex items-center justify-center shrink-0`}>
-              <item.icon className={`h-5 w-5 ${item.iconColor}`} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold">{item.label}</p>
-              <p className="text-sm text-muted-foreground">{item.desc}</p>
-            </div>
-            <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
-          </Link>
-        )) }
-      </div>
-
-      {/* Available quizzes */}
-      <div className="rounded-2xl bg-white border border-border/60 shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border/50 bg-muted/20">
-          <div>
-            <h2 className="font-semibold">Available Quizzes</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Take an assessment to earn points</p>
-          </div>
-          <Link href="/employee/quizzes" className="text-sm text-primary font-medium hover:underline underline-offset-4 flex items-center gap-1">
-            View all <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </div>
-        <div className="p-5">
-          {activeQuizzes.length > 0 ? (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {activeQuizzes.slice(0, 6).map((quiz: any) => (
-                <div key={quiz.id} className="flex flex-col p-4 rounded-xl border border-border/60 hover:border-primary/30 hover:shadow-sm transition-all bg-[#f9f9fb]">
-                  <div className="flex items-start gap-2 mb-2">
-                    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${difficultyColors[quiz.difficulty] || 'bg-gray-100 text-gray-700'}`}>{quiz.difficulty}</span>
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {statCards.map((card) => (
+                <div key={card.title} className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">{card.title}</p>
+                    <card.icon className="h-4 w-4 text-white" />
                   </div>
-                  <h3 className="font-semibold text-sm line-clamp-1 mb-1">{quiz.title}</h3>
-                  <p className="text-xs text-muted-foreground line-clamp-2 mb-3">{quiz.description || quiz.topic}</p>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
-                    <span className="flex items-center gap-1"><FileQuestion className="h-3 w-3" />{quiz.questions?.[0]?.count || quiz.question_count} Q</span>
-                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{quiz.time_limit_minutes}m</span>
-                  </div>
-                  <Button size="sm" className="mt-auto rounded-xl h-8 text-xs font-semibold bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 border-0" asChild>
-                    <Link href={`/employee/quizzes/${quiz.id}`}>
-                      {quiz.attemptStatus === 'in_progress' ? '▶ Continue' : '🚀 Start'}
-                    </Link>
-                  </Button>
+                  <p className="mt-4 text-3xl font-semibold">{card.value}</p>
                 </div>
               ))}
             </div>
-          ) : (
-            <div className="text-center py-10 text-muted-foreground">
-              <FileQuestion className="h-12 w-12 mx-auto mb-3 opacity-30" />
-              <p className="font-medium">No quizzes available right now</p>
-              <p className="text-sm mt-1">Check back later for new assessments</p>
+          </div>
+
+          <div className="space-y-4">
+            {nextQuiz?.readiness ? <ReadinessMeter readiness={nextQuiz.readiness} className="bg-white text-black" /> : null}
+            <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-5">
+              <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                <Brain className="h-4 w-4" />
+                Next best move
+              </div>
+              <p className="mt-3 text-lg font-medium text-white">{nextQuiz ? nextQuiz.title : 'No active assignment'}</p>
+              <p className="mt-2 text-sm text-zinc-400">
+                {nextQuiz ? nextQuiz.readiness?.recommendation : 'Your manager has not assigned a quiz yet.'}
+              </p>
+              <Button className="mt-5 rounded-full bg-white text-black hover:bg-zinc-200" asChild>
+                <Link href={nextQuiz ? `/employee/quizzes/${nextQuiz.id}` : '/employee/badges'}>
+                  {nextQuiz ? 'Open quiz' : 'View badges'}
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* Recent results */}
-      {stats?.recentAttempts && stats.recentAttempts.length > 0 && (
-        <div className="rounded-2xl bg-white border border-border/60 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-border/50 bg-muted/20">
-            <h2 className="font-semibold">Recent Results</h2>
           </div>
-          <div className="divide-y divide-border/40">
-            {stats.recentAttempts.slice(0, 5).map((attempt: any) => (
-              <div key={attempt.id} className="flex flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="font-medium text-sm">{attempt.quizzes?.title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{attempt.quizzes?.topic}</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                  <span className="text-xs text-muted-foreground">{Math.floor(attempt.time_taken_seconds / 60)}m {attempt.time_taken_seconds % 60}s</span>
-                  <span className={`text-sm font-bold px-2.5 py-1 rounded-lg ${attempt.score >= 70 ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                    {attempt.score}%
+        </div>
+      </section>
+
+      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+        <section className="space-y-5">
+          {openQuizzes.slice(0, 3).map((quiz: any) => (
+            <div key={quiz.id} className="grid gap-4 rounded-[2rem] border border-zinc-200 bg-white p-5 shadow-sm md:grid-cols-[1.1fr_0.9fr]">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-black px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-white">
+                    {quiz.attemptStatus === 'in_progress' ? 'In progress' : 'Queued'}
                   </span>
-                  <Button variant="outline" size="sm" className="h-8 rounded-xl text-xs" asChild>
-                    <Link href={`/employee/quizzes/${attempt.quiz_id}/results`}>
-                      Results
+                  <span className="rounded-full bg-zinc-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-zinc-600">
+                    {quiz.topic}
+                  </span>
+                  {quiz.challengeMode && (
+                    <span className="rounded-full bg-zinc-200 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-zinc-900">
+                      Challenge
+                    </span>
+                  )}
+                </div>
+                <h2 className="mt-4 text-2xl font-semibold text-black">{quiz.title}</h2>
+                <p className="mt-2 text-sm text-zinc-500">{quiz.description || quiz.topic}</p>
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <Button className="rounded-full bg-black text-white hover:bg-zinc-800" asChild>
+                    <Link href={`/employee/quizzes/${quiz.id}`}>
+                      <FileQuestion className="mr-2 h-4 w-4" />
+                      {quiz.attemptStatus === 'in_progress' ? 'Continue' : 'Start'}
                     </Link>
                   </Button>
-                  <Button size="sm" className="h-8 rounded-xl text-xs" asChild>
-                    <Link href={`/employee/quizzes/${attempt.quiz_id}/leaderboard`}>
-                      Leaderboard
-                    </Link>
+                  <Button variant="outline" className="rounded-full" asChild>
+                    <Link href="/employee/quizzes">See all quizzes</Link>
                   </Button>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+              {quiz.readiness ? <ReadinessMeter readiness={quiz.readiness} compact /> : null}
+            </div>
+          ))}
+        </section>
 
-      {/* Badges */}
-      {stats?.badges && stats.badges.length > 0 && (
-        <div className="rounded-2xl bg-white border border-border/60 shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border/50 bg-muted/20">
-            <h2 className="font-semibold flex items-center gap-2"><Award className="h-4 w-4 text-pink-500" />Your Badges</h2>
-            <Link href="/employee/badges" className="text-sm text-primary font-medium hover:underline underline-offset-4 flex items-center gap-1">
-              View all <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
-          <div className="p-5 flex flex-wrap gap-3">
-            {stats.badges.map((ub: any) => (
-              <div key={ub.id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-violet-50 border border-violet-100">
-                <span className="text-lg">🏆</span>
-                <div>
-                  <p className="text-xs font-semibold text-violet-800">{ub.badges?.name}</p>
-                </div>
+        <aside className="space-y-6">
+          <div className="rounded-[2rem] border border-zinc-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-2 text-sm font-semibold text-black">
+              <ShieldAlert className="h-4 w-4" />
+              Knowledge decay tracker
+            </div>
+            {retentionRisk ? (
+              <div className="mt-4 space-y-2 text-sm text-zinc-600">
+                <p className="font-medium text-black">{retentionRisk.topic}</p>
+                <p>{retentionRisk.daysSinceLastAssessment} days since the last assessment.</p>
+                <p>Baseline {retentionRisk.baselineScore}% vs latest {retentionRisk.latestScore}%.</p>
               </div>
-            ))}
+            ) : (
+              <p className="mt-4 text-sm text-zinc-500">No retention risk has crossed the two-week threshold.</p>
+            )}
           </div>
-        </div>
-      )}
+
+          <div className="rounded-[2rem] border border-zinc-900 bg-black p-5 text-white shadow-[0_30px_80px_rgba(0,0,0,0.35)]">
+            <p className="text-sm font-semibold">Behavioral AI is active</p>
+            <p className="mt-3 text-sm leading-relaxed text-zinc-400">
+              During each quiz, SkillTest now measures hesitation, panic patterns, and adaptive difficulty shifts in real time.
+            </p>
+            <Button variant="outline" className="mt-5 rounded-full border-white/15 bg-white/5 text-white hover:bg-white/10" asChild>
+              <Link href="/employee/quizzes">
+                Explore quiz deck
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+        </aside>
+      </div>
     </div>
   )
 }

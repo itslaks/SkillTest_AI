@@ -180,6 +180,10 @@ export const submitQuizSchema = z
       selectedOption: z.number().int().min(0),
       isCorrect: z.boolean(),
       timeSpent: z.number().int().min(0),
+      questionDifficulty: difficultyLevelSchema.optional(),
+      cognitiveLoadFlag: z.boolean().optional(),
+      panicSignal: z.boolean().optional(),
+      adaptiveDifficulty: difficultyLevelSchema.optional(),
     })),
     time_taken_seconds: z.number().int().min(0).max(86400),
   })

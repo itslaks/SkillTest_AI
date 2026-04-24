@@ -37,10 +37,10 @@ export default async function EmployeeLayout({
   }
 
   const navigation = [
-    { name: 'Dashboard', href: '/employee', icon: LayoutDashboard, color: 'text-sky-400' },
-    { name: 'Quizzes', href: '/employee/quizzes', icon: FileQuestion, color: 'text-violet-400' },
-    { name: 'Leaderboard', href: '/employee/leaderboard', icon: Trophy, color: 'text-amber-400' },
-    { name: 'Badges', href: '/employee/badges', icon: Award, color: 'text-pink-400' },
+    { name: 'Dashboard', href: '/employee', icon: LayoutDashboard, color: 'text-white' },
+    { name: 'Quizzes', href: '/employee/quizzes', icon: FileQuestion, color: 'text-white' },
+    { name: 'Leaderboard', href: '/employee/leaderboard', icon: Trophy, color: 'text-white' },
+    { name: 'Badges', href: '/employee/badges', icon: Award, color: 'text-white' },
   ]
 
   const { data: userStats } = await supabase
@@ -56,13 +56,13 @@ export default async function EmployeeLayout({
     : (profile?.email?.[0] || user.email?.[0] || 'E').toUpperCase()
 
   return (
-    <div className="min-h-screen flex bg-[#f5f5f7]">
+    <div className="min-h-screen flex bg-[#f5f5f5]">
       {/* Sidebar */}
-      <aside className="hidden md:flex w-60 flex-col bg-[#0f0f10] fixed inset-y-0 left-0 z-50">
+      <aside className="hidden md:flex w-60 flex-col bg-black fixed inset-y-0 left-0 z-50">
         {/* Logo */}
         <div className="flex items-center gap-3 px-5 h-16 border-b border-white/5 shrink-0">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-lg shrink-0">
-            <Sparkles className="w-4 h-4 text-white" />
+          <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shadow-lg shrink-0">
+            <Sparkles className="w-4 h-4 text-black" />
           </div>
           <div>
             <p className="text-white font-bold text-sm leading-none tracking-tight">SkillTest</p>
@@ -102,7 +102,7 @@ export default async function EmployeeLayout({
             )}
           </div>
           <div className="flex items-center gap-3 px-2 py-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+            <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-black text-xs font-bold shrink-0">
               {initials}
             </div>
             <div className="flex-1 min-w-0">
@@ -120,10 +120,10 @@ export default async function EmployeeLayout({
       </aside>
 
       {/* Mobile top bar */}
-      <header className="md:hidden fixed top-0 left-0 right-0 z-50 h-14 bg-[#0f0f10] border-b border-white/5 flex items-center justify-between px-4">
+      <header className="md:hidden fixed top-0 left-0 right-0 z-50 h-14 bg-black border-b border-white/5 flex items-center justify-between px-4">
         <Link href="/employee" className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
-            <Sparkles className="w-3.5 h-3.5 text-white" />
+          <div className="w-7 h-7 rounded-lg bg-white flex items-center justify-center">
+            <Sparkles className="w-3.5 h-3.5 text-black" />
           </div>
           <span className="text-white font-bold text-sm">SkillTest</span>
         </Link>
