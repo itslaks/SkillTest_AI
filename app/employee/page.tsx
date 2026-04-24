@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import { ReadinessMeter } from '@/components/insights/readiness-meter'
 import { MonochromeOrb } from '@/components/insights/monochrome-orb'
+import { DashboardSignalShowcase } from '@/components/insights/dashboard-signal-showcase'
 import Link from 'next/link'
 import {
   ArrowRight,
@@ -43,11 +44,11 @@ export default async function EmployeeDashboard() {
 
   return (
     <div className="space-y-8">
-      <section className="relative overflow-hidden rounded-[2rem] border border-zinc-900 bg-black p-6 text-white shadow-[0_40px_120px_rgba(0,0,0,0.5)] md:p-8">
+      <section className="relative overflow-hidden rounded-[2rem] border border-zinc-900 bg-black p-6 text-white shadow-[0_40px_120px_rgba(0,0,0,0.5)] md:p-8 dashboard-grid-bg">
         <div className="absolute right-4 top-4 hidden md:block">
           <MonochromeOrb />
         </div>
-        <div className="relative z-10 grid gap-6 md:grid-cols-[1.1fr_0.9fr]">
+        <div className="relative z-10 grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
           <div>
             <p className="text-[10px] uppercase tracking-[0.35em] text-zinc-500">Employee Intelligence Console</p>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight md:text-5xl">
@@ -89,8 +90,34 @@ export default async function EmployeeDashboard() {
               </Button>
             </div>
           </div>
+          <DashboardSignalShowcase
+            theme="dark"
+            badge="Learner Motion Layer"
+            title="A learner dashboard with enough atmosphere to feel memorable."
+            subtitle="The visuals reinforce momentum, intelligence, and progression while the core actions stay obvious."
+          />
         </div>
       </section>
+
+      <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+        <DashboardSignalShowcase
+          theme="light"
+          badge="Momentum Surface"
+          title="The employee experience also carries the wow factor, not just admin screens."
+          subtitle="Judges will notice when the learner side feels thoughtfully designed instead of visually forgotten."
+        />
+        <div className="grid gap-4 md:grid-cols-3">
+          {[
+            'Small ambient animations make the journey feel alive.',
+            'Panels have more depth and personality without harming usability.',
+            'The visual language stays consistent with the landing showcase.',
+          ].map((item) => (
+            <div key={item} className="glass-panel spotlight-card rounded-[1.75rem] p-5 text-sm leading-relaxed text-zinc-600 shadow-[0_25px_70px_rgba(15,23,42,0.08)]">
+              {item}
+            </div>
+          ))}
+        </div>
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <section className="space-y-5">
@@ -109,7 +136,7 @@ export default async function EmployeeDashboard() {
           </div>
 
           {openQuizzes.slice(0, 3).map((quiz: any) => (
-            <div key={quiz.id} className="grid gap-4 rounded-[2rem] border border-zinc-200 bg-white p-5 shadow-sm md:grid-cols-[1.1fr_0.9fr]">
+            <div key={quiz.id} className="grid gap-4 rounded-[2rem] border border-zinc-200 bg-white p-5 shadow-sm md:grid-cols-[1.1fr_0.9fr] spotlight-card">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] ${

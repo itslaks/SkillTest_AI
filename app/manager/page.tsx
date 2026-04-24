@@ -3,6 +3,7 @@ import { requireManager } from '@/lib/rbac'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import { DashboardSignalShowcase } from '@/components/insights/dashboard-signal-showcase'
 import { 
   FileQuestion, 
   Users, 
@@ -177,10 +178,10 @@ export default async function ManagerDashboard() {
   return (
     <div className="space-y-8">
       {/* Welcome Section */}
-      <div className="relative overflow-hidden rounded-[2rem] border border-zinc-900 bg-black p-6 md:p-8 text-white shadow-[0_40px_120px_rgba(0,0,0,0.55)]">
+      <div className="relative overflow-hidden rounded-[2rem] border border-zinc-900 bg-black p-6 md:p-8 text-white shadow-[0_40px_120px_rgba(0,0,0,0.55)] dashboard-grid-bg">
         <div className="absolute top-0 right-0 -mt-20 -mr-20 w-80 h-80 bg-white/10 rounded-full blur-3xl" />
         <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-80 h-80 bg-white/5 rounded-full blur-3xl" />
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="relative z-10 grid gap-6 xl:grid-cols-[0.85fr_1.15fr] xl:items-center">
           <div>
             <div className="flex items-center gap-2 mb-3">
               <div className="px-3 py-1 rounded-full bg-white/20 text-xs font-semibold tracking-wide uppercase">
@@ -193,37 +194,71 @@ export default async function ManagerDashboard() {
             <p className="text-white/75 max-w-md text-sm md:text-base">
               Here&apos;s an overview of your assessments and employee performance today.
             </p>
+            <div className="mt-6 flex gap-2 flex-wrap">
+              <Button 
+                asChild 
+                size="lg" 
+                className="bg-white text-blue-700 hover:bg-blue-50 shadow-lg font-semibold"
+              >
+                <Link href="/manager/quizzes/new">
+                  <Plus className="mr-2 h-5 w-5" />
+                  Create Quiz
+                </Link>
+              </Button>
+              <Button 
+                asChild 
+                variant="outline"
+                size="lg"
+                className="border-white/30 text-white hover:bg-white/10 bg-white/10"
+              >
+                <Link href="/manager/operations">
+                  <CalendarDays className="mr-2 h-4 w-4" />
+                  Training Ops
+                </Link>
+              </Button>
+            </div>
           </div>
-          <div className="flex gap-2 flex-wrap">
-            <Button 
-              asChild 
-              size="lg" 
-              className="bg-white text-blue-700 hover:bg-blue-50 shadow-lg font-semibold"
-            >
-              <Link href="/manager/quizzes/new">
-                <Plus className="mr-2 h-5 w-5" />
-                Create Quiz
-              </Link>
-            </Button>
-            <Button 
-              asChild 
-              variant="outline"
-              size="lg"
-              className="border-white/30 text-white hover:bg-white/10 bg-white/10"
-            >
-              <Link href="/manager/operations">
-                <CalendarDays className="mr-2 h-4 w-4" />
-                Training Ops
-              </Link>
-            </Button>
-          </div>
+          <DashboardSignalShowcase
+            theme="dark"
+            badge="Manager Signal Deck"
+            title="A command center that feels as sharp as the decisions made inside it."
+            subtitle="Ambient 3D telemetry gives the manager view more presence without getting in the way of metrics, actions, and live reporting."
+          />
         </div>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+        <Card className="glass-panel spotlight-card border-black/5 shadow-[0_30px_80px_rgba(15,23,42,0.08)]">
+          <CardHeader>
+            <CardTitle className="text-lg">Presentation Edge</CardTitle>
+            <CardDescription>
+              These screens now carry the same design confidence as the landing page, so the wow factor is visible in the real product experience too.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-3">
+            {[
+              'Layered dark surfaces create depth on the first manager impression.',
+              'Interactive-feeling ambient motion comes from scene objects, not gimmicks.',
+              'Operational content still stays readable and presentation-ready.',
+            ].map((item) => (
+              <div key={item} className="rounded-[1.4rem] border border-black/6 bg-white/70 p-4 text-sm text-zinc-600">
+                {item}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+        <DashboardSignalShowcase
+          theme="light"
+          badge="Ops + AI Layer"
+          title="The product screens now flex interface craft, not just the marketing shell."
+          subtitle="That matters in a designathon, because judges notice whether the actual workflow pages feel special."
+        />
       </div>
 
       {/* Stats Grid */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         {statCards.map((stat) => (
-          <Card key={stat.title} className={`relative overflow-hidden bg-gradient-to-br ${stat.bgGradient} ${stat.border} shadow-sm hover:shadow-md transition-shadow`}>
+          <Card key={stat.title} className={`relative overflow-hidden bg-gradient-to-br ${stat.bgGradient} ${stat.border} spotlight-card shadow-sm hover:shadow-md transition-shadow`}>
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
               <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
                 {stat.title}

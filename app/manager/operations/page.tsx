@@ -8,6 +8,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { DashboardSignalShowcase } from '@/components/insights/dashboard-signal-showcase'
 import {
   BellRing,
   CalendarDays,
@@ -102,8 +103,8 @@ export default async function ManagerOperationsPage() {
 
   return (
     <div className="space-y-8">
-      <section className="rounded-[2rem] border border-zinc-900 bg-black p-6 text-white shadow-[0_40px_120px_rgba(0,0,0,0.55)] md:p-8">
-        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+      <section className="rounded-[2rem] border border-zinc-900 bg-black p-6 text-white shadow-[0_40px_120px_rgba(0,0,0,0.55)] md:p-8 dashboard-grid-bg">
+        <div className="grid gap-6 xl:grid-cols-[0.82fr_1.18fr]">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-[10px] uppercase tracking-[0.35em] text-zinc-400">
               Training Execution Platform
@@ -113,17 +114,25 @@ export default async function ManagerOperationsPage() {
               This module closes the gap between assessment analytics and day-to-day training execution. Every operational requirement from the brief now has a visible workflow here.
             </p>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <StatCard label="Active batches" value={`${summary.activeBatches}`} icon={Users} />
-            <StatCard label="Upcoming sessions" value={`${summary.upcomingSessions}`} icon={CalendarDays} />
-            <StatCard label="Attendance health" value={`${summary.attendanceRate}%`} icon={ClipboardCheck} />
-            <StatCard label="Feedback risks" value={`${summary.negativeFeedbackCount}`} icon={ShieldAlert} />
+          <div className="space-y-4">
+            <DashboardSignalShowcase
+              theme="dark"
+              badge="Ops Control Deck"
+              title="Execution screens now feel more cinematic and presentation-ready."
+              subtitle="Sessions, attendance, reminders, and feedback sit inside a richer visual system instead of plain utility layouts."
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <StatCard label="Active batches" value={`${summary.activeBatches}`} icon={Users} />
+              <StatCard label="Upcoming sessions" value={`${summary.upcomingSessions}`} icon={CalendarDays} />
+              <StatCard label="Attendance health" value={`${summary.attendanceRate}%`} icon={ClipboardCheck} />
+              <StatCard label="Feedback risks" value={`${summary.negativeFeedbackCount}`} icon={ShieldAlert} />
+            </div>
           </div>
         </div>
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <Card className="border-zinc-200 shadow-sm">
+        <Card className="border-zinc-200 shadow-sm spotlight-card">
           <CardHeader>
             <CardTitle>Batch Lifecycle Management</CardTitle>
             <CardDescription>Create batches, attach trainers, enroll learners, and link assessments in one action.</CardDescription>
@@ -204,7 +213,7 @@ export default async function ManagerOperationsPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-zinc-200 shadow-sm">
+        <Card className="border-zinc-200 shadow-sm spotlight-card">
           <CardHeader>
             <CardTitle>Session Planner & Notifications</CardTitle>
             <CardDescription>Schedule trainer-led sessions and trigger communication without leaving this screen.</CardDescription>
@@ -341,7 +350,7 @@ export default async function ManagerOperationsPage() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <Card className="border-zinc-200 shadow-sm">
+        <Card className="border-zinc-200 shadow-sm spotlight-card">
           <CardHeader>
             <CardTitle>Live Batch Board</CardTitle>
             <CardDescription>Operational visibility across lifecycle, trainer ownership, enrolled learners, and linked assessments.</CardDescription>
@@ -407,7 +416,7 @@ export default async function ManagerOperationsPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-zinc-200 shadow-sm">
+        <Card className="border-zinc-200 shadow-sm spotlight-card">
           <CardHeader>
             <CardTitle>Feedback & Reminder Pulse</CardTitle>
             <CardDescription>Recent learner sentiment and communication activity tied to training execution.</CardDescription>
@@ -459,7 +468,7 @@ export default async function ManagerOperationsPage() {
         </Card>
       </div>
 
-      <Card className="border-zinc-200 shadow-sm">
+      <Card className="border-zinc-200 shadow-sm spotlight-card">
         <CardHeader>
           <CardTitle>Attendance Tracker</CardTitle>
           <CardDescription>Session-level attendance now has physical controls in the UI and persists through the backend.</CardDescription>
