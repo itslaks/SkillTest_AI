@@ -210,4 +210,85 @@
       linear-gradient(135deg, var(--foreground) 25%, transparent 25%, transparent 50%, var(--foreground) 50%, var(--foreground) 75%, transparent 75%) border-box;
     background-size: 100% 100%, 8px 8px;
   }
+
+  .glass-panel {
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.46)),
+      radial-gradient(circle at top left, rgba(255, 255, 255, 0.7), transparent 42%);
+    backdrop-filter: blur(18px);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow:
+      0 30px 80px rgba(16, 18, 24, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  }
+
+  .mesh-bg {
+    background-image:
+      radial-gradient(circle at 15% 20%, rgba(43, 108, 255, 0.14), transparent 22%),
+      radial-gradient(circle at 85% 15%, rgba(8, 145, 178, 0.14), transparent 18%),
+      radial-gradient(circle at 50% 80%, rgba(15, 23, 42, 0.08), transparent 24%),
+      linear-gradient(135deg, rgba(255,255,255,0.8), rgba(244,246,248,0.9));
+  }
+
+  .tilt-sheen {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .tilt-sheen::before {
+    content: '';
+    position: absolute;
+    inset: -30%;
+    background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.6), transparent 70%);
+    transform: translateX(-120%) rotate(12deg);
+    transition: transform 0.8s ease;
+    pointer-events: none;
+  }
+
+  .tilt-sheen:hover::before {
+    transform: translateX(120%) rotate(12deg);
+  }
+
+  .aura-ring {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(24px);
+    opacity: 0.5;
+    animation: drift 10s ease-in-out infinite;
+  }
+
+  .float-slow {
+    animation: float-slow 8s ease-in-out infinite;
+  }
+
+  .float-delayed {
+    animation: float-delayed 10s ease-in-out infinite;
+  }
+
+  @keyframes float-slow {
+    0%, 100% {
+      transform: translate3d(0, 0, 0) rotate(0deg);
+    }
+    50% {
+      transform: translate3d(0, -14px, 0) rotate(-2deg);
+    }
+  }
+
+  @keyframes float-delayed {
+    0%, 100% {
+      transform: translate3d(0, 0, 0) rotate(0deg);
+    }
+    50% {
+      transform: translate3d(0, 12px, 0) rotate(2deg);
+    }
+  }
+
+  @keyframes drift {
+    0%, 100% {
+      transform: scale(1) translate3d(0, 0, 0);
+    }
+    50% {
+      transform: scale(1.08) translate3d(12px, -18px, 0);
+    }
+  }
 }

@@ -94,7 +94,8 @@ export function MetricsSection() {
   }, []);
 
   return (
-    <section id="why-skilltest" ref={sectionRef} className="relative py-24 lg:py-32 border-y border-foreground/10">
+    <section id="why-skilltest" ref={sectionRef} className="relative overflow-hidden py-24 lg:py-32 border-y border-foreground/10 bg-[radial-gradient(circle_at_top,rgba(15,23,42,0.06),transparent_35%),linear-gradient(180deg,rgba(255,255,255,0.88),rgba(244,244,245,0.96))]">
+      <div className="pointer-events-none absolute inset-x-0 top-10 mx-auto h-56 max-w-5xl rounded-full bg-blue-300/20 blur-3xl" />
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8 mb-16 lg:mb-24">
@@ -124,15 +125,16 @@ export function MetricsSection() {
         </div>
         
         {/* Metrics Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-foreground/10">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {metrics.map((metric, index) => (
             <div
               key={metric.label}
-              className={`bg-background p-8 lg:p-12 transition-all duration-700 ${
+              className={`glass-panel tilt-sheen rounded-[2rem] p-8 lg:p-12 transition-all duration-700 ${
                 isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
               }`}
               style={{ transitionDelay: `${index * 100}ms` }}
             >
+              <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Live metric</p>
               <AnimatedCounter 
                 end={typeof metric.value === 'number' ? metric.value : 0} 
                 suffix={metric.suffix} 

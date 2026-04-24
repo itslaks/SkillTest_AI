@@ -34,7 +34,10 @@ export function IntegrationsSection() {
   }, []);
 
   return (
-    <section id="gamification" ref={sectionRef} className="relative py-24 lg:py-32 overflow-hidden">
+    <section id="gamification" ref={sectionRef} className="relative py-24 lg:py-32 overflow-hidden bg-foreground text-background">
+      <div className="pointer-events-none absolute inset-0 opacity-[0.08]" style={{
+        backgroundImage: "radial-gradient(circle at 20% 20%, white, transparent 22%), radial-gradient(circle at 80% 30%, white, transparent 20%), linear-gradient(135deg, transparent 0%, rgba(255,255,255,0.25) 50%, transparent 100%)"
+      }} />
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
         {/* Header */}
         <div
@@ -50,13 +53,24 @@ export function IntegrationsSection() {
           <h2 className="text-4xl lg:text-6xl font-display tracking-tight mb-6">
             Engagement features
             <br />
-            that drive results.
+            with a showpiece interface.
           </h2>
-          <p className="text-xl text-muted-foreground">
-            Built-in gamification elements that keep employees motivated and engaged throughout every assessment.
+          <p className="text-xl text-background/65">
+            These layers are designed to feel premium and memorable while still keeping the product fast, readable, and practical.
           </p>
         </div>
 
+        <div className="mb-10 grid gap-4 md:grid-cols-3">
+          {[
+            "Visual rhythm through dual marquees and high-contrast cards.",
+            "Aesthetic depth using glow fields, glass panels, and motion.",
+            "Clear performance-first restraint so the interface still feels crisp.",
+          ].map((item) => (
+            <div key={item} className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 text-sm leading-relaxed text-white/70">
+              {item}
+            </div>
+          ))}
+        </div>
       </div>
       
       {/* Full-width marquees outside container */}
@@ -67,7 +81,7 @@ export function IntegrationsSection() {
               {gamificationFeatures.map((feature) => (
                 <div
                   key={`${feature.name}-${setIndex}`}
-                  className="shrink-0 px-8 py-6 border border-foreground/10 hover:border-foreground/30 hover:bg-foreground/[0.02] transition-all duration-300 group"
+                  className="shrink-0 rounded-[1.5rem] px-8 py-6 border border-white/10 bg-white/[0.03] hover:border-white/30 hover:bg-white/[0.08] transition-all duration-300 group"
                 >
                   <div className="text-lg font-medium group-hover:translate-x-1 transition-transform">
                     {feature.name}
@@ -88,7 +102,7 @@ export function IntegrationsSection() {
               {[...gamificationFeatures].reverse().map((feature) => (
                 <div
                   key={`${feature.name}-reverse-${setIndex}`}
-                  className="shrink-0 px-8 py-6 border border-foreground/10 hover:border-foreground/30 hover:bg-foreground/[0.02] transition-all duration-300 group"
+                  className="shrink-0 rounded-[1.5rem] px-8 py-6 border border-white/10 bg-white/[0.03] hover:border-white/30 hover:bg-white/[0.08] transition-all duration-300 group"
                 >
                   <div className="text-lg font-medium group-hover:translate-x-1 transition-transform">
                     {feature.name}

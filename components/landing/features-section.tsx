@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { AnimatedTetrahedron } from "./animated-tetrahedron";
+import { AnimatedWave } from "./animated-wave";
 
 const features = [
   {
@@ -272,8 +274,23 @@ function FeatureCard({ feature, index }: { feature: typeof features[0]; index: n
           
           {/* Visual */}
           <div className="flex justify-center lg:justify-end">
-            <div className="w-48 h-40 text-foreground">
-              <AnimatedVisual type={feature.visual} />
+            <div className="relative w-full max-w-[420px]">
+              <div className="absolute -top-4 right-8 h-16 w-16 rounded-full bg-cyan-300/30 blur-2xl" />
+              <div className="absolute -bottom-4 left-8 h-20 w-20 rounded-full bg-blue-400/20 blur-2xl" />
+              <div className="glass-panel rounded-[2rem] p-5 tilt-sheen">
+                <div className="grid gap-4 md:grid-cols-[1.05fr_0.95fr] md:items-center">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Showcase Layer</p>
+                    <p className="mt-3 text-xl font-display text-foreground">{feature.title}</p>
+                    <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                      Each capability is presented as a premium product surface, not a flat list item.
+                    </p>
+                  </div>
+                  <div className="h-40 rounded-[1.6rem] bg-gradient-to-br from-zinc-50 to-slate-100 p-3 text-foreground shadow-inner">
+                    <AnimatedVisual type={feature.visual} />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -304,9 +321,22 @@ export function FeaturesSection() {
       ref={sectionRef}
       className="relative py-24 lg:py-32"
     >
+      <div className="pointer-events-none absolute inset-x-0 top-12 mx-auto hidden max-w-[1200px] lg:block">
+        <div className="grid grid-cols-[0.4fr_1fr_0.4fr] items-center gap-6 opacity-70">
+          <div className="glass-panel h-40 rounded-[2rem] p-4 float-slow">
+            <AnimatedTetrahedron />
+          </div>
+          <div className="glass-panel h-24 rounded-[2rem] p-4 float-delayed">
+            <AnimatedWave />
+          </div>
+          <div className="glass-panel h-40 rounded-[2rem] p-4 float-slow">
+            <AnimatedTetrahedron />
+          </div>
+        </div>
+      </div>
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
         {/* Header */}
-        <div className="mb-16 lg:mb-24">
+        <div className="mb-16 lg:mb-24 pt-8 lg:pt-28">
           <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-6">
             <span className="w-8 h-px bg-foreground/30" />
             Platform Features
@@ -318,8 +348,19 @@ export function FeaturesSection() {
           >
             Everything you need
             <br />
-            <span className="text-muted-foreground">to assess your team.</span>
+            <span className="text-muted-foreground">to make the experience unforgettable.</span>
           </h2>
+          <div className="mt-8 grid gap-4 md:grid-cols-3">
+            {[
+              "A premium visual layer that feels crafted rather than assembled.",
+              "Depth, blur, gradients, and motion used with discipline.",
+              "The wow factor stays attached to real operational and AI features.",
+            ].map((copy) => (
+              <div key={copy} className="glass-panel rounded-[1.5rem] p-4 text-sm leading-relaxed text-muted-foreground">
+                {copy}
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Features List */}
