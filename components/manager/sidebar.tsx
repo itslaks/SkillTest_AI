@@ -8,10 +8,9 @@ import {
   FileQuestion,
   Users,
   BarChart3,
+  CalendarDays,
   Sparkles,
   LogOut,
-  ChevronLeft,
-  ChevronRight,
   Trophy,
   Brain,
   PanelLeftClose,
@@ -30,6 +29,7 @@ const navigation = [
     section: 'Main',
     items: [
       { name: 'Dashboard', href: '/manager', icon: LayoutDashboard, color: 'text-sky-400', bg: 'bg-sky-400/10', activeBg: 'bg-sky-500', description: 'Overview & stats' },
+      { name: 'Training Ops', href: '/manager/operations', icon: CalendarDays, color: 'text-cyan-400', bg: 'bg-cyan-400/10', activeBg: 'bg-cyan-500', description: 'Batches & sessions' },
       { name: 'Quizzes', href: '/manager/quizzes', icon: FileQuestion, color: 'text-violet-400', bg: 'bg-violet-400/10', activeBg: 'bg-violet-500', description: 'Manage assessments' },
       { name: 'Employees', href: '/manager/employees', icon: Users, color: 'text-emerald-400', bg: 'bg-emerald-400/10', activeBg: 'bg-emerald-500', description: 'Team management' },
     ]

@@ -11,6 +11,7 @@ import {
   LogOut,
   Star,
   Flame,
+  CalendarDays,
 } from 'lucide-react'
 
 export default async function EmployeeLayout({
@@ -38,6 +39,7 @@ export default async function EmployeeLayout({
 
   const navigation = [
     { name: 'Dashboard', href: '/employee', icon: LayoutDashboard, color: 'text-white' },
+    { name: 'Training', href: '/employee/training', icon: CalendarDays, color: 'text-white' },
     { name: 'Quizzes', href: '/employee/quizzes', icon: FileQuestion, color: 'text-white' },
     { name: 'Leaderboard', href: '/employee/leaderboard', icon: Trophy, color: 'text-white' },
     { name: 'Badges', href: '/employee/badges', icon: Award, color: 'text-white' },

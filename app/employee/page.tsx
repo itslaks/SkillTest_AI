@@ -10,6 +10,7 @@ import {
   Brain,
   FileQuestion,
   Flame,
+  CalendarDays,
   ShieldAlert,
   Star,
   Trophy,
@@ -155,15 +156,18 @@ export default async function EmployeeDashboard() {
         <aside className="space-y-6">
           <div className="rounded-[2rem] border border-blue-100 bg-blue-50 p-5 shadow-sm">
             <div className="flex items-center gap-2 text-sm font-semibold text-blue-900">
-              <Brain className="h-4 w-4" />
-              How to use this app
+              <CalendarDays className="h-4 w-4" />
+              Training operations
             </div>
             <div className="mt-4 space-y-2 text-sm text-blue-800">
-              <p>1. Open the top recommended quiz first.</p>
-              <p>2. Watch your readiness meter before starting.</p>
+              <p>1. Open the training tab to see your batch and session schedule.</p>
+              <p>2. Watch your readiness meter before starting linked assessments.</p>
               <p>3. If cooldown appears mid-quiz, slow down and reset.</p>
-              <p>4. Revisit results to improve your next attempt.</p>
+              <p>4. Submit feedback after sessions so the trainer can improve the next cycle.</p>
             </div>
+            <Button variant="outline" className="mt-5 rounded-full border-blue-200 bg-white text-blue-900 hover:bg-blue-100" asChild>
+              <Link href="/employee/training">Open training hub</Link>
+            </Button>
           </div>
 
           <div className="rounded-[2rem] border border-zinc-200 bg-white p-5 shadow-sm">

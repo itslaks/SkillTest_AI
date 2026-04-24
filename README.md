@@ -283,6 +283,7 @@ scripts/016_safe_remove_approval_system.sql
 scripts/017_enhanced_user_stats_trigger.sql
 scripts/018_add_updated_at_to_questions.sql
 scripts/019_more_meaningful_badges.sql
+scripts/020_create_training_operations.sql
 ```
 
 ## 🔑 Environment Variables
@@ -358,12 +359,14 @@ npx tsc --noEmit --pretty false
 | `/auth/reset-password` | Request reset link |
 | `/auth/update-password` | Set new password |
 | `/manager` | Manager dashboard |
+| `/manager/operations` | Batch lifecycle, attendance, trainer coordination, reminders |
 | `/manager/quizzes` | Quiz creation and management |
 | `/manager/analytics` | Behavioral AI analytics cockpit |
 | `/manager/employees` | Employee management |
 | `/manager/leaderboard` | Rankings and exports |
 | `/manager/reports` | Reports and downloads |
 | `/employee` | Employee intelligence dashboard |
+| `/employee/training` | Batch, sessions, reminders, attendance, feedback |
 | `/employee/quizzes` | Assigned quiz deck |
 | `/employee/quizzes/[quizId]` | Adaptive quiz player |
 | `/employee/quizzes/[quizId]/results` | Behavioral results report |

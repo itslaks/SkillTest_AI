@@ -21,6 +21,7 @@ import {
   AlertTriangle,
   ClipboardCheck,
   ShieldAlert,
+  CalendarDays,
 } from 'lucide-react'
 import { getQuizStats } from '@/lib/actions/quiz'
 
@@ -210,9 +211,9 @@ export default async function ManagerDashboard() {
               size="lg"
               className="border-white/30 text-white hover:bg-white/10 bg-white/10"
             >
-              <Link href="/manager/analytics">
-                <Brain className="mr-2 h-4 w-4" />
-                AI Tools
+              <Link href="/manager/operations">
+                <CalendarDays className="mr-2 h-4 w-4" />
+                Training Ops
               </Link>
             </Button>
           </div>
@@ -251,7 +252,7 @@ export default async function ManagerDashboard() {
             {[
               { step: '1', title: 'Create a quiz', body: 'Start with one topic and at least 5 questions.', tone: 'bg-blue-50 border-blue-100 text-blue-700' },
               { step: '2', title: 'Assign employees', body: 'Pick the trainees or batch who should attempt it.', tone: 'bg-emerald-50 border-emerald-100 text-emerald-700' },
-              { step: '3', title: 'Watch live insights', body: 'See overload, panic, and readiness signals.', tone: 'bg-violet-50 border-violet-100 text-violet-700' },
+              { step: '3', title: 'Run training operations', body: 'Schedule sessions, track attendance, and send reminders.', tone: 'bg-cyan-50 border-cyan-100 text-cyan-700' },
               { step: '4', title: 'Review weak topics', body: 'Use Batch DNA and trainer impact to coach faster.', tone: 'bg-amber-50 border-amber-100 text-amber-700' },
             ].map((item) => (
               <div key={item.step} className={`rounded-2xl border p-4 ${item.tone}`}>
@@ -392,6 +393,20 @@ export default async function ManagerDashboard() {
                 <p className="text-xs text-muted-foreground hidden md:block">View and edit assessments</p>
               </div>
               <ArrowRight className="hidden lg:block h-5 w-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/manager/operations" className="group">
+          <Card className="h-full hover:shadow-lg hover:border-cyan-500/50 transition-all cursor-pointer border-cyan-200/50">
+            <CardContent className="p-4 flex flex-col md:flex-row items-start md:items-center gap-3">
+              <div className="p-2 md:p-3 rounded-xl bg-cyan-500/10 group-hover:bg-cyan-500/20 transition-colors">
+                <CalendarDays className="h-5 w-5 md:h-6 md:w-6 text-cyan-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-sm group-hover:text-cyan-600 transition-colors">Training Ops</h3>
+                <p className="text-xs text-muted-foreground hidden md:block">Batches, sessions, attendance</p>
+              </div>
+              <ArrowRight className="hidden lg:block h-5 w-5 text-muted-foreground group-hover:text-cyan-600 group-hover:translate-x-1 transition-all" />
             </CardContent>
           </Card>
         </Link>

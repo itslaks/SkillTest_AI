@@ -23,6 +23,7 @@ export interface Quiz {
   title: string
   description: string | null
   topic: string
+  batch_id: string | null
   difficulty: DifficultyLevel
   time_limit_minutes: number
   question_count: number
@@ -103,6 +104,106 @@ export interface QuizAssignment {
   assigned_by: string
   assigned_at: string
   due_date: string | null
+}
+
+export type TrainingBatchStatus = 'planned' | 'active' | 'at_risk' | 'completed'
+export type BatchMemberStatus = 'invited' | 'active' | 'completed' | 'dropped'
+export type BatchSupportStatus = 'on_track' | 'needs_support' | 'critical'
+export type SessionMode = 'virtual' | 'classroom' | 'hybrid'
+export type SessionStatus = 'scheduled' | 'completed' | 'cancelled'
+export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused'
+export type NotificationAudience = 'batch' | 'trainers' | 'coordinators' | 'individual'
+export type NotificationChannel = 'in_app' | 'email' | 'whatsapp'
+export type NotificationDeliveryStatus = 'draft' | 'scheduled' | 'sent'
+export type FeedbackSentiment = 'positive' | 'neutral' | 'negative'
+
+export interface TrainingBatch {
+  id: string
+  title: string
+  description: string | null
+  domain: string | null
+  status: TrainingBatchStatus
+  start_date: string | null
+  end_date: string | null
+  trainer_id: string | null
+  coordinator_id: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface BatchMember {
+  id: string
+  batch_id: string
+  user_id: string
+  enrollment_status: BatchMemberStatus
+  support_status: BatchSupportStatus
+  joined_at: string
+  completed_at: string | null
+}
+
+export interface TrainingSession {
+  id: string
+  batch_id: string
+  trainer_id: string | null
+  title: string
+  agenda: string | null
+  session_date: string
+  mode: SessionMode
+  status: SessionStatus
+  attendance_required: boolean
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface SessionAttendance {
+  id: string
+  session_id: string
+  user_id: string
+  status: AttendanceStatus
+  check_in_time: string | null
+  notes: string | null
+  updated_by: string | null
+  updated_at: string
+}
+
+export interface TrainingNotification {
+  id: string
+  batch_id: string | null
+  session_id: string | null
+  recipient_user_id: string | null
+  title: string
+  message: string
+  audience: NotificationAudience
+  channel: NotificationChannel
+  delivery_status: NotificationDeliveryStatus
+  scheduled_for: string | null
+  sent_at: string | null
+  created_by: string
+  created_at: string
+}
+
+export interface TrainingFeedback {
+  id: string
+  batch_id: string | null
+  session_id: string | null
+  user_id: string
+  submitted_by: string
+  rating: number
+  sentiment: FeedbackSentiment
+  feedback_text: string
+  action_item: string | null
+  created_at: string
+}
+
+export interface TrainingOpsSummary {
+  totalBatches: number
+  activeBatches: number
+  upcomingSessions: number
+  attendanceRate: number
+  notificationsSent: number
+  negativeFeedbackCount: number
 }
 
 // Extended types with relations
