@@ -93,24 +93,48 @@ export default async function EmployeeDashboard() {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <section className="space-y-5">
+          <div className="grid gap-4 md:grid-cols-3">
+            {[
+              { title: 'Blue means guidance', body: 'Helpful prompts and next-step suggestions.', tone: 'bg-blue-50 border-blue-100 text-blue-800' },
+              { title: 'Green means healthy', body: 'Good readiness, completed work, or safe learning rhythm.', tone: 'bg-emerald-50 border-emerald-100 text-emerald-800' },
+              { title: 'Amber means review', body: 'Revision, retention checks, or low-confidence areas.', tone: 'bg-amber-50 border-amber-100 text-amber-800' },
+            ].map((item) => (
+              <div key={item.title} className={`rounded-[1.5rem] border p-4 ${item.tone}`}>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.3em]">Quick Hint</p>
+                <p className="mt-2 font-semibold">{item.title}</p>
+                <p className="mt-1 text-sm opacity-80">{item.body}</p>
+              </div>
+            ))}
+          </div>
+
           {openQuizzes.slice(0, 3).map((quiz: any) => (
             <div key={quiz.id} className="grid gap-4 rounded-[2rem] border border-zinc-200 bg-white p-5 shadow-sm md:grid-cols-[1.1fr_0.9fr]">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-black px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-white">
+                  <span className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] ${
+                    quiz.attemptStatus === 'in_progress' ? 'bg-blue-600 text-white' : 'bg-emerald-600 text-white'
+                  }`}>
                     {quiz.attemptStatus === 'in_progress' ? 'In progress' : 'Queued'}
                   </span>
-                  <span className="rounded-full bg-zinc-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-zinc-600">
+                  <span className="rounded-full bg-violet-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-violet-700">
                     {quiz.topic}
                   </span>
                   {quiz.challengeMode && (
-                    <span className="rounded-full bg-zinc-200 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-zinc-900">
+                    <span className="rounded-full bg-rose-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-rose-700">
                       Challenge
+                    </span>
+                  )}
+                  {quiz.retentionCheck?.daysSinceLastAssessment >= 14 && (
+                    <span className="rounded-full bg-amber-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-amber-700">
+                      Retention due
                     </span>
                   )}
                 </div>
                 <h2 className="mt-4 text-2xl font-semibold text-black">{quiz.title}</h2>
                 <p className="mt-2 text-sm text-zinc-500">{quiz.description || quiz.topic}</p>
+                <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800">
+                  {quiz.readiness?.recommendation || 'This quiz is ready for you.'}
+                </div>
                 <div className="mt-5 flex flex-wrap gap-3">
                   <Button className="rounded-full bg-black text-white hover:bg-zinc-800" asChild>
                     <Link href={`/employee/quizzes/${quiz.id}`}>
@@ -129,6 +153,19 @@ export default async function EmployeeDashboard() {
         </section>
 
         <aside className="space-y-6">
+          <div className="rounded-[2rem] border border-blue-100 bg-blue-50 p-5 shadow-sm">
+            <div className="flex items-center gap-2 text-sm font-semibold text-blue-900">
+              <Brain className="h-4 w-4" />
+              How to use this app
+            </div>
+            <div className="mt-4 space-y-2 text-sm text-blue-800">
+              <p>1. Open the top recommended quiz first.</p>
+              <p>2. Watch your readiness meter before starting.</p>
+              <p>3. If cooldown appears mid-quiz, slow down and reset.</p>
+              <p>4. Revisit results to improve your next attempt.</p>
+            </div>
+          </div>
+
           <div className="rounded-[2rem] border border-zinc-200 bg-white p-5 shadow-sm">
             <div className="flex items-center gap-2 text-sm font-semibold text-black">
               <ShieldAlert className="h-4 w-4" />

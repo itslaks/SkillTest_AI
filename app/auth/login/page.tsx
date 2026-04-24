@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { signIn } from '@/lib/actions/auth'
-import { Mail, Lock, Sparkles, ArrowRight, CheckCircle2, ShieldCheck, Zap } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Lock, Mail, ShieldCheck, Sparkles, Zap } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -28,8 +28,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex bg-background">
-      {/* Left branding panel */}
-      <div className="hidden lg:flex lg:w-[42%] bg-[#0f0f10] relative overflow-hidden flex-col justify-between p-12">
+      <div className="hidden lg:flex lg:w-[42%] bg-black relative overflow-hidden flex-col justify-between p-12">
         <div className="absolute top-0 left-0 w-72 h-72 bg-blue-600/20 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
         <div className="absolute bottom-0 right-0 w-72 h-72 bg-violet-600/20 rounded-full blur-3xl translate-x-1/2 translate-y-1/2" />
 
@@ -42,15 +41,17 @@ export default function LoginPage() {
 
         <div className="relative z-10 space-y-8">
           <div>
-            <h2 className="text-4xl font-bold text-white leading-tight mb-4">Welcome<br />back.</h2>
-            <p className="text-white/50 text-lg leading-relaxed">Pick up where you left off. Your progress, scores, and badges are all here.</p>
+            <h2 className="text-4xl font-bold text-white leading-tight mb-4">Welcome back.</h2>
+            <p className="text-white/50 text-lg leading-relaxed">
+              Managers and employees can both pick up right where they left off with guided actions and clear progress.
+            </p>
           </div>
           <div className="space-y-4">
             {[
-              { icon: Zap, label: 'Continue your journey', desc: 'Resume quizzes right where you stopped' },
-              { icon: ShieldCheck, label: 'Secure sign in', desc: 'Your account is always protected' },
-              { icon: CheckCircle2, label: 'Track your growth', desc: 'See how your scores improve over time' },
-            ].map(item => (
+              { icon: Zap, label: 'Continue your journey', desc: 'Resume quizzes and workflows without hunting around' },
+              { icon: ShieldCheck, label: 'Secure sign in', desc: 'Password recovery and updates are now more direct and reliable' },
+              { icon: CheckCircle2, label: 'Track your growth', desc: 'Scores, readiness, badges, and guided next steps stay visible' },
+            ].map((item) => (
               <div key={item.label} className="flex items-center gap-4">
                 <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
                   <item.icon className="h-4 w-4 text-blue-400" />
@@ -63,16 +64,13 @@ export default function LoginPage() {
             ))}
           </div>
         </div>
-
       </div>
 
-      {/* Right form panel */}
       <div className="flex-1 flex items-center justify-center p-6 md:p-12 relative overflow-y-auto">
         <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-primary/5 pointer-events-none" />
         <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 w-full max-w-md py-8">
-          {/* Mobile logo */}
           <Link href="/" className="lg:hidden inline-flex items-center gap-2.5 mb-8">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-md">
               <Sparkles className="w-4 h-4 text-white" />
@@ -88,7 +86,8 @@ export default function LoginPage() {
           <form onSubmit={handleSignIn} className="space-y-4">
             {error && (
               <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
-                <span className="shrink-0">⚠️</span>{error}
+                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{error}</span>
               </div>
             )}
 
@@ -109,14 +108,15 @@ export default function LoginPage() {
                   {showPassword ? 'Hide' : 'Show'}
                 </button>
               </div>
-              <div className="flex justify-end mt-1">
+              <div className="flex justify-between mt-1">
+                <span className="text-xs text-muted-foreground">Need help signing in?</span>
                 <Link href="/auth/reset-password" className="text-xs text-primary font-semibold hover:underline underline-offset-4">Forgot password?</Link>
               </div>
             </div>
 
             <div className="pt-2">
               <Button type="submit" disabled={isPending} className="w-full h-11 rounded-xl text-sm font-semibold border-0 bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 shadow-lg shadow-blue-500/20 transition-all group">
-                {isPending ? <><Spinner className="mr-2" />Signing in&hellip;</> : <>Sign In <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-0.5 transition-transform" /></>}
+                {isPending ? <><Spinner className="mr-2" />Signing in...</> : <>Sign In <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-0.5 transition-transform" /></>}
               </Button>
             </div>
           </form>

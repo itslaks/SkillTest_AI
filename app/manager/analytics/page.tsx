@@ -109,14 +109,17 @@ export default async function AnalyticsPage() {
         <FeatureCard
           title="Predictive Readiness Score"
           body="Every quiz now receives a pre-attempt score forecast powered by streak, prior history, domain fit, and training age."
+          tone="blue"
         />
         <FeatureCard
           title="Emotional State Inference"
           body="Fast wrong-answer runs now trigger a cooldown recommendation instead of treating every miss as equal."
+          tone="rose"
         />
         <FeatureCard
           title="Auto Retention Check"
           body="Topics crossing the two-week gap are now surfaced through the decay tracker with baseline-versus-latest deltas."
+          tone="amber"
         />
       </div>
     </div>
@@ -143,9 +146,16 @@ function StatTile({
   )
 }
 
-function FeatureCard({ title, body }: { title: string; body: string }) {
+function FeatureCard({ title, body, tone }: { title: string; body: string; tone: 'blue' | 'rose' | 'amber' }) {
+  const toneClass =
+    tone === 'blue'
+      ? 'border-blue-100 bg-blue-50'
+      : tone === 'rose'
+        ? 'border-rose-100 bg-rose-50'
+        : 'border-amber-100 bg-amber-50'
+
   return (
-    <Card className="border-zinc-200 bg-white">
+    <Card className={toneClass}>
       <CardHeader>
         <CardTitle className="text-lg">{title}</CardTitle>
         <CardDescription className="text-sm leading-relaxed">{body}</CardDescription>

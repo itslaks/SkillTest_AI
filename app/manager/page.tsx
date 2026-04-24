@@ -239,14 +239,69 @@ export default async function ManagerDashboard() {
         ))}
       </div>
 
+      <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+        <Card className="border-zinc-200 bg-white shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg">Quick Start Guide</CardTitle>
+            <CardDescription>
+              A simple manager flow to get value from the platform without technical setup knowledge.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2">
+            {[
+              { step: '1', title: 'Create a quiz', body: 'Start with one topic and at least 5 questions.', tone: 'bg-blue-50 border-blue-100 text-blue-700' },
+              { step: '2', title: 'Assign employees', body: 'Pick the trainees or batch who should attempt it.', tone: 'bg-emerald-50 border-emerald-100 text-emerald-700' },
+              { step: '3', title: 'Watch live insights', body: 'See overload, panic, and readiness signals.', tone: 'bg-violet-50 border-violet-100 text-violet-700' },
+              { step: '4', title: 'Review weak topics', body: 'Use Batch DNA and trainer impact to coach faster.', tone: 'bg-amber-50 border-amber-100 text-amber-700' },
+            ].map((item) => (
+              <div key={item.step} className={`rounded-2xl border p-4 ${item.tone}`}>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.3em]">Step {item.step}</p>
+                <p className="mt-2 font-semibold">{item.title}</p>
+                <p className="mt-1 text-sm opacity-80">{item.body}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="border-zinc-200 bg-white shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg">Color Legend</CardTitle>
+            <CardDescription>
+              Fast visual cues so a manager can know what needs attention immediately.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {[
+              { label: 'Blue', meaning: 'Informational guidance and setup help', tone: 'bg-blue-500' },
+              { label: 'Green', meaning: 'Healthy, ready, or completed successfully', tone: 'bg-emerald-500' },
+              { label: 'Amber', meaning: 'Needs review soon or low-score coaching opportunity', tone: 'bg-amber-500' },
+              { label: 'Violet', meaning: 'AI and advanced intelligence insights', tone: 'bg-violet-500' },
+            ].map((item) => (
+              <div key={item.label} className="flex items-start gap-3 rounded-2xl border border-zinc-200 p-4">
+                <div className={`mt-0.5 h-3 w-3 rounded-full ${item.tone}`} />
+                <div>
+                  <p className="font-semibold text-black">{item.label}</p>
+                  <p className="text-sm text-zinc-500">{item.meaning}</p>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {[
           'Cognitive Load Detector',
           'Emotional State Inference',
           'Batch DNA Fingerprint',
           'Trainer Impact Score',
-        ].map((feature) => (
-          <div key={feature} className="rounded-[1.5rem] border border-zinc-200 bg-white p-4 shadow-sm">
+        ].map((feature, index) => (
+          <div key={feature} className={`rounded-[1.5rem] border p-4 shadow-sm ${
+            index === 0 ? 'border-blue-100 bg-blue-50' :
+            index === 1 ? 'border-rose-100 bg-rose-50' :
+            index === 2 ? 'border-violet-100 bg-violet-50' :
+            'border-amber-100 bg-amber-50'
+          }`}>
             <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">AI Surface</p>
             <p className="mt-3 font-semibold text-black">{feature}</p>
           </div>

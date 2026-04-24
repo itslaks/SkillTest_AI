@@ -1,6 +1,6 @@
 'use client'
 
-import { Bell, Search, Plus, ChevronDown, HelpCircle, Menu } from 'lucide-react'
+import { Bell, Search, Plus, ChevronDown, HelpCircle, FileQuestion, Users, Brain } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -9,7 +9,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
@@ -27,6 +26,10 @@ export function ManagerHeader({ profile }: ManagerHeaderProps) {
   return (
     <header className="sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-border/50 bg-white/98 backdrop-blur-md px-4 md:px-6">
       <div className="flex-1 flex items-center gap-3">
+        <div className="hidden xl:flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-[11px] font-semibold text-blue-700">
+          <HelpCircle className="h-3.5 w-3.5" />
+          Tip: Start with Create, then Assign, then Analytics
+        </div>
         <div className="relative max-w-md flex-1 hidden md:block">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
           <Input
@@ -38,7 +41,6 @@ export function ManagerHeader({ profile }: ManagerHeaderProps) {
       </div>
 
       <div className="flex items-center gap-1.5">
-        {/* Quick create */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button size="sm" className="h-9 gap-1.5 rounded-xl bg-black text-white hover:bg-black/85 shadow-sm hidden sm:flex">
@@ -47,40 +49,37 @@ export function ManagerHeader({ profile }: ManagerHeaderProps) {
               <ChevronDown className="h-3.5 w-3.5 opacity-70" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-xl border-border/60">
+          <DropdownMenuContent align="end" className="w-52 rounded-xl shadow-xl border-border/60">
             <DropdownMenuItem onClick={() => router.push('/manager/quizzes/new')} className="rounded-lg cursor-pointer gap-2 py-2.5">
               <div className="w-7 h-7 rounded-lg bg-violet-100 flex items-center justify-center">
-                <span className="text-violet-600 text-xs">📋</span>
+                <FileQuestion className="h-3.5 w-3.5 text-violet-600" />
               </div>
               New Quiz
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => router.push('/manager/employees')} className="rounded-lg cursor-pointer gap-2 py-2.5">
               <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center">
-                <span className="text-xs">👥</span>
+                <Users className="h-3.5 w-3.5 text-emerald-600" />
               </div>
               Import Employees
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => router.push('/manager/analytics')} className="rounded-lg cursor-pointer gap-2 py-2.5">
               <div className="w-7 h-7 rounded-lg bg-pink-100 flex items-center justify-center">
-                <span className="text-xs">🤖</span>
+                <Brain className="h-3.5 w-3.5 text-pink-600" />
               </div>
               AI Analysis
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Help */}
         <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/60">
           <HelpCircle className="h-4.5 w-4.5" />
         </Button>
 
-        {/* Notifications */}
         <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/60">
           <Bell className="h-4.5 w-4.5" />
           <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-red-500 rounded-full ring-1 ring-white" />
         </Button>
 
-        {/* Profile */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-2.5 h-9 pl-1.5 pr-3 rounded-xl hover:bg-muted/60 transition-colors">
