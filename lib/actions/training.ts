@@ -262,6 +262,11 @@ export async function createTrainingBatch(formData: FormData): Promise<ApiRespon
   const title = asRequiredString(formData.get('title'))
   const description = asOptionalString(formData.get('description'))
   const domain = asOptionalString(formData.get('domain'))
+  const cadence = asOptionalString(formData.get('cadence'))
+  const capacity = asOptionalString(formData.get('capacity'))
+  const priority = asOptionalString(formData.get('priority'))
+  const supportModel = asOptionalString(formData.get('support_model'))
+  const timezone = asOptionalString(formData.get('timezone'))
   const status = (asRequiredString(formData.get('status'), 'planned') || 'planned') as TrainingBatchStatus
   const startDate = asOptionalString(formData.get('start_date'))
   const endDate = asOptionalString(formData.get('end_date'))
@@ -273,11 +278,23 @@ export async function createTrainingBatch(formData: FormData): Promise<ApiRespon
     return { error: 'Batch title is required.' }
   }
 
+  const customDetails = [
+    cadence ? `Cadence: ${cadence}` : null,
+    capacity ? `Capacity: ${capacity}` : null,
+    priority ? `Priority: ${priority}` : null,
+    supportModel ? `Support model: ${supportModel}` : null,
+    timezone ? `Timezone: ${timezone}` : null,
+  ].filter(Boolean)
+
+  const batchDescription = [description, customDetails.length ? customDetails.join(' | ') : null]
+    .filter(Boolean)
+    .join('\n\n')
+
   const { data: batch, error } = await admin
     .from('training_batches')
     .insert({
       title,
-      description,
+      description: batchDescription || null,
       domain,
       status,
       start_date: startDate,

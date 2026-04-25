@@ -1,103 +1,11 @@
-"use client";
-
-import { useEffect, useRef } from "react";
-
 export function AnimatedSphere() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const frameRef = useRef(0);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const chars = "░▒▓█▀▄▌▐│─┤├┴┬╭╮╰╯";
-    let time = 0;
-
-    const resize = () => {
-      const dpr = window.devicePixelRatio || 1;
-      const rect = canvas.getBoundingClientRect();
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-      ctx.scale(dpr, dpr);
-    };
-
-    resize();
-    window.addEventListener("resize", resize);
-
-    const render = () => {
-      const rect = canvas.getBoundingClientRect();
-      ctx.clearRect(0, 0, rect.width, rect.height);
-
-      const centerX = rect.width / 2;
-      const centerY = rect.height / 2;
-      const radius = Math.min(rect.width, rect.height) * 0.525;
-
-      ctx.font = "12px monospace";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-
-      const step = 12;
-      const points: { x: number; y: number; z: number; char: string }[] = [];
-
-      // Generate sphere points
-      for (let phi = 0; phi < Math.PI * 2; phi += 0.15) {
-        for (let theta = 0; theta < Math.PI; theta += 0.15) {
-          const x = Math.sin(theta) * Math.cos(phi + time * 0.5);
-          const y = Math.sin(theta) * Math.sin(phi + time * 0.5);
-          const z = Math.cos(theta);
-
-          // Rotate around Y axis
-          const rotY = time * 0.3;
-          const newX = x * Math.cos(rotY) - z * Math.sin(rotY);
-          const newZ = x * Math.sin(rotY) + z * Math.cos(rotY);
-
-          // Rotate around X axis
-          const rotX = time * 0.2;
-          const newY = y * Math.cos(rotX) - newZ * Math.sin(rotX);
-          const finalZ = y * Math.sin(rotX) + newZ * Math.cos(rotX);
-
-          const depth = (finalZ + 1) / 2;
-          const charIndex = Math.floor(depth * (chars.length - 1));
-
-          points.push({
-            x: centerX + newX * radius,
-            y: centerY + newY * radius,
-            z: finalZ,
-            char: chars[charIndex],
-          });
-        }
-      }
-
-      // Sort by z for depth
-      points.sort((a, b) => a.z - b.z);
-
-      // Draw points
-      points.forEach((point) => {
-        const alpha = 0.2 + (point.z + 1) * 0.4;
-        ctx.fillStyle = `rgba(0, 0, 0, ${alpha})`;
-        ctx.fillText(point.char, point.x, point.y);
-      });
-
-      time += 0.02;
-      frameRef.current = requestAnimationFrame(render);
-    };
-
-    render();
-
-    return () => {
-      window.removeEventListener("resize", resize);
-      cancelAnimationFrame(frameRef.current);
-    };
-  }, []);
-
   return (
-    <canvas
-      ref={canvasRef}
-      className="w-full h-full"
-      style={{ display: "block" }}
-    />
-  );
+    <div className="flex h-full w-full items-center justify-center">
+      <div className="relative aspect-square w-[72%] max-w-28 rounded-full border border-black/15 bg-[radial-gradient(circle_at_30%_25%,rgba(255,255,255,0.92),rgba(56,189,248,0.24)_38%,rgba(15,23,42,0.08)_70%,transparent_72%)] shadow-[inset_-16px_-18px_30px_rgba(15,23,42,0.12),0_18px_50px_rgba(15,23,42,0.12)]">
+        <div className="absolute inset-[18%] rounded-full border border-black/10" />
+        <div className="absolute inset-y-[12%] left-1/2 w-px -translate-x-1/2 rounded-full bg-black/10" />
+        <div className="absolute inset-x-[12%] top-1/2 h-px -translate-y-1/2 rounded-full bg-black/10" />
+      </div>
+    </div>
+  )
 }

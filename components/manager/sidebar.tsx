@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { signOut } from '@/lib/actions/auth'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 interface ManagerSidebarProps {
   profile: Profile | null
@@ -49,10 +49,17 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
 
+  useEffect(() => {
+    document.documentElement.style.setProperty('--manager-sidebar-width', collapsed ? '68px' : '16rem')
+    return () => {
+      document.documentElement.style.removeProperty('--manager-sidebar-width')
+    }
+  }, [collapsed])
+
   return (
     <aside
       className={cn(
-        'fixed inset-y-0 left-0 z-50 flex flex-col transition-all duration-300 ease-in-out',
+        'fixed inset-y-0 left-0 z-50 hidden flex-col transition-[width] duration-200 ease-out lg:flex',
         'bg-[#0f0f10] border-r border-white/[0.06]',
         collapsed ? 'w-[68px]' : 'w-64'
       )}
@@ -92,7 +99,7 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
                     onClick={() => router.push(item.href)}
                     title={collapsed ? item.name : undefined}
                     className={cn(
-                      'w-full flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-150 group relative',
+                      'w-full flex items-center gap-3 rounded-xl text-sm font-medium transition-colors duration-150 group relative',
                       collapsed ? 'justify-center p-2.5' : 'px-3 py-2.5',
                       isActive
                         ? 'bg-white/10 text-white'

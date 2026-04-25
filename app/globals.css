@@ -104,6 +104,15 @@
     outline: 2px solid oklch(0.45 0.18 255);
     outline-offset: 2px;
   }
+  input,
+  select,
+  textarea {
+    min-width: 0;
+    max-width: 100%;
+  }
+  main :where(h1, h2, h3, p, a, span, td, th, label, button) {
+    overflow-wrap: anywhere;
+  }
 }
 
 @layer utilities {

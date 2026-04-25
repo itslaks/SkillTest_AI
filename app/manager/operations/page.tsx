@@ -142,21 +142,21 @@ export default async function ManagerOperationsPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="grid gap-2 text-sm">
                   <span className="font-medium">Batch name</span>
-                  <input name="title" required className="h-11 rounded-xl border border-zinc-200 px-3" placeholder="Java Foundation Batch 07" />
+                  <input name="title" required className="h-11 w-full min-w-0 rounded-xl border border-zinc-200 px-3" placeholder="Java Foundation Batch 07" />
                 </label>
                 <label className="grid gap-2 text-sm">
                   <span className="font-medium">Domain</span>
-                  <input name="domain" className="h-11 rounded-xl border border-zinc-200 px-3" placeholder="Java, Data, Cloud..." />
+                  <input name="domain" className="h-11 w-full min-w-0 rounded-xl border border-zinc-200 px-3" placeholder="Java, Data, Cloud..." />
                 </label>
               </div>
               <label className="grid gap-2 text-sm">
                 <span className="font-medium">Description</span>
-                <textarea name="description" rows={3} className="rounded-xl border border-zinc-200 px-3 py-3" placeholder="Goal, scope, batch objective, and delivery expectations." />
+                <textarea name="description" rows={3} className="w-full min-w-0 rounded-xl border border-zinc-200 px-3 py-3" placeholder="Goal, scope, batch objective, and delivery expectations." />
               </label>
-              <div className="grid gap-4 md:grid-cols-4">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <label className="grid gap-2 text-sm">
                   <span className="font-medium">Status</span>
-                  <select name="status" defaultValue="planned" className="h-11 rounded-xl border border-zinc-200 px-3">
+                  <select name="status" defaultValue="planned" className="h-11 w-full min-w-0 rounded-xl border border-zinc-200 px-3">
                     <option value="planned">Planned</option>
                     <option value="active">Active</option>
                     <option value="at_risk">At Risk</option>
@@ -165,15 +165,15 @@ export default async function ManagerOperationsPage() {
                 </label>
                 <label className="grid gap-2 text-sm">
                   <span className="font-medium">Start date</span>
-                  <input name="start_date" type="date" className="h-11 rounded-xl border border-zinc-200 px-3" />
+                  <input name="start_date" type="date" className="h-11 w-full min-w-0 rounded-xl border border-zinc-200 px-3" />
                 </label>
                 <label className="grid gap-2 text-sm">
                   <span className="font-medium">End date</span>
-                  <input name="end_date" type="date" className="h-11 rounded-xl border border-zinc-200 px-3" />
+                  <input name="end_date" type="date" className="h-11 w-full min-w-0 rounded-xl border border-zinc-200 px-3" />
                 </label>
                 <label className="grid gap-2 text-sm">
                   <span className="font-medium">Lead trainer</span>
-                  <select name="trainer_id" className="h-11 rounded-xl border border-zinc-200 px-3">
+                  <select name="trainer_id" className="h-11 w-full min-w-0 rounded-xl border border-zinc-200 px-3">
                     <option value="">Select trainer</option>
                     {trainers.map((trainer: any) => (
                       <option key={trainer.id} value={trainer.id}>
@@ -183,23 +183,64 @@ export default async function ManagerOperationsPage() {
                   </select>
                 </label>
               </div>
+              <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Customization</p>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                  <label className="grid gap-2 text-sm">
+                    <span className="font-medium">Cadence</span>
+                    <select name="cadence" className="h-11 w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-3">
+                      <option value="">Flexible</option>
+                      <option value="Daily">Daily</option>
+                      <option value="Twice weekly">Twice weekly</option>
+                      <option value="Weekly">Weekly</option>
+                      <option value="Bootcamp">Bootcamp</option>
+                    </select>
+                  </label>
+                  <label className="grid gap-2 text-sm">
+                    <span className="font-medium">Capacity</span>
+                    <input name="capacity" type="number" min="1" className="h-11 w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-3" placeholder="30" />
+                  </label>
+                  <label className="grid gap-2 text-sm">
+                    <span className="font-medium">Priority</span>
+                    <select name="priority" className="h-11 w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-3">
+                      <option value="">Normal</option>
+                      <option value="High">High</option>
+                      <option value="Critical">Critical</option>
+                      <option value="Pilot">Pilot</option>
+                    </select>
+                  </label>
+                  <label className="grid gap-2 text-sm">
+                    <span className="font-medium">Support model</span>
+                    <select name="support_model" className="h-11 w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-3">
+                      <option value="">Standard</option>
+                      <option value="Mentor led">Mentor led</option>
+                      <option value="Office hours">Office hours</option>
+                      <option value="Manager coaching">Manager coaching</option>
+                    </select>
+                  </label>
+                  <label className="grid gap-2 text-sm">
+                    <span className="font-medium">Timezone</span>
+                    <input name="timezone" className="h-11 w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-3" placeholder="IST, UTC..." />
+                  </label>
+                </div>
+              </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="grid gap-2 text-sm">
                   <span className="font-medium">Enroll learners</span>
-                  <select name="employee_ids" multiple className="min-h-44 rounded-xl border border-zinc-200 px-3 py-3">
+                  <select name="employee_ids" multiple className="min-h-44 w-full min-w-0 rounded-xl border border-zinc-200 px-3 py-3">
                     {employees.map((employee: any) => (
                       <option key={employee.id} value={employee.id}>
-                        {employee.full_name || employee.email} {employee.domain ? `• ${employee.domain}` : ''}
+                        {employee.full_name || employee.email} {employee.domain ? `- ${employee.domain}` : ''}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label className="grid gap-2 text-sm">
                   <span className="font-medium">Link assessments</span>
-                  <select name="quiz_ids" multiple className="min-h-44 rounded-xl border border-zinc-200 px-3 py-3">
+                  <select name="quiz_ids" multiple className="min-h-44 w-full min-w-0 rounded-xl border border-zinc-200 px-3 py-3">
                     {quizzes.map((quiz: any) => (
                       <option key={quiz.id} value={quiz.id}>
-                        {quiz.title} • {quiz.topic}
+                        {quiz.title} - {quiz.topic}
                       </option>
                     ))}
                   </select>
@@ -252,10 +293,10 @@ export default async function ManagerOperationsPage() {
                 <span className="font-medium">Agenda</span>
                 <textarea name="agenda" rows={3} className="rounded-xl border border-zinc-200 px-3 py-3" placeholder="Concept coverage, practicals, feedback checkpoints, blockers." />
               </label>
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 lg:grid-cols-3">
                 <label className="grid gap-2 text-sm">
                   <span className="font-medium">Session date & time</span>
-                  <input name="session_date" type="datetime-local" required className="h-11 rounded-xl border border-zinc-200 px-3" />
+                  <input name="session_date" type="datetime-local" required className="h-11 w-full min-w-0 rounded-xl border border-zinc-200 px-3" />
                 </label>
                 <label className="grid gap-2 text-sm">
                   <span className="font-medium">Mode</span>
@@ -341,7 +382,7 @@ export default async function ManagerOperationsPage() {
               </label>
               <label className="grid gap-2 text-sm">
                 <span className="font-medium">Schedule for</span>
-                <input name="scheduled_for" type="datetime-local" className="h-11 rounded-xl border border-zinc-200 px-3" />
+                <input name="scheduled_for" type="datetime-local" className="h-11 w-full min-w-0 rounded-xl border border-zinc-200 px-3" />
               </label>
               <Button type="submit" variant="outline" className="rounded-full">Create notification</Button>
             </form>
@@ -365,7 +406,7 @@ export default async function ManagerOperationsPage() {
                 return (
                   <div key={batch.id} className="rounded-[1.5rem] border border-zinc-200 p-5">
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                      <div>
+                      <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <h2 className="text-xl font-semibold">{batch.title}</h2>
                           <span className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] ${toneForBatchStatus(batch.status)}`}>
@@ -374,13 +415,13 @@ export default async function ManagerOperationsPage() {
                         </div>
                         <p className="mt-2 text-sm text-zinc-500">{batch.description || 'No description added yet.'}</p>
                       </div>
-                      <div className="text-sm text-zinc-500">
+                      <div className="shrink-0 text-sm text-zinc-500 md:text-right">
                         <p>{batch.start_date ? new Date(batch.start_date).toLocaleDateString() : 'TBD'} to {batch.end_date ? new Date(batch.end_date).toLocaleDateString() : 'TBD'}</p>
                         <p className="mt-1">Trainer: {batch.trainer?.full_name || batch.trainer?.email || 'Unassigned'}</p>
                       </div>
                     </div>
 
-                    <div className="mt-4 grid gap-3 md:grid-cols-4">
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                       <MiniMetric label="Learners" value={`${batchMembers.length}`} />
                       <MiniMetric label="Sessions" value={`${batch.training_sessions?.[0]?.count || 0}`} />
                       <MiniMetric label="Assessments" value={`${batchQuizzes.length}`} />
@@ -440,7 +481,7 @@ export default async function ManagerOperationsPage() {
                     </div>
                     <p className="mt-1 text-sm text-zinc-500">{item.message}</p>
                     <p className="mt-2 text-xs text-zinc-400">
-                      {item.batch?.title || item.session?.title || item.recipient?.full_name || 'General'} • {new Date(item.created_at).toLocaleString()}
+                      {item.batch?.title || item.session?.title || item.recipient?.full_name || 'General'} - {new Date(item.created_at).toLocaleString()}
                     </p>
                   </div>
                 ))
@@ -482,17 +523,17 @@ export default async function ManagerOperationsPage() {
               return (
                 <div key={session.id} className="rounded-[1.5rem] border border-zinc-200 p-5">
                   <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
                         <h3 className="text-lg font-semibold">{session.title}</h3>
                         <Badge variant="outline" className="capitalize">{session.mode}</Badge>
                         <Badge variant="outline" className="capitalize">{session.status}</Badge>
                       </div>
                       <p className="mt-1 text-sm text-zinc-500">
-                        {session.batch?.title || 'Batch'} • {new Date(session.session_date).toLocaleString()} • {session.trainer?.full_name || session.trainer?.email || 'Trainer TBD'}
+                        {session.batch?.title || 'Batch'} - {new Date(session.session_date).toLocaleString()} - {session.trainer?.full_name || session.trainer?.email || 'Trainer TBD'}
                       </p>
                     </div>
-                    <div className="rounded-full bg-black px-4 py-2 text-sm font-medium text-white">
+                    <div className="shrink-0 rounded-full bg-black px-4 py-2 text-sm font-medium text-white">
                       {records.filter((record: any) => record.status === 'present' || record.status === 'late').length}/{records.length} marked
                     </div>
                   </div>
@@ -506,7 +547,7 @@ export default async function ManagerOperationsPage() {
                           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                             <div>
                               <p className="font-medium">{record.profile?.full_name || record.profile?.email || 'Learner'}</p>
-                              <p className="text-sm opacity-80">{record.status.toUpperCase()} {record.check_in_time ? `• ${new Date(record.check_in_time).toLocaleTimeString()}` : ''}</p>
+                              <p className="text-sm opacity-80">{record.status.toUpperCase()} {record.check_in_time ? `- ${new Date(record.check_in_time).toLocaleTimeString()}` : ''}</p>
                             </div>
                             <div className="flex flex-wrap gap-2">
                               {(['present', 'late', 'excused', 'absent'] as const).map((status) => (
@@ -537,9 +578,9 @@ export default async function ManagerOperationsPage() {
 
 function StatCard({ label, value, icon: Icon }: { label: string; value: string; icon: any }) {
   return (
-    <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-5">
+    <div className="min-w-0 rounded-[1.75rem] border border-white/10 bg-white/5 p-5">
       <div className="flex items-center justify-between">
-        <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">{label}</p>
+        <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">{label}</p>
         <Icon className="h-4 w-4 text-white" />
       </div>
       <p className="mt-4 text-3xl font-semibold text-white">{value}</p>
@@ -549,9 +590,9 @@ function StatCard({ label, value, icon: Icon }: { label: string; value: string; 
 
 function MiniMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-      <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">{label}</p>
-      <p className="mt-3 text-xl font-semibold text-black">{value}</p>
+    <div className="min-w-0 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+      <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">{label}</p>
+      <p className="mt-3 text-lg font-semibold leading-tight text-black">{value}</p>
     </div>
   )
 }

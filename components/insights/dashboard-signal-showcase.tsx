@@ -20,7 +20,7 @@ export function DashboardSignalShowcase({
   const dark = theme === "dark";
 
   return (
-    <div className={`relative h-[320px] w-full overflow-hidden rounded-[2rem] ${dark ? "glass-panel-dark" : "glass-panel"} ${dark ? "dashboard-grid-bg" : "mesh-bg"}`}>
+    <div className={`relative min-h-[320px] w-full overflow-hidden rounded-[1.5rem] ${dark ? "glass-panel-dark" : "glass-panel"} ${dark ? "dashboard-grid-bg" : "mesh-bg"}`}>
       <div className={`absolute left-6 top-6 rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.28em] ${dark ? "border border-white/10 bg-white/10 text-white/70" : "border border-black/10 bg-white/70 text-zinc-600"}`}>
         {badge || "Signal Stack"}
       </div>
@@ -30,17 +30,17 @@ export function DashboardSignalShowcase({
         <div className={`aura-ring bottom-12 right-10 h-28 w-28 ${dark ? "bg-blue-500/25" : "bg-blue-300/30"}`} style={{ animationDelay: "1.3s" }} />
       </div>
 
-      <div className="absolute inset-0 p-5">
-        <div className="grid h-full gap-4 md:grid-cols-[1.1fr_0.9fr]">
+      <div className="relative z-10 p-5 pt-14">
+        <div className="grid min-h-[250px] gap-4 md:grid-cols-[1.1fr_0.9fr]">
           <div className="flex flex-col justify-end">
-            <div className={`max-w-sm rounded-[1.6rem] p-5 ${dark ? "border border-white/10 bg-white/6" : "border border-black/8 bg-white/70"}`}>
+            <div className={`min-w-0 max-w-sm rounded-[1.25rem] p-5 ${dark ? "border border-white/10 bg-white/6" : "border border-black/8 bg-white/70"}`}>
               <p className={`text-[10px] uppercase tracking-[0.25em] ${dark ? "text-white/45" : "text-zinc-500"}`}>Immersive Surface</p>
               <h3 className={`mt-3 text-2xl font-display leading-tight ${dark ? "text-white" : "text-zinc-950"}`}>{title}</h3>
               <p className={`mt-3 text-sm leading-relaxed ${dark ? "text-white/65" : "text-zinc-600"}`}>{subtitle}</p>
             </div>
           </div>
 
-          <div className="relative">
+          <div className="relative hidden min-h-[230px] md:block">
             <div className={`absolute right-0 top-6 h-28 w-32 rounded-[1.5rem] p-3 ${dark ? "border border-white/10 bg-black/35" : "border border-black/8 bg-white/70"} float-delayed`}>
               <AnimatedWave />
             </div>

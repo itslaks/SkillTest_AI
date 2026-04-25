@@ -180,7 +180,7 @@ export default async function ManagerDashboard() {
       <div className="relative overflow-hidden rounded-[2rem] border border-zinc-900 bg-black p-6 md:p-8 text-white shadow-[0_40px_120px_rgba(0,0,0,0.55)] dashboard-grid-bg">
         <div className="absolute top-0 right-0 -mt-20 -mr-20 w-80 h-80 bg-white/10 rounded-full blur-3xl" />
         <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-80 h-80 bg-white/5 rounded-full blur-3xl" />
-        <div className="relative z-10 grid gap-6 xl:grid-cols-[0.85fr_1.15fr] xl:items-center">
+        <div className="relative z-10">
           <div>
             <div className="flex items-center gap-2 mb-3">
               <div className="px-3 py-1 rounded-full bg-white/20 text-xs font-semibold tracking-wide uppercase">
@@ -188,7 +188,7 @@ export default async function ManagerDashboard() {
               </div>
             </div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-2">
-              Welcome back, {profile?.full_name?.split(' ')[0] || 'Manager'}! 👋
+              Welcome back, {profile?.full_name?.split(' ')[0] || 'Manager'}!
             </h1>
             <p className="text-white/75 max-w-md text-sm md:text-base">
               Here&apos;s an overview of your assessments and employee performance today.
@@ -217,12 +217,6 @@ export default async function ManagerDashboard() {
               </Button>
             </div>
           </div>
-          <DashboardSignalShowcase
-            theme="dark"
-            badge="Manager Signal Deck"
-            title="A command center that feels as sharp as the decisions made inside it."
-            subtitle="Ambient 3D telemetry gives the manager view more presence without getting in the way of metrics, actions, and live reporting."
-          />
         </div>
       </div>
 
@@ -530,7 +524,7 @@ export default async function ManagerDashboard() {
                       <p className="font-medium truncate">{quiz.title}</p>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <span>{quiz.questions?.[0]?.count || 0} questions</span>
-                        <span>•</span>
+                        <span>-</span>
                         <span className="capitalize">{quiz.difficulty}</span>
                       </div>
                     </div>

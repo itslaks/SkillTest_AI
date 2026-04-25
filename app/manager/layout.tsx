@@ -21,9 +21,9 @@ export default async function ManagerLayout({
   return (
     <div className="min-h-screen bg-background text-foreground noise-overlay">
       <ManagerSidebar profile={profile} />
-      <div className="lg:pl-64 relative z-10">
+      <div className="relative z-10 transition-[padding-left] duration-200 ease-out lg:pl-[var(--manager-sidebar-width,16rem)]">
         <ManagerHeader profile={profile} />
-        <main className="p-4 md:p-8 max-w-[1600px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <main className="mx-auto max-w-[1600px] overflow-x-hidden p-4 md:p-8">
           {children}
         </main>
       </div>

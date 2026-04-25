@@ -71,7 +71,7 @@ export default async function EmployeeTrainingPage() {
               memberships.map((membership: any) => (
                 <div key={membership.id} className="rounded-[1.5rem] border border-zinc-200 p-5">
                   <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                    <div>
+                    <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <h2 className="text-xl font-semibold text-black">{membership.batch?.title}</h2>
                         <Badge variant="outline" className="capitalize">{membership.enrollment_status}</Badge>
@@ -79,13 +79,13 @@ export default async function EmployeeTrainingPage() {
                       </div>
                       <p className="mt-2 text-sm text-zinc-500">{membership.batch?.description || 'Training details will be updated by your coordinator.'}</p>
                     </div>
-                    <div className="text-sm text-zinc-500">
+                    <div className="shrink-0 text-sm text-zinc-500 md:text-right">
                       <p>Trainer: {membership.batch?.trainer?.full_name || membership.batch?.trainer?.email || 'TBD'}</p>
                       <p className="mt-1">Coordinator: {membership.batch?.coordinator?.full_name || membership.batch?.coordinator?.email || 'TBD'}</p>
                     </div>
                   </div>
 
-                  <div className="mt-4 grid gap-3 md:grid-cols-3">
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
                     <MiniMetric label="Start" value={membership.batch?.start_date ? new Date(membership.batch.start_date).toLocaleDateString() : 'TBD'} />
                     <MiniMetric label="End" value={membership.batch?.end_date ? new Date(membership.batch.end_date).toLocaleDateString() : 'TBD'} />
                     <MiniMetric label="Linked quizzes" value={`${quizzes.filter((quiz: any) => quiz.batch_id === membership.batch_id).length}`} />
@@ -101,7 +101,7 @@ export default async function EmployeeTrainingPage() {
               </div>
               <p className="mt-3 text-lg font-medium text-blue-950">{nextSession?.title || 'No scheduled session yet'}</p>
               <p className="mt-1 text-sm text-blue-800">
-                {nextSession ? `${new Date(nextSession.session_date).toLocaleString()} • ${nextSession.mode} • ${nextSession.trainer?.full_name || nextSession.trainer?.email || 'Trainer TBD'}` : 'Your next session details will appear here as soon as your trainer schedules one.'}
+                {nextSession ? `${new Date(nextSession.session_date).toLocaleString()} - ${nextSession.mode} - ${nextSession.trainer?.full_name || nextSession.trainer?.email || 'Trainer TBD'}` : 'Your next session details will appear here as soon as your trainer schedules one.'}
               </p>
             </div>
           </CardContent>
@@ -125,7 +125,7 @@ export default async function EmployeeTrainingPage() {
               ) : (
                 attendance.slice(0, 6).map((entry: any) => (
                   <div key={entry.id} className="rounded-2xl border border-zinc-200 p-4">
-                    <div className="flex items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
                       <p className="font-medium">{entry.session?.title || 'Session'}</p>
                       <Badge variant="outline" className="capitalize">{entry.status}</Badge>
                     </div>
@@ -142,7 +142,7 @@ export default async function EmployeeTrainingPage() {
               ) : (
                 notifications.slice(0, 5).map((item: any) => (
                   <div key={item.id} className="rounded-2xl border border-zinc-200 p-4">
-                    <div className="flex items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
                       <p className="font-medium">{item.title}</p>
                       <Badge variant="outline" className="capitalize">{item.channel}</Badge>
                     </div>
@@ -253,9 +253,9 @@ export default async function EmployeeTrainingPage() {
 
 function StatTile({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
   return (
-    <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-5">
+    <div className="min-w-0 rounded-[1.75rem] border border-white/10 bg-white/5 p-5">
       <div className="flex items-center justify-between">
-        <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">{label}</p>
+        <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">{label}</p>
         <Icon className="h-4 w-4 text-white" />
       </div>
       <p className="mt-4 text-3xl font-semibold text-white">{value}</p>
@@ -265,9 +265,9 @@ function StatTile({ icon: Icon, label, value }: { icon: any; label: string; valu
 
 function MiniMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-      <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">{label}</p>
-      <p className="mt-3 text-xl font-semibold text-black">{value}</p>
+    <div className="min-w-0 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+      <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">{label}</p>
+      <p className="mt-3 text-lg font-semibold leading-tight text-black">{value}</p>
     </div>
   )
 }
