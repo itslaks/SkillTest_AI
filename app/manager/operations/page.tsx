@@ -118,8 +118,8 @@ export default async function ManagerOperationsPage() {
             <DashboardSignalShowcase
               theme="dark"
               badge="Ops Control Deck"
-              title="Execution screens now feel more cinematic and presentation-ready."
-              subtitle="Sessions, attendance, reminders, and feedback sit inside a richer visual system instead of plain utility layouts."
+              title="Execution screens are polished and presentation-ready."
+              subtitle="Sessions, attendance, reminders, and feedback sit inside a clear visual system instead of plain utility layouts."
             />
             <div className="grid gap-4 sm:grid-cols-2">
               <StatCard label="Active batches" value={`${summary.activeBatches}`} icon={Users} />
@@ -142,7 +142,7 @@ export default async function ManagerOperationsPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="grid gap-2 text-sm">
                   <span className="font-medium">Batch name</span>
-                  <input name="title" required className="h-11 rounded-xl border border-zinc-200 px-3" placeholder="Maverick Java Batch 07" />
+                  <input name="title" required className="h-11 rounded-xl border border-zinc-200 px-3" placeholder="Java Foundation Batch 07" />
                 </label>
                 <label className="grid gap-2 text-sm">
                   <span className="font-medium">Domain</span>

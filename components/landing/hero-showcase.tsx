@@ -8,7 +8,7 @@ import { AnimatedWave } from "./animated-wave";
 const commandCards = [
   { label: "Batch", value: "24 Active", detail: "Cohorts under orchestration" },
   { label: "Attendance", value: "94%", detail: "Live across scheduled sessions" },
-  { label: "AI", value: "Readiness + DNA", detail: "Signals driving interventions" },
+  { label: "Insights", value: "Readiness", detail: "Signals driving interventions" },
 ];
 
 export function HeroShowcase() {
@@ -42,48 +42,48 @@ export function HeroShowcase() {
       <div className="absolute inset-0" style={transforms.shell}>
         <div className="absolute left-0 top-16 h-52 w-40 rounded-[2rem] glass-panel p-4 float-slow" style={transforms.back}>
           <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.25em] text-zinc-500">
-            <span>Signal Prism</span>
+            <span>Readiness</span>
             <span>Live</span>
           </div>
           <div className="mt-4 h-32 rounded-[1.5rem] bg-white/70 p-2">
             <AnimatedTetrahedron />
           </div>
-          <p className="mt-3 text-sm font-medium text-zinc-900">3D geometry reacting to the system pulse.</p>
+          <p className="mt-3 text-sm font-medium text-zinc-900">Learning readiness and training load in one view.</p>
         </div>
 
         <div className="absolute right-2 top-0 h-44 w-48 rounded-[2rem] glass-panel p-4 float-delayed" style={transforms.chip}>
           <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.25em] text-zinc-500">
-            <span>Execution Grid</span>
+            <span>Execution</span>
             <span>Realtime</span>
           </div>
           <div className="mt-4 h-24 rounded-[1.5rem] bg-zinc-950 p-2 text-white">
             <AnimatedWave />
           </div>
-          <p className="mt-3 text-sm font-medium text-zinc-900">Attendance, reminders, and session load visualized as flowing telemetry.</p>
+          <p className="mt-3 text-sm font-medium text-zinc-900">Attendance, reminders, and session load kept visible.</p>
         </div>
 
         <div className="absolute bottom-8 right-6 h-56 w-44 rounded-[2rem] glass-panel p-4 float-slow" style={transforms.front}>
           <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.25em] text-zinc-500">
-            <span>Behavior Orb</span>
-            <span>AI</span>
+            <span>Insights</span>
+            <span>Live</span>
           </div>
           <div className="mt-4 h-36 rounded-[1.5rem] bg-zinc-100 p-3">
             <AnimatedSphere />
           </div>
-          <p className="mt-3 text-sm font-medium text-zinc-900">Behavioral intelligence rendered as a kinetic signal object.</p>
+          <p className="mt-3 text-sm font-medium text-zinc-900">Signals that help managers act sooner.</p>
         </div>
 
         <div className="absolute inset-x-[12%] top-24 rounded-[2.25rem] glass-panel tilt-sheen overflow-hidden" style={transforms.front}>
           <div className="mesh-bg p-6 md:p-7">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[10px] uppercase tracking-[0.35em] text-zinc-500">Maverick Command Deck</p>
+                <p className="text-[10px] uppercase tracking-[0.35em] text-zinc-500">Manager Workspace</p>
                 <h3 className="mt-3 max-w-xl text-3xl font-display leading-[0.95] text-zinc-950 md:text-4xl">
-                  A cinematic control surface for execution, intelligence, and learner momentum.
+                  One calm workspace for execution, assessment, and learner progress.
                 </h3>
               </div>
               <div className="hidden rounded-full border border-black/10 bg-white/70 px-4 py-2 text-xs font-mono text-zinc-600 md:block">
-                smooth · interactive · production-focused
+                clear / secure / role-based
               </div>
             </div>
 
@@ -92,7 +92,7 @@ export function HeroShowcase() {
                 <div className="flex items-center justify-between">
                   <p className="text-[10px] uppercase tracking-[0.3em] text-white/45">Training Signal Stack</p>
                   <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] uppercase tracking-[0.25em] text-white/70">
-                    Designathon Mode
+                    Live View
                   </span>
                 </div>
                 <div className="mt-5 grid gap-4 sm:grid-cols-3">
@@ -118,21 +118,21 @@ export function HeroShowcase() {
 
               <div className="space-y-4">
                 <div className="rounded-[1.75rem] border border-black/8 bg-white/75 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
-                  <p className="text-[10px] uppercase tracking-[0.28em] text-zinc-500">Visual DNA</p>
+                  <p className="text-[10px] uppercase tracking-[0.28em] text-zinc-500">Interface System</p>
                   <div className="mt-4 grid grid-cols-3 gap-3">
                     <div className="h-16 rounded-[1.25rem] bg-[radial-gradient(circle_at_top,rgba(12,74,110,0.38),transparent_65%),linear-gradient(135deg,#f8fafc,#dbeafe)]" />
                     <div className="h-16 rounded-[1.25rem] bg-[radial-gradient(circle_at_40%_35%,rgba(8,145,178,0.28),transparent_60%),linear-gradient(135deg,#111827,#0f172a)]" />
                     <div className="h-16 rounded-[1.25rem] bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.24),transparent_50%),linear-gradient(135deg,#ffffff,#e4e4e7)]" />
                   </div>
-                  <p className="mt-4 text-sm text-zinc-600">The interface intentionally blends execution-grade utility with motion-rich premium surfaces.</p>
+                  <p className="mt-4 text-sm text-zinc-600">The interface uses restrained contrast, clear hierarchy, and connected product states.</p>
                 </div>
 
                 <div className="rounded-[1.75rem] border border-black/8 bg-white/75 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
-                  <p className="text-[10px] uppercase tracking-[0.28em] text-zinc-500">Standout Factor</p>
+                  <p className="text-[10px] uppercase tracking-[0.28em] text-zinc-500">Product Strength</p>
                   <ul className="mt-4 space-y-2 text-sm text-zinc-700">
-                    <li>3D-inspired motion without blocking core flows</li>
-                    <li>Landing page showcases taste and technical depth</li>
-                    <li>Visual energy remains connected to the actual product story</li>
+                    <li>Manager and employee journeys share the same system language</li>
+                    <li>Operational tasks stay visible without adding clutter</li>
+                    <li>Assessment insights connect directly to next actions</li>
                   </ul>
                 </div>
               </div>

@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { signOut } from '@/lib/actions/auth'
 import {
@@ -26,7 +26,8 @@ export default async function EmployeeLayout({
     redirect('/auth/login')
   }
 
-  const { data: profile } = await supabase
+  const adminClient = createAdminClient()
+  const { data: profile } = await adminClient
     .from('profiles')
     .select('*')
     .eq('id', user.id)

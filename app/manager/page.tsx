@@ -30,16 +30,15 @@ export default async function ManagerDashboard() {
   const { userId } = await requireManager()
 
   const supabase = await createClient()
+  const adminClient = createAdminClient()
   
-  const { data: profile } = await supabase
+  const { data: profile } = await adminClient
     .from('profiles')
     .select('full_name')
     .eq('id', userId)
     .single()
 
   const { data: stats } = await getQuizStats()
-  const adminClient = createAdminClient()
-  
   // Get recent quizzes
   const { data: recentQuizzes } = await supabase
     .from('quizzes')
@@ -49,7 +48,7 @@ export default async function ManagerDashboard() {
     .limit(5)
 
   // Get recent attempts on manager's quizzes
-  const { data: recentAttempts } = await supabase
+  const { data: recentAttempts } = await adminClient
     .from('quiz_attempts')
     .select(`
       *,
@@ -232,7 +231,7 @@ export default async function ManagerDashboard() {
           <CardHeader>
             <CardTitle className="text-lg">Presentation Edge</CardTitle>
             <CardDescription>
-              These screens now carry the same design confidence as the landing page, so the wow factor is visible in the real product experience too.
+              These screens carry the same restrained design confidence as the landing page and the real product workflow.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-3">
@@ -250,8 +249,8 @@ export default async function ManagerDashboard() {
         <DashboardSignalShowcase
           theme="light"
           badge="Ops + AI Layer"
-          title="The product screens now flex interface craft, not just the marketing shell."
-          subtitle="That matters in a designathon, because judges notice whether the actual workflow pages feel special."
+          title="The product screens show interface craft beyond the landing page."
+          subtitle="The actual workflow pages stay refined, useful, and connected."
         />
       </div>
 

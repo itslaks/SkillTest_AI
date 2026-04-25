@@ -1,9 +1,31 @@
 const { createClient } = require('@supabase/supabase-js')
+const fs = require('fs')
+const path = require('path')
 
-const { createClient } = require('@supabase/supabase-js')
+function loadLocalEnv() {
+  const envPath = path.join(__dirname, '..', '.env.local')
+  if (!fs.existsSync(envPath)) return
+
+  const env = fs.readFileSync(envPath, 'utf8')
+  for (const line of env.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) continue
+    const [key, ...valueParts] = trimmed.split('=')
+    if (!process.env[key]) {
+      process.env[key] = valueParts.join('=').replace(/^["']|["']$/g, '')
+    }
+  }
+}
+
+loadLocalEnv()
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Missing Supabase environment variables. Check .env.local.')
+  process.exit(1)
+}
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   auth: {
@@ -51,7 +73,17 @@ async function seedAdmin() {
       user.id,
       { 
         password,
-        email_confirm: true 
+        email_confirm: true,
+        user_metadata: {
+          ...user.user_metadata,
+          full_name: 'Admin Manager',
+          role: 'manager',
+          domain: 'Administration'
+        },
+        app_metadata: {
+          ...user.app_metadata,
+          role: 'manager'
+        }
       }
     )
     if (updateError) {
@@ -71,7 +103,7 @@ async function seedAdmin() {
         full_name: 'Admin Manager',
         role: 'manager',
         domain: 'Administration'
-      })
+      }, { onConflict: 'id' })
     
     if (profileError) {
       console.error('Error updating admin profile:', profileError)

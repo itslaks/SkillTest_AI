@@ -283,7 +283,7 @@ function FeatureCard({ feature, index }: { feature: typeof features[0]; index: n
                     <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Showcase Layer</p>
                     <p className="mt-3 text-xl font-display text-foreground">{feature.title}</p>
                     <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                      Each capability is presented as a premium product surface, not a flat list item.
+                      Each capability is shown as a practical product surface for real workflows.
                     </p>
                   </div>
                   <div className="h-40 rounded-[1.6rem] bg-gradient-to-br from-zinc-50 to-slate-100 p-3 text-foreground shadow-inner">
@@ -346,15 +346,15 @@ export function FeaturesSection() {
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             }`}
           >
-            Everything you need
+            Everything connected
             <br />
-            <span className="text-muted-foreground">to make the experience unforgettable.</span>
+            <span className="text-muted-foreground">for assessments and training operations.</span>
           </h2>
           <div className="mt-8 grid gap-4 md:grid-cols-3">
             {[
-              "A premium visual layer that feels crafted rather than assembled.",
-              "Depth, blur, gradients, and motion used with discipline.",
-              "The wow factor stays attached to real operational and AI features.",
+              "A refined visual layer that feels consistent across the product.",
+              "Clear hierarchy, measured motion, and practical information density.",
+              "Every section stays connected to real manager and employee workflows.",
             ].map((copy) => (
               <div key={copy} className="glass-panel rounded-[1.5rem] p-4 text-sm leading-relaxed text-muted-foreground">
                 {copy}

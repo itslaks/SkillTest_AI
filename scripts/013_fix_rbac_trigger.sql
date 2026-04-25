@@ -42,16 +42,11 @@ WHERE role IS NULL OR role = '';
 -- RLS: Allow service role to bypass for admin operations
 -- (service role key always bypasses RLS automatically)
 
--- Fix the "Managers and admins can view all profiles" policy
--- to use the profiles table role, not just JWT metadata
+-- Fix profile SELECT policies without recursively querying profiles.
+-- Manager-only write paths are enforced in server code with the service role.
+DROP POLICY IF EXISTS "Users can view their own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Managers and admins can view all profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Authenticated users can view all profiles" ON public.profiles;
 
-CREATE POLICY "Managers and admins can view all profiles" ON public.profiles
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles p
-      WHERE p.id = auth.uid()
-      AND p.role IN ('manager', 'admin')
-    )
-    OR auth.uid() = id
-  );
+CREATE POLICY "Authenticated users can view all profiles" ON public.profiles
+  FOR SELECT USING (auth.uid() IS NOT NULL);

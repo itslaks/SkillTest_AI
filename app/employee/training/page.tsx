@@ -45,8 +45,8 @@ export default async function EmployeeTrainingPage() {
             <DashboardSignalShowcase
               theme="dark"
               badge="Learner Ops Layer"
-              title="Even the utility views now feel like part of the design story."
-              subtitle="The wow factor extends into the daily training surfaces judges will inspect during the demo."
+              title="Utility views feel connected to the product system."
+              subtitle="Daily training surfaces stay clear, consistent, and presentation-ready."
             />
             <div className="grid gap-4 sm:grid-cols-2">
               <StatTile icon={Users} label="My batches" value={`${memberships.length}`} />
@@ -211,7 +211,7 @@ export default async function EmployeeTrainingPage() {
         <Card className="border-zinc-200 shadow-sm spotlight-card">
           <CardHeader>
             <CardTitle>Why This Matters</CardTitle>
-            <CardDescription>The designathon brief expects more than quizzes. This screen proves the product thinks end to end.</CardDescription>
+            <CardDescription>This screen keeps training operations connected with assessments from end to end.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-[1.5rem] border border-emerald-100 bg-emerald-50 p-5">

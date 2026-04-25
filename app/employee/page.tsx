@@ -1,5 +1,5 @@
 import { getEmployeeStats, getAvailableQuizzes } from '@/lib/actions/employee'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import { ReadinessMeter } from '@/components/insights/readiness-meter'
 import { MonochromeOrb } from '@/components/insights/monochrome-orb'
@@ -21,7 +21,8 @@ export default async function EmployeeDashboard() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: profile } = await supabase
+  const adminClient = createAdminClient()
+  const { data: profile } = await adminClient
     .from('profiles')
     .select('full_name')
     .eq('id', user?.id)
@@ -103,13 +104,13 @@ export default async function EmployeeDashboard() {
         <DashboardSignalShowcase
           theme="light"
           badge="Momentum Surface"
-          title="The employee experience also carries the wow factor, not just admin screens."
-          subtitle="Judges will notice when the learner side feels thoughtfully designed instead of visually forgotten."
+          title="The employee experience uses the same calm product language."
+          subtitle="Learner pages stay practical, polished, and connected to the manager workflow."
         />
         <div className="grid gap-4 md:grid-cols-3">
           {[
-            'Small ambient animations make the journey feel alive.',
-            'Panels have more depth and personality without harming usability.',
+            'Small ambient animations support the learning journey.',
+            'Panels add depth without harming usability.',
             'The visual language stays consistent with the landing showcase.',
           ].map((item) => (
             <div key={item} className="glass-panel spotlight-card rounded-[1.75rem] p-5 text-sm leading-relaxed text-zinc-600 shadow-[0_25px_70px_rgba(15,23,42,0.08)]">

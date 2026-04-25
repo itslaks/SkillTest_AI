@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
 export function CTASection() {
@@ -26,10 +26,6 @@ export function CTASection() {
       ref={sectionRef}
       className="relative py-24 lg:py-40 overflow-hidden bg-foreground text-background"
     >
-      {/* Background circles */}
-      <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 w-96 h-96 rounded-full bg-background/5 blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 left-0 translate-y-1/2 -translate-x-1/2 w-96 h-96 rounded-full bg-background/5 blur-3xl pointer-events-none" />
-
       <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-12 text-center">
         <div 
           className={`max-w-3xl mx-auto transition-all duration-1000 ${
@@ -37,8 +33,8 @@ export function CTASection() {
           }`}
         >
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-background/10 text-background/70 text-sm font-mono mb-8">
-            <Sparkles className="w-4 h-4" />
-            Join the future of assessments
+            <ShieldCheck className="w-4 h-4" />
+            Enterprise-ready assessment workflows
           </div>
           
           <h2 className="text-5xl lg:text-7xl font-display tracking-tight mb-8">
@@ -48,8 +44,7 @@ export function CTASection() {
           </h2>
           
           <p className="text-xl text-background/60 mb-12 leading-relaxed">
-            Empower your HR and L&D teams with AI-powered questions and gamified workflows. 
-            Get started with SkillTest today and transform your enterprise knowledge checking.
+            Give HR and L&D teams one place to create assessments, manage learners, track performance, and act on clear signals.
           </p>
           
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -74,7 +69,7 @@ export function CTASection() {
           </div>
           
           <p className="mt-8 text-sm text-background/40 font-mono">
-            FREE INTERNAL TOOL • NO CREDIT CARD REQUIRED
+            SECURE ROLE-BASED ACCESS / MANAGER AND EMPLOYEE WORKFLOWS
           </p>
         </div>
       </div>

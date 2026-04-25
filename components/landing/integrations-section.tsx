@@ -53,18 +53,18 @@ export function IntegrationsSection() {
           <h2 className="text-4xl lg:text-6xl font-display tracking-tight mb-6">
             Engagement features
             <br />
-            with a showpiece interface.
+            with a focused interface.
           </h2>
           <p className="text-xl text-background/65">
-            These layers are designed to feel premium and memorable while still keeping the product fast, readable, and practical.
+            These layers are designed to keep progress visible while the product stays fast, readable, and practical.
           </p>
         </div>
 
         <div className="mb-10 grid gap-4 md:grid-cols-3">
           {[
-            "Visual rhythm through dual marquees and high-contrast cards.",
-            "Aesthetic depth using glow fields, glass panels, and motion.",
-            "Clear performance-first restraint so the interface still feels crisp.",
+            "Readable rewards, progress, and leaderboard signals.",
+            "Consistent card language across manager and learner surfaces.",
+            "Performance-first restraint so the interface stays crisp.",
           ].map((item) => (
             <div key={item} className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 text-sm leading-relaxed text-white/70">
               {item}

@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { requireManager } from '@/lib/rbac'
 import { ManagerSidebar } from '@/components/manager/sidebar'
 import { ManagerHeader } from '@/components/manager/header'
@@ -11,7 +11,7 @@ export default async function ManagerLayout({
 }) {
   const { userId } = await requireManager()
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   const { data: profile } = await supabase
     .from('profiles')
     .select('*')

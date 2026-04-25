@@ -2,7 +2,7 @@
  * Centralized RBAC utility. Single source of truth for role checks.
  */
 
-import { createClient } from "@/lib/supabase/server"
+import { createAdminClient, createClient } from "@/lib/supabase/server"
 import type { UserRole } from "@/lib/types/database"
 import { redirect } from "next/navigation"
 import { NextResponse } from "next/server"
@@ -14,7 +14,8 @@ export async function getCurrentUserRole(): Promise<{ userId: string; role: RBAC
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return null
 
-  const { data: profile } = await supabase
+  const adminClient = createAdminClient()
+  const { data: profile } = await adminClient
     .from("profiles")
     .select("role")
     .eq("id", user.id)
@@ -23,7 +24,7 @@ export async function getCurrentUserRole(): Promise<{ userId: string; role: RBAC
   const role = (profile?.role || user.user_metadata?.role || "employee") as RBACRole
 
   if (profile && !profile.role && user.user_metadata?.role) {
-    await supabase.from("profiles").update({ role: user.user_metadata.role }).eq("id", user.id)
+    await adminClient.from("profiles").update({ role: user.user_metadata.role }).eq("id", user.id)
   }
 
   return { userId: user.id, role }

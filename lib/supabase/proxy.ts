@@ -64,8 +64,7 @@ export async function updateSession(request: NextRequest) {
   // If user is logged in and tries to access auth pages, redirect based on role
   if (user && (pathname.startsWith('/auth/login') || pathname.startsWith('/auth/sign-up'))) {
     const url = request.nextUrl.clone()
-    // Get role from user_metadata first, layouts will do proper DB check
-    const role = user.user_metadata?.role || 'employee'
+    const role = user.user_metadata?.role || user.app_metadata?.role || 'employee'
     url.pathname = role === 'manager' || role === 'admin' ? '/manager' : '/employee'
     return NextResponse.redirect(url)
   }

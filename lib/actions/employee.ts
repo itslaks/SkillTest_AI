@@ -83,11 +83,12 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
     console.error('Quiz submission auth error:', authError)
     return { error: 'Not authenticated' }
   }
+  const adminClient = createAdminClient()
 
   const { quiz_id, answers, time_taken_seconds } = parsed.data
 
   try {
-    const { data: profile } = await supabase
+    const { data: profile } = await adminClient
       .from('profiles')
       .select('created_at')
       .eq('id', user.id)
@@ -228,7 +229,7 @@ export async function getAvailableQuizzes() {
     .select('quiz_id, status, score, answers, completed_at, quizzes:quiz_id(id, topic, difficulty, created_by)')
     .eq('user_id', user.id)
 
-  const { data: profile } = await supabase
+  const { data: profile } = await adminClient
     .from('profiles')
     .select('domain, created_at')
     .eq('id', user.id)
@@ -307,7 +308,7 @@ export async function getQuizForAttempt(quizId: string) {
 
   if (questionsError) return { error: questionsError.message }
 
-  const { data: profile } = await supabase
+  const { data: profile } = await adminClient
     .from('profiles')
     .select('domain, created_at')
     .eq('id', user.id)

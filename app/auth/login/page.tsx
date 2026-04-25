@@ -16,6 +16,7 @@ function LoginContent() {
   const [isPending, startTransition] = useTransition()
   const [showPassword, setShowPassword] = useState(false)
   const resetSuccess = searchParams.get('reset') === 'success'
+  const redirectTo = searchParams.get('redirect')
 
   function handleSignIn(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -86,6 +87,7 @@ function LoginContent() {
           </div>
 
           <form onSubmit={handleSignIn} className="space-y-4">
+            {redirectTo && <input type="hidden" name="redirect" value={redirectTo} />}
             {resetSuccess && (
               <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />

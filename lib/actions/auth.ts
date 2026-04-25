@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import type { UserRole } from '@/lib/types/database'
 import { parseFormData } from '@/lib/security/validation'
@@ -70,9 +70,6 @@ export async function signIn(formData: FormData) {
 
   const supabase = await createClient()
 
-  // Clear any stale recovery or prior local session state before fresh sign-in.
-  await supabase.auth.signOut({ scope: 'local' })
-
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
@@ -80,13 +77,14 @@ export async function signIn(formData: FormData) {
 
   if (error) {
     if (/invalid login credentials/i.test(error.message)) {
-      return { error: 'Invalid email or password. If you just reset your password, wait a few seconds and try the new password again.' }
+      return { error: 'Invalid email or password. Please check the email and password exactly as shared for this account.' }
     }
     return { error: error.message }
   }
 
   // Get the profile to check the actual role from database
-  const { data: profile } = await supabase
+  const adminClient = createAdminClient()
+  const { data: profile } = await adminClient
     .from('profiles')
     .select('role')
     .eq('id', data.user.id)
@@ -149,7 +147,8 @@ export async function getUserProfile() {
     return null
   }
 
-  const { data: profile, error: profileError } = await supabase
+  const adminClient = createAdminClient()
+  const { data: profile, error: profileError } = await adminClient
     .from('profiles')
     .select('*')
     .eq('id', user.id)
@@ -178,7 +177,8 @@ export async function updateProfile(formData: FormData) {
     return { error: 'Not authenticated' }
   }
 
-  const { error } = await supabase
+  const adminClient = createAdminClient()
+  const { error } = await adminClient
     .from('profiles')
     .update({
       full_name: fullName,
@@ -213,7 +213,7 @@ export async function resendVerificationEmail(email: string) {
 }
 
 export async function syncProfileFromUserMetadata(userId: string, userMetadata: any) {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   if (!userId || !userMetadata) return;
   // Only update if profile.full_name is null or empty
   const { data: profile } = await supabase
