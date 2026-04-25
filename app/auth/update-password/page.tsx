@@ -8,6 +8,14 @@ import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import { ArrowLeft, CheckCircle2, KeyRound, ShieldCheck, Sparkles } from "lucide-react";
 
+function recoveryErrorMessage(message?: string) {
+  if (!message) return "This password reset link is invalid or expired.";
+  if (/code verifier|pkce|expired|invalid|otp|token/i.test(message)) {
+    return "This password reset link is invalid or expired. Please request a fresh reset email and open the new link in the same browser.";
+  }
+  return "We could not verify this password reset link. Please request a fresh reset email and try again.";
+}
+
 function UpdatePasswordForm() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -57,7 +65,7 @@ function UpdatePasswordForm() {
         }
       } catch (err: any) {
         if (mounted) {
-          setError(err?.message || "This password reset link is invalid or expired.");
+          setError(recoveryErrorMessage(err?.message));
           setIsRecoveryReady(false);
         }
       } finally {
@@ -200,7 +208,7 @@ function UpdatePasswordForm() {
 
             {!isRecoveryReady && !isCheckingLink && !success && (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                This link may be expired. Request a fresh password reset email to continue.
+                Request a fresh password reset email and open the newest link in this browser to continue.
               </div>
             )}
 

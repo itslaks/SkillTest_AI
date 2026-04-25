@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { sendPasswordReset } from "@/lib/actions/auth";
+import { createClient } from "@/lib/supabase/client";
 import { ArrowLeft, CheckCircle2, KeyRound, Mail, ShieldCheck } from "lucide-react";
 
 export default function ResetPasswordPage() {
@@ -18,9 +18,19 @@ export default function ResetPasswordPage() {
     setSuccess(null);
     const formData = new FormData(event.currentTarget);
     startTransition(async () => {
-      const result = await sendPasswordReset(formData);
-      if (result?.error) setError(result.error);
-      else setSuccess("Reset link sent. Check your inbox and spam folder.");
+      const email = String(formData.get("email") || "").trim();
+      if (!email) {
+        setError("Email is required.");
+        return;
+      }
+
+      const supabase = createClient();
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/update-password`,
+      });
+
+      if (error) setError("We could not send a reset link right now. Please check the email and try again.");
+      else setSuccess("Reset link sent. Open it in this same browser, then set your new password.");
     });
   }
 
