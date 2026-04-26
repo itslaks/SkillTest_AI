@@ -14,7 +14,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export default async function ManagerEmployeesPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
   const [{ data: employees }, { data: rawGrouped }, { data: importHistory }, { data: quizzes }] = await Promise.all([
     getEmployees(),

@@ -12,7 +12,6 @@ import { DashboardSignalShowcase } from '@/components/insights/dashboard-signal-
 import {
   BellRing,
   CalendarDays,
-  CheckCircle2,
   ClipboardCheck,
   MessageSquareQuote,
   ShieldAlert,

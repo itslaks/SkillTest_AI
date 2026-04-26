@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { requireManagerForApi } from '@/lib/rbac'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   const auth = await requireManagerForApi()
   if (auth instanceof NextResponse) return auth
 

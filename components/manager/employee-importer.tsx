@@ -96,7 +96,7 @@ export function EmployeeImporter() {
         if (rowErrors.length > 0) {
           setError(`${rowErrors.length} row(s) skipped: ${rowErrors.slice(0, 3).join('; ')}`)
         }
-      } catch (err) {
+      } catch {
         setError('Failed to parse file. Use Excel or CSV with Email and name columns.')
       }
     }

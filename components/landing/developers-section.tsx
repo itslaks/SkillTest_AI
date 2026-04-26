@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Copy, Check, FileSpreadsheet, PlusCircle, BarChart, Users } from "lucide-react";
+import { FileSpreadsheet, PlusCircle, BarChart, Users } from "lucide-react";
 
 const managerCapabilities = [
   {

@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { 
   Clock, Trophy, Target, Download, Calendar,
-  User, CheckCircle2, XCircle, BarChart3
+  User, CheckCircle2, BarChart3
 } from 'lucide-react'
 
 interface QuizCompletionEntry {
@@ -168,7 +168,7 @@ export function QuizCompletionDetails({
         <CardContent>
           {completions.length > 0 ? (
             <div className="space-y-3">
-              {completions.map((completion, index) => {
+              {completions.map((completion) => {
                 const { date, time } = formatDate(completion.completed_at)
                 const scoreColor = getScoreColor(completion.score)
                 

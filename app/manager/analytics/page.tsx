@@ -1,7 +1,7 @@
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { requireManager } from '@/lib/rbac'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { BarChart3, Brain, Radar, ShieldAlert, Sparkles, Users } from 'lucide-react'
+import { BarChart3, Brain, ShieldAlert, Sparkles, Users } from 'lucide-react'
 import { IntelligenceDashboard } from '@/components/manager/intelligence-dashboard'
 import {
   analyzeAttemptPattern,

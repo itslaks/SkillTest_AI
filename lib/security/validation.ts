@@ -44,17 +44,6 @@ const safePassword = z
   .min(6, 'Password must be at least 6 characters')
   .max(MAX_LEN, `Must be at most ${MAX_LEN} characters`)
 
-/** Safe URL */
-const safeUrl = z
-  .string()
-  .trim()
-  .max(MAX_LEN, `Must be at most ${MAX_LEN} characters`)
-  .url('Invalid URL')
-  .refine(
-    (val) => /^https?:\/\//i.test(val),
-    'URL must start with http:// or https://'
-  )
-
 /** Optional safe URL */
 const optionalSafeUrl = z
   .string()
@@ -67,8 +56,6 @@ const optionalSafeUrl = z
   .or(z.literal('').transform(() => null))
 
 // ─── Role enum ────────────────────────────────────────────────────────
-
-const userRoleSchema = z.enum(['employee', 'manager'])
 
 // ─── Auth schemas ─────────────────────────────────────────────────────
 

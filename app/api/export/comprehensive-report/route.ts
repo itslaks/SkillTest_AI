@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Mock data representing what would come from your database
     const comprehensiveLeaderboardData = [

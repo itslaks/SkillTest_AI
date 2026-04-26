@@ -95,7 +95,7 @@ export function AddEmployeeDialog({ onEmployeeAdded }: AddEmployeeDialogProps) {
             variant: 'destructive'
           })
         }
-      } catch (error) {
+      } catch {
         toast({
           title: 'Error',
           description: 'Network error. Please try again.',

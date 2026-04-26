@@ -47,7 +47,7 @@ function SignUpSuccessContent() {
       } else {
         setResendSuccess(true)
       }
-    } catch (err) {
+    } catch {
       setError('Failed to resend verification email')
     } finally {
       setResendLoading(false)

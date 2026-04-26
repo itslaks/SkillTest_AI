@@ -57,7 +57,7 @@ export function DeleteEmployeeButton({
             variant: 'destructive'
           })
         }
-      } catch (error) {
+    } catch {
         toast({
           title: 'Error',
           description: 'Network error. Please try again.',

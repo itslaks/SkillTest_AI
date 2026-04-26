@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { 
   Trophy, Download, Users, TrendingUp, Clock, Target,
-  BarChart3, Crown, Medal, CheckCircle2, Calendar
+  BarChart3, Crown, Medal
 } from 'lucide-react'
 
 export default function DemoManagerLeaderboard() {

@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ quizId: string }> }
 ) {
   try {
@@ -21,7 +21,7 @@ export async function GET(
       if (serviceKey) {
         dataClient = createAdminClient()
       }
-    } catch (e) {
+    } catch {
       console.warn('Using regular client for data fetch')
     }
 
@@ -122,8 +122,3 @@ export async function GET(
   }
 }
 
-function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  return `${m}m ${s}s`
-}

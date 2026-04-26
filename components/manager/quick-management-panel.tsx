@@ -6,21 +6,17 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { 
   Users, 
-  UserPlus, 
   FileQuestion, 
   Plus, 
   Settings, 
   Download, 
   BarChart3,
-  Trash2,
-  Clock,
   Trophy,
   Activity,
   Upload,
   ClipboardList,
   Edit,
-  Eye,
-  Copy
+  Eye
 } from 'lucide-react'
 import Link from 'next/link'
 import { AddEmployeeDialog } from './add-employee-dialog'

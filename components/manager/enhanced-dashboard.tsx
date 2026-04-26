@@ -12,7 +12,6 @@ import {
   Clock, 
   Target,
   Plus,
-  Trash2,
   Edit,
   BarChart3,
   Calendar,

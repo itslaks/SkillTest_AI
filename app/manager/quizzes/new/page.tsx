@@ -5,16 +5,15 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/hooks/use-toast'
 import { createQuiz, bulkCreateQuestions } from '@/lib/actions/quiz'
 import {
   ArrowLeft, Sparkles, Wand2, Upload, FileSpreadsheet, Download,
-  CheckCircle2, Clock, Target, Users, Lock, Globe, AlarmClock,
-  Shuffle, Eye, EyeOff, Hash, BookOpen, Zap, ChevronRight,
-  Info, XCircle, GraduationCap, Settings2, FileUp,
+  CheckCircle2, Clock, Target, AlarmClock,
+  Shuffle, Eye, Hash, BookOpen, Zap, ChevronRight,
+  Info, XCircle, Settings2, FileUp,
 } from 'lucide-react'
 import Link from 'next/link'
 import type { DifficultyLevel, ParsedQuestion } from '@/lib/types/database'
@@ -78,7 +77,6 @@ export default function NewQuizPage() {
   // Settings
   const [passingScore, setPassingScore] = useState(60)
   const [timeLimit, setTimeLimit] = useState(30)
-  const [isPublic, setIsPublic] = useState(true)
   const [shuffleQuestions, setShuffleQuestions] = useState(false)
   const [shuffleOptions, setShuffleOptions] = useState(false)
   const [showResults, setShowResults] = useState(true)

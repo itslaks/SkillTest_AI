@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireManager } from '@/lib/rbac'
 import { ManagerSidebar } from '@/components/manager/sidebar'

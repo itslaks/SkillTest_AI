@@ -90,7 +90,7 @@ export function QuizImporter({
       }
 
       // Map to expected format - handle various column name formats
-      const questions: ParsedQuestion[] = jsonData.map((row, i) => {
+      const questions: ParsedQuestion[] = jsonData.map((row) => {
         const q: ParsedQuestion = {
           question_text: row['question_text'] || row['Question'] || row['question'] || row['Q'] || '',
           option_a: row['option_a'] || row['Option A'] || row['A'] || row['a'] || '',

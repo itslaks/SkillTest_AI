@@ -21,6 +21,8 @@ const jetbrainsMono = JetBrains_Mono({
   variable: '--font-jetbrains'
 });
 
+const isVercelDeployment = process.env.VERCEL === '1'
+
 export const metadata: Metadata = {
   title: 'SkillTest - Gamified Employee Assessment Platform',
   description: 'A highly interactive and gamified employee assessment platform with AI-powered MCQ generation, dynamic leaderboards, and Excel-based reporting.',
@@ -36,7 +38,7 @@ export default function RootLayout({
       <body className={`${instrumentSans.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
         {children}
         <Toaster />
-        <Analytics />
+        {isVercelDeployment && <Analytics />}
       </body>
     </html>
   )

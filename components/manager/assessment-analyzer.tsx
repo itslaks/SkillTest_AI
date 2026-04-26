@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -9,9 +8,9 @@ import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Upload, FileSpreadsheet, CheckCircle2, XCircle,
-  MessageSquare, Send, Bot, User, Loader2, Trash2, Download,
+  Send, Bot, User, Loader2, Trash2, Download,
   BarChart3, Users, Trophy, TrendingUp, Sparkles, RefreshCw,
-  ChevronRight, ArrowUpRight, Zap, Target, Clock,
+  ChevronRight, Zap, Target, Clock,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { cn } from '@/lib/utils'

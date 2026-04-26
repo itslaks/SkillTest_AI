@@ -1,10 +1,10 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { requireManagerForApi } from '@/lib/rbac'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
 import { buildCumulativeLeaderboard, formatDuration, type CumulativeAttempt } from '@/lib/leaderboard'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const auth = await requireManagerForApi()
     if (auth instanceof NextResponse) return auth
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
       if (serviceKey) {
         dataClient = createAdminClient()
       }
-    } catch (e) {
+    } catch {
       console.warn('Using regular client for data fetch')
     }
 

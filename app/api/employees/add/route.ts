@@ -5,7 +5,7 @@ import { requireManager } from '@/lib/rbac'
 export async function POST(request: NextRequest) {
   try {
     // Verify manager authentication
-    const { userId } = await requireManager()
+    await requireManager()
     
     const employees = await request.json()
     

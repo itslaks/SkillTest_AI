@@ -83,23 +83,10 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
     console.error('Quiz submission auth error:', authError)
     return { error: 'Not authenticated' }
   }
-  const adminClient = createAdminClient()
 
   const { quiz_id, answers, time_taken_seconds } = parsed.data
 
   try {
-    const { data: profile } = await adminClient
-      .from('profiles')
-      .select('created_at')
-      .eq('id', user.id)
-      .single()
-
-    const { data: userStats } = await supabase
-      .from('user_stats')
-      .select('current_streak')
-      .eq('user_id', user.id)
-      .single()
-
     // Fetch quiz to calculate score
     const { data: quiz, error: quizError } = await supabase
       .from('quizzes')
@@ -135,13 +122,6 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
       panicSignal: answer.panicSignal ?? (!answer.isCorrect && answer.timeSpent <= 5),
       adaptiveDifficulty: answer.adaptiveDifficulty || rawInsight.suggestedNextDifficulty,
     }))
-
-    const readiness = computeReadinessInsight({
-      attempts: previousAttempts || [],
-      quiz,
-      currentStreak: userStats?.current_streak || 0,
-      daysInTraining: getDaysInTraining(profile?.created_at),
-    })
 
     // Points: base 10 per correct + speed bonus
     const speedBonus = time_taken_seconds < (quiz.time_limit_minutes * 60 * 0.5) ? 25 : 0

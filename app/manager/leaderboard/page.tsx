@@ -1,6 +1,5 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { requireManager } from '@/lib/rbac'
-import { redirect } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -8,10 +7,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { RealtimeManagerLeaderboard } from '@/components/manager/realtime-manager-leaderboard'
 import { QuizCompletionDetails } from '@/components/manager/quiz-completion-details'
 import { buildCumulativeLeaderboard, type CumulativeAttempt } from '@/lib/leaderboard'
-import Link from 'next/link'
 import { 
-  Trophy, Medal, Crown, Users, TrendingUp, Clock, 
-  Download, ArrowLeft, BarChart3, Target 
+  Trophy, Crown, Users, TrendingUp, Clock, 
+  Download, BarChart3, Target 
 } from 'lucide-react'
 
 export default async function ManagerLeaderboardPage() {

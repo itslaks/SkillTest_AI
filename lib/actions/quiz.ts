@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import type { CreateQuizInput, CreateQuestionInput, DifficultyLevel } from '@/lib/types/database'
+import type { CreateQuizInput, CreateQuestionInput } from '@/lib/types/database'
 import {
   createQuizSchema,
   updateQuizSchema,

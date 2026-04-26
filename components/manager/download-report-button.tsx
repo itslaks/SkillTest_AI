@@ -10,7 +10,7 @@ interface DownloadReportButtonProps {
   variant?: 'quiz' | 'all'
 }
 
-export function DownloadReportButton({ quizId, quizTitle, variant = 'quiz' }: DownloadReportButtonProps) {
+export function DownloadReportButton({ quizId, variant = 'quiz' }: DownloadReportButtonProps) {
   const [loading, setLoading] = useState(false)
 
   const handleDownload = () => {

@@ -19,7 +19,7 @@ import { DownloadReportButton } from '@/components/manager/download-report-butto
 import { QuickDeleteButton } from '@/components/manager/quick-delete-button'
 
 export default async function ManagerReportsPage() {
-  const { userId } = await requireManager()
+  await requireManager()
 
   const supabase = await createClient()
 

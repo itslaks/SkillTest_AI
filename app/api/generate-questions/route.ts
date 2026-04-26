@@ -340,7 +340,7 @@ Return ONLY valid JSON, no markdown.`
 // ─── Template-based fallback generation ───────────────────────────────
 function generateTemplateQuestions(topic: string, distribution: Record<string, number>) {
   const questions: any[] = []
-  const templates = getTemplatesForTopic(topic)
+  const templates = getTemplatesForTopic()
 
   for (const [diff, count] of Object.entries(distribution)) {
     for (let i = 0; i < count; i++) {
@@ -427,7 +427,7 @@ function shuffleOptions<T>(options: T[]) {
   return shuffled
 }
 
-function getTemplatesForTopic(topic: string) {
+function getTemplatesForTopic() {
   return [
     {
       question: `Which of the following best describes a key concept in {topic}?`,

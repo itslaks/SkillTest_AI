@@ -11,7 +11,6 @@ import {
   Crown,
   Gauge,
   Snowflake,
-  Trophy,
 } from 'lucide-react'
 
 export default async function QuizResultsPage({ params }: { params: Promise<{ quizId: string }> }) {

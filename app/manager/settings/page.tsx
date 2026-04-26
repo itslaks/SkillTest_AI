@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { ProfileForm } from '@/components/manager/profile-form'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Settings, Shield, Key, Globe } from 'lucide-react'
+import { Shield, Key, Globe } from 'lucide-react'
 
 export default async function ManagerSettingsPage() {
   const profile = await getUserProfile()

@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import {
   ArrowLeft, Download, Users, Clock, Trophy, CheckCircle2, XCircle,
-  FileQuestion, Pencil, ClipboardList, Brain, Upload, FileText,
+  FileQuestion, Pencil, Upload, FileText,
 } from 'lucide-react'
 import { getQuizLeaderboard } from '@/lib/actions/employee'
 import { getQuizAssignments, getEmployees } from '@/lib/actions/manager'

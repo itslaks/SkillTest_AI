@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -12,7 +12,6 @@ import { startQuizAttempt, submitQuizAttempt } from '@/lib/actions/employee'
 import { shiftDifficulty } from '@/lib/insights'
 import type { DifficultyLevel, QuizAnswer } from '@/lib/types/database'
 import {
-  AlertTriangle,
   Brain,
   CheckCircle2,
   ChevronRight,
@@ -69,6 +68,11 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const [showFeedback, setShowFeedback] = useState(false)
   const [streak, setStreak] = useState(0)
   const [totalTime, setTotalTime] = useState(0)
+  const totalTimeRef = useRef(0)
+  useEffect(() => {
+    totalTimeRef.current = totalTime
+  }, [totalTime])
+
   const [questionStartTime, setQuestionStartTime] = useState(0)
   const [timeRemaining, setTimeRemaining] = useState(quiz.time_limit_minutes * 60)
   const [finished, setFinished] = useState(false)
@@ -89,6 +93,32 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const progress = totalQuestions > 0 ? ((currentIndex + (showFeedback ? 1 : 0)) / totalQuestions) * 100 : 0
   const readiness = quiz.insights?.readiness
 
+  const doSubmit = useCallback((finalAnswers: QuizAnswer[]) => {
+    setSubmitting(true)
+    startTransition(async () => {
+      const result = await submitQuizAttempt({
+        quiz_id: quiz.id,
+        answers: finalAnswers,
+        time_taken_seconds: totalTimeRef.current,
+      })
+
+      if (result.error) {
+        setSubmitting(false)
+        return
+      }
+
+      router.push(`/employee/quizzes/${quiz.id}/results`)
+    })
+  }, [quiz.id, router, startTransition])
+
+  const handleAutoSubmit = useCallback(() => {
+    if (!finishedRef.current) {
+      finishedRef.current = true
+      setFinished(true)
+      doSubmit(answersRef.current)
+    }
+  }, [doSubmit])
+
   useEffect(() => {
     if (!started || finished) return
     const interval = setInterval(() => {
@@ -105,15 +135,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       setTotalTime((previous) => previous + 1)
     }, 1000)
     return () => clearInterval(interval)
-  }, [started, finished, quiz.time_limit_minutes])
-
-  function handleAutoSubmit() {
-    if (!finishedRef.current) {
-      finishedRef.current = true
-      setFinished(true)
-      doSubmit(answersRef.current)
-    }
-  }
+  }, [started, finished, quiz.time_limit_minutes, handleAutoSubmit])
 
   function handleStart() {
     startTransition(async () => {
@@ -203,24 +225,6 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     setSelectedOption(null)
     setShowFeedback(false)
     setQuestionStartTime(Date.now())
-  }
-
-  function doSubmit(finalAnswers: QuizAnswer[]) {
-    setSubmitting(true)
-    startTransition(async () => {
-      const result = await submitQuizAttempt({
-        quiz_id: quiz.id,
-        answers: finalAnswers,
-        time_taken_seconds: totalTime,
-      })
-
-      if (result.error) {
-        setSubmitting(false)
-        return
-      }
-
-      router.push(`/employee/quizzes/${quiz.id}/results`)
-    })
   }
 
   function formatTime(seconds: number) {
