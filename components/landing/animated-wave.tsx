@@ -6,7 +6,12 @@ export function AnimatedWave() {
           <div
             key={row}
             className="h-2 rounded-full bg-[linear-gradient(90deg,rgba(14,165,233,0.08),rgba(14,165,233,0.5),rgba(15,23,42,0.12))]"
-            style={{ width: `${92 - row * 12}%`, marginLeft: `${row * 8}%` }}
+            style={{
+              width: `${92 - row * 12}%`,
+              marginLeft: `${row * 8}%`,
+              animation: `wave-bar ${1.4 + row * 0.25}s ease-in-out ${row * 0.18}s infinite alternate`,
+              willChange: "transform, opacity",
+            }}
           />
         ))}
       </div>

@@ -22,9 +22,9 @@ export default async function ManagerLayout({
   // (This is handled in signIn, but just in case someone navigates directly)
 
   return (
-    <div className="min-h-screen bg-background text-foreground noise-overlay">
+    <div className="min-h-screen bg-background text-foreground">
       <ManagerSidebar profile={profile} />
-      <div className="relative z-10 transition-[padding-left] duration-200 ease-out lg:pl-[var(--manager-sidebar-width,16rem)]">
+      <div className="relative z-10 transition-[margin-left] duration-200 ease-out lg:ml-[var(--manager-sidebar-width,16rem)]">
         <ManagerHeader profile={profile} />
         <main className="mx-auto max-w-[1600px] overflow-x-hidden p-4 md:p-8">
           {children}

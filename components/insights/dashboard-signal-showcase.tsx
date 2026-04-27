@@ -25,9 +25,16 @@ export function DashboardSignalShowcase({
         {badge || "Signal Stack"}
       </div>
 
-      <div className="absolute inset-0">
-        <div className={`aura-ring left-10 top-14 h-24 w-24 ${dark ? "bg-cyan-400/30" : "bg-cyan-300/35"}`} />
-        <div className={`aura-ring bottom-12 right-10 h-28 w-28 ${dark ? "bg-blue-500/25" : "bg-blue-300/30"}`} style={{ animationDelay: "1.3s" }} />
+      {/* Aura rings — isolated so they don't retrigger backdrop-filter */}
+      <div className="absolute inset-0 pointer-events-none" style={{ isolation: "isolate" }}>
+        <div
+          className={`aura-ring left-10 top-14 h-24 w-24 ${dark ? "bg-cyan-400/30" : "bg-cyan-300/35"}`}
+          style={{ willChange: "transform" }}
+        />
+        <div
+          className={`aura-ring bottom-12 right-10 h-28 w-28 ${dark ? "bg-blue-500/25" : "bg-blue-300/30"}`}
+          style={{ animationDelay: "1.3s", willChange: "transform" }}
+        />
       </div>
 
       <div className="relative z-10 p-5 pt-14">
@@ -41,13 +48,23 @@ export function DashboardSignalShowcase({
           </div>
 
           <div className="relative hidden min-h-[230px] md:block">
-            <div className={`absolute right-0 top-6 h-28 w-32 rounded-[1.5rem] p-3 ${dark ? "border border-white/10 bg-black/35" : "border border-black/8 bg-white/70"} float-delayed`}>
+            {/* Wrap each in a GPU-isolated container */}
+            <div
+              className={`absolute right-0 top-6 h-28 w-32 rounded-[1.5rem] p-3 ${dark ? "border border-white/10 bg-black/35" : "border border-black/8 bg-white/70"}`}
+              style={{ animation: "float-delayed 10s ease-in-out infinite", willChange: "transform" }}
+            >
               <AnimatedWave />
             </div>
-            <div className={`absolute left-6 top-16 h-32 w-32 rounded-[1.75rem] p-3 ${dark ? "border border-white/10 bg-white/8" : "border border-black/8 bg-zinc-50/90"} float-slow`}>
+            <div
+              className={`absolute left-6 top-16 h-32 w-32 rounded-[1.75rem] p-3 ${dark ? "border border-white/10 bg-white/8" : "border border-black/8 bg-zinc-50/90"}`}
+              style={{ animation: "float-slow 8s ease-in-out infinite", willChange: "transform" }}
+            >
               <AnimatedTetrahedron />
             </div>
-            <div className={`absolute bottom-6 right-6 h-40 w-40 rounded-[1.9rem] p-4 ${dark ? "border border-white/10 bg-white/8" : "border border-black/8 bg-zinc-50/90"} float-slow`}>
+            <div
+              className={`absolute bottom-6 right-6 h-40 w-40 rounded-[1.9rem] p-4 ${dark ? "border border-white/10 bg-white/8" : "border border-black/8 bg-zinc-50/90"}`}
+              style={{ animation: "float-slow 8s ease-in-out 1.5s infinite", willChange: "transform" }}
+            >
               <AnimatedSphere />
             </div>
           </div>

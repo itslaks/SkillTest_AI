@@ -97,7 +97,7 @@ export function HeroSection() {
         </div>
       </div>
 
-      <div className="relative z-10 mt-2">
+      <div className="relative z-10 mt-2 marquee-container">
         <div className="flex gap-16 marquee whitespace-nowrap">
           {[...Array(2)].map((_, i) => (
             <div key={i} className="flex gap-16">
