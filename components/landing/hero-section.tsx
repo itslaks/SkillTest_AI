@@ -41,7 +41,7 @@ export function HeroSection() {
 
         <div className="mb-10">
           <h1 className="text-[clamp(3rem,10vw,8rem)] font-display leading-[0.94] tracking-tight">
-            <span className="block">SkillTest</span>
+            <span className="block">Maverick Execution Platform</span>
             <span className="block text-foreground/70">for enterprise learning</span>
           </h1>
         </div>

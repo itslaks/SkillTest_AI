@@ -1,7 +1,8 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { requireManager } from '@/lib/rbac'
 import { getQuizStats, getQuizzes } from '@/lib/actions/quiz'
 import { getEmployees } from '@/lib/actions/manager'
+import { getTrainingGovernanceSettings } from '@/lib/actions/training'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -21,19 +22,68 @@ import { DownloadReportButton } from '@/components/manager/download-report-butto
 import { QuickDeleteButton } from '@/components/manager/quick-delete-button'
 
 export default async function ManagerReportsPage() {
-  await requireManager()
+  const { userId } = await requireManager()
 
   const supabase = await createClient()
+  const admin = createAdminClient()
 
-  const [statsRes, quizzesRes, employeesRes] = await Promise.all([
+  const [statsRes, quizzesRes, employeesRes, governance] = await Promise.all([
     getQuizStats(),
     getQuizzes(),
     getEmployees(),
+    getTrainingGovernanceSettings(),
   ])
 
   const stats = statsRes.data || { totalQuizzes: 0, totalAttempts: 0, averageScore: 0, uniqueEmployees: 0 }
   const quizzes = quizzesRes.data || []
   const employees = employeesRes.data || []
+
+  const { data: batches } = await admin
+    .from('training_batches')
+    .select('id, title, status')
+    .or(`created_by.eq.${userId},coordinator_id.eq.${userId},trainer_id.eq.${userId}`)
+    .order('created_at', { ascending: false })
+
+  const batchIds = (batches || []).map((batch: any) => batch.id)
+  const [membersRes, attendanceRes, projectRes, attemptsRes] = await Promise.all([
+    batchIds.length
+      ? admin
+          .from('batch_members')
+          .select('*, profile:user_id(full_name, email, employee_id)')
+          .in('batch_id', batchIds)
+      : Promise.resolve({ data: [] }),
+    batchIds.length
+      ? admin
+          .from('session_attendance')
+          .select('user_id, status, session:session_id(batch_id)')
+      : Promise.resolve({ data: [] }),
+    batchIds.length
+      ? admin
+          .from('training_project_evaluations')
+          .select('user_id, score')
+          .in('batch_id', batchIds)
+      : Promise.resolve({ data: [] }),
+    batchIds.length
+      ? admin
+          .from('quiz_attempts')
+          .select('user_id, score, quizzes!inner(batch_id)')
+          .in('quizzes.batch_id', batchIds)
+          .eq('status', 'completed')
+      : Promise.resolve({ data: [] }),
+  ])
+
+  const members = membersRes.data || []
+  const trainingAttendance = attendanceRes.data || []
+  const projectEvaluations = projectRes.data || []
+  const trainingAttempts = attemptsRes.data || []
+  const statusCounts = {
+    discontinued: members.filter((member: any) => ['discontinued', 'dropped'].includes(member.enrollment_status)).length,
+    notCleared: members.filter((member: any) => member.enrollment_status === 'not_cleared').length,
+    offered: members.filter((member: any) => member.enrollment_status === 'offered').length,
+    onboarded: members.filter((member: any) => ['onboarded', 'active'].includes(member.enrollment_status)).length,
+  }
+
+  const topperRows = buildTopperRows(members, trainingAttempts, projectEvaluations, trainingAttendance, governance).slice(0, 10)
 
   // Get per-quiz attempt data
   const quizIds = quizzes.map((q: any) => q.id)
@@ -78,8 +128,8 @@ export default async function ManagerReportsPage() {
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Reports &amp; Analytics</h1>
-          <p className="text-muted-foreground mt-1">Overview of quiz performance and employee engagement</p>
+          <h1 className="text-2xl md:text-3xl font-bold">Maverick TMS Report Center</h1>
+          <p className="text-muted-foreground mt-1">Attendance, assessment, feedback, topper, and consolidated batch reporting</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" asChild>
@@ -96,6 +146,73 @@ export default async function ManagerReportsPage() {
           </Button>
           <DownloadReportButton quizId="all" variant="all" />
         </div>
+      </div>
+
+      <Card className="border-zinc-200 bg-black text-white shadow-sm">
+        <CardHeader>
+          <CardTitle>BRD-Aligned Downloads</CardTitle>
+          <CardDescription className="text-zinc-400">
+            The Excel workbook includes batch summary, candidate status, attendance, assessments, uploads, topper criteria, topper candidates, feedback, and notifications.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-3">
+          {[
+            { title: 'Consolidated batch report', body: 'Filter in Excel by discontinued, not cleared, offered, and onboarded candidates.' },
+            { title: 'Transparent topper report', body: 'Topper score uses configured assessment/project weights and minimum attendance.' },
+            { title: 'Governance audit report', body: 'Attendance upload logs, notification records, and feedback outcomes stay exportable.' },
+          ].map((item) => (
+            <div key={item.title} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <p className="font-semibold">{item.title}</p>
+              <p className="mt-2 text-sm text-zinc-400">{item.body}</p>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+        <Card className="border-amber-100 bg-amber-50 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-amber-950">
+              <Trophy className="h-5 w-5" />
+              Topper Center
+            </CardTitle>
+            <CardDescription className="text-amber-800">
+              Transparent ranking using {governance.topperAssessmentWeight}% assessment, {governance.topperProjectWeight}% project, and {governance.topperMinAttendance}% minimum attendance.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {topperRows.length === 0 ? (
+              <p className="rounded-2xl border border-dashed border-amber-200 bg-white/70 p-6 text-center text-sm text-amber-800">No topper data yet. Upload assessment scores and project evaluations to populate this board.</p>
+            ) : topperRows.map((row, index) => (
+              <div key={row.userId} className="grid gap-3 rounded-2xl border border-amber-200 bg-white p-4 md:grid-cols-[auto_1fr_auto] md:items-center">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-500 text-sm font-bold text-white">{index + 1}</div>
+                <div className="min-w-0">
+                  <p className="font-semibold text-amber-950">{row.name}</p>
+                  <p className="text-sm text-amber-800">Assessment {row.assessmentScore}% - Project {row.projectScore}% - Attendance {row.attendanceRate}%</p>
+                </div>
+                <div className="rounded-full bg-black px-4 py-2 text-sm font-semibold text-white">{row.topperScore}</div>
+              </div>
+            ))}
+            <div className="flex flex-wrap gap-2 pt-2">
+              <Button asChild className="rounded-full bg-black text-white hover:bg-zinc-800">
+                <a href="/api/reports/training-ops/download">Export topper workbook</a>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-zinc-200 shadow-sm">
+          <CardHeader>
+            <CardTitle>Consolidated Batch Filters</CardTitle>
+            <CardDescription>BRD status filters are visible before export and mirrored in the Excel workbook.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2">
+            <FilterMetric title="Discontinued" value={statusCounts.discontinued} tone="rose" />
+            <FilterMetric title="Not cleared" value={statusCounts.notCleared} tone="amber" />
+            <FilterMetric title="Offered" value={statusCounts.offered} tone="blue" />
+            <FilterMetric title="Onboarded / active" value={statusCounts.onboarded} tone="emerald" />
+          </CardContent>
+        </Card>
       </div>
 
       {/* Overview Cards */}
@@ -332,4 +449,58 @@ export default async function ManagerReportsPage() {
       </div>
     </div>
   )
+}
+
+function FilterMetric({ title, value, tone }: { title: string; value: number; tone: 'rose' | 'amber' | 'blue' | 'emerald' }) {
+  const tones = {
+    rose: 'border-rose-100 bg-rose-50 text-rose-800',
+    amber: 'border-amber-100 bg-amber-50 text-amber-800',
+    blue: 'border-blue-100 bg-blue-50 text-blue-800',
+    emerald: 'border-emerald-100 bg-emerald-50 text-emerald-800',
+  }
+  return (
+    <div className={`rounded-2xl border p-4 ${tones[tone]}`}>
+      <p className="text-xs font-semibold uppercase tracking-[0.22em] opacity-70">{title}</p>
+      <p className="mt-3 text-3xl font-bold">{value}</p>
+    </div>
+  )
+}
+
+function buildTopperRows(
+  members: any[],
+  attempts: any[],
+  projectEvaluations: any[],
+  attendance: any[],
+  governance: {
+    topperAssessmentWeight: number
+    topperProjectWeight: number
+    topperMinAttendance: number
+  }
+) {
+  const memberByUser = new Map(members.map((member: any) => [member.user_id, member]))
+  const userIds = Array.from(memberByUser.keys())
+
+  return userIds.map((userId) => {
+    const profile = memberByUser.get(userId)?.profile
+    const scores = attempts.filter((attempt: any) => attempt.user_id === userId).map((attempt: any) => Number(attempt.score || 0))
+    const projects = projectEvaluations.filter((item: any) => item.user_id === userId).map((item: any) => Number(item.score || 0))
+    const attendanceRows = attendance.filter((item: any) => item.user_id === userId)
+    const positiveAttendance = attendanceRows.filter((item: any) => ['present', 'late'].includes(item.status)).length
+    const attendanceRate = attendanceRows.length ? Math.round((positiveAttendance / attendanceRows.length) * 100) : 0
+    const assessmentScore = scores.length ? Math.round(scores.reduce((sum: number, score: number) => sum + score, 0) / scores.length) : 0
+    const projectScore = projects.length ? Math.round(projects.reduce((sum: number, score: number) => sum + score, 0) / projects.length) : 0
+    const totalWeight = Math.max(1, governance.topperAssessmentWeight + governance.topperProjectWeight)
+    const topperScore = attendanceRate >= governance.topperMinAttendance
+      ? Math.round(((assessmentScore * governance.topperAssessmentWeight) + (projectScore * governance.topperProjectWeight)) / totalWeight)
+      : 0
+
+    return {
+      userId,
+      name: profile?.full_name || profile?.email || 'Candidate',
+      assessmentScore,
+      projectScore,
+      attendanceRate,
+      topperScore,
+    }
+  }).sort((a, b) => b.topperScore - a.topperScore)
 }

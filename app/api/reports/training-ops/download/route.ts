@@ -67,7 +67,7 @@ export async function GET() {
 
   const sessions = sessionsRes.data || []
   const sessionIds = sessions.map((session: any) => session.id)
-  const [attendanceRes, uploadsRes, settingsRes, attemptsRes] = await Promise.all([
+  const [attendanceRes, uploadsRes, settingsRes, attemptsRes, projectRes, assessmentSetupRes, automationRes] = await Promise.all([
     sessionIds.length
       ? dataClient
           .from('session_attendance')
@@ -90,6 +90,24 @@ export async function GET() {
           .select('user_id, score, points_earned, time_taken_seconds, quizzes!inner(title, batch_id), profiles:user_id(full_name, email, employee_id)')
           .in('quizzes.batch_id', batchIds)
           .eq('status', 'completed')
+      : Promise.resolve({ data: [] }),
+    batchIds.length
+      ? dataClient
+          .from('training_project_evaluations')
+          .select('*, profile:user_id(full_name, email, employee_id), evaluator:evaluator_id(full_name, email)')
+          .in('batch_id', batchIds)
+      : Promise.resolve({ data: [] }),
+    batchIds.length
+      ? dataClient
+          .from('training_assessment_setups')
+          .select('*')
+          .in('batch_id', batchIds)
+      : Promise.resolve({ data: [] }),
+    batchIds.length
+      ? dataClient
+          .from('training_automation_runs')
+          .select('*')
+          .in('batch_id', batchIds)
       : Promise.resolve({ data: [] }),
   ])
 
@@ -163,6 +181,17 @@ export async function GET() {
     'Passing Score': quiz.passing_score,
     'Status': quiz.is_active ? 'Active' : 'Inactive',
   })))
+  addSheet(wb, 'Assessment Setup', (assessmentSetupRes.data || []).map((setup: any) => ({
+    'Batch ID': setup.batch_id,
+    'Assessment': setup.title,
+    'Type': setup.assessment_type,
+    'Scheduled At': setup.scheduled_at ? new Date(setup.scheduled_at).toLocaleString() : 'TBD',
+    'Template': setup.template_name || 'N/A',
+    'Question File': setup.question_file_name || 'N/A',
+    'Max Score': setup.max_score,
+    'Passing Score': setup.passing_score,
+    'Status': setup.status,
+  })))
   addSheet(wb, 'Attendance Uploads', uploads.map((upload: any) => ({
     'Session': upload.session?.title || upload.session_id,
     'Uploaded By': upload.uploader?.full_name || upload.uploader?.email || 'Unknown',
@@ -181,7 +210,17 @@ export async function GET() {
       'Absence Alert Days': settings.absence_alert_days || 3,
     },
   ])
-  addSheet(wb, 'Topper Candidates', buildTopperRows(attemptsRes.data || [], attendance, settings))
+  addSheet(wb, 'Topper Candidates', buildTopperRows(attemptsRes.data || [], attendance, settings, projectRes.data || []))
+  addSheet(wb, 'Project Evaluations', (projectRes.data || []).map((item: any) => ({
+    'Batch ID': item.batch_id,
+    'Candidate': item.profile?.full_name || item.profile?.email || 'Unknown',
+    'Employee ID': item.profile?.employee_id || 'N/A',
+    'Project Title': item.project_title,
+    'Score': item.score,
+    'Evidence File': item.evidence_file_name || 'N/A',
+    'Evaluator': item.evaluator?.full_name || item.evaluator?.email || 'Unknown',
+    'Remarks': item.remarks || '',
+  })))
   addSheet(wb, 'Feedback', feedback.map((item: any) => ({
     'Batch': item.batch?.title || 'N/A',
     'Session': item.session?.title || 'N/A',
@@ -202,6 +241,15 @@ export async function GET() {
     'Scheduled For': item.scheduled_for ? new Date(item.scheduled_for).toLocaleString() : 'N/A',
     'Sent At': item.sent_at ? new Date(item.sent_at).toLocaleString() : 'N/A',
     'Message': item.message,
+  })))
+  addSheet(wb, 'Automation Runs', (automationRes.data || []).map((item: any) => ({
+    'Run Type': item.run_type,
+    'Batch ID': item.batch_id || 'All',
+    'Session ID': item.session_id || 'N/A',
+    'Status': item.status,
+    'Notifications Created': item.notifications_created,
+    'Notes': item.notes || '',
+    'Run At': item.created_at ? new Date(item.created_at).toLocaleString() : 'N/A',
   })))
 
   const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
@@ -239,8 +287,9 @@ function normalizeStatus(status: string) {
   return status.replace('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
-function buildTopperRows(attempts: any[], attendance: any[], settings: Record<string, any>) {
+function buildTopperRows(attempts: any[], attendance: any[], settings: Record<string, any>, projectEvaluations: any[]) {
   const assessmentWeight = Number(settings.topper_assessment_weight || 70)
+  const projectWeight = Number(settings.topper_project_weight || 30)
   const minAttendance = Number(settings.topper_min_attendance || 75)
   const byUser = new Map<string, any>()
   for (const attempt of attempts) {
@@ -269,12 +318,15 @@ function buildTopperRows(attempts: any[], attendance: any[], settings: Record<st
       const attendanceStats = attendanceByUser.get(userId)
       const attendanceRate = attendanceStats?.total ? Math.round((attendanceStats.positive / attendanceStats.total) * 100) : 0
       const averageScore = item.scores.length ? Math.round(item.scores.reduce((sum: number, score: number) => sum + score, 0) / item.scores.length) : 0
-      const topperScore = Math.round((averageScore * assessmentWeight) / 100)
+      const projectScores = projectEvaluations.filter((item: any) => item.user_id === userId).map((item: any) => Number(item.score || 0))
+      const projectScore = projectScores.length ? Math.round(projectScores.reduce((sum: number, score: number) => sum + score, 0) / projectScores.length) : 0
+      const topperScore = Math.round(((averageScore * assessmentWeight) + (projectScore * projectWeight)) / Math.max(1, assessmentWeight + projectWeight))
       return {
         'Candidate Name': item.profile?.full_name || 'Unknown',
         'Email': item.profile?.email || '',
         'Employee ID': item.profile?.employee_id || 'N/A',
         'Average Assessment Score': averageScore,
+        'Average Project Score': projectScore,
         'Attendance (%)': attendanceRate,
         'Eligible': attendanceRate >= minAttendance ? 'Yes' : 'Attendance below threshold',
         'Transparent Topper Score': topperScore,

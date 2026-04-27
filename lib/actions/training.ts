@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
-import { requireEmployee, requireManager } from '@/lib/rbac'
+import { requireEmployee, requireManager, requireTrainingStaff } from '@/lib/rbac'
 import type {
   ApiResponse,
   AttendanceStatus,
@@ -11,6 +11,7 @@ import type {
   NotificationChannel,
   SessionMode,
   SessionStatus,
+  TrainingAssessmentType,
   TrainingBatchStatus,
 } from '@/lib/types/database'
 
@@ -92,21 +93,35 @@ function attendanceCutoffForTime(date: Date, cutoffTime: string) {
 }
 
 export async function getTrainingOpsManagerData() {
-  const { userId } = await requireManager()
+  const { userId, role } = await requireTrainingStaff()
   const admin = createAdminClient()
 
+  const { data: trainerAssignments } = role === 'trainer'
+    ? await admin.from('training_batch_trainers').select('batch_id').eq('trainer_id', userId)
+    : { data: [] }
+  const assignedBatchIds = (trainerAssignments || []).map((item: any) => item.batch_id)
+
+  let batchQuery = admin
+    .from('training_batches')
+    .select(`
+      *,
+      trainer:trainer_id(id, full_name, email),
+      coordinator:coordinator_id(id, full_name, email),
+      batch_members(count),
+      training_sessions(count)
+    `)
+    .order('created_at', { ascending: false })
+
+  if (role === 'trainer') {
+    const filters = [`trainer_id.eq.${userId}`]
+    if (assignedBatchIds.length) filters.push(`id.in.(${assignedBatchIds.join(',')})`)
+    batchQuery = batchQuery.or(filters.join(','))
+  } else {
+    batchQuery = batchQuery.or(`created_by.eq.${userId},coordinator_id.eq.${userId},trainer_id.eq.${userId}`)
+  }
+
   const [batchesRes, trainersRes, employeesRes] = await Promise.all([
-    admin
-      .from('training_batches')
-      .select(`
-        *,
-        trainer:trainer_id(id, full_name, email),
-        coordinator:coordinator_id(id, full_name, email),
-        batch_members(count),
-        training_sessions(count)
-      `)
-      .or(`created_by.eq.${userId},coordinator_id.eq.${userId},trainer_id.eq.${userId}`)
-      .order('created_at', { ascending: false }),
+    batchQuery,
     admin
       .from('profiles')
       .select('id, full_name, email, role, domain, department')
@@ -126,7 +141,7 @@ export async function getTrainingOpsManagerData() {
 
   const batchIds = batches.map((batch: any) => batch.id)
 
-  const [membersRes, sessionsRes, notificationsRes, feedbackRes, quizzesRes] = await Promise.all([
+  const [membersRes, sessionsRes, notificationsRes, feedbackRes, quizzesRes, batchTrainersRes, assessmentSetupsRes, projectEvaluationsRes, automationRunsRes, attendanceVersionsRes, assessmentUploadsRes] = await Promise.all([
     batchIds.length
       ? admin
           .from('batch_members')
@@ -180,6 +195,50 @@ export async function getTrainingOpsManagerData() {
           .select('id, title, topic, difficulty, batch_id, is_active')
           .in('batch_id', batchIds)
       : Promise.resolve({ data: [] }),
+    batchIds.length
+      ? admin
+          .from('training_batch_trainers')
+          .select('*, trainer:trainer_id(id, full_name, email)')
+          .in('batch_id', batchIds)
+      : Promise.resolve({ data: [] }),
+    batchIds.length
+      ? admin
+          .from('training_assessment_setups')
+          .select('*')
+          .in('batch_id', batchIds)
+          .order('scheduled_at', { ascending: true })
+      : Promise.resolve({ data: [] }),
+    batchIds.length
+      ? admin
+          .from('training_project_evaluations')
+          .select('*, trainee:user_id(id, full_name, email), evaluator:evaluator_id(id, full_name, email)')
+          .in('batch_id', batchIds)
+          .order('created_at', { ascending: false })
+          .limit(25)
+      : Promise.resolve({ data: [] }),
+    batchIds.length
+      ? admin
+          .from('training_automation_runs')
+          .select('*')
+          .in('batch_id', batchIds)
+          .order('created_at', { ascending: false })
+          .limit(20)
+      : Promise.resolve({ data: [] }),
+    batchIds.length
+      ? admin
+          .from('session_attendance_versions')
+          .select('*, profile:user_id(id, full_name, email), changer:changed_by(id, full_name, email), session:session_id(id, title, batch_id)')
+          .order('changed_at', { ascending: false })
+          .limit(25)
+      : Promise.resolve({ data: [] }),
+    batchIds.length
+      ? admin
+          .from('training_assessment_uploads')
+          .select('*')
+          .in('batch_id', batchIds)
+          .order('created_at', { ascending: false })
+          .limit(25)
+      : Promise.resolve({ data: [] }),
   ])
 
   const members = membersRes.data || []
@@ -187,6 +246,12 @@ export async function getTrainingOpsManagerData() {
   const notifications = notificationsRes.data || []
   const feedback = feedbackRes.data || []
   const quizzes = quizzesRes.data || []
+  const batchTrainers = batchTrainersRes.data || []
+  const assessmentSetups = assessmentSetupsRes.data || []
+  const projectEvaluations = projectEvaluationsRes.data || []
+  const automationRuns = automationRunsRes.data || []
+  const attendanceVersions = attendanceVersionsRes.data || []
+  const assessmentUploads = assessmentUploadsRes.data || []
   const sessionIds = sessions.map((session: any) => session.id)
   const attendanceRes = sessionIds.length
     ? await admin
@@ -257,9 +322,13 @@ export async function getTrainingOpsManagerData() {
     absenceAlerts,
     notificationsSent: notifications.filter((item: any) => item.delivery_status === 'sent').length,
     negativeFeedbackCount: feedback.filter((item: any) => item.sentiment === 'negative').length,
+    assessmentSetups: assessmentSetups.length,
+    projectEvaluations: projectEvaluations.length,
+    automationRuns: automationRuns.length,
   }
 
   return {
+    role,
     summary,
     batches,
     sessions,
@@ -270,6 +339,12 @@ export async function getTrainingOpsManagerData() {
     notifications,
     feedback,
     quizzes,
+    batchTrainers,
+    assessmentSetups,
+    projectEvaluations,
+    automationRuns,
+    attendanceVersions,
+    assessmentUploads,
     governanceSettings,
   }
 }
@@ -418,6 +493,7 @@ export async function createTrainingBatch(formData: FormData): Promise<ApiRespon
   const startDate = asOptionalString(formData.get('start_date'))
   const endDate = asOptionalString(formData.get('end_date'))
   const trainerId = asOptionalString(formData.get('trainer_id'))
+  const trainerIds = Array.from(new Set([trainerId, ...parseIds(formData.getAll('trainer_ids'))].filter(Boolean) as string[]))
   const employeeIds = parseIds(formData.getAll('employee_ids'))
   const quizIds = parseIds(formData.getAll('quiz_ids'))
 
@@ -446,7 +522,7 @@ export async function createTrainingBatch(formData: FormData): Promise<ApiRespon
       status,
       start_date: startDate,
       end_date: endDate,
-      trainer_id: trainerId,
+      trainer_id: trainerIds[0] || trainerId,
       coordinator_id: userId,
       created_by: userId,
     })
@@ -466,6 +542,18 @@ export async function createTrainingBatch(formData: FormData): Promise<ApiRespon
     }))
 
     await admin.from('batch_members').upsert(memberRows, { onConflict: 'batch_id,user_id' })
+  }
+
+  if (trainerIds.length > 0) {
+    await admin.from('training_batch_trainers').upsert(
+      trainerIds.map((id, index) => ({
+        batch_id: batch.id,
+        trainer_id: id,
+        role_label: index === 0 ? 'Lead Trainer' : 'Trainer',
+        assigned_by: userId,
+      })),
+      { onConflict: 'batch_id,trainer_id' }
+    )
   }
 
   if (quizIds.length > 0) {
@@ -537,6 +625,71 @@ export async function updateTrainingBatchStatus(formData: FormData): Promise<Api
   revalidatePath('/manager')
   revalidatePath('/manager/operations')
   revalidatePath('/employee')
+  revalidatePath('/employee/training')
+  return { data: true }
+}
+
+export async function updateTrainingBatchDetails(formData: FormData): Promise<ApiResponse<boolean>> {
+  const { userId } = await requireManager()
+  const admin = createAdminClient()
+
+  const batchId = asRequiredString(formData.get('batch_id'))
+  const title = asRequiredString(formData.get('title'))
+  const description = asOptionalString(formData.get('description'))
+  const domain = asOptionalString(formData.get('domain'))
+  const startDate = asOptionalString(formData.get('start_date'))
+  const endDate = asOptionalString(formData.get('end_date'))
+  const status = normalizeBatchStatus(asRequiredString(formData.get('status'), 'planned') || 'planned')
+  const trainerIds = parseIds(formData.getAll('trainer_ids'))
+
+  if (!batchId || !title) {
+    return { error: 'Batch and title are required.' }
+  }
+
+  const { data: previous } = await admin
+    .from('training_batches')
+    .select('*')
+    .eq('id', batchId)
+    .single()
+
+  const { error } = await admin
+    .from('training_batches')
+    .update({
+      title,
+      description,
+      domain,
+      status,
+      start_date: startDate,
+      end_date: endDate,
+      trainer_id: trainerIds[0] || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', batchId)
+    .or(`created_by.eq.${userId},coordinator_id.eq.${userId}`)
+
+  if (error) return { error: error.message }
+
+  if (trainerIds.length > 0) {
+    await admin.from('training_batch_trainers').delete().eq('batch_id', batchId)
+    await admin.from('training_batch_trainers').insert(
+      trainerIds.map((trainerId, index) => ({
+        batch_id: batchId,
+        trainer_id: trainerId,
+        role_label: index === 0 ? 'Lead Trainer' : 'Trainer',
+        assigned_by: userId,
+      }))
+    )
+  }
+
+  await admin.from('training_batch_change_audit').insert({
+    batch_id: batchId,
+    change_type: 'batch_details_update',
+    previous_value: previous || null,
+    new_value: { title, description, domain, status, startDate, endDate, trainerIds },
+    changed_by: userId,
+  })
+
+  revalidatePath('/manager/operations')
   revalidatePath('/employee/training')
   return { data: true }
 }
@@ -615,7 +768,7 @@ export async function createTrainingSession(formData: FormData): Promise<ApiResp
 }
 
 export async function updateAttendanceStatus(formData: FormData): Promise<ApiResponse<boolean>> {
-  const { userId } = await requireManager()
+  const { userId, role } = await requireTrainingStaff()
   const admin = createAdminClient()
 
   const sessionId = asRequiredString(formData.get('session_id'))
@@ -626,6 +779,32 @@ export async function updateAttendanceStatus(formData: FormData): Promise<ApiRes
   if (!sessionId || !userTargetId || !status) {
     return { error: 'Session, learner, and status are required.' }
   }
+
+  const { data: session } = await admin
+    .from('training_sessions')
+    .select('id, batch_id, trainer_id, batch:batch_id(created_by, coordinator_id, trainer_id)')
+    .eq('id', sessionId)
+    .single()
+
+  if (!session) return { error: 'Session not found.' }
+
+  if (role === 'trainer') {
+    const { data: assignment } = await admin
+      .from('training_batch_trainers')
+      .select('id')
+      .eq('batch_id', session.batch_id)
+      .eq('trainer_id', userId)
+      .maybeSingle()
+    const isAssigned = session.trainer_id === userId || (session.batch as any)?.trainer_id === userId || Boolean(assignment)
+    if (!isAssigned) return { error: 'Trainer access is limited to assigned batches.' }
+  }
+
+  const { data: previous } = await admin
+    .from('session_attendance')
+    .select('*')
+    .eq('session_id', sessionId)
+    .eq('user_id', userTargetId)
+    .maybeSingle()
 
   const payload = {
     session_id: sessionId,
@@ -644,6 +823,25 @@ export async function updateAttendanceStatus(formData: FormData): Promise<ApiRes
   if (error) {
     return { error: error.message }
   }
+
+  const { data: current } = await admin
+    .from('session_attendance')
+    .select('id')
+    .eq('session_id', sessionId)
+    .eq('user_id', userTargetId)
+    .single()
+
+  await admin.from('session_attendance_versions').insert({
+    attendance_id: current?.id || previous?.id || null,
+    session_id: sessionId,
+    user_id: userTargetId,
+    previous_status: previous?.status || null,
+    new_status: status,
+    previous_notes: previous?.notes || null,
+    new_notes: notes,
+    changed_by: userId,
+    source: 'manual',
+  })
 
   revalidatePath('/manager/operations')
   revalidatePath('/employee/training')
@@ -690,6 +888,249 @@ export async function createTrainingNotification(formData: FormData): Promise<Ap
   revalidatePath('/manager/operations')
   revalidatePath('/employee')
   revalidatePath('/employee/training')
+  return { data: true }
+}
+
+export async function createTrainingAssessmentSetup(formData: FormData): Promise<ApiResponse<boolean>> {
+  const { userId } = await requireManager()
+  const admin = createAdminClient()
+
+  const batchId = asRequiredString(formData.get('batch_id'))
+  const title = asRequiredString(formData.get('title'))
+  const assessmentType = (asRequiredString(formData.get('assessment_type'), 'sprint_review') || 'sprint_review') as TrainingAssessmentType
+  const scheduledAt = asOptionalString(formData.get('scheduled_at'))
+  const templateName = asOptionalString(formData.get('template_name'))
+  const questionFileName = asOptionalString(formData.get('question_file_name'))
+  const maxScore = Number(asRequiredString(formData.get('max_score'), '100')) || 100
+  const passingScore = Number(asRequiredString(formData.get('passing_score'), '70')) || 70
+
+  if (!batchId || !title) return { error: 'Batch and assessment title are required.' }
+  if (maxScore <= 0 || passingScore < 0 || passingScore > maxScore) {
+    return { error: 'Score ranges are invalid.' }
+  }
+
+  const { error } = await admin.from('training_assessment_setups').insert({
+    batch_id: batchId,
+    title,
+    assessment_type: assessmentType,
+    scheduled_at: scheduledAt,
+    template_name: templateName,
+    question_file_name: questionFileName,
+    max_score: maxScore,
+    passing_score: passingScore,
+    status: 'planned',
+    created_by: userId,
+  })
+
+  if (error) return { error: error.message }
+
+  await admin.from('training_notifications').insert({
+    batch_id: batchId,
+    title: `Assessment scheduled: ${title}`,
+    message: scheduledAt ? `Assessment is scheduled for ${new Date(scheduledAt).toLocaleString()}.` : 'Assessment setup has been created.',
+    audience: 'batch',
+    channel: 'email',
+    delivery_status: 'sent',
+    sent_at: new Date().toISOString(),
+    created_by: userId,
+  })
+
+  revalidatePath('/manager/operations')
+  return { data: true }
+}
+
+export async function createProjectEvaluation(formData: FormData): Promise<ApiResponse<boolean>> {
+  const { userId, role } = await requireTrainingStaff()
+  const admin = createAdminClient()
+
+  const batchId = asRequiredString(formData.get('batch_id'))
+  const targetUserId = asRequiredString(formData.get('user_id'))
+  const projectTitle = asRequiredString(formData.get('project_title'))
+  const score = Number(asRequiredString(formData.get('score'), '0'))
+  const evidenceFileName = asOptionalString(formData.get('evidence_file_name'))
+  const remarks = asOptionalString(formData.get('remarks'))
+
+  if (!batchId || !targetUserId || !projectTitle) return { error: 'Batch, candidate, and project title are required.' }
+  if (!Number.isFinite(score) || score < 0 || score > 100) return { error: 'Project score must be between 0 and 100.' }
+
+  if (role === 'trainer') {
+    const { data: assignment } = await admin
+      .from('training_batch_trainers')
+      .select('id')
+      .eq('batch_id', batchId)
+      .eq('trainer_id', userId)
+      .maybeSingle()
+    const { data: batch } = await admin
+      .from('training_batches')
+      .select('trainer_id')
+      .eq('id', batchId)
+      .single()
+    if (!assignment && batch?.trainer_id !== userId) return { error: 'Trainer access is limited to assigned batches.' }
+  }
+
+  const { error } = await admin.from('training_project_evaluations').upsert({
+    batch_id: batchId,
+    user_id: targetUserId,
+    evaluator_id: userId,
+    project_title: projectTitle,
+    score,
+    evidence_file_name: evidenceFileName,
+    remarks,
+    updated_at: new Date().toISOString(),
+  })
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/manager/operations')
+  revalidatePath('/employee/training')
+  return { data: true }
+}
+
+export async function runTrainingAutomation(formData: FormData): Promise<ApiResponse<boolean>> {
+  const { userId } = await requireManager()
+  const admin = createAdminClient()
+  const runType = asRequiredString(formData.get('run_type'), 'attendance_cutoff')
+  const batchId = asOptionalString(formData.get('batch_id'))
+
+  const settings = await readGovernanceSettings(admin)
+  const now = new Date()
+  let notificationsCreated = 0
+
+  const { data: sessions } = await admin
+    .from('training_sessions')
+    .select('id, title, batch_id, session_date, attendance_required, status, batch:batch_id(title, coordinator_id)')
+    .eq(batchId ? 'batch_id' : 'attendance_required', batchId || true)
+    .neq('status', 'cancelled')
+    .limit(100)
+
+  if (runType === 'attendance_cutoff') {
+    for (const session of sessions || []) {
+      const sessionDate = new Date(session.session_date)
+      if (now < attendanceCutoffForTime(sessionDate, settings.attendanceCutoffTime)) continue
+      const { count } = await admin
+        .from('session_attendance')
+        .select('id', { count: 'exact', head: true })
+        .eq('session_id', session.id)
+        .in('status', ['present', 'late'])
+      if ((count || 0) > 0) continue
+      await admin.from('training_notifications').insert({
+        batch_id: session.batch_id,
+        session_id: session.id,
+        title: `Attendance cut-off missed: ${session.title}`,
+        message: `No positive attendance was found after ${settings.attendanceCutoffTime}. Coordinator follow-up required.`,
+        audience: 'coordinators',
+        channel: 'email',
+        delivery_status: 'sent',
+        sent_at: new Date().toISOString(),
+        created_by: userId,
+      })
+      notificationsCreated++
+    }
+  }
+
+  if (runType === 'assessment_reminder') {
+    const { data: setups } = await admin
+      .from('training_assessment_setups')
+      .select('id, title, batch_id, scheduled_at')
+      .gte('scheduled_at', new Date().toISOString())
+      .lte('scheduled_at', new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString())
+      .limit(100)
+    for (const setup of setups || []) {
+      if (batchId && setup.batch_id !== batchId) continue
+      await admin.from('training_notifications').insert({
+        batch_id: setup.batch_id,
+        title: `Upcoming assessment: ${setup.title}`,
+        message: `Assessment is coming up on ${new Date(setup.scheduled_at).toLocaleString()}.`,
+        audience: 'batch',
+        channel: 'email',
+        delivery_status: 'sent',
+        sent_at: new Date().toISOString(),
+        created_by: userId,
+      })
+      notificationsCreated++
+    }
+  }
+
+  if (runType === 'absence_streak') {
+    const targetBatchIds = batchId ? [batchId] : (await admin.from('training_batches').select('id').limit(100)).data?.map((batch: any) => batch.id) || []
+    for (const targetBatchId of targetBatchIds) {
+      const { data: batchSessions } = await admin
+        .from('training_sessions')
+        .select('id, title, session_date')
+        .eq('batch_id', targetBatchId)
+        .eq('attendance_required', true)
+        .neq('status', 'cancelled')
+        .order('session_date', { ascending: false })
+        .limit(settings.absenceAlertDays)
+      if (!batchSessions || batchSessions.length < settings.absenceAlertDays) continue
+
+      const { data: batchMembers } = await admin
+        .from('batch_members')
+        .select('user_id, profile:user_id(full_name, email)')
+        .eq('batch_id', targetBatchId)
+
+      for (const member of batchMembers || []) {
+        const memberProfile = (member as any).profile
+        const attendanceEntriesRes: any = await admin
+          .from('session_attendance')
+          .select('session_id, status')
+          .eq('user_id', member.user_id)
+          .in('session_id', batchSessions.map((session: any) => session.id))
+        const entries = attendanceEntriesRes.data || []
+        const absentAcrossWindow = batchSessions.every((session: any) => {
+          const entry = (entries || []).find((item: any) => item.session_id === session.id)
+          return !entry || entry.status === 'absent'
+        })
+        if (!absentAcrossWindow) continue
+        await admin.from('training_notifications').insert({
+          batch_id: targetBatchId,
+          title: `Absence streak: ${memberProfile?.full_name || memberProfile?.email || 'Candidate'}`,
+          message: `Candidate is absent across the latest ${settings.absenceAlertDays} attendance-required sessions. Coordinator follow-up required.`,
+          audience: 'coordinators',
+          channel: 'email',
+          delivery_status: 'sent',
+          sent_at: new Date().toISOString(),
+          created_by: userId,
+        })
+        notificationsCreated++
+      }
+    }
+  }
+
+  if (runType === 'feedback_reminder') {
+    const { data: windows } = await admin
+      .from('training_feedback_windows')
+      .select('id, title, batch_id, closes_at, status')
+      .eq('status', 'open')
+      .gte('closes_at', new Date().toISOString())
+      .lte('closes_at', new Date(Date.now() + settings.feedbackWindowDays * 24 * 60 * 60 * 1000).toISOString())
+      .limit(100)
+    for (const window of windows || []) {
+      if (batchId && window.batch_id !== batchId) continue
+      await admin.from('training_notifications').insert({
+        batch_id: window.batch_id,
+        title: `Feedback reminder: ${window.title}`,
+        message: `Feedback window closes on ${new Date(window.closes_at).toLocaleString()}. Please complete training content and trainer effectiveness feedback.`,
+        audience: 'batch',
+        channel: 'email',
+        delivery_status: 'sent',
+        sent_at: new Date().toISOString(),
+        created_by: userId,
+      })
+      notificationsCreated++
+    }
+  }
+
+  await admin.from('training_automation_runs').insert({
+    run_type: runType,
+    batch_id: batchId,
+    status: 'completed',
+    notifications_created: notificationsCreated,
+    notes: `Manual governance run from operations console.`,
+    triggered_by: userId,
+  })
+
+  revalidatePath('/manager/operations')
   return { data: true }
 }
 
@@ -768,6 +1209,8 @@ export async function submitTrainingFeedback(formData: FormData): Promise<ApiRes
   const batchId = asOptionalString(formData.get('batch_id'))
   const sessionId = asOptionalString(formData.get('session_id'))
   const rating = Number(asRequiredString(formData.get('rating'), '0'))
+  const contentQualityRating = Number(asRequiredString(formData.get('content_quality_rating'), String(rating))) || rating
+  const trainerEffectivenessRating = Number(asRequiredString(formData.get('trainer_effectiveness_rating'), String(rating))) || rating
   const feedbackText = asRequiredString(formData.get('feedback_text'))
   const actionItem = asOptionalString(formData.get('action_item'))
 
@@ -788,6 +1231,8 @@ export async function submitTrainingFeedback(formData: FormData): Promise<ApiRes
     sentiment,
     feedback_text: feedbackText,
     action_item: actionItem,
+    content_quality_rating: contentQualityRating,
+    trainer_effectiveness_rating: trainerEffectivenessRating,
   })
 
   if (error) {

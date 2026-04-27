@@ -225,7 +225,7 @@ export default async function EmployeeDashboard() {
               <MiniMetric label="Done" value={`${completedQuizzes.length}`} />
             </div>
             <p className="mt-4 text-sm leading-relaxed text-zinc-400">
-              SkillTest watches readiness, pace, and retention so each quiz feels like the right next step.
+              Maverick TMS watches readiness, pace, and retention so each assessment feels like the right next step.
             </p>
           </section>
         </aside>

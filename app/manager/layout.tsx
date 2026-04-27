@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
-import { requireManager } from '@/lib/rbac'
+import { requireTrainingStaff } from '@/lib/rbac'
 import { ManagerSidebar } from '@/components/manager/sidebar'
 import { ManagerHeader } from '@/components/manager/header'
 
@@ -8,7 +8,7 @@ export default async function ManagerLayout({
 }: {
   children: React.ReactNode
 }) {
-  const { userId } = await requireManager()
+  const { userId } = await requireTrainingStaff()
 
   const supabase = createAdminClient()
   const { data: profile } = await supabase

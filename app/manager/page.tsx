@@ -1,5 +1,6 @@
 import { createAdminClient, createClient } from '@/lib/supabase/server'
-import { requireManager } from '@/lib/rbac'
+import { requireTrainingStaff } from '@/lib/rbac'
+import { redirect } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -24,7 +25,8 @@ import {
 import { getQuizStats } from '@/lib/actions/quiz'
 
 export default async function ManagerDashboard() {
-  const { userId } = await requireManager()
+  const { userId, role } = await requireTrainingStaff()
+  if (role === 'trainer') redirect('/manager/operations')
 
   const supabase = await createClient()
   const adminClient = createAdminClient()

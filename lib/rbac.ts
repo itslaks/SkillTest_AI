@@ -41,6 +41,14 @@ export async function requireManager(): Promise<{ userId: string; role: RBACRole
   return requireRole("training_coordinator", "manager", "admin")
 }
 
+export async function requireTrainingStaff(): Promise<{ userId: string; role: RBACRole }> {
+  return requireRole("trainer", "training_coordinator", "manager", "admin")
+}
+
+export async function requireAdmin(): Promise<{ userId: string; role: RBACRole }> {
+  return requireRole("admin")
+}
+
 export async function requireEmployee(): Promise<{ userId: string; role: RBACRole }> {
   return requireRole("employee", "manager", "admin")
 }
@@ -49,9 +57,20 @@ export function isManager(role: string | null | undefined): boolean {
   return role === "training_coordinator" || role === "manager" || role === "admin"
 }
 
+export function isTrainingStaff(role: string | null | undefined): boolean {
+  return role === "trainer" || isManager(role)
+}
+
 export async function requireManagerForApi(): Promise<{ userId: string; role: RBACRole } | NextResponse> {
   const result = await getCurrentUserRole()
   if (!result) return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
   if (!isManager(result.role)) return NextResponse.json({ error: "Forbidden: manager role required" }, { status: 403 })
+  return result
+}
+
+export async function requireTrainingStaffForApi(): Promise<{ userId: string; role: RBACRole } | NextResponse> {
+  const result = await getCurrentUserRole()
+  if (!result) return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+  if (!isTrainingStaff(result.role)) return NextResponse.json({ error: "Forbidden: training staff role required" }, { status: 403 })
   return result
 }

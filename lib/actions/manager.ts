@@ -1,9 +1,65 @@
 'use server'
 
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { requireManager } from '@/lib/rbac'
+import { requireAdmin, requireManager } from '@/lib/rbac'
 import { revalidatePath } from 'next/cache'
 import type { ApiResponse, EmployeeImport, EmployeeImportError, EmployeeImportResult } from '@/lib/types/database'
+
+export async function getAdminUsers() {
+  await requireAdmin()
+  const admin = createAdminClient()
+  const { data, error } = await admin
+    .from('profiles')
+    .select('id, email, full_name, role, department, domain, employee_id, created_at')
+    .in('role', ['trainer', 'training_coordinator', 'manager', 'admin'])
+    .order('created_at', { ascending: false })
+
+  if (error) return { error: error.message, data: [] }
+  return { data: data || [] }
+}
+
+export async function getAdminAuditLogs() {
+  await requireAdmin()
+  const admin = createAdminClient()
+  const { data, error } = await admin
+    .from('training_admin_audit')
+    .select('*, actor:actor_id(full_name, email)')
+    .order('created_at', { ascending: false })
+    .limit(25)
+
+  if (error) return { error: error.message, data: [] }
+  return { data: data || [] }
+}
+
+export async function updateUserRole(formData: FormData): Promise<ApiResponse<boolean>> {
+  const { userId } = await requireAdmin()
+  const admin = createAdminClient()
+  const targetUserId = String(formData.get('user_id') || '')
+  const role = String(formData.get('role') || '')
+
+  if (!targetUserId || !['employee', 'trainer', 'training_coordinator', 'manager', 'admin'].includes(role)) {
+    return { error: 'User and valid role are required.' }
+  }
+
+  const { error } = await admin
+    .from('profiles')
+    .update({ role, updated_at: new Date().toISOString() })
+    .eq('id', targetUserId)
+
+  if (error) return { error: error.message }
+
+  await admin.from('training_admin_audit').insert({
+    actor_id: userId,
+    action: 'user_role_update',
+    target_table: 'profiles',
+    target_id: targetUserId,
+    details: { role },
+  })
+
+  revalidatePath('/manager/admin')
+  revalidatePath('/manager/settings')
+  return { data: true }
+}
 
 // ─── Import employees from parsed Excel data ─────────────────────────
 export async function importEmployees(employees: EmployeeImport[]): Promise<ApiResponse<EmployeeImportResult>> {
