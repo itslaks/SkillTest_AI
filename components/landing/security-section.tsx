@@ -64,7 +64,7 @@ export function SecuritySection() {
               safe with us.
             </h2>
             <p className="text-xl text-muted-foreground leading-relaxed mb-12">
-              Corporate assessment data is sensitive. SkillTest is built with enterprise-grade security at every layer, ensuring your team&apos;s results stay private.
+              Corporate training data is sensitive. Maverick TMS is built with enterprise-grade security at every layer, ensuring batch execution records stay private.
             </p>
 
             {/* Highlights */}

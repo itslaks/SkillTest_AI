@@ -24,8 +24,8 @@ const jetbrainsMono = JetBrains_Mono({
 const isVercelDeployment = process.env.VERCEL === '1'
 
 export const metadata: Metadata = {
-  title: 'SkillTest - Gamified Employee Assessment Platform',
-  description: 'A highly interactive and gamified employee assessment platform with AI-powered MCQ generation, dynamic leaderboards, and Excel-based reporting.',
+  title: 'Maverick Execution Platform - Training Management System',
+  description: 'Centralized TMS for batch execution, candidate onboarding, attendance, assessments, trainer coordination, feedback, dashboards, and governance reporting.',
 }
 
 export default function RootLayout({

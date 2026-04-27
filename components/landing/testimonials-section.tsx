@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 const testimonials = [
   {
-    quote: "SkillTest transformed our quarterly assessments. The AI question generation saves us hours of manual work.",
+    quote: "Maverick TMS transformed our training execution. Attendance, assessments, feedback, and trainer signals finally live in one place.",
     author: "Priya Sharma",
     role: "L&D Manager",
     company: "TechForward Solutions",

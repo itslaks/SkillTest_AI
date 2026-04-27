@@ -1,16 +1,20 @@
 import {
+  createProjectEvaluation,
+  createTrainingAssessmentSetup,
   createTrainingBatch,
   createFeedbackWindow,
   createTrainingNotification,
   createTrainingSession,
   getTrainingOpsManagerData,
-  updateTrainingBatchStatus,
+  runTrainingAutomation,
+  updateTrainingBatchDetails,
   updateAttendanceStatus,
 } from '@/lib/actions/training'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { AttendanceImporter } from '@/components/manager/attendance-importer'
+import { AssessmentScoreImporter } from '@/components/manager/assessment-score-importer'
 import { BatchCandidateImporter } from '@/components/manager/batch-candidate-importer'
 import { DashboardSignalShowcase } from '@/components/insights/dashboard-signal-showcase'
 import {
@@ -48,9 +52,24 @@ async function updateAttendanceStatusAction(formData: FormData) {
   await updateAttendanceStatus(formData)
 }
 
-async function updateTrainingBatchStatusAction(formData: FormData) {
+async function updateTrainingBatchDetailsAction(formData: FormData) {
   'use server'
-  await updateTrainingBatchStatus(formData)
+  await updateTrainingBatchDetails(formData)
+}
+
+async function createTrainingAssessmentSetupAction(formData: FormData) {
+  'use server'
+  await createTrainingAssessmentSetup(formData)
+}
+
+async function createProjectEvaluationAction(formData: FormData) {
+  'use server'
+  await createProjectEvaluation(formData)
+}
+
+async function runTrainingAutomationAction(formData: FormData) {
+  'use server'
+  await runTrainingAutomation(formData)
 }
 
 function toneForBatchStatus(status: string) {
@@ -84,6 +103,7 @@ function toneForAttendance(status: string) {
 
 export default async function ManagerOperationsPage() {
   const {
+    role,
     summary,
     batches,
     sessions,
@@ -94,7 +114,15 @@ export default async function ManagerOperationsPage() {
     notifications,
     feedback,
     quizzes,
+    batchTrainers,
+    assessmentSetups,
+    projectEvaluations,
+    automationRuns,
+    attendanceVersions,
+    assessmentUploads,
   } = await getTrainingOpsManagerData()
+
+  const canCoordinate = role !== 'trainer'
 
   const membersByBatch = new Map<string, any[]>()
   for (const member of members) {
@@ -116,6 +144,20 @@ export default async function ManagerOperationsPage() {
     const items = quizzesByBatch.get(quiz.batch_id) || []
     items.push(quiz)
     quizzesByBatch.set(quiz.batch_id, items)
+  }
+
+  const trainersByBatch = new Map<string, any[]>()
+  for (const item of batchTrainers) {
+    const list = trainersByBatch.get(item.batch_id) || []
+    list.push(item)
+    trainersByBatch.set(item.batch_id, list)
+  }
+
+  const assessmentsByBatch = new Map<string, any[]>()
+  for (const item of assessmentSetups) {
+    const list = assessmentsByBatch.get(item.batch_id) || []
+    list.push(item)
+    assessmentsByBatch.set(item.batch_id, list)
   }
 
   return (
@@ -184,6 +226,7 @@ export default async function ManagerOperationsPage() {
         </div>
       </section>
 
+      {canCoordinate ? (
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <Card className="border-zinc-200 shadow-sm spotlight-card">
           <CardHeader>
@@ -236,6 +279,16 @@ export default async function ManagerOperationsPage() {
                   </select>
                 </label>
               </div>
+              <label className="grid gap-2 text-sm">
+                <span className="font-medium">Trainer panel</span>
+                <select name="trainer_ids" multiple className="min-h-28 w-full min-w-0 rounded-xl border border-zinc-200 px-3 py-3">
+                  {trainers.filter((trainer: any) => trainer.role === 'trainer').map((trainer: any) => (
+                    <option key={trainer.id} value={trainer.id}>
+                      {trainer.full_name || trainer.email}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Customization</p>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -442,8 +495,161 @@ export default async function ManagerOperationsPage() {
           </CardContent>
         </Card>
       </div>
+      ) : (
+        <Card className="border-cyan-200 bg-cyan-50 shadow-sm">
+          <CardHeader>
+            <CardTitle>Trainer Workspace</CardTitle>
+            <CardDescription>Your access is scoped to assigned batches. Use the attendance tracker, project evaluations, and assessment upload controls below.</CardDescription>
+          </CardHeader>
+        </Card>
+      )}
 
-      <BatchCandidateImporter batches={batches.map((batch: any) => ({ id: batch.id, title: batch.title }))} />
+      {canCoordinate ? <BatchCandidateImporter batches={batches.map((batch: any) => ({ id: batch.id, title: batch.title }))} /> : null}
+
+      <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+        {canCoordinate ? (
+        <Card className="border-zinc-200 shadow-sm spotlight-card">
+          <CardHeader>
+            <CardTitle>Assessment Governance</CardTitle>
+            <CardDescription>Define assessment type, date, template, question file, and score rules before trainers upload results.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form action={createTrainingAssessmentSetupAction} className="grid gap-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Batch</span>
+                  <select name="batch_id" required className="h-11 rounded-xl border border-zinc-200 px-3">
+                    <option value="">Select batch</option>
+                    {batches.map((batch: any) => <option key={batch.id} value={batch.id}>{batch.title}</option>)}
+                  </select>
+                </label>
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Assessment type</span>
+                  <select name="assessment_type" defaultValue="sprint_review" className="h-11 rounded-xl border border-zinc-200 px-3">
+                    <option value="sprint_review">Sprint review</option>
+                    <option value="api_coding">API and coding</option>
+                    <option value="coding">Coding</option>
+                    <option value="project">Project evaluation</option>
+                    <option value="other">Other</option>
+                  </select>
+                </label>
+              </div>
+              <label className="grid gap-2 text-sm">
+                <span className="font-medium">Assessment title</span>
+                <input name="title" required className="h-11 rounded-xl border border-zinc-200 px-3" placeholder="Sprint 2 Review - Collections and API" />
+              </label>
+              <div className="grid gap-4 md:grid-cols-3">
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Schedule</span>
+                  <input name="scheduled_at" type="datetime-local" className="h-11 rounded-xl border border-zinc-200 px-3" />
+                </label>
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Max score</span>
+                  <input name="max_score" type="number" min="1" defaultValue="100" className="h-11 rounded-xl border border-zinc-200 px-3" />
+                </label>
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Passing score</span>
+                  <input name="passing_score" type="number" min="0" defaultValue="70" className="h-11 rounded-xl border border-zinc-200 px-3" />
+                </label>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Excel template name</span>
+                  <input name="template_name" className="h-11 rounded-xl border border-zinc-200 px-3" placeholder="api-coding-template.xlsx" />
+                </label>
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Question file name</span>
+                  <input name="question_file_name" className="h-11 rounded-xl border border-zinc-200 px-3" placeholder="sprint-2-question-bank.xlsx" />
+                </label>
+              </div>
+              <Button type="submit" className="w-fit rounded-full bg-black text-white hover:bg-zinc-800">Create assessment setup</Button>
+            </form>
+          </CardContent>
+        </Card>
+        ) : null}
+
+        <Card className="border-zinc-200 shadow-sm spotlight-card">
+          <CardHeader>
+            <CardTitle>Project Evaluation Evidence</CardTitle>
+            <CardDescription>Trainer-uploaded project scores and evidence filenames are tracked as a first-class TMS artifact.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form action={createProjectEvaluationAction} className="grid gap-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Batch</span>
+                  <select name="batch_id" required className="h-11 rounded-xl border border-zinc-200 px-3">
+                    <option value="">Select batch</option>
+                    {batches.map((batch: any) => <option key={batch.id} value={batch.id}>{batch.title}</option>)}
+                  </select>
+                </label>
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Candidate</span>
+                  <select name="user_id" required className="h-11 rounded-xl border border-zinc-200 px-3">
+                    <option value="">Select candidate</option>
+                    {members.map((member: any) => (
+                      <option key={member.id} value={member.user_id}>{member.profile?.full_name || member.profile?.email}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <label className="grid gap-2 text-sm">
+                <span className="font-medium">Project title</span>
+                <input name="project_title" required className="h-11 rounded-xl border border-zinc-200 px-3" placeholder="Capstone API project" />
+              </label>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Score</span>
+                  <input name="score" type="number" min="0" max="100" required className="h-11 rounded-xl border border-zinc-200 px-3" />
+                </label>
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Evidence file</span>
+                  <input name="evidence_file_name" className="h-11 rounded-xl border border-zinc-200 px-3" placeholder="candidate-project-review.pdf" />
+                </label>
+              </div>
+              <label className="grid gap-2 text-sm">
+                <span className="font-medium">Remarks</span>
+                <textarea name="remarks" rows={3} className="rounded-xl border border-zinc-200 px-3 py-3" placeholder="Evaluation notes, strengths, and improvement actions." />
+              </label>
+              <Button type="submit" className="w-fit rounded-full bg-black text-white hover:bg-zinc-800">Save project evaluation</Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+
+      {canCoordinate ? (
+      <Card className="border-zinc-200 shadow-sm spotlight-card">
+        <CardHeader>
+          <CardTitle>Automation Control</CardTitle>
+          <CardDescription>Run governance checks for cut-off alerts and upcoming assessment reminders. Each run is logged for audit.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2">
+          {(['attendance_cutoff', 'absence_streak', 'assessment_reminder', 'feedback_reminder'] as const).map((runType) => (
+            <form key={runType} action={runTrainingAutomationAction} className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+              <input type="hidden" name="run_type" value={runType} />
+              <p className="font-semibold capitalize">{runType.replace('_', ' ')}</p>
+              <p className="mt-1 text-sm text-zinc-500">
+                {runType === 'attendance_cutoff'
+                  ? 'Create coordinator email alerts for sessions past the attendance cut-off.'
+                  : runType === 'absence_streak'
+                    ? 'Create coordinator alerts for candidates absent across the configured streak window.'
+                    : runType === 'assessment_reminder'
+                      ? 'Create candidate email reminders for assessments due in the next 48 hours.'
+                      : 'Create candidate email reminders for open feedback windows before closure.'}
+              </p>
+              <label className="mt-3 grid gap-2 text-sm">
+                <span className="font-medium">Optional batch</span>
+                <select name="batch_id" className="h-11 rounded-xl border border-zinc-200 bg-white px-3">
+                  <option value="">All visible batches</option>
+                  {batches.map((batch: any) => <option key={batch.id} value={batch.id}>{batch.title}</option>)}
+                </select>
+              </label>
+              <Button type="submit" variant="outline" className="mt-4 rounded-full bg-white">Run check</Button>
+            </form>
+          ))}
+        </CardContent>
+      </Card>
+      ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <Card className="border-zinc-200 shadow-sm spotlight-card">
@@ -458,6 +664,8 @@ export default async function ManagerOperationsPage() {
               batches.map((batch: any) => {
                 const batchMembers = membersByBatch.get(batch.id) || []
                 const batchQuizzes = quizzesByBatch.get(batch.id) || []
+                const assignedTrainers = trainersByBatch.get(batch.id) || []
+                const batchAssessments = assessmentsByBatch.get(batch.id) || []
                 return (
                   <div key={batch.id} className="rounded-[1.5rem] border border-zinc-200 p-5">
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -480,22 +688,56 @@ export default async function ManagerOperationsPage() {
                       <MiniMetric label="Learners" value={`${batchMembers.length}`} />
                       <MiniMetric label="Sessions" value={`${batch.training_sessions?.[0]?.count || 0}`} />
                       <MiniMetric label="Assessments" value={`${batchQuizzes.length}`} />
-                      <MiniMetric label="Coordinator" value={batch.coordinator?.full_name || batch.coordinator?.email || 'Manager'} />
+                      <MiniMetric label="Trainers" value={`${Math.max(assignedTrainers.length, batch.trainer ? 1 : 0)}`} />
                     </div>
 
-                    <form action={updateTrainingBatchStatusAction} className="mt-4 flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-4 sm:flex-row sm:items-end sm:justify-between">
+                    {canCoordinate ? (
+                    <form action={updateTrainingBatchDetailsAction} className="mt-4 grid gap-3 rounded-2xl border border-zinc-200 bg-white p-4">
                       <input type="hidden" name="batch_id" value={batch.id} />
-                      <label className="grid flex-1 gap-2 text-sm">
-                        <span className="font-medium">Lifecycle status</span>
-                        <select name="status" defaultValue={batch.status === 'active' || batch.status === 'at_risk' ? 'running' : batch.status} className="h-11 w-full min-w-0 rounded-xl border border-zinc-200 px-3">
-                          <option value="planned">Planned</option>
-                          <option value="running">Running</option>
-                          <option value="completed">Completed</option>
-                          <option value="closed">Closed</option>
-                        </select>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <label className="grid gap-2 text-sm">
+                          <span className="font-medium">Batch name</span>
+                          <input name="title" defaultValue={batch.title} className="h-11 rounded-xl border border-zinc-200 px-3" />
+                        </label>
+                        <label className="grid gap-2 text-sm">
+                          <span className="font-medium">Domain</span>
+                          <input name="domain" defaultValue={batch.domain || ''} className="h-11 rounded-xl border border-zinc-200 px-3" />
+                        </label>
+                      </div>
+                      <label className="grid gap-2 text-sm">
+                        <span className="font-medium">Description</span>
+                        <textarea name="description" defaultValue={batch.description || ''} rows={2} className="rounded-xl border border-zinc-200 px-3 py-3" />
                       </label>
-                      <Button type="submit" variant="outline" className="rounded-full">Update lifecycle</Button>
+                      <div className="grid gap-3 md:grid-cols-4">
+                        <label className="grid gap-2 text-sm">
+                          <span className="font-medium">Status</span>
+                          <select name="status" defaultValue={batch.status === 'active' || batch.status === 'at_risk' ? 'running' : batch.status} className="h-11 rounded-xl border border-zinc-200 px-3">
+                            <option value="planned">Planned</option>
+                            <option value="running">Running</option>
+                            <option value="completed">Completed</option>
+                            <option value="closed">Closed</option>
+                          </select>
+                        </label>
+                        <label className="grid gap-2 text-sm">
+                          <span className="font-medium">Start</span>
+                          <input name="start_date" type="date" defaultValue={batch.start_date || ''} className="h-11 rounded-xl border border-zinc-200 px-3" />
+                        </label>
+                        <label className="grid gap-2 text-sm">
+                          <span className="font-medium">End</span>
+                          <input name="end_date" type="date" defaultValue={batch.end_date || ''} className="h-11 rounded-xl border border-zinc-200 px-3" />
+                        </label>
+                        <label className="grid gap-2 text-sm">
+                          <span className="font-medium">Trainer panel</span>
+                          <select name="trainer_ids" multiple defaultValue={assignedTrainers.map((item: any) => item.trainer_id)} className="min-h-11 rounded-xl border border-zinc-200 px-3 py-2">
+                            {trainers.filter((trainer: any) => trainer.role === 'trainer').map((trainer: any) => (
+                              <option key={trainer.id} value={trainer.id}>{trainer.full_name || trainer.email}</option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                      <Button type="submit" variant="outline" className="w-fit rounded-full">Save batch edits</Button>
                     </form>
+                    ) : null}
 
                     <div className="mt-4 grid gap-3 lg:grid-cols-2">
                       <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
@@ -511,7 +753,11 @@ export default async function ManagerOperationsPage() {
                       <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
                         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Linked assessments</p>
                         <div className="mt-3 flex flex-wrap gap-2">
-                          {batchQuizzes.length > 0 ? batchQuizzes.map((quiz: any) => (
+                          {batchAssessments.length > 0 ? batchAssessments.map((setup: any) => (
+                            <Badge key={setup.id} variant="outline" className="rounded-full bg-white">
+                              {setup.title} - {setup.assessment_type.replace('_', ' ')}
+                            </Badge>
+                          )) : batchQuizzes.length > 0 ? batchQuizzes.map((quiz: any) => (
                             <Badge key={quiz.id} variant="outline" className="rounded-full bg-white">
                               {quiz.title}
                             </Badge>
@@ -682,6 +928,67 @@ export default async function ManagerOperationsPage() {
           )}
         </CardContent>
       </Card>
+
+      <Card className="border-zinc-200 shadow-sm spotlight-card">
+        <CardHeader>
+          <CardTitle>Assessment Score Upload</CardTitle>
+          <CardDescription>Trainers can upload sprint review, API/coding, and project-linked assessment scores for assigned batches.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AssessmentScoreImporter
+            batches={batches.map((batch: any) => ({ id: batch.id, title: batch.title }))}
+            assessments={assessmentSetups.map((setup: any) => ({
+              id: setup.id,
+              batch_id: setup.batch_id,
+              title: setup.title,
+              assessment_type: setup.assessment_type,
+            }))}
+          />
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-6 xl:grid-cols-3">
+        <AuditPanel
+          title="Attendance Versions"
+          empty="No attendance changes have been versioned yet."
+          items={attendanceVersions.slice(0, 5).map((item: any) => ({
+            id: item.id,
+            title: item.profile?.full_name || item.profile?.email || 'Candidate',
+            body: `${item.previous_status || 'new'} -> ${item.new_status} via ${item.source}`,
+            meta: new Date(item.changed_at).toLocaleString(),
+          }))}
+        />
+        <AuditPanel
+          title="Project Evaluations"
+          empty="No project evaluations uploaded yet."
+          items={projectEvaluations.slice(0, 5).map((item: any) => ({
+            id: item.id,
+            title: item.trainee?.full_name || item.trainee?.email || 'Candidate',
+            body: `${item.project_title} - ${item.score}/100`,
+            meta: item.evidence_file_name || 'Evidence optional',
+          }))}
+        />
+        <AuditPanel
+          title="Automation Runs"
+          empty="No automation run has been logged yet."
+          items={automationRuns.slice(0, 5).map((item: any) => ({
+            id: item.id,
+            title: item.run_type.replace('_', ' '),
+            body: `${item.notifications_created} notification(s) created`,
+            meta: new Date(item.created_at).toLocaleString(),
+          }))}
+        />
+        <AuditPanel
+          title="Assessment Upload Errors"
+          empty="No assessment score upload errors yet."
+          items={assessmentUploads.filter((item: any) => item.failed_records > 0).slice(0, 5).map((item: any) => ({
+            id: item.id,
+            title: item.file_name || 'Assessment upload',
+            body: `${item.failed_records} failed, ${item.duplicate_records || 0} duplicate, ${item.successful_records} successful`,
+            meta: new Date(item.created_at).toLocaleString(),
+          }))}
+        />
+      </div>
     </div>
   )
 }
@@ -729,5 +1036,26 @@ function EmptyState({ text, compact = false }: { text: string; compact?: boolean
       <MessageSquareQuote className="mx-auto mb-3 h-5 w-5 opacity-50" />
       <p>{text}</p>
     </div>
+  )
+}
+
+function AuditPanel({ title, empty, items }: { title: string; empty: string; items: Array<{ id: string; title: string; body: string; meta: string }> }) {
+  return (
+    <Card className="border-zinc-200 shadow-sm">
+      <CardHeader>
+        <CardTitle className="text-lg">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {items.length === 0 ? (
+          <EmptyState text={empty} compact />
+        ) : items.map((item) => (
+          <div key={item.id} className="rounded-2xl border border-zinc-200 p-4">
+            <p className="font-medium capitalize">{item.title}</p>
+            <p className="mt-1 text-sm text-zinc-500">{item.body}</p>
+            <p className="mt-2 text-xs text-zinc-400">{item.meta}</p>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   )
 }

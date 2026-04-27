@@ -132,6 +132,15 @@ export interface TrainingBatch {
   updated_at: string
 }
 
+export interface TrainingBatchTrainer {
+  id: string
+  batch_id: string
+  trainer_id: string
+  role_label: string
+  assigned_by: string | null
+  assigned_at: string
+}
+
 export interface BatchMember {
   id: string
   batch_id: string
@@ -168,6 +177,20 @@ export interface SessionAttendance {
   updated_at: string
 }
 
+export interface SessionAttendanceVersion {
+  id: string
+  attendance_id: string | null
+  session_id: string
+  user_id: string
+  previous_status: AttendanceStatus | null
+  new_status: AttendanceStatus
+  previous_notes: string | null
+  new_notes: string | null
+  changed_by: string | null
+  changed_at: string
+  source: 'manual' | 'excel' | 'automation'
+}
+
 export interface TrainingNotification {
   id: string
   batch_id: string | null
@@ -194,7 +217,41 @@ export interface TrainingFeedback {
   sentiment: FeedbackSentiment
   feedback_text: string
   action_item: string | null
+  content_quality_rating: number | null
+  trainer_effectiveness_rating: number | null
   created_at: string
+}
+
+export type TrainingAssessmentType = 'sprint_review' | 'api_coding' | 'coding' | 'project' | 'other'
+export type TrainingAssessmentSetupStatus = 'planned' | 'open' | 'completed' | 'cancelled'
+
+export interface TrainingAssessmentSetup {
+  id: string
+  batch_id: string
+  title: string
+  assessment_type: TrainingAssessmentType
+  scheduled_at: string | null
+  template_name: string | null
+  question_file_name: string | null
+  max_score: number
+  passing_score: number
+  status: TrainingAssessmentSetupStatus
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface TrainingProjectEvaluation {
+  id: string
+  batch_id: string
+  user_id: string
+  evaluator_id: string | null
+  project_title: string
+  score: number
+  evidence_file_name: string | null
+  remarks: string | null
+  created_at: string
+  updated_at: string
 }
 
 export interface TrainingOpsSummary {
@@ -213,6 +270,9 @@ export interface TrainingOpsSummary {
   absenceAlerts: number
   notificationsSent: number
   negativeFeedbackCount: number
+  assessmentSetups: number
+  projectEvaluations: number
+  automationRuns: number
 }
 
 // Extended types with relations
@@ -295,6 +355,10 @@ export interface AssessmentResult {
   id: string
   import_id: string
   quiz_id: string | null
+  batch_id?: string | null
+  assessment_setup_id?: string | null
+  uploaded_by?: string | null
+  upload_fingerprint?: string | null
   candidate_id: string | null
   candidate_name: string
   candidate_email: string

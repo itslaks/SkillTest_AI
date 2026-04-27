@@ -122,7 +122,7 @@ export function DevelopersSection() {
               <span className="text-muted-foreground">Effortless workflow.</span>
             </h2>
             <p className="text-xl text-muted-foreground mb-12 leading-relaxed">
-              SkillTest provides managers with a unified workspace to manage employees, create advanced assessments, and extract actionable insights.
+              Maverick TMS provides training teams with a unified workspace to manage batches, candidates, trainers, attendance, assessments, and actionable insights.
             </p>
             
             {/* Features */}

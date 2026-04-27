@@ -62,7 +62,7 @@ export function PricingSection() {
             <span className="text-stroke">place</span>
           </h2>
           <p className="text-lg text-muted-foreground max-w-xl">
-            From automated question generation to massive scale leadership reporting. SkillTest is the complete package.
+            From automated governance to massive scale training reporting. Maverick TMS is the complete package.
           </p>
         </div>
 

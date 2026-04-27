@@ -195,6 +195,28 @@ export default async function EmployeeTrainingPage() {
                   <option value="1">1 - Poor</option>
                 </select>
               </label>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Training content quality</span>
+                  <select name="content_quality_rating" defaultValue="5" className="h-11 rounded-xl border border-zinc-200 px-3">
+                    <option value="5">5 - Excellent</option>
+                    <option value="4">4 - Good</option>
+                    <option value="3">3 - Average</option>
+                    <option value="2">2 - Needs Improvement</option>
+                    <option value="1">1 - Poor</option>
+                  </select>
+                </label>
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Trainer effectiveness</span>
+                  <select name="trainer_effectiveness_rating" defaultValue="5" className="h-11 rounded-xl border border-zinc-200 px-3">
+                    <option value="5">5 - Excellent</option>
+                    <option value="4">4 - Good</option>
+                    <option value="3">3 - Average</option>
+                    <option value="2">2 - Needs Improvement</option>
+                    <option value="1">1 - Poor</option>
+                  </select>
+                </label>
+              </div>
               <label className="grid gap-2 text-sm">
                 <span className="font-medium">Feedback</span>
                 <textarea name="feedback_text" rows={4} required className="rounded-xl border border-zinc-200 px-3 py-3" placeholder="What worked well? What should be improved?" />

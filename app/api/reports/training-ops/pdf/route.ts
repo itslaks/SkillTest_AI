@@ -10,10 +10,17 @@ export async function GET() {
   const admin = createAdminClient()
   const { data: batches } = await admin
     .from('training_batches')
-    .select('id, title, status, start_date, end_date, batch_members(count), training_sessions(count)')
+    .select('id, title, status, start_date, end_date, batch_members(count), training_sessions(count), trainer:trainer_id(full_name, email)')
     .or(`created_by.eq.${userId},coordinator_id.eq.${userId},trainer_id.eq.${userId}`)
     .order('created_at', { ascending: false })
     .limit(12)
+
+  const batchIds = (batches || []).map((batch: any) => batch.id)
+  const [feedbackRes, projectRes, automationRes] = await Promise.all([
+    batchIds.length ? admin.from('training_feedback').select('id, batch_id').in('batch_id', batchIds) : Promise.resolve({ data: [] }),
+    batchIds.length ? admin.from('training_project_evaluations').select('id, batch_id').in('batch_id', batchIds) : Promise.resolve({ data: [] }),
+    batchIds.length ? admin.from('training_automation_runs').select('id, batch_id, notifications_created').in('batch_id', batchIds) : Promise.resolve({ data: [] }),
+  ])
 
   const lines = [
     'Maverick Execution Platform - Training Ops PDF Report',
@@ -27,9 +34,14 @@ export async function GET() {
       `   Dates: ${batch.start_date || 'TBD'} to ${batch.end_date || 'TBD'}`,
       `   Candidates: ${batch.batch_members?.[0]?.count || 0}`,
       `   Sessions: ${batch.training_sessions?.[0]?.count || 0}`,
+      `   Trainer: ${batch.trainer?.full_name || batch.trainer?.email || 'Unassigned'}`,
       '',
     ]),
-    'For detailed attendance, assessment, feedback, topper, and notification data, use the Excel export.',
+    `Feedback responses: ${feedbackRes.data?.length || 0}`,
+    `Project evaluations: ${projectRes.data?.length || 0}`,
+    `Automation notifications created: ${(automationRes.data || []).reduce((sum: number, item: any) => sum + Number(item.notifications_created || 0), 0)}`,
+    '',
+    'Detailed attendance, assessment setup, feedback, topper, project, and notification sheets are available in the Excel export.',
   ]
 
   const pdf = createSimplePdf(lines)

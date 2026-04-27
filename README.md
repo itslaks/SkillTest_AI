@@ -1,292 +1,180 @@
-# SkillTest AI
+# Maverick Execution Platform - TMS
 
-🚀 SkillTest AI is a production-focused employee assessment platform built for training teams that want more than basic quiz delivery.
+Maverick Execution Platform - TMS is a centralized Training Management System for managing the complete training lifecycle: batch creation, candidate onboarding, attendance, assessments, trainer coordination, feedback, dashboards, topper identification, governance controls, and reporting.
 
-It combines quiz operations, gamification, behavioral intelligence, trainer outcome analytics, and retention tracking in one system. Managers can create and assign assessments, while employees get adaptive quiz experiences with readiness guidance, cooldown prompts, live performance feedback, and leaderboard-based motivation.
+The product is designed for training teams that want to replace spreadsheet-driven follow-ups with a disciplined execution platform that is visible, auditable, and presentation-ready.
 
-## ✨ What Problem This Solves
+## What This Solves
 
-Traditional quiz tools usually stop at:
+Training operations are often split across spreadsheets, chat groups, email reminders, quiz tools, and manual reports. Maverick TMS brings those workflows into one system so coordinators and leaders can answer:
 
-- quiz creation
-- score calculation
-- static reporting
+- Which batches are planned, running, completed, or closed?
+- Which trainers own each batch?
+- Which candidates are absent repeatedly?
+- Was attendance submitted before the cut-off?
+- Which assessments are scheduled and uploaded?
+- Who are the toppers, and how was the score calculated?
+- Which candidates are discontinued, not cleared, offered, or onboarded?
+- What feedback did candidates give about content quality and trainer effectiveness?
+- What audit trail exists for attendance, status changes, notifications, and admin changes?
 
-SkillTest AI goes further by turning quizzes into a training intelligence engine.
+## BRD Coverage
 
-This project is designed to support a training-management platform where the product should not only measure scores, but also help answer questions like:
+### Role-Based Workspaces
 
-- Is a trainee overloaded even before they fail?
-- Is a trainee panicking and randomly guessing?
-- Is a perfect score actually learning, or just memorization?
-- Which topics are weak across an entire batch?
-- Which trainer is driving stronger outcomes?
-- Which knowledge areas are decaying over time?
-- Should a trainee attempt a quiz now, or revise first?
+- **Admin**: role management, governance thresholds, topper criteria, cut-offs, audit logs.
+- **Training Coordinator / Manager**: batch lifecycle, candidate import, trainer assignment, scheduling, automation checks, feedback windows, reports.
+- **Trainer**: assigned-batch workspace, attendance upload, assessment score upload, project evaluation upload.
+- **Candidate**: batch details, sessions, attendance history, reminders, linked assessments, structured feedback.
 
-## 🧠 Core AI Intelligence Layer
+### Training Operations
 
-The following intelligence features are now wired into both backend logic and frontend surfaces.
+- Batch lifecycle with `Planned`, `Running`, `Completed`, and `Closed` statuses.
+- Multi-trainer assignment with lead trainer and trainer panel support.
+- Batch editing for schedule, status, dates, description, domain, and trainers.
+- Candidate onboarding by manual selection or Excel batch-candidate upload.
+- Session planning with trainer, date/time, mode, status, agenda, and attendance requirement.
 
-### 1. Cognitive Load Detector
+### Attendance Management
 
-- Tracks hesitation time per answer.
-- Flags cognitive overload when an `easy` question takes more than 15 seconds.
-- Influences the next adaptive difficulty target in real time.
-- Visible inside the employee quiz flow and manager analytics.
+- Manual attendance marking.
+- Excel attendance upload with template support.
+- Attendance cut-off governance setting.
+- Dashboard risks for missed attendance and absence streaks.
+- Versioned attendance history with old status, new status, source, timestamp, and changed-by user.
 
-### 2. Emotional State Inference via Answer Patterns
+### Assessment Management
 
-- Detects panic-like behavior using fast wrong-answer streaks.
-- Suggests a cooldown/reset prompt mid-quiz.
-- Feeds behavioral summaries in the results view and analytics cockpit.
+- Assessment setup by batch with type, schedule, Excel template, question file, max score, passing score, and status.
+- Assessment score upload for trainers and coordinators.
+- Validation for candidate existence, score ranges, duplicate rows, and upload errors.
+- Upload error logs visible in Training Ops.
+- Existing quiz/adaptive assessment engine remains available for linked assessments.
 
-### 3. Batch DNA Fingerprint
+### Project Evaluation
 
-- Aggregates topic-level strength and blind-spot patterns across attempts.
-- Displays a radar-chart batch profile for trainer review.
-- Helps managers plan the next session based on collective weak areas.
+- Project evaluation upload as a first-class TMS workflow.
+- Tracks candidate, batch, evaluator, project title, score, evidence filename, and remarks.
+- Project score feeds topper calculation.
 
-### 4. Predictive Readiness Score
+### Notifications and Automation
 
-- Estimates readiness before a trainee starts a quiz.
-- Uses quiz history, streak, topic/domain alignment, and training age.
-- Shows a readiness meter with recommendation states:
-  - `ready`
-  - `focus`
-  - `revise`
+The platform includes a governance simulation panel for BRD alert events:
 
-### 5. Anti-Gaming / Anti-Pattern Detection
+- Attendance cut-off missed.
+- Consecutive absence streak.
+- Upcoming assessment reminder.
+- Feedback window reminder.
 
-- Detects same-topic repeated perfect attempts completed too quickly.
-- Flags likely memorization behavior instead of genuine mastery.
-- Pushes the quiz flow toward challenge mode and harder follow-up behavior.
+All notification records are logged with channel, status, timestamp, audience, and message.
 
-### 6. Trainer Impact Score
+### Feedback Management
 
-- Connects outcomes back to the quiz owner / trainer.
-- Surfaces topic-level trainer performance signals.
-- Helps identify which trainer-topic combinations need intervention.
+- Training Coordinator can open feedback windows.
+- Candidate feedback captures:
+  - overall rating
+  - training content quality
+  - trainer effectiveness
+  - free-text feedback
+  - suggested action item
+- Feedback is stored batch/session-wise and exported in reports.
 
-### 7. Knowledge Decay Tracker
+### Topper Identification
 
-- Tracks time since last assessment on a topic.
-- Highlights topics that cross the 2-week retention window.
-- Compares baseline vs latest score to surface decay risk.
+- Visible Topper Center in Reports.
+- Uses configurable admin criteria:
+  - assessment weight
+  - project weight
+  - minimum attendance threshold
+- Shows transparent calculation inputs: assessment score, project score, attendance, final topper score.
+- Topper data is included in the Training Ops Excel workbook.
 
-## 🖥️ Frontend Coverage
+### Reports
 
-These changes are not backend-only. They are visible across the product UI.
+The Report Center includes:
 
-### Employee Frontend
-
-#### Dashboard
-
-- Shows readiness-driven next actions.
-- Highlights retention-risk topics.
-- Surfaces behavioral AI as part of the learning flow.
-
-#### Quiz Listing
-
-- Displays readiness meters per available quiz.
-- Shows challenge mode and retention due states.
-- Gives revision/attempt guidance before launch.
-
-#### Quiz Player
-
-- Uses a black-and-white high-contrast aesthetic.
-- Includes animated 3D-style orb visuals.
-- Tracks live cognitive load and panic signals.
-- Suggests cooldown moments when stress patterns appear.
-- Adjusts the next question batch target difficulty in real time.
-
-#### Results Page
-
-- Shows behavioral AI summary after submission.
-- Explains cognitive-load and panic detections.
-- Shows next recommended difficulty and retention context.
-
-### Manager Frontend
-
-#### Dashboard
-
-- Shows the updated monochrome design direction.
-- Exposes the new AI surfaces from the main manager entry point.
-
-#### Analytics Cockpit
-
-- Shows batch DNA radar chart.
-- Shows trainer impact score chart.
-- Shows retention / knowledge decay cards.
-- Shows anti-gaming watchlist.
-- Summarizes panic-mode and overload counts.
-
-## ⚙️ Backend Coverage
-
-The backend is wired so these features are not mock UI states.
-
-### Shared intelligence engine
-
-[`lib/insights.ts`](./lib/insights.ts)
-
-Contains the shared intelligence logic for:
-
-- readiness scoring
-- attempt behavior analysis
-- batch profiling
-- trainer impact scoring
-- retention checks
-- adaptive difficulty shifting
-
-### Employee actions
-
-[`lib/actions/employee.ts`](./lib/actions/employee.ts)
-
-Handles:
-
-- enriched answer payloads
-- post-submit behavioral signal persistence
-- readiness calculation before quiz launch
-- anti-gaming analysis
-- retention mapping for employee quiz lists and dashboards
-
-### Validation and types
-
-[`lib/security/validation.ts`](./lib/security/validation.ts)
-[`lib/types/database.ts`](./lib/types/database.ts)
-
-These were extended to support:
-
-- question difficulty per answer
-- cognitive-load flags
-- panic flags
-- adaptive difficulty metadata
-- readiness and retention data structures
-
-## 🎨 Design Direction
-
-The app now leans into a cooler black-and-white aesthetic instead of a generic bright dashboard look.
-
-### Design choices
-
-- monochrome palette
-- higher contrast cards
-- cinematic dark hero sections
-- subtle radial background texture
-- 3D orb-style animated visual element
-- rounded premium card shapes
-- calmer, more deliberate motion
-
-Primary styling updates live in:
-
-- [`app/globals.css`](./app/globals.css)
-- [`components/insights/monochrome-orb.tsx`](./components/insights/monochrome-orb.tsx)
-- [`components/insights/readiness-meter.tsx`](./components/insights/readiness-meter.tsx)
-
-## 🧩 Feature Summary
-
-### Managers can
-
-- create quizzes
-- edit and manage questions
-- activate/deactivate quizzes
-- assign quizzes to employees
-- monitor completions
-- export reports and leaderboards
-- inspect trainer impact
-- review batch fingerprinting
-- identify panic or overload patterns
-- detect memorization anti-patterns
-- identify knowledge decay risk
-
-### Employees can
-
-- see assigned quizzes only
-- continue in-progress quizzes
-- view readiness scores before starting
-- take adaptive quizzes
-- receive instant answer feedback
-- receive cooldown guidance during panic/overload signals
-- review behavior-aware results
-- view quiz and global leaderboards
-- earn points, streaks, and badges
-
-## 🏗️ Tech Stack
-
-| Area | Technology |
-| --- | --- |
-| Framework | Next.js 16 App Router |
-| Language | TypeScript |
-| Styling | Tailwind CSS |
-| UI primitives | Radix UI |
-| Auth + DB | Supabase |
-| Charts | Recharts |
-| 3D visuals | Three.js + React Three Fiber |
-| File import | SheetJS / xlsx |
-| AI integrations | OpenAI + Gemini fallback |
-| Analytics | Vercel Analytics |
-
-## 📁 Important App Areas
-
-### Employee experience
-
-- [`app/employee/page.tsx`](./app/employee/page.tsx)
-- [`app/employee/quizzes/page.tsx`](./app/employee/quizzes/page.tsx)
-- [`app/employee/quizzes/[quizId]/page.tsx`](./app/employee/quizzes/%5BquizId%5D/page.tsx)
-- [`app/employee/quizzes/[quizId]/quiz-player.tsx`](./app/employee/quizzes/%5BquizId%5D/quiz-player.tsx)
-- [`app/employee/quizzes/[quizId]/results/page.tsx`](./app/employee/quizzes/%5BquizId%5D/results/page.tsx)
-
-### Manager experience
-
-- [`app/manager/page.tsx`](./app/manager/page.tsx)
-- [`app/manager/analytics/page.tsx`](./app/manager/analytics/page.tsx)
-- [`components/manager/intelligence-dashboard.tsx`](./components/manager/intelligence-dashboard.tsx)
-
-### Intelligence engine
+- Training Ops Excel export.
+- Training Ops PDF export.
+- Quiz/assessment reports.
+- Consolidated batch filter metrics:
+  - discontinued
+  - not cleared
+  - offered
+  - onboarded / active
+- Exported workbook sheets for batch summary, candidate status, attendance, assessment setup, assessment uploads, project evaluations, topper criteria, topper candidates, feedback, notifications, and automation runs.
+
+### Governance and Audit
+
+- Admin Governance Console for user roles and settings.
+- Attendance cut-off time.
+- Absence alert day threshold.
+- Feedback window default.
+- Topper weights and minimum attendance.
+- Admin audit log for sensitive role/governance changes.
+- Batch status audit and batch change audit.
+- Attendance version audit.
+- Upload and notification logs.
+
+## AI Intelligence Layer
+
+Maverick TMS also includes an assessment intelligence layer:
+
+- Predictive readiness scoring.
+- Cognitive load detection.
+- Panic-mode / fast wrong-answer pattern detection.
+- Anti-gaming / memorization detection.
+- Batch DNA fingerprinting.
+- Trainer impact scoring.
+- Knowledge decay tracking.
+
+Core intelligence logic lives in:
 
 - [`lib/insights.ts`](./lib/insights.ts)
 - [`lib/actions/employee.ts`](./lib/actions/employee.ts)
+- [`components/manager/intelligence-dashboard.tsx`](./components/manager/intelligence-dashboard.tsx)
 
-## 🔐 Authentication
+## Important Routes
 
-SkillTest uses Supabase Auth.
+| Route | Purpose |
+| --- | --- |
+| `/` | Maverick TMS landing page |
+| `/auth/login` | Login |
+| `/manager` | Coordinator / manager dashboard |
+| `/manager/operations` | Batch lifecycle, trainer workspace, attendance, assessment uploads, project evaluation, automation |
+| `/manager/admin` | Admin governance console |
+| `/manager/reports` | BRD report center and topper center |
+| `/manager/analytics` | AI analytics cockpit |
+| `/manager/employees` | Candidate master and assignment management |
+| `/manager/quizzes` | Assessment / quiz management |
+| `/employee` | Candidate dashboard |
+| `/employee/training` | Candidate training hub, attendance, reminders, feedback |
+| `/employee/quizzes` | Assigned assessments |
 
-Supported flows:
+## Key Implementation Files
 
-- employee sign up
-- sign in
-- forgot password
-- reset/update password
-- manager/employee role-based redirects
+| Area | Files |
+| --- | --- |
+| Training server actions | [`lib/actions/training.ts`](./lib/actions/training.ts) |
+| RBAC helpers | [`lib/rbac.ts`](./lib/rbac.ts) |
+| Training Ops UI | [`app/manager/operations/page.tsx`](./app/manager/operations/page.tsx) |
+| Admin console | [`app/manager/admin/page.tsx`](./app/manager/admin/page.tsx) |
+| Report center | [`app/manager/reports/page.tsx`](./app/manager/reports/page.tsx) |
+| Assessment score upload | [`components/manager/assessment-score-importer.tsx`](./components/manager/assessment-score-importer.tsx) |
+| Attendance upload | [`components/manager/attendance-importer.tsx`](./components/manager/attendance-importer.tsx) |
+| Training Ops Excel export | [`app/api/reports/training-ops/download/route.ts`](./app/api/reports/training-ops/download/route.ts) |
+| Training schema completion | [`scripts/024_complete_brd_tms_controls.sql`](./scripts/024_complete_brd_tms_controls.sql) |
 
-## 🗄️ Database Setup
+## Database Setup
 
-Run the SQL scripts in `scripts/` in order through the Supabase SQL editor.
+Run the SQL scripts in `scripts/` in order through the Supabase SQL editor. The latest TMS completion migration is:
 
 ```text
-scripts/001_create_profiles.sql
-scripts/002_create_quizzes.sql
-scripts/003_create_questions.sql
-scripts/004_create_attempts.sql
-scripts/005_create_gamification.sql
-scripts/006_create_triggers.sql
-scripts/007_seed_badges.sql
-scripts/008_add_passing_score.sql
-scripts/009_create_quiz_assignments.sql
-scripts/010_fix_leaderboard_rls.sql
-scripts/011_fix_manager_rls.sql
-scripts/012_create_assessment_imports.sql
-scripts/013_fix_rbac_trigger.sql
-scripts/014_add_status_to_quizzes.sql
-scripts/015_remove_question_approval_system.sql
-scripts/016_safe_remove_approval_system.sql
-scripts/017_enhanced_user_stats_trigger.sql
-scripts/018_add_updated_at_to_questions.sql
-scripts/019_more_meaningful_badges.sql
-scripts/020_create_training_operations.sql
+scripts/024_complete_brd_tms_controls.sql
 ```
 
-## 🔑 Environment Variables
+It is defensive and creates the assessment import/result tables if an older environment has not run `012_create_assessment_imports.sql`.
+
+## Environment Variables
 
 Create `.env.local`:
 
@@ -303,21 +191,24 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 Notes:
 
-- At least one AI key is needed for AI generation features.
 - `SUPABASE_SERVICE_ROLE_KEY` is required for admin-style import/export flows.
+- At least one AI key is needed for AI generation features.
 
-## 🧪 Verification
+## Tech Stack
 
-The production hardening pass included:
+| Area | Technology |
+| --- | --- |
+| Framework | Next.js 16 App Router |
+| Language | TypeScript |
+| Styling | Tailwind CSS |
+| UI primitives | Radix UI |
+| Auth + DB | Supabase |
+| Charts | Recharts |
+| File import/export | SheetJS / xlsx |
+| AI integrations | OpenAI + Gemini fallback |
+| Analytics | Vercel Analytics |
 
-- ✅ `npx tsc --noEmit --pretty false`
-- ✅ `npm run build`
-
-Known note:
-
-- `npm run lint` is currently not runnable because `eslint` is not installed in this repository even though the script exists.
-
-## 🚀 Local Development
+## Local Development
 
 Install dependencies:
 
@@ -337,60 +228,32 @@ Open:
 http://localhost:3000
 ```
 
-Run build:
+## Verification
+
+Current validation:
 
 ```bash
+npm run lint
 npm run build
 ```
 
-Run type-check:
+Both pass on the TMS completion branch.
 
-```bash
-npx tsc --noEmit --pretty false
-```
+## Contest Positioning
 
-## 🧭 Useful Routes
+Most submissions will likely focus on quizzes, dashboards, or a simple LMS-style flow. Maverick TMS is positioned as a full execution platform:
 
-| Route | Purpose |
-| --- | --- |
-| `/` | Landing page |
-| `/auth/login` | Login |
-| `/auth/sign-up` | Employee sign up |
-| `/auth/reset-password` | Request reset link |
-| `/auth/update-password` | Set new password |
-| `/manager` | Manager dashboard |
-| `/manager/operations` | Batch lifecycle, attendance, trainer coordination, reminders |
-| `/manager/quizzes` | Quiz creation and management |
-| `/manager/analytics` | Behavioral AI analytics cockpit |
-| `/manager/employees` | Employee management |
-| `/manager/leaderboard` | Rankings and exports |
-| `/manager/reports` | Reports and downloads |
-| `/employee` | Employee intelligence dashboard |
-| `/employee/training` | Batch, sessions, reminders, attendance, feedback |
-| `/employee/quizzes` | Assigned quiz deck |
-| `/employee/quizzes/[quizId]` | Adaptive quiz player |
-| `/employee/quizzes/[quizId]/results` | Behavioral results report |
-| `/employee/leaderboard` | Employee leaderboard |
-| `/employee/badges` | Badge collection |
+- operational workflows
+- role-specific workspaces
+- trainer accountability
+- automated governance checks
+- visible audit trails
+- transparent topper logic
+- BRD-aligned reporting
+- AI-powered learning intelligence
 
-## 🛠️ Production Readiness Notes
+That combination is the core differentiator.
 
-### Strong areas
-
-- shared intelligence logic instead of duplicated UI math
-- server-side readiness computation
-- adaptive behavior reflected in frontend
-- type-checked intelligence flow
-- production build passing
-- clear separation of employee vs manager surfaces
-
-### Recommended next steps for an even stronger production rollout
-
-- add real automated tests for readiness and behavioral scoring
-- install and enforce ESLint in CI
-- add database migrations specifically for long-term analytics persistence if you want historical trainer benchmarking beyond attempt payload analysis
-- add scheduled jobs if retention checks should proactively create assignments instead of only surfacing UI signals
-
-## 📜 License
+## License
 
 MIT

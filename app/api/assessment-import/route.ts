@@ -1,20 +1,62 @@
 import { createClient } from '@/lib/supabase/server'
-import { requireManagerForApi } from '@/lib/rbac'
+import { requireTrainingStaffForApi } from '@/lib/rbac'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
-  const auth = await requireManagerForApi()
+  const auth = await requireTrainingStaffForApi()
   if (auth instanceof NextResponse) return auth
   const { userId } = auth
 
   const supabase = await createClient()
 
   try {
-    const { quizId, records, fileName } = await request.json()
+    const { quizId, batchId, assessmentSetupId, records, fileName } = await request.json()
 
     if (!records || !Array.isArray(records) || records.length === 0) {
       return NextResponse.json({ error: 'No records provided' }, { status: 400 })
     }
+
+    const seenFingerprints = new Set<string>()
+    const validationErrors: any[] = []
+    const cleanRecords = records.filter((record: any, index: number) => {
+      const candidateEmail = String(record.Candidate_Email_Address || record.candidate_email || '').trim().toLowerCase()
+      const candidateId = String(record.Candidate_ID || record.candidate_id || '').trim().toLowerCase()
+      const percentage = Number(record.Percentage ?? record.percentage ?? 0)
+      const candidateScore = Number(record.Candidate_Score ?? record.candidate_score ?? 0)
+      const fingerprint = `${batchId || quizId || 'global'}:${assessmentSetupId || record.Test_Id || record.test_id || 'assessment'}:${candidateEmail || candidateId}`
+
+      if (!candidateEmail && !candidateId) {
+        validationErrors.push({ row: index + 1, error: 'Missing candidate email or candidate ID.' })
+        return false
+      }
+      if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100 || candidateScore < 0) {
+        validationErrors.push({ row: index + 1, error: 'Invalid score range.' })
+        return false
+      }
+      if (seenFingerprints.has(fingerprint)) {
+        validationErrors.push({ row: index + 1, error: 'Duplicate candidate assessment row in upload.' })
+        return false
+      }
+      seenFingerprints.add(fingerprint)
+      record.__uploadFingerprint = fingerprint
+      return true
+    })
+
+    const candidateEmails = cleanRecords
+      .map((record: any) => String(record.Candidate_Email_Address || record.candidate_email || '').trim().toLowerCase())
+      .filter(Boolean)
+    const { data: profiles } = candidateEmails.length
+      ? await supabase.from('profiles').select('email').in('email', candidateEmails)
+      : { data: [] }
+    const existingEmails = new Set((profiles || []).map((profile: any) => String(profile.email).toLowerCase()))
+    const candidateCheckedRecords = cleanRecords.filter((record: any, index: number) => {
+      const email = String(record.Candidate_Email_Address || record.candidate_email || '').trim().toLowerCase()
+      if (email && !existingEmails.has(email)) {
+        validationErrors.push({ row: index + 1, error: 'Candidate does not exist in candidate master.', email })
+        return false
+      }
+      return true
+    })
 
     // Create import record
     const { data: importRecord, error: importError } = await supabase
@@ -35,9 +77,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse and insert assessment results
-    const resultsToInsert = records.map((record: any) => ({
+    const resultsToInsert = candidateCheckedRecords.map((record: any) => ({
       import_id: importRecord.id,
       quiz_id: quizId || null,
+      batch_id: batchId || null,
+      assessment_setup_id: assessmentSetupId || null,
+      uploaded_by: userId,
+      upload_fingerprint: record.__uploadFingerprint || null,
       candidate_id: record.Candidate_ID || record.candidate_id,
       candidate_name: record.Candidate_Full_Name || record.candidate_name || 'Unknown',
       candidate_email: record.Candidate_Email_Address || record.candidate_email || '',
@@ -74,7 +120,7 @@ export async function POST(request: NextRequest) {
     // Insert results in batches
     const batchSize = 50
     let insertedCount = 0
-    const errors: any[] = []
+    const errors: any[] = [...validationErrors]
 
     for (let i = 0; i < resultsToInsert.length; i += batchSize) {
       const batch = resultsToInsert.slice(i, i + batchSize)
@@ -93,10 +139,24 @@ export async function POST(request: NextRequest) {
     await supabase
       .from('assessment_imports')
       .update({
-        status: errors.length === 0 ? 'completed' : 'failed',
+        status: errors.length === 0 ? 'completed' : insertedCount > 0 ? 'completed' : 'failed',
         updated_at: new Date().toISOString(),
       })
       .eq('id', importRecord.id)
+
+    if (batchId) {
+      await supabase.from('training_assessment_uploads').insert({
+        assessment_setup_id: assessmentSetupId || null,
+        batch_id: batchId,
+        uploaded_by: userId,
+        file_name: fileName || 'assessment_import.csv',
+        total_records: records.length,
+        successful_records: insertedCount,
+        failed_records: errors.length,
+        duplicate_records: validationErrors.filter((item) => String(item.error).toLowerCase().includes('duplicate')).length,
+        error_log: errors.length ? errors : null,
+      })
+    }
 
     return NextResponse.json({
       success: true,
@@ -164,7 +224,7 @@ function extractSectionData(record: any): Record<string, any> {
 
 // GET endpoint to fetch assessment results
 export async function GET(request: NextRequest) {
-  const auth = await requireManagerForApi()
+  const auth = await requireTrainingStaffForApi()
   if (auth instanceof NextResponse) return auth
   const { userId } = auth
 
