@@ -11,8 +11,8 @@ const commandCards = [
 export function HeroShowcase() {
   return (
     <div className="relative min-h-[560px] w-full overflow-hidden rounded-[2rem] border border-black/8 bg-white/55 p-4 shadow-[0_30px_90px_rgba(15,23,42,0.10)] sm:p-5">
-      <div className="aura-ring left-8 top-10 h-40 w-40 bg-cyan-400/35" />
-      <div className="aura-ring bottom-16 right-6 h-48 w-48 bg-blue-600/30" style={{ animationDelay: "1.5s" }} />
+      <div className="aura-ring left-8 top-10 h-40 w-40 bg-cyan-400/35" style={{ willChange: "transform" }} />
+      <div className="aura-ring bottom-16 right-6 h-48 w-48 bg-blue-600/30" style={{ animationDelay: "1.5s", willChange: "transform" }} />
 
       <div className="relative z-10 grid h-full min-h-[520px] gap-4 sm:grid-cols-2">
         <div className="glass-panel flex min-h-52 flex-col rounded-[1.5rem] p-4">

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
+import Link from 'next/link'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,14 +15,12 @@ import {
 } from '@/components/ui/dropdown-menu'
 import type { Profile } from '@/lib/types/database'
 import { signOut } from '@/lib/actions/auth'
-import { useRouter } from 'next/navigation'
 
 interface ManagerHeaderProps {
   profile: Profile | null
 }
 
 export function ManagerHeader({ profile }: ManagerHeaderProps) {
-  const router = useRouter()
 
   return (
     <header className="sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-border/50 bg-white/98 backdrop-blur-md px-4 md:px-6">
@@ -50,23 +49,29 @@ export function ManagerHeader({ profile }: ManagerHeaderProps) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52 rounded-xl shadow-xl border-border/60">
-            <DropdownMenuItem onClick={() => router.push('/manager/quizzes/new')} className="rounded-lg cursor-pointer gap-2 py-2.5">
-              <div className="w-7 h-7 rounded-lg bg-violet-100 flex items-center justify-center">
-                <FileQuestion className="h-3.5 w-3.5 text-violet-600" />
-              </div>
-              New Quiz
+            <DropdownMenuItem asChild className="rounded-lg cursor-pointer gap-2 py-2.5">
+              <Link href="/manager/quizzes/new" prefetch className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-violet-100 flex items-center justify-center">
+                  <FileQuestion className="h-3.5 w-3.5 text-violet-600" />
+                </div>
+                New Quiz
+              </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => router.push('/manager/employees')} className="rounded-lg cursor-pointer gap-2 py-2.5">
-              <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center">
-                <Users className="h-3.5 w-3.5 text-emerald-600" />
-              </div>
-              Import Employees
+            <DropdownMenuItem asChild className="rounded-lg cursor-pointer gap-2 py-2.5">
+              <Link href="/manager/employees" prefetch className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center">
+                  <Users className="h-3.5 w-3.5 text-emerald-600" />
+                </div>
+                Import Employees
+              </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => router.push('/manager/analytics')} className="rounded-lg cursor-pointer gap-2 py-2.5">
-              <div className="w-7 h-7 rounded-lg bg-pink-100 flex items-center justify-center">
-                <Brain className="h-3.5 w-3.5 text-pink-600" />
-              </div>
-              AI Analysis
+            <DropdownMenuItem asChild className="rounded-lg cursor-pointer gap-2 py-2.5">
+              <Link href="/manager/analytics" prefetch className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-pink-100 flex items-center justify-center">
+                  <Brain className="h-3.5 w-3.5 text-pink-600" />
+                </div>
+                AI Analysis
+              </Link>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

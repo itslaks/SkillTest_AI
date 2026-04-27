@@ -1,6 +1,7 @@
 'use client'
 
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
+import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import type { Profile } from '@/lib/types/database'
 import {
@@ -65,7 +66,6 @@ function getRoleBadge(role: string | undefined) {
 
 export function ManagerSidebar({ profile }: ManagerSidebarProps) {
   const pathname = usePathname()
-  const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
   const roleBadge = getRoleBadge(profile?.role)
   const RoleBadgeIcon = roleBadge.icon
@@ -84,22 +84,27 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
       ? 'from-violet-500 to-orange-600'
       : 'from-blue-500 to-violet-600'
 
+  const logoHref = profile?.role === 'admin' ? '/manager/admin' : '/manager'
+
   return (
     <aside
       className={cn(
-        'fixed inset-y-0 left-0 z-50 hidden flex-col transition-[width] duration-200 ease-out lg:flex',
+        'fixed inset-y-0 left-0 z-50 hidden flex-col lg:flex',
         'bg-[#0f0f10] border-r border-white/[0.06]',
-        collapsed ? 'w-[68px]' : 'w-64'
+        collapsed ? 'w-[68px]' : 'w-64',
+        // Use will-change only for the width transition to keep it GPU-accelerated
+        'transition-[width] duration-200 ease-out will-change-[width]'
       )}
     >
       {/* Logo */}
       <div className={cn('flex h-16 items-center border-b border-white/[0.06] px-4', collapsed ? 'justify-center' : 'gap-3')}>
-        <button
-          onClick={() => router.push(profile?.role === 'admin' ? '/manager/admin' : '/manager')}
+        <Link
+          href={logoHref}
+          prefetch
           className="flex items-center gap-3 group"
         >
           <div className={cn(
-            'w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-lg transition-all',
+            'w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-lg',
             `bg-gradient-to-br ${sidebarAccent}`
           )}>
             <Sparkles className="w-4 h-4 text-white" />
@@ -112,7 +117,7 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
               </p>
             </div>
           )}
-        </button>
+        </Link>
       </div>
 
       {/* Role badge */}
@@ -147,9 +152,10 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
                 const isActive = pathname === item.href ||
                   (item.href !== '/manager' && pathname.startsWith(item.href))
                 return (
-                  <button
+                  <Link
                     key={item.name}
-                    onClick={() => router.push(item.href)}
+                    href={item.href}
+                    prefetch
                     title={collapsed ? item.name : undefined}
                     className={cn(
                       'w-full flex items-center gap-3 rounded-xl text-sm font-medium transition-colors duration-150 group relative',
@@ -160,7 +166,7 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
                     )}
                   >
                     <div className={cn(
-                      'flex items-center justify-center rounded-lg shrink-0 transition-all',
+                      'flex items-center justify-center rounded-lg shrink-0',
                       collapsed ? 'w-8 h-8' : 'w-7 h-7',
                       isActive ? item.bg : 'bg-white/[0.04] group-hover:bg-white/[0.08]'
                     )}>
@@ -175,7 +181,7 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
                     {collapsed && isActive && (
                       <div className={cn('absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r-full', item.activeBg)} />
                     )}
-                  </button>
+                  </Link>
                 )
               })}
             </div>
@@ -189,7 +195,7 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
         <button
           onClick={() => setCollapsed(!collapsed)}
           className={cn(
-            'w-full flex items-center gap-3 px-3 py-2 rounded-xl text-white/30 hover:text-white/70 hover:bg-white/[0.05] transition-all text-sm',
+            'w-full flex items-center gap-3 px-3 py-2 rounded-xl text-white/30 hover:text-white/70 hover:bg-white/[0.05] transition-colors text-sm',
             collapsed && 'justify-center px-2.5'
           )}
         >
@@ -198,7 +204,7 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
         </button>
 
         {/* User */}
-        <div className={cn('flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.05] transition-all cursor-default', collapsed && 'justify-center')}>
+        <div className={cn('flex items-center gap-3 p-2 rounded-xl cursor-default', collapsed && 'justify-center')}>
           <Avatar className="h-8 w-8 shrink-0 ring-1 ring-white/20">
             <AvatarImage src={(profile as any)?.avatar_url || undefined} />
             <AvatarFallback className={cn('text-white text-xs font-bold bg-gradient-to-br', sidebarAccent)}>
@@ -218,7 +224,7 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
           <button
             type="submit"
             className={cn(
-              'w-full flex items-center gap-3 px-3 py-2 rounded-xl text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-all text-sm group',
+              'w-full flex items-center gap-3 px-3 py-2 rounded-xl text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-colors text-sm group',
               collapsed && 'justify-center px-2.5'
             )}
           >
