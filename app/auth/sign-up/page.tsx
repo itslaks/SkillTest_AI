@@ -7,19 +7,25 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { signUp } from '@/lib/actions/auth'
-import { Mail, Lock, User, Building, Sparkles, ArrowRight, CheckCircle2, ShieldCheck, Zap } from 'lucide-react'
+import {
+  Mail, Lock, User, Building, Sparkles, ArrowRight, CheckCircle2,
+  ShieldCheck, Zap, GraduationCap, BookOpen, ChevronRight, Clock, Star
+} from 'lucide-react'
+
+type SignUpRole = 'employee' | 'trainer'
 
 export default function SignUpPage() {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [showPassword, setShowPassword] = useState(false)
+  const [selectedRole, setSelectedRole] = useState<SignUpRole>('employee')
 
   function handleSignUp(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
     const formData = new FormData(event.currentTarget)
-    formData.append('role', 'employee')
+    formData.set('role', selectedRole)
     startTransition(async () => {
       const result = await signUp(formData)
       if (result?.error) setError(result.error)
@@ -27,34 +33,80 @@ export default function SignUpPage() {
     })
   }
 
+  const isTrainer = selectedRole === 'trainer'
+
   return (
     <div className="min-h-screen flex bg-background">
       {/* Left branding panel */}
-      <div className="hidden lg:flex lg:w-[42%] bg-[#0f0f10] relative overflow-hidden flex-col justify-between p-12">
-        <div className="absolute top-0 left-0 w-72 h-72 bg-blue-600/20 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
-        <div className="absolute bottom-0 right-0 w-72 h-72 bg-violet-600/20 rounded-full blur-3xl translate-x-1/2 translate-y-1/2" />
+      <div className={`hidden lg:flex lg:w-[42%] relative overflow-hidden flex-col justify-between p-12 transition-colors duration-500 ${isTrainer ? 'bg-[#0d0a1a]' : 'bg-[#0f0f10]'}`}>
+        {/* Animated gradient blobs */}
+        <div className={`absolute top-0 left-0 w-96 h-96 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 transition-colors duration-500 ${isTrainer ? 'bg-violet-600/25' : 'bg-blue-600/20'}`} />
+        <div className={`absolute bottom-0 right-0 w-96 h-96 rounded-full blur-3xl translate-x-1/2 translate-y-1/2 transition-colors duration-500 ${isTrainer ? 'bg-orange-600/20' : 'bg-violet-600/20'}`} />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full blur-3xl opacity-30 bg-indigo-500/20" />
+
+        {/* 3D floating card element */}
+        <div className="absolute right-8 top-1/2 -translate-y-1/2 perspective-1000">
+          <div
+            className="w-52 h-64 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-sm p-5 shadow-2xl"
+            style={{
+              transform: 'rotateY(-15deg) rotateX(5deg)',
+              transformStyle: 'preserve-3d',
+            }}
+          >
+            <div className={`w-10 h-10 rounded-2xl mb-4 flex items-center justify-center ${isTrainer ? 'bg-violet-500/30' : 'bg-blue-500/30'}`}>
+              {isTrainer ? <BookOpen className="w-5 h-5 text-violet-300" /> : <GraduationCap className="w-5 h-5 text-blue-300" />}
+            </div>
+            <p className="text-[10px] uppercase tracking-widest text-white/40 mb-2">{isTrainer ? 'Trainer Portal' : 'Student Portal'}</p>
+            <p className="text-white font-semibold text-sm leading-tight">{isTrainer ? 'Shape the next generation of talent' : 'Your learning journey starts here'}</p>
+            <div className="mt-4 space-y-2">
+              {(isTrainer
+                ? ['Create quizzes', 'Track batches', 'Score insights']
+                : ['Take assessments', 'Earn badges', 'Track progress']
+              ).map(item => (
+                <div key={item} className="flex items-center gap-2">
+                  <div className={`w-1.5 h-1.5 rounded-full ${isTrainer ? 'bg-violet-400' : 'bg-cyan-400'}`} />
+                  <span className="text-xs text-white/60">{item}</span>
+                </div>
+              ))}
+            </div>
+            {/* 3D shine effect */}
+            <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none" />
+          </div>
+          {/* Shadow cast */}
+          <div className={`absolute -bottom-4 left-1/2 -translate-x-1/2 w-40 h-6 rounded-full blur-xl opacity-60 ${isTrainer ? 'bg-violet-600' : 'bg-blue-600'}`} />
+        </div>
 
         <Link href="/" className="relative z-10 flex items-center gap-3 w-fit">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-lg">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transition-colors duration-500 ${isTrainer ? 'bg-gradient-to-br from-violet-500 to-orange-600' : 'bg-gradient-to-br from-blue-500 to-violet-600'}`}>
             <Sparkles className="w-5 h-5 text-white" />
           </div>
           <span className="text-2xl font-bold text-white tracking-tight">SkillTest</span>
         </Link>
 
-        <div className="relative z-10 space-y-8">
+        <div className="relative z-10 space-y-8 max-w-xs">
           <div>
-            <h2 className="text-4xl font-bold text-white leading-tight mb-4">Your skills,<br />measured right.</h2>
-            <p className="text-white/50 text-lg leading-relaxed">Join thousands of employees taking smarter assessments powered by AI.</p>
+            <h2 className="text-4xl font-bold text-white leading-tight mb-4">
+              {isTrainer ? 'Train smarter,\nnot harder.' : 'Your skills,\nmeasured right.'}
+            </h2>
+            <p className="text-white/50 text-base leading-relaxed">
+              {isTrainer
+                ? 'Join as a trainer and access powerful tools to design, deploy, and measure assessments.'
+                : 'Join thousands of employees taking smarter assessments powered by AI.'}
+            </p>
           </div>
           <div className="space-y-4">
-            {[
+            {(isTrainer ? [
+              { icon: Zap, label: 'Admin-approved access', desc: 'Your account is reviewed before activation' },
+              { icon: ShieldCheck, label: 'Secure & professional', desc: 'Enterprise-grade platform controls' },
+              { icon: Star, label: 'Full analytics suite', desc: 'Measure student outcomes in real time' },
+            ] : [
               { icon: Zap, label: 'AI-powered assessments', desc: 'Smart questions tailored to your role' },
               { icon: ShieldCheck, label: 'Secure & private', desc: 'Your data is always protected' },
               { icon: CheckCircle2, label: 'Instant results', desc: 'Know your score right away' },
-            ].map(item => (
+            ]).map(item => (
               <div key={item.label} className="flex items-center gap-4">
                 <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                  <item.icon className="h-4 w-4 text-blue-400" />
+                  <item.icon className={`h-4 w-4 ${isTrainer ? 'text-violet-400' : 'text-blue-400'}`} />
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-white">{item.label}</p>
@@ -64,27 +116,79 @@ export default function SignUpPage() {
             ))}
           </div>
         </div>
-
       </div>
 
       {/* Right form panel */}
       <div className="flex-1 flex items-center justify-center p-6 md:p-12 relative overflow-y-auto">
         <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-primary/5 pointer-events-none" />
-        <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
+        <div className={`absolute top-0 right-0 w-80 h-80 rounded-full blur-3xl pointer-events-none transition-colors duration-500 ${isTrainer ? 'bg-violet-500/5' : 'bg-blue-500/5'}`} />
 
         <div className="relative z-10 w-full max-w-md py-8">
           {/* Mobile logo */}
           <Link href="/" className="lg:hidden inline-flex items-center gap-2.5 mb-8">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-md">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-md ${isTrainer ? 'bg-gradient-to-br from-violet-500 to-orange-600' : 'bg-gradient-to-br from-blue-500 to-violet-600'}`}>
               <Sparkles className="w-4 h-4 text-white" />
             </div>
             <span className="text-xl font-bold tracking-tight">SkillTest</span>
           </Link>
 
-          <div className="mb-8">
+          <div className="mb-6">
             <h1 className="text-3xl font-bold tracking-tight">Create your account</h1>
-            <p className="text-muted-foreground mt-1.5">Get started with your employee assessments</p>
+            <p className="text-muted-foreground mt-1.5">Choose your role to get started</p>
           </div>
+
+          {/* Role Selector */}
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            <button
+              type="button"
+              onClick={() => setSelectedRole('employee')}
+              className={`relative rounded-2xl border-2 p-4 text-left transition-all duration-200 focus:outline-none ${
+                selectedRole === 'employee'
+                  ? 'border-blue-500 bg-blue-50 shadow-lg shadow-blue-100'
+                  : 'border-border hover:border-blue-200 hover:bg-muted/30'
+              }`}
+            >
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-2 ${selectedRole === 'employee' ? 'bg-blue-500' : 'bg-muted'}`}>
+                <GraduationCap className={`h-5 w-5 ${selectedRole === 'employee' ? 'text-white' : 'text-muted-foreground'}`} />
+              </div>
+              <p className={`font-semibold text-sm ${selectedRole === 'employee' ? 'text-blue-700' : ''}`}>Student</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Instant access</p>
+              {selectedRole === 'employee' && (
+                <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
+                  <CheckCircle2 className="w-3 h-3 text-white" />
+                </div>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedRole('trainer')}
+              className={`relative rounded-2xl border-2 p-4 text-left transition-all duration-200 focus:outline-none ${
+                selectedRole === 'trainer'
+                  ? 'border-violet-500 bg-violet-50 shadow-lg shadow-violet-100'
+                  : 'border-border hover:border-violet-200 hover:bg-muted/30'
+              }`}
+            >
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-2 ${selectedRole === 'trainer' ? 'bg-violet-500' : 'bg-muted'}`}>
+                <BookOpen className={`h-5 w-5 ${selectedRole === 'trainer' ? 'text-white' : 'text-muted-foreground'}`} />
+              </div>
+              <p className={`font-semibold text-sm ${selectedRole === 'trainer' ? 'text-violet-700' : ''}`}>Trainer</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Needs approval</p>
+              {selectedRole === 'trainer' && (
+                <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-violet-500 flex items-center justify-center">
+                  <CheckCircle2 className="w-3 h-3 text-white" />
+                </div>
+              )}
+            </button>
+          </div>
+
+          {/* Trainer info banner */}
+          {isTrainer && (
+            <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-800 mb-4">
+              <Clock className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
+              <p>Your trainer account will be reviewed by an admin before you can log in. You&apos;ll see your status on your next login attempt.</p>
+            </div>
+          )}
 
           <form onSubmit={handleSignUp} className="space-y-4">
             {error && (
@@ -107,7 +211,7 @@ export default function SignUpPage() {
                 <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
                 <Input id="email" name="email" type="email" placeholder="yourname@company.com" required className="pl-11 h-11 rounded-xl border-border/70 bg-muted/30 focus-visible:ring-1 focus-visible:ring-primary/30" />
               </div>
-              <p className="text-xs text-muted-foreground">Use your official work email address</p>
+              <p className="text-xs text-muted-foreground">Use your official work or corporate email</p>
             </div>
 
             <div className="space-y-1.5">
@@ -134,8 +238,19 @@ export default function SignUpPage() {
             </div>
 
             <div className="pt-2">
-              <Button type="submit" disabled={isPending} className="w-full h-11 rounded-xl text-sm font-semibold border-0 bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 shadow-lg shadow-blue-500/20 transition-all group">
-                {isPending ? <><Spinner className="mr-2" />Creating account&hellip;</> : <>Create Account <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-0.5 transition-transform" /></>}
+              <Button
+                type="submit"
+                disabled={isPending}
+                className={`w-full h-11 rounded-xl text-sm font-semibold border-0 shadow-lg transition-all group ${
+                  isTrainer
+                    ? 'bg-gradient-to-r from-violet-600 to-orange-600 hover:from-violet-700 hover:to-orange-700 shadow-violet-500/20'
+                    : 'bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 shadow-blue-500/20'
+                }`}
+              >
+                {isPending
+                  ? <><Spinner className="mr-2" />Creating account&hellip;</>
+                  : <>{isTrainer ? 'Submit Trainer Application' : 'Create Student Account'} <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-0.5 transition-transform" /></>
+                }
               </Button>
             </div>
 

@@ -1,9 +1,9 @@
-import { getAdminAuditLogs, getAdminUsers, updateUserRole } from '@/lib/actions/manager'
+import { getAdminAuditLogs, getAdminUsers, updateUserRole, getPendingTrainerSignups, approveTrainerSignup, rejectTrainerSignup } from '@/lib/actions/manager'
 import { getTrainingGovernanceSettings, updateTrainingGovernanceSettings } from '@/lib/actions/training'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Clock, ShieldCheck, Trophy, Users } from 'lucide-react'
+import { Clock, ShieldCheck, Trophy, Users, CheckCircle2, XCircle, UserCheck, AlertTriangle } from 'lucide-react'
 
 async function updateRoleAction(formData: FormData) {
   'use server'
@@ -15,30 +15,116 @@ async function updateGovernanceAction(formData: FormData) {
   await updateTrainingGovernanceSettings(formData)
 }
 
+async function approveAction(formData: FormData) {
+  'use server'
+  await approveTrainerSignup(formData)
+}
+
+async function rejectAction(formData: FormData) {
+  'use server'
+  await rejectTrainerSignup(formData)
+}
+
 export default async function AdminConsolePage() {
-  const [{ data: users }, { data: auditLogs }, governance] = await Promise.all([
+  const [{ data: users }, { data: auditLogs }, governance, { data: pendingTrainers }] = await Promise.all([
     getAdminUsers(),
     getAdminAuditLogs(),
     getTrainingGovernanceSettings(),
+    getPendingTrainerSignups(),
   ])
 
   return (
     <div className="space-y-8">
-      <section className="rounded-[2rem] border border-zinc-900 bg-black p-6 text-white shadow-[0_40px_120px_rgba(0,0,0,0.55)] md:p-8 dashboard-grid-bg">
-        <div className="flex items-center gap-3">
-          <div className="rounded-2xl bg-white/10 p-3">
-            <ShieldCheck className="h-6 w-6" />
+      {/* Hero Banner */}
+      <section className="rounded-[2rem] border border-zinc-900 bg-black p-6 text-white shadow-[0_40px_120px_rgba(0,0,0,0.55)] md:p-8 dashboard-grid-bg relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-72 h-72 bg-yellow-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-72 h-72 bg-amber-600/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+        <div className="relative z-10 flex items-center gap-4">
+          {/* 3D Gold Crown */}
+          <div className="relative shrink-0">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-yellow-400 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/30" style={{ transform: 'perspective(80px) rotateX(5deg) rotateY(-5deg)' }}>
+              <ShieldCheck className="h-7 w-7 text-white drop-shadow" />
+            </div>
+            <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-yellow-400 flex items-center justify-center text-[9px] font-bold text-yellow-900">⚡</div>
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-[0.35em] text-zinc-500">Maverick TMS</p>
-            <h1 className="text-3xl font-semibold tracking-tight md:text-5xl">Admin governance console</h1>
-            <p className="mt-2 max-w-3xl text-sm text-zinc-400">
-              Manage roles, operational thresholds, topper criteria, and audit-sensitive controls from one place.
+            <p className="text-[10px] uppercase tracking-[0.35em] text-yellow-400/80 mb-1">Maverick TMS — Full Control</p>
+            <h1 className="text-2xl md:text-4xl font-bold tracking-tight">Admin Governance Console</h1>
+            <p className="mt-1 text-sm text-zinc-400">
+              Approve trainer accounts, manage roles, configure thresholds, and review audit logs.
             </p>
           </div>
         </div>
+        {pendingTrainers.length > 0 && (
+          <div className="relative z-10 mt-4 inline-flex items-center gap-2 rounded-full bg-amber-500/20 border border-amber-500/40 px-4 py-2 text-sm font-semibold text-amber-400">
+            <AlertTriangle className="h-4 w-4" />
+            {pendingTrainers.length} trainer sign-up{pendingTrainers.length > 1 ? 's' : ''} waiting for your approval
+          </div>
+        )}
       </section>
 
+      {/* ── PENDING TRAINER SIGN-UPS ── */}
+      <Card className={`border-2 shadow-md ${pendingTrainers.length > 0 ? 'border-amber-300 shadow-amber-100' : 'border-zinc-200'}`}>
+        <CardHeader className={`${pendingTrainers.length > 0 ? 'bg-amber-50' : 'bg-zinc-50'} rounded-t-xl`}>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <UserCheck className={`h-5 w-5 ${pendingTrainers.length > 0 ? 'text-amber-600' : 'text-zinc-500'}`} />
+            Pending Trainer Sign-Ups
+            {pendingTrainers.length > 0 && (
+              <span className="ml-2 inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-500 text-white text-xs font-bold">
+                {pendingTrainers.length}
+              </span>
+            )}
+          </CardTitle>
+          <CardDescription>
+            New trainer registrations waiting for your approval. Approved trainers can log in; rejected ones cannot.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-4 space-y-3">
+          {pendingTrainers.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 p-8 text-center">
+              <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto mb-3" />
+              <p className="font-semibold text-zinc-700">All clear!</p>
+              <p className="text-sm text-zinc-500 mt-1">No pending trainer sign-up requests.</p>
+            </div>
+          ) : (
+            pendingTrainers.map((trainer: any) => (
+              <div key={trainer.id} className="grid gap-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-4 md:grid-cols-[1fr_auto] md:items-center">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-semibold text-zinc-900">{trainer.full_name || 'Unnamed'}</p>
+                    <span className="px-2 py-0.5 rounded-full bg-amber-200 text-amber-800 text-[10px] font-bold uppercase tracking-wide">Pending</span>
+                  </div>
+                  <p className="text-sm text-zinc-600 mt-0.5">{trainer.email}</p>
+                  {trainer.department && (
+                    <p className="text-xs text-zinc-500 mt-0.5">Dept: {trainer.department}</p>
+                  )}
+                  <p className="text-xs text-zinc-400 mt-1">
+                    Applied {new Date(trainer.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </p>
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  <form action={approveAction}>
+                    <input type="hidden" name="user_id" value={trainer.id} />
+                    <Button type="submit" size="sm" className="rounded-full bg-emerald-600 text-white hover:bg-emerald-700 gap-1.5">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      Approve
+                    </Button>
+                  </form>
+                  <form action={rejectAction}>
+                    <input type="hidden" name="user_id" value={trainer.id} />
+                    <Button type="submit" size="sm" variant="outline" className="rounded-full border-red-200 text-red-600 hover:bg-red-50 gap-1.5">
+                      <XCircle className="h-3.5 w-3.5" />
+                      Reject
+                    </Button>
+                  </form>
+                </div>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── USER ROLE MANAGEMENT + TMS CONTROLS ── */}
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <Card className="border-zinc-200 shadow-sm">
           <CardHeader>
@@ -46,7 +132,9 @@ export default async function AdminConsolePage() {
               <Users className="h-5 w-5" />
               Role Management
             </CardTitle>
-            <CardDescription>Add users through employee import, then promote staff into Trainer, Training Coordinator, Manager, or Admin roles.</CardDescription>
+            <CardDescription>
+              Promote staff into Trainer, Training Coordinator, Manager, or Admin roles. Employee accounts are managed via the import system.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {users.length === 0 ? (
@@ -80,7 +168,9 @@ export default async function AdminConsolePage() {
               <Trophy className="h-5 w-5" />
               TMS Controls
             </CardTitle>
-            <CardDescription>These values drive cut-off alerts, feedback windows, and reproducible topper calculations.</CardDescription>
+            <CardDescription>
+              These values drive cut-off alerts, feedback windows, and reproducible topper calculations.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form action={updateGovernanceAction} className="space-y-4">
@@ -110,6 +200,7 @@ export default async function AdminConsolePage() {
         </Card>
       </div>
 
+      {/* ── AUDIT LOG ── */}
       <Card className="border-zinc-200 shadow-sm">
         <CardHeader>
           <CardTitle>Admin Audit Log</CardTitle>
@@ -125,7 +216,7 @@ export default async function AdminConsolePage() {
                 <Badge variant="outline">{entry.target_table || 'system'}</Badge>
               </div>
               <p className="mt-1 text-sm text-zinc-500">
-                {entry.actor?.full_name || entry.actor?.email || 'System'} - {new Date(entry.created_at).toLocaleString()}
+                {entry.actor?.full_name || entry.actor?.email || 'System'} — {new Date(entry.created_at).toLocaleString()}
               </p>
             </div>
           ))}

@@ -16,6 +16,9 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   ShieldCheck,
+  Crown,
+  BookOpen,
+  GraduationCap,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { signOut } from '@/lib/actions/auth'
@@ -41,15 +44,31 @@ const navigation = [
       { name: 'Leaderboard', href: '/manager/leaderboard', icon: Trophy, color: 'text-amber-400', bg: 'bg-amber-400/10', activeBg: 'bg-amber-500', description: 'Rankings & scores' },
       { name: 'Analytics & AI', href: '/manager/analytics', icon: Brain, color: 'text-pink-400', bg: 'bg-pink-400/10', activeBg: 'bg-pink-500', description: 'AI-powered insights' },
       { name: 'Reports', href: '/manager/reports', icon: BarChart3, color: 'text-orange-400', bg: 'bg-orange-400/10', activeBg: 'bg-orange-500', description: 'Download reports' },
-      { name: 'Admin Console', href: '/manager/admin', icon: ShieldCheck, color: 'text-lime-400', bg: 'bg-lime-400/10', activeBg: 'bg-lime-500', description: 'Roles & controls' },
+      { name: 'Admin Console', href: '/manager/admin', icon: ShieldCheck, color: 'text-yellow-400', bg: 'bg-yellow-400/10', activeBg: 'bg-yellow-500', description: 'Roles & controls' },
     ]
   },
 ]
+
+function getRoleBadge(role: string | undefined) {
+  switch (role) {
+    case 'admin':
+      return { label: 'Admin', icon: Crown, color: 'text-yellow-400', bg: 'bg-yellow-500/15 border-yellow-500/30' }
+    case 'trainer':
+      return { label: 'Trainer', icon: BookOpen, color: 'text-violet-400', bg: 'bg-violet-500/15 border-violet-500/30' }
+    case 'manager':
+    case 'training_coordinator':
+      return { label: 'Manager', icon: LayoutDashboard, color: 'text-sky-400', bg: 'bg-sky-500/15 border-sky-500/30' }
+    default:
+      return { label: 'Staff', icon: Users, color: 'text-zinc-400', bg: 'bg-zinc-500/15 border-zinc-500/30' }
+  }
+}
 
 export function ManagerSidebar({ profile }: ManagerSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
+  const roleBadge = getRoleBadge(profile?.role)
+  const RoleBadgeIcon = roleBadge.icon
 
   useEffect(() => {
     document.documentElement.style.setProperty('--manager-sidebar-width', collapsed ? '68px' : '16rem')
@@ -57,6 +76,13 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
       document.documentElement.style.removeProperty('--manager-sidebar-width')
     }
   }, [collapsed])
+
+  // Determine sidebar accent color based on role
+  const sidebarAccent = profile?.role === 'admin'
+    ? 'from-yellow-500 to-amber-600'
+    : profile?.role === 'trainer'
+      ? 'from-violet-500 to-orange-600'
+      : 'from-blue-500 to-violet-600'
 
   return (
     <aside
@@ -69,23 +95,40 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
       {/* Logo */}
       <div className={cn('flex h-16 items-center border-b border-white/[0.06] px-4', collapsed ? 'justify-center' : 'gap-3')}>
         <button
-          onClick={() => router.push('/manager')}
+          onClick={() => router.push(profile?.role === 'admin' ? '/manager/admin' : '/manager')}
           className="flex items-center gap-3 group"
         >
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/25 group-hover:shadow-blue-500/40 transition-all">
-            <Sparkles className="w-4.5 h-4.5 text-white" />
+          <div className={cn(
+            'w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-lg transition-all',
+            `bg-gradient-to-br ${sidebarAccent}`
+          )}>
+            <Sparkles className="w-4 h-4 text-white" />
           </div>
           {!collapsed && (
             <div className="leading-none">
               <span className="font-bold text-[15px] text-white tracking-tight">Maverick TMS</span>
-              <p className="text-[10px] text-white/30 mt-0.5 font-medium tracking-wide uppercase">{profile?.role === 'trainer' ? 'Trainer' : 'Control'}</p>
+              <p className="text-[10px] text-white/30 mt-0.5 font-medium tracking-wide uppercase">
+                {profile?.role === 'trainer' ? 'Trainer Portal' : profile?.role === 'admin' ? 'Admin Console' : 'Control'}
+              </p>
             </div>
           )}
         </button>
       </div>
 
+      {/* Role badge */}
+      {!collapsed && (
+        <div className="px-4 pt-3 pb-1">
+          <div className={cn('flex items-center gap-1.5 rounded-xl border px-3 py-1.5', roleBadge.bg)}>
+            <RoleBadgeIcon className={cn('h-3.5 w-3.5 shrink-0', roleBadge.color)} />
+            <span className={cn('text-[11px] font-semibold uppercase tracking-widest', roleBadge.color)}>
+              {roleBadge.label}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4 px-2.5 space-y-5">
+      <nav className="flex-1 overflow-y-auto py-3 px-2.5 space-y-5">
         {navigation.map((group) => (
           <div key={group.section}>
             {!collapsed && (
@@ -93,7 +136,11 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
             )}
             <div className="space-y-0.5">
               {group.items.filter((item) => {
-                if (profile?.role === 'trainer') return ['/manager', '/manager/operations'].includes(item.href)
+                // Trainer only sees Dashboard and Training Ops
+                if (profile?.role === 'trainer') {
+                  return ['/manager', '/manager/operations', '/manager/quizzes', '/manager/employees'].includes(item.href)
+                }
+                // Admin Console only for admins
                 if (item.href === '/manager/admin') return profile?.role === 'admin'
                 return true
               }).map((item) => {
@@ -154,13 +201,13 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
         <div className={cn('flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.05] transition-all cursor-default', collapsed && 'justify-center')}>
           <Avatar className="h-8 w-8 shrink-0 ring-1 ring-white/20">
             <AvatarImage src={(profile as any)?.avatar_url || undefined} />
-            <AvatarFallback className="bg-gradient-to-br from-blue-500 to-violet-600 text-white text-xs font-bold">
+            <AvatarFallback className={cn('text-white text-xs font-bold bg-gradient-to-br', sidebarAccent)}>
               {profile?.full_name?.charAt(0) || profile?.email?.charAt(0) || 'M'}
             </AvatarFallback>
           </Avatar>
           {!collapsed && (
             <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-semibold text-white/90 truncate">{profile?.full_name || 'Manager'}</p>
+              <p className="text-[13px] font-semibold text-white/90 truncate">{profile?.full_name || 'Staff'}</p>
               <p className="text-[11px] text-white/30 truncate">{profile?.email}</p>
             </div>
           )}

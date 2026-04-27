@@ -4,6 +4,40 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { requireAdmin, requireManager } from '@/lib/rbac'
 import { revalidatePath } from 'next/cache'
 import type { ApiResponse, EmployeeImport, EmployeeImportError, EmployeeImportResult } from '@/lib/types/database'
+import { approveTrainer, rejectTrainer } from '@/lib/actions/auth'
+
+// ─── Pending Trainer Sign-Ups (Admin only) ────────────────────────────
+
+export async function getPendingTrainerSignups() {
+  await requireAdmin()
+  const admin = createAdminClient()
+  const { data, error } = await admin
+    .from('profiles')
+    .select('id, email, full_name, department, created_at, rejection_reason')
+    .eq('role', 'trainer')
+    .eq('approval_status', 'pending')
+    .order('created_at', { ascending: false })
+
+  if (error) return { error: error.message, data: [] }
+  return { data: data || [] }
+}
+
+export async function approveTrainerSignup(formData: FormData) {
+  const userId = String(formData.get('user_id') || '')
+  if (!userId) return { error: 'User ID required' }
+  const result = await approveTrainer(userId)
+  revalidatePath('/manager/admin')
+  return result
+}
+
+export async function rejectTrainerSignup(formData: FormData) {
+  const userId = String(formData.get('user_id') || '')
+  const reason = String(formData.get('reason') || '')
+  if (!userId) return { error: 'User ID required' }
+  const result = await rejectTrainer(userId, reason)
+  revalidatePath('/manager/admin')
+  return result
+}
 
 export async function getAdminUsers() {
   await requireAdmin()

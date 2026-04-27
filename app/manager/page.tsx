@@ -5,10 +5,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { DashboardSignalShowcase } from '@/components/insights/dashboard-signal-showcase'
-import { 
-  FileQuestion, 
-  Users, 
-  TrendingUp, 
+import {
+  FileQuestion,
+  Users,
+  TrendingUp,
   Clock,
   Plus,
   ArrowRight,
@@ -26,11 +26,12 @@ import { getQuizStats } from '@/lib/actions/quiz'
 
 export default async function ManagerDashboard() {
   const { userId, role } = await requireTrainingStaff()
-  if (role === 'trainer') redirect('/manager/operations')
+  // Admin users get redirected to admin console
+  if (role === 'admin') redirect('/manager/admin')
 
   const supabase = await createClient()
   const adminClient = createAdminClient()
-  
+
   const { data: profile } = await adminClient
     .from('profiles')
     .select('full_name')
@@ -38,6 +39,7 @@ export default async function ManagerDashboard() {
     .single()
 
   const { data: stats } = await getQuizStats()
+
   // Get recent quizzes
   const { data: recentQuizzes } = await supabase
     .from('quizzes')
@@ -179,23 +181,31 @@ export default async function ManagerDashboard() {
       <div className="relative overflow-hidden rounded-[2rem] border border-zinc-900 bg-black p-6 md:p-8 text-white shadow-[0_40px_120px_rgba(0,0,0,0.55)] dashboard-grid-bg">
         <div className="absolute top-0 right-0 -mt-20 -mr-20 w-80 h-80 bg-white/10 rounded-full blur-3xl" />
         <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-80 h-80 bg-white/5 rounded-full blur-3xl" />
+        {role === 'trainer' && (
+          <div className="absolute top-0 right-0 -mt-16 -mr-16 w-64 h-64 bg-violet-500/15 rounded-full blur-3xl" />
+        )}
         <div className="relative z-10">
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <div className="px-3 py-1 rounded-full bg-white/20 text-xs font-semibold tracking-wide uppercase">
-                Manager Dashboard
+              <div className={`px-3 py-1 rounded-full text-xs font-semibold tracking-wide uppercase ${
+                role === 'trainer' ? 'bg-violet-500/30 text-violet-200' : 'bg-white/20'
+              }`}>
+                {role === 'trainer' ? '👨‍🏫 Trainer Dashboard' : 'Manager Dashboard'}
               </div>
             </div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-2">
               Welcome back, {profile?.full_name?.split(' ')[0] || 'Manager'}!
             </h1>
             <p className="text-white/75 max-w-md text-sm md:text-base">
-              Here&apos;s an overview of your assessments and employee performance today.
+              {role === 'trainer'
+                ? 'Manage your training batches, sessions, and track student performance.'
+                : "Here's an overview of your assessments and employee performance today."
+              }
             </p>
             <div className="mt-6 flex gap-2 flex-wrap">
-              <Button 
-                asChild 
-                size="lg" 
+              <Button
+                asChild
+                size="lg"
                 className="bg-white text-blue-700 hover:bg-blue-50 shadow-lg font-semibold"
               >
                 <Link href="/manager/quizzes/new">
@@ -203,8 +213,8 @@ export default async function ManagerDashboard() {
                   Create Quiz
                 </Link>
               </Button>
-              <Button 
-                asChild 
+              <Button
+                asChild
                 variant="outline"
                 size="lg"
                 className="border-white/30 text-white hover:bg-white/10 bg-white/10"
@@ -459,7 +469,7 @@ export default async function ManagerDashboard() {
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="font-semibold text-sm group-hover:text-yellow-600 transition-colors">Leaderboard</h3>
-                <p className="text-xs text-muted-foreground hidden md:block">Rankings & scores</p>
+                <p className="text-xs text-muted-foreground hidden md:block">Rankings &amp; scores</p>
               </div>
               <ArrowRight className="hidden lg:block h-5 w-5 text-muted-foreground group-hover:text-yellow-600 group-hover:translate-x-1 transition-all" />
             </CardContent>
@@ -472,8 +482,8 @@ export default async function ManagerDashboard() {
                 <Brain className="h-5 w-5 md:h-6 md:w-6 text-purple-600" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-sm group-hover:text-purple-600 transition-colors">Analytics & AI</h3>
-                <p className="text-xs text-muted-foreground hidden md:block">Import & analyze</p>
+                <h3 className="font-semibold text-sm group-hover:text-purple-600 transition-colors">Analytics &amp; AI</h3>
+                <p className="text-xs text-muted-foreground hidden md:block">Import &amp; analyze</p>
               </div>
               <ArrowRight className="hidden lg:block h-5 w-5 text-muted-foreground group-hover:text-purple-600 group-hover:translate-x-1 transition-all" />
             </CardContent>
@@ -514,7 +524,7 @@ export default async function ManagerDashboard() {
             {recentQuizzes && recentQuizzes.length > 0 ? (
               <div className="space-y-3">
                 {recentQuizzes.map((quiz: any) => (
-                  <Link 
+                  <Link
                     key={quiz.id}
                     href={`/manager/quizzes/${quiz.id}`}
                     className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
@@ -528,8 +538,8 @@ export default async function ManagerDashboard() {
                       </div>
                     </div>
                     <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      quiz.is_active 
-                        ? 'bg-green-100 text-green-700' 
+                      quiz.is_active
+                        ? 'bg-green-100 text-green-700'
                         : 'bg-muted text-muted-foreground'
                     }`}>
                       {quiz.is_active ? 'Active' : 'Draft'}
@@ -548,7 +558,6 @@ export default async function ManagerDashboard() {
             )}
           </CardContent>
         </Card>
-
       </div>
 
       {/* Recent Activity */}
@@ -561,8 +570,8 @@ export default async function ManagerDashboard() {
           {recentAttempts && recentAttempts.length > 0 ? (
             <div className="space-y-4">
               {recentAttempts.map((attempt: any) => (
-                <div 
-                  key={attempt.id} 
+                <div
+                  key={attempt.id}
                   className="flex items-center justify-between p-3 rounded-lg border"
                 >
                   <div className="flex items-center gap-3">

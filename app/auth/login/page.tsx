@@ -7,7 +7,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { signIn } from '@/lib/actions/auth'
-import { ArrowRight, CheckCircle2, Lock, Mail, ShieldCheck, Sparkles, Zap } from 'lucide-react'
+import {
+  ArrowRight, CheckCircle2, Lock, Mail, ShieldCheck, Sparkles, Zap,
+  GraduationCap, BookOpen, Crown
+} from 'lucide-react'
 
 function LoginContent() {
   const router = useRouter()
@@ -31,9 +34,11 @@ function LoginContent() {
 
   return (
     <div className="min-h-screen flex bg-background">
+      {/* Left panel */}
       <div className="hidden lg:flex lg:w-[42%] bg-black relative overflow-hidden flex-col justify-between p-12">
         <div className="absolute top-0 left-0 w-72 h-72 bg-blue-600/20 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
         <div className="absolute bottom-0 right-0 w-72 h-72 bg-violet-600/20 rounded-full blur-3xl translate-x-1/2 translate-y-1/2" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl" />
 
         <Link href="/" className="relative z-10 flex items-center gap-3 w-fit">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-lg">
@@ -46,15 +51,53 @@ function LoginContent() {
           <div>
             <h2 className="text-4xl font-bold text-white leading-tight mb-4">Welcome back.</h2>
             <p className="text-white/50 text-lg leading-relaxed">
-              Managers and employees can both pick up right where they left off with guided actions and clear progress.
+              One platform, three roles. Everyone picks up right where they left off.
             </p>
           </div>
-          <div className="space-y-4">
+
+          {/* Role cards with 3D effect */}
+          <div className="space-y-3">
             {[
-              { icon: Zap, label: 'Continue your journey', desc: 'Resume quizzes and workflows without hunting around' },
-              { icon: ShieldCheck, label: 'Secure sign in', desc: 'Password recovery and updates are now more direct and reliable' },
-              { icon: CheckCircle2, label: 'Track your growth', desc: 'Scores, readiness, badges, and guided next steps stay visible' },
-            ].map((item) => (
+              {
+                icon: Crown,
+                role: 'Admin',
+                desc: 'Full governance control — manage users, roles & platform settings',
+                color: 'text-yellow-400',
+                bg: 'bg-yellow-500/10 border-yellow-500/20',
+              },
+              {
+                icon: BookOpen,
+                role: 'Trainer',
+                desc: 'Create quizzes, manage batches, track student performance',
+                color: 'text-violet-400',
+                bg: 'bg-violet-500/10 border-violet-500/20',
+              },
+              {
+                icon: GraduationCap,
+                role: 'Student',
+                desc: 'Take assessments, earn badges, track your learning journey',
+                color: 'text-cyan-400',
+                bg: 'bg-cyan-500/10 border-cyan-500/20',
+              },
+            ].map(item => (
+              <div key={item.role} className={`flex items-center gap-4 rounded-2xl border p-3 ${item.bg}`}>
+                <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center shrink-0">
+                  <item.icon className={`h-4 w-4 ${item.color}`} />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-white">{item.role}</p>
+                  <p className="text-xs text-white/40">{item.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="space-y-3">
+            {[
+              { icon: Zap, label: 'Continue your journey', desc: 'Resume quizzes and workflows seamlessly' },
+              { icon: ShieldCheck, label: 'Secure sign in', desc: 'Password recovery is fast and reliable' },
+              { icon: CheckCircle2, label: 'Track your growth', desc: 'Scores, badges & readiness always visible' },
+            ].map(item => (
               <div key={item.label} className="flex items-center gap-4">
                 <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
                   <item.icon className="h-4 w-4 text-blue-400" />
@@ -69,6 +112,7 @@ function LoginContent() {
         </div>
       </div>
 
+      {/* Right form panel */}
       <div className="flex-1 flex items-center justify-center p-6 md:p-12 relative overflow-y-auto">
         <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-primary/5 pointer-events-none" />
         <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
@@ -91,7 +135,7 @@ function LoginContent() {
             {resetSuccess && (
               <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>Your password was updated. Sign in with the new password you just created.</span>
+                <span>Your password was updated. Sign in with your new password.</span>
               </div>
             )}
             {error && (
@@ -105,7 +149,14 @@ function LoginContent() {
               <label htmlFor="email" className="text-sm font-semibold">Email Address</label>
               <div className="relative">
                 <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
-                <Input id="email" name="email" type="email" placeholder="yourname@company.com" required className="pl-11 h-11 rounded-xl border-border/70 bg-muted/30 focus-visible:ring-1 focus-visible:ring-primary/30" />
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  placeholder="yourname@company.com"
+                  required
+                  className="pl-11 h-11 rounded-xl border-border/70 bg-muted/30 focus-visible:ring-1 focus-visible:ring-primary/30"
+                />
               </div>
             </div>
 
@@ -113,20 +164,40 @@ function LoginContent() {
               <label htmlFor="password" className="text-sm font-semibold">Password</label>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
-                <Input id="password" name="password" type={showPassword ? 'text' : 'password'} placeholder="Enter your password" required className="pl-11 pr-16 h-11 rounded-xl border-border/70 bg-muted/30 focus-visible:ring-1 focus-visible:ring-primary/30" />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground font-medium transition-colors">
+                <Input
+                  id="password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Enter your password"
+                  required
+                  className="pl-11 pr-16 h-11 rounded-xl border-border/70 bg-muted/30 focus-visible:ring-1 focus-visible:ring-primary/30"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground font-medium transition-colors"
+                >
                   {showPassword ? 'Hide' : 'Show'}
                 </button>
               </div>
               <div className="flex justify-between mt-1">
                 <span className="text-xs text-muted-foreground">Need help signing in?</span>
-                <Link href="/auth/reset-password" className="text-xs text-primary font-semibold hover:underline underline-offset-4">Forgot password?</Link>
+                <Link href="/auth/reset-password" className="text-xs text-primary font-semibold hover:underline underline-offset-4">
+                  Forgot password?
+                </Link>
               </div>
             </div>
 
             <div className="pt-2">
-              <Button type="submit" disabled={isPending} className="w-full h-11 rounded-xl text-sm font-semibold border-0 bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 shadow-lg shadow-blue-500/20 transition-all group">
-                {isPending ? <><Spinner className="mr-2" />Signing in...</> : <>Sign In <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-0.5 transition-transform" /></>}
+              <Button
+                type="submit"
+                disabled={isPending}
+                className="w-full h-11 rounded-xl text-sm font-semibold border-0 bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 shadow-lg shadow-blue-500/20 transition-all group"
+              >
+                {isPending
+                  ? <><Spinner className="mr-2" />Signing in...</>
+                  : <>Sign In <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-0.5 transition-transform" /></>
+                }
               </Button>
             </div>
           </form>
@@ -134,7 +205,9 @@ function LoginContent() {
           <div className="mt-8 pt-6 border-t border-border/50 text-center">
             <p className="text-sm text-muted-foreground">
               Don&apos;t have an account?{' '}
-              <Link href="/auth/sign-up" className="text-primary font-semibold hover:underline underline-offset-4">Sign up</Link>
+              <Link href="/auth/sign-up" className="text-primary font-semibold hover:underline underline-offset-4">
+                Sign up as Student or Trainer
+              </Link>
             </p>
           </div>
         </div>

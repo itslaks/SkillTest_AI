@@ -11,6 +11,7 @@ import {
   updateProfileSchema,
 } from '@/lib/security/validation'
 import { getAuthRedirectUrl, getSiteUrl } from '@/lib/security/env'
+import { revalidatePath } from 'next/cache'
 
 export async function signUp(formData: FormData) {
   // Validate and sanitize all inputs
@@ -19,36 +20,54 @@ export async function signUp(formData: FormData) {
     return { error: parsed.error }
   }
 
-  const { email, password, fullName, employeeId, department } = parsed.data
+  const { email, password, fullName, employeeId, department, role } = parsed.data
 
-  // Always enforce employee role on sign-up – manager accounts are created by admins only
-  const role: UserRole = 'employee'
+  // Determine approval status:
+  // trainers need admin approval; employees get instant access
+  const approvalStatus = role === 'trainer' ? 'pending' : 'approved'
 
   const supabase = await createClient()
 
-  const { error } = await supabase.auth.signUp({
+  const { error, data: signUpData } = await supabase.auth.signUp({
     email,
     password,
-    options:
-      {
-        emailRedirectTo: getAuthRedirectUrl(),
-        data: {
-          full_name: fullName,
-          employee_id: employeeId,
-          role,
-          department,
-        },
-      }
+    options: {
+      emailRedirectTo: getAuthRedirectUrl(),
+      data: {
+        full_name: fullName,
+        employee_id: employeeId,
+        role,
+        department,
+        approval_status: approvalStatus,
+      },
+    }
   })
 
   if (error) {
     return { error: error.message }
   }
 
-  // After sign up, sync profile full_name if missing
-  const { data: { user } } = await supabase.auth.getUser();
-  if (user) {
-    await syncProfileFromUserMetadata(user.id, user.user_metadata);
+  // After sign up, update the profile with role and approval_status
+  if (signUpData?.user) {
+    const adminClient = createAdminClient()
+    await adminClient
+      .from('profiles')
+      .update({
+        role: role as UserRole,
+        approval_status: approvalStatus,
+        full_name: fullName,
+        department: department || null,
+        employee_id: employeeId || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', signUpData.user.id)
+  }
+
+  if (role === 'trainer') {
+    return {
+      success: true,
+      redirectTo: `/auth/sign-up-success?email=${encodeURIComponent(email)}&role=trainer`
+    }
   }
 
   return { success: true, redirectTo: `/auth/sign-up-success?email=${encodeURIComponent(email)}` }
@@ -77,22 +96,45 @@ export async function signIn(formData: FormData) {
 
   if (error) {
     if (/invalid login credentials/i.test(error.message)) {
-      return { error: 'Invalid email or password. Please check the email and password exactly as shared for this account.' }
+      return { error: 'Invalid email or password. Please check your credentials.' }
     }
     return { error: error.message }
   }
 
-  // Get the profile to check the actual role from database
+  // Get the profile to check role AND approval_status
   const adminClient = createAdminClient()
   const { data: profile } = await adminClient
     .from('profiles')
-    .select('role')
+    .select('role, approval_status')
     .eq('id', data.user.id)
     .single()
 
-  // Use profile role if available, fallback to user_metadata
   const role = profile?.role || data.user?.user_metadata?.role || 'employee'
-  const defaultRedirect = role === 'manager' || role === 'admin' ? '/manager' : '/employee'
+  const approvalStatus = profile?.approval_status || 'approved'
+
+  // Block trainer login if pending approval
+  if (role === 'trainer' && approvalStatus === 'pending') {
+    await supabase.auth.signOut()
+    return { error: 'Your trainer account is pending admin approval. You will be notified once approved.' }
+  }
+
+  // Block if rejected
+  if (role === 'trainer' && approvalStatus === 'rejected') {
+    await supabase.auth.signOut()
+    return { error: 'Your trainer account request was rejected. Please contact the admin for more information.' }
+  }
+
+  // Role-based redirect
+  let defaultRedirect: string
+  if (role === 'admin') {
+    defaultRedirect = '/manager/admin'
+  } else if (role === 'manager' || role === 'training_coordinator') {
+    defaultRedirect = '/manager'
+  } else if (role === 'trainer') {
+    defaultRedirect = '/manager'
+  } else {
+    defaultRedirect = '/employee'
+  }
 
   return { success: true, redirectTo: redirectTo || defaultRedirect }
 }
@@ -194,6 +236,7 @@ export async function updateProfile(formData: FormData) {
 
   return { success: true }
 }
+
 export async function resendVerificationEmail(email: string) {
   const supabase = await createClient()
 
@@ -239,4 +282,72 @@ export async function sendPasswordReset(formData: FormData) {
   });
   if (error) return { error: error.message };
   return { success: true };
+}
+
+// ─── Trainer Approval Actions (called from Admin Console) ─────────────
+
+export async function approveTrainer(userId: string) {
+  const adminClient = createAdminClient()
+
+  // Check caller is admin
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { data: callerProfile } = await adminClient
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (callerProfile?.role !== 'admin') {
+    return { error: 'Only admins can approve trainer accounts' }
+  }
+
+  const { error } = await adminClient
+    .from('profiles')
+    .update({
+      approval_status: 'approved',
+      rejection_reason: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/manager/admin')
+  return { success: true }
+}
+
+export async function rejectTrainer(userId: string, reason?: string) {
+  const adminClient = createAdminClient()
+
+  // Check caller is admin
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { data: callerProfile } = await adminClient
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (callerProfile?.role !== 'admin') {
+    return { error: 'Only admins can reject trainer accounts' }
+  }
+
+  const { error } = await adminClient
+    .from('profiles')
+    .update({
+      approval_status: 'rejected',
+      rejection_reason: reason || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/manager/admin')
+  return { success: true }
 }

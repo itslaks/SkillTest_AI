@@ -2,13 +2,14 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { requireTrainingStaff } from '@/lib/rbac'
 import { ManagerSidebar } from '@/components/manager/sidebar'
 import { ManagerHeader } from '@/components/manager/header'
+import { redirect } from 'next/navigation'
 
 export default async function ManagerLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const { userId } = await requireTrainingStaff()
+  const { userId, role } = await requireTrainingStaff()
 
   const supabase = createAdminClient()
   const { data: profile } = await supabase
@@ -16,6 +17,9 @@ export default async function ManagerLayout({
     .select('*')
     .eq('id', userId)
     .single()
+
+  // Admin visiting /manager root → go to admin console
+  // (This is handled in signIn, but just in case someone navigates directly)
 
   return (
     <div className="min-h-screen bg-background text-foreground noise-overlay">

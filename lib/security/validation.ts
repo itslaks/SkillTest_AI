@@ -55,18 +55,16 @@ const optionalSafeUrl = z
   .nullable()
   .or(z.literal('').transform(() => null))
 
-// ─── Role enum ────────────────────────────────────────────────────────
-
 // ─── Auth schemas ─────────────────────────────────────────────────────
 
-/** Sign-up schema – only 'employee' role is accepted via self-registration */
+/** Sign-up schema – self-registration allowed for 'employee' and 'trainer' only */
 export const signUpSchema = z
   .object({
     email: safeEmail,
     password: safePassword,
     fullName: sanitizedString(150),
     employeeId: sanitizedString(50).optional().nullable().or(z.literal('').transform(() => null)),
-    role: z.literal('employee').default('employee'),
+    role: z.enum(['employee', 'trainer']).default('employee'),
     department: sanitizedString(150).optional().nullable().or(z.literal('').transform(() => null)),
   })
   .strict()
