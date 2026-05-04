@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireTrainingStaffForApi } from '@/lib/rbac'
+import { sendEmail, buildUploadConfirmationEmail } from '@/lib/email'
 import { NextRequest, NextResponse } from 'next/server'
 
 const VALID_STATUSES = new Set(['present', 'absent', 'late', 'excused'])
@@ -130,7 +131,7 @@ export async function POST(request: NextRequest) {
     error_log: errors.length ? errors : null,
   })
 
-  await admin.from('training_notifications').insert({
+  const { data: notification } = await admin.from('training_notifications').insert({
     batch_id: session.batch_id,
     session_id: sessionId,
     title: `Attendance uploaded: ${session.title}`,
@@ -140,7 +141,29 @@ export async function POST(request: NextRequest) {
     delivery_status: 'sent',
     sent_at: new Date().toISOString(),
     created_by: userId,
-  })
+  }).select('id').single()
+
+  // Send real email confirmation to uploader
+  const { data: uploaderProfile } = await admin.from('profiles').select('full_name, email').eq('id', userId).single()
+  if (uploaderProfile?.email) {
+    const html = buildUploadConfirmationEmail({
+      uploaderName: uploaderProfile.full_name || uploaderProfile.email,
+      uploadType: 'attendance',
+      batchTitle: (session.batch as any)?.title || 'Training Batch',
+      recordCount: rows.length,
+      errorCount: errors.length,
+    })
+    await sendEmail({ to: uploaderProfile.email, subject: `✅ Attendance Upload Confirmed — ${(session.batch as any)?.title || session.title}`, html })
+    if (notification?.id) {
+      await admin.from('training_notification_dispatch_log').insert({
+        notification_id: notification.id,
+        recipient_email: uploaderProfile.email,
+        channel: 'email',
+        provider_status: 'sent',
+        provider_message: 'Sent via Resend',
+      })
+    }
+  }
 
   return NextResponse.json({
     success: true,

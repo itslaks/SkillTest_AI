@@ -17,9 +17,11 @@ import {
   XCircle,
   Target,
   FileSpreadsheet,
+  FileText,
 } from 'lucide-react'
 import { DownloadReportButton } from '@/components/manager/download-report-button'
 import { QuickDeleteButton } from '@/components/manager/quick-delete-button'
+import { TmsBatchDownloads } from '@/components/manager/tms-batch-downloads'
 
 export default async function ManagerReportsPage() {
   const { userId } = await requireManager()
@@ -133,15 +135,27 @@ export default async function ManagerReportsPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" asChild>
-            <a href="/api/reports/training-ops/download">
+            <a href="/api/export/comprehensive-report">
               <FileSpreadsheet className="mr-2 h-4 w-4" />
-              Training Ops Excel
+              Full TMS Report (Excel)
             </a>
           </Button>
           <Button variant="outline" asChild>
-            <a href="/api/reports/training-ops/pdf">
-              <FileSpreadsheet className="mr-2 h-4 w-4" />
-              Training Ops PDF
+            <a href="/api/export/pdf?type=consolidated">
+              <FileText className="mr-2 h-4 w-4" />
+              Consolidated PDF
+            </a>
+          </Button>
+          <Button variant="outline" asChild>
+            <a href="/api/export/toppers">
+              <Trophy className="mr-2 h-4 w-4" />
+              All Toppers (Excel)
+            </a>
+          </Button>
+          <Button variant="outline" asChild>
+            <a href="/api/export/pdf?type=toppers">
+              <FileText className="mr-2 h-4 w-4" />
+              Toppers PDF
             </a>
           </Button>
           <DownloadReportButton quizId="all" variant="all" />
@@ -152,22 +166,43 @@ export default async function ManagerReportsPage() {
         <CardHeader>
           <CardTitle>BRD-Aligned Downloads</CardTitle>
           <CardDescription className="text-zinc-400">
-            The Excel workbook includes batch summary, candidate status, attendance, assessments, uploads, topper criteria, topper candidates, feedback, and notifications.
+            All reports use real live data. Topper reports include configurable scoring criteria sheets.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-3">
-          {[
-            { title: 'Consolidated batch report', body: 'Filter in Excel by discontinued, not cleared, offered, and onboarded candidates.' },
-            { title: 'Transparent topper report', body: 'Topper score uses configured assessment/project weights and minimum attendance.' },
-            { title: 'Governance audit report', body: 'Attendance upload logs, notification records, and feedback outcomes stay exportable.' },
-          ].map((item) => (
-            <div key={item.title} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="font-semibold">{item.title}</p>
-              <p className="mt-2 text-sm text-zinc-400">{item.body}</p>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-3">
+            {[
+              { title: 'Consolidated batch report', body: 'Filter in Excel by discontinued, not cleared, offered, and onboarded candidates.' },
+              { title: 'Transparent topper report', body: 'Topper score uses configured assessment/project weights and minimum attendance.' },
+              { title: 'Governance audit report', body: 'Attendance upload logs, notification records, and feedback outcomes stay exportable.' },
+            ].map((item) => (
+              <div key={item.title} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p className="font-semibold">{item.title}</p>
+                <p className="mt-2 text-sm text-zinc-400">{item.body}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Consolidated filter downloads */}
+          <div className="border-t border-white/10 pt-4">
+            <p className="text-xs uppercase tracking-[0.25em] text-zinc-400 mb-3">Consolidated Report — Filter by Status</p>
+            <div className="flex flex-wrap gap-2">
+              {(['all', 'discontinued', 'not_cleared', 'offered', 'onboarded'] as const).map((filter) => (
+                <a key={filter} href={`/api/export/consolidated?filter=${filter}`}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-4 py-2 text-xs font-semibold text-white hover:bg-white/15 transition-colors">
+                  <FileSpreadsheet className="h-3.5 w-3.5" />
+                  {filter === 'all' ? 'All Candidates' : filter === 'not_cleared' ? 'Not Cleared' : filter.charAt(0).toUpperCase() + filter.slice(1)}
+                </a>
+              ))}
             </div>
-          ))}
+          </div>
         </CardContent>
       </Card>
+
+      {/* Per-batch download section */}
+      {(batches || []).length > 0 && (
+        <TmsBatchDownloads batches={(batches || []).map((b: any) => ({ id: b.id, title: b.title, status: b.status }))} />
+      )}
 
       <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <Card className="border-amber-100 bg-amber-50 shadow-sm">

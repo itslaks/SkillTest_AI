@@ -3,6 +3,14 @@
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireEmployee, requireManager, requireTrainingStaff } from '@/lib/rbac'
+import {
+  sendEmail,
+  buildAttendanceCutoffEmail,
+  buildAbsenceStreakEmail,
+  buildAssessmentReminderEmail,
+  buildFeedbackRequestEmail,
+  buildUploadConfirmationEmail,
+} from '@/lib/email'
 import type {
   ApiResponse,
   AttendanceStatus,
@@ -1013,7 +1021,8 @@ export async function runTrainingAutomation(formData: FormData): Promise<ApiResp
         .eq('session_id', session.id)
         .in('status', ['present', 'late'])
       if ((count || 0) > 0) continue
-      await admin.from('training_notifications').insert({
+
+      const { data: notif } = await admin.from('training_notifications').insert({
         batch_id: session.batch_id,
         session_id: session.id,
         title: `Attendance cut-off missed: ${session.title}`,
@@ -1023,7 +1032,32 @@ export async function runTrainingAutomation(formData: FormData): Promise<ApiResp
         delivery_status: 'sent',
         sent_at: new Date().toISOString(),
         created_by: userId,
-      })
+      }).select('id').single()
+
+      // Send real email to coordinator
+      const coordinatorId = (session.batch as any)?.coordinator_id
+      if (coordinatorId) {
+        const { data: coord } = await admin.from('profiles').select('full_name, email').eq('id', coordinatorId).single()
+        if (coord?.email) {
+          const html = buildAttendanceCutoffEmail({
+            batchTitle: (session.batch as any)?.title || 'Training Batch',
+            sessionTitle: session.title,
+            sessionDate: new Date(session.session_date).toLocaleString(),
+            cutoffTime: settings.attendanceCutoffTime,
+            coordinatorName: coord.full_name || coord.email,
+          })
+          const emailResult = await sendEmail({ to: coord.email, subject: `⚠️ Attendance Cut-off Missed — ${session.title}`, html })
+          if (notif?.id) {
+            await admin.from('training_notification_dispatch_log').insert({
+              notification_id: notif.id,
+              recipient_email: coord.email,
+              channel: 'email',
+              provider_status: emailResult.success ? 'sent' : 'failed',
+              provider_message: emailResult.error || 'Sent via Resend',
+            })
+          }
+        }
+      }
       notificationsCreated++
     }
   }
@@ -1031,13 +1065,14 @@ export async function runTrainingAutomation(formData: FormData): Promise<ApiResp
   if (runType === 'assessment_reminder') {
     const { data: setups } = await admin
       .from('training_assessment_setups')
-      .select('id, title, batch_id, scheduled_at')
+      .select('id, title, batch_id, scheduled_at, batch:batch_id(title)')
       .gte('scheduled_at', new Date().toISOString())
       .lte('scheduled_at', new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString())
       .limit(100)
     for (const setup of setups || []) {
       if (batchId && setup.batch_id !== batchId) continue
-      await admin.from('training_notifications').insert({
+
+      const { data: notif } = await admin.from('training_notifications').insert({
         batch_id: setup.batch_id,
         title: `Upcoming assessment: ${setup.title}`,
         message: `Assessment is coming up on ${new Date(setup.scheduled_at).toLocaleString()}.`,
@@ -1046,7 +1081,33 @@ export async function runTrainingAutomation(formData: FormData): Promise<ApiResp
         delivery_status: 'sent',
         sent_at: new Date().toISOString(),
         created_by: userId,
-      })
+      }).select('id').single()
+
+      // Email every batch member
+      const { data: members } = await admin
+        .from('batch_members')
+        .select('profile:user_id(full_name, email)')
+        .eq('batch_id', setup.batch_id)
+      for (const member of members || []) {
+        const profile = (member as any).profile
+        if (!profile?.email) continue
+        const html = buildAssessmentReminderEmail({
+          assessmentTitle: setup.title,
+          batchTitle: (setup.batch as any)?.title || 'Training Batch',
+          scheduledAt: new Date(setup.scheduled_at).toLocaleString(),
+          candidateName: profile.full_name || profile.email,
+        })
+        const emailResult = await sendEmail({ to: profile.email, subject: `📋 Upcoming Assessment: ${setup.title}`, html })
+        if (notif?.id) {
+          await admin.from('training_notification_dispatch_log').insert({
+            notification_id: notif.id,
+            recipient_email: profile.email,
+            channel: 'email',
+            provider_status: emailResult.success ? 'sent' : 'failed',
+            provider_message: emailResult.error || 'Sent via Resend',
+          })
+        }
+      }
       notificationsCreated++
     }
   }
@@ -1082,7 +1143,7 @@ export async function runTrainingAutomation(formData: FormData): Promise<ApiResp
           return !entry || entry.status === 'absent'
         })
         if (!absentAcrossWindow) continue
-        await admin.from('training_notifications').insert({
+        const { data: notif } = await admin.from('training_notifications').insert({
           batch_id: targetBatchId,
           title: `Absence streak: ${memberProfile?.full_name || memberProfile?.email || 'Candidate'}`,
           message: `Candidate is absent across the latest ${settings.absenceAlertDays} attendance-required sessions. Coordinator follow-up required.`,
@@ -1091,7 +1152,32 @@ export async function runTrainingAutomation(formData: FormData): Promise<ApiResp
           delivery_status: 'sent',
           sent_at: new Date().toISOString(),
           created_by: userId,
-        })
+        }).select('id').single()
+
+        // Email coordinator
+        const { data: batchRec } = await admin.from('training_batches').select('coordinator_id, title').eq('id', targetBatchId).single()
+        if (batchRec?.coordinator_id) {
+          const { data: coord } = await admin.from('profiles').select('full_name, email').eq('id', batchRec.coordinator_id).single()
+          if (coord?.email) {
+            const html = buildAbsenceStreakEmail({
+              candidateName: memberProfile?.full_name || memberProfile?.email || 'Candidate',
+              candidateEmail: memberProfile?.email || '',
+              batchTitle: batchRec.title || 'Training Batch',
+              absenceDays: settings.absenceAlertDays,
+              coordinatorName: coord.full_name || coord.email,
+            })
+            const emailResult = await sendEmail({ to: coord.email, subject: `🚨 Absence Alert — ${memberProfile?.full_name || memberProfile?.email}`, html })
+            if (notif?.id) {
+              await admin.from('training_notification_dispatch_log').insert({
+                notification_id: notif.id,
+                recipient_email: coord.email,
+                channel: 'email',
+                provider_status: emailResult.success ? 'sent' : 'failed',
+                provider_message: emailResult.error || 'Sent via Resend',
+              })
+            }
+          }
+        }
         notificationsCreated++
       }
     }
@@ -1100,14 +1186,15 @@ export async function runTrainingAutomation(formData: FormData): Promise<ApiResp
   if (runType === 'feedback_reminder') {
     const { data: windows } = await admin
       .from('training_feedback_windows')
-      .select('id, title, batch_id, closes_at, status')
+      .select('id, title, batch_id, closes_at, status, batch:batch_id(title)')
       .eq('status', 'open')
       .gte('closes_at', new Date().toISOString())
       .lte('closes_at', new Date(Date.now() + settings.feedbackWindowDays * 24 * 60 * 60 * 1000).toISOString())
       .limit(100)
     for (const window of windows || []) {
       if (batchId && window.batch_id !== batchId) continue
-      await admin.from('training_notifications').insert({
+
+      const { data: notif } = await admin.from('training_notifications').insert({
         batch_id: window.batch_id,
         title: `Feedback reminder: ${window.title}`,
         message: `Feedback window closes on ${new Date(window.closes_at).toLocaleString()}. Please complete training content and trainer effectiveness feedback.`,
@@ -1116,7 +1203,33 @@ export async function runTrainingAutomation(formData: FormData): Promise<ApiResp
         delivery_status: 'sent',
         sent_at: new Date().toISOString(),
         created_by: userId,
-      })
+      }).select('id').single()
+
+      // Email every batch member
+      const { data: members } = await admin
+        .from('batch_members')
+        .select('profile:user_id(full_name, email)')
+        .eq('batch_id', window.batch_id)
+      for (const member of members || []) {
+        const profile = (member as any).profile
+        if (!profile?.email) continue
+        const html = buildFeedbackRequestEmail({
+          batchTitle: (window.batch as any)?.title || 'Training Batch',
+          windowTitle: window.title,
+          closesAt: new Date(window.closes_at).toLocaleString(),
+          candidateName: profile.full_name || profile.email,
+        })
+        const emailResult = await sendEmail({ to: profile.email, subject: `💬 Feedback Requested — ${(window.batch as any)?.title || window.title}`, html })
+        if (notif?.id) {
+          await admin.from('training_notification_dispatch_log').insert({
+            notification_id: notif.id,
+            recipient_email: profile.email,
+            channel: 'email',
+            provider_status: emailResult.success ? 'sent' : 'failed',
+            provider_message: emailResult.error || 'Sent via Resend',
+          })
+        }
+      }
       notificationsCreated++
     }
   }
@@ -1195,6 +1308,33 @@ export async function createFeedbackWindow(formData: FormData): Promise<ApiRespo
         provider_message: 'Email dispatch logged for demo/governance. Connect SMTP provider for live sending.',
       }))
     )
+  }
+
+  // Send real feedback request emails to all batch members
+  const { data: batchInfo } = await admin.from('training_batches').select('title').eq('id', batchId).single()
+  for (const member of members || []) {
+    const profile = (member as any).profile
+    if (!profile?.email) continue
+    const html = buildFeedbackRequestEmail({
+      batchTitle: batchInfo?.title || 'Training Batch',
+      windowTitle: title,
+      closesAt: new Date(closesAt).toLocaleString(),
+      candidateName: profile.full_name || profile.email,
+    })
+    const emailResult = await sendEmail({
+      to: profile.email,
+      subject: `💬 Feedback Requested — ${batchInfo?.title || title}`,
+      html,
+    })
+    if (notification?.id) {
+      await admin.from('training_notification_dispatch_log').insert({
+        notification_id: notification.id,
+        recipient_email: profile.email,
+        channel: 'email',
+        provider_status: emailResult.success ? 'sent' : 'failed',
+        provider_message: emailResult.error || 'Sent via Resend',
+      })
+    }
   }
 
   revalidatePath('/manager/operations')

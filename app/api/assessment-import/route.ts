@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireTrainingStaffForApi } from '@/lib/rbac'
 import { NextRequest, NextResponse } from 'next/server'
+import { sendEmail, buildUploadConfirmationEmail } from '@/lib/email'
 
 export async function POST(request: NextRequest) {
   const auth = await requireTrainingStaffForApi()
@@ -156,6 +157,31 @@ export async function POST(request: NextRequest) {
         duplicate_records: validationErrors.filter((item) => String(item.error).toLowerCase().includes('duplicate')).length,
         error_log: errors.length ? errors : null,
       })
+    }
+
+    // Send upload confirmation email to uploader
+    try {
+      const { data: uploaderProfile } = await supabase
+        .from('profiles')
+        .select('full_name, email')
+        .eq('id', userId)
+        .single()
+      if (uploaderProfile?.email) {
+        const emailHtml = buildUploadConfirmationEmail({
+          uploaderName: uploaderProfile.full_name || 'Trainer',
+          uploadType: 'assessment_scores',
+          batchTitle: batchId || 'Assessment Import',
+          recordCount: records.length,
+          errorCount: errors.length,
+        })
+        await sendEmail({
+          to: uploaderProfile.email,
+          subject: `Assessment Upload Confirmed — ${insertedCount} records imported`,
+          html: emailHtml,
+        })
+      }
+    } catch (emailErr) {
+      console.warn('Upload confirmation email failed (non-fatal):', emailErr)
     }
 
     return NextResponse.json({
