@@ -2,7 +2,7 @@ export function AnimatedSphere() {
   return (
     <div className="flex h-full w-full items-center justify-center">
       <div
-        className="relative aspect-square w-[72%] max-w-28 rounded-full border border-black/15 bg-[radial-gradient(circle_at_30%_25%,rgba(255,255,255,0.92),rgba(56,189,248,0.24)_38%,rgba(15,23,42,0.08)_70%,transparent_72%)] shadow-[inset_-16px_-18px_30px_rgba(15,23,42,0.12),0_18px_50px_rgba(15,23,42,0.12)]"
+        className="motion-safe-3d relative aspect-square w-[72%] max-w-28 rounded-full border border-black/15 bg-[radial-gradient(circle_at_30%_25%,rgba(255,255,255,0.92),rgba(56,189,248,0.24)_38%,rgba(15,23,42,0.08)_70%,transparent_72%)] shadow-[inset_-16px_-18px_30px_rgba(15,23,42,0.12),0_18px_50px_rgba(15,23,42,0.12)]"
         style={{
           animation: "float-slow 6s ease-in-out infinite",
           willChange: "transform",

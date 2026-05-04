@@ -796,7 +796,7 @@ export default async function ManagerOperationsPage() {
       </div>
 
       {canCoordinate ? (
-      <Card className="border-zinc-200 shadow-sm spotlight-card">
+      <Card id="feedback" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
         <CardHeader>
           <CardTitle>Automation Runbook</CardTitle>
           <CardDescription>Each governed check has a business rule, an operator override, and an audit record after execution.</CardDescription>
@@ -1062,7 +1062,7 @@ export default async function ManagerOperationsPage() {
         </Card>
       </div>
 
-      <Card className="border-zinc-200 shadow-sm spotlight-card">
+      <Card id="attendance" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
         <CardHeader>
           <CardTitle>Attendance Tracker</CardTitle>
           <CardDescription>Session-level attendance now has physical controls in the UI and persists through the backend.</CardDescription>
@@ -1146,7 +1146,7 @@ export default async function ManagerOperationsPage() {
         </CardContent>
       </Card>
 
-      <Card className="border-zinc-200 shadow-sm spotlight-card">
+      <Card id="assessment" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
         <CardHeader>
           <CardTitle>Assessment Score Upload</CardTitle>
           <CardDescription>Trainers can upload sprint review, API/coding, and project-linked assessment scores for assigned batches.</CardDescription>

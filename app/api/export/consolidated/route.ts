@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireManagerForApi } from '@/lib/rbac'
 import { createAdminClient } from '@/lib/supabase/server'
-import { canAccessTrainingBatch } from '@/lib/training-access'
+import { canAccessTrainingBatch, getAccessibleTrainingBatchIds } from '@/lib/training-access'
 import { averageScore, computeTopperScore, isTopper, normalizeTopperWeights } from '@/lib/topper'
 import * as XLSX from 'xlsx'
 
@@ -18,6 +18,10 @@ export async function GET(request: NextRequest) {
   }
 
   const admin = createAdminClient()
+  const accessibleBatchIds = await getAccessibleTrainingBatchIds(userId, role)
+  if (!accessibleBatchIds.length) {
+    return NextResponse.json({ error: 'No accessible batches found' }, { status: 404 })
+  }
 
   // Governance weights
   const { data: govRows } = await admin
@@ -34,8 +38,8 @@ export async function GET(request: NextRequest) {
   let batchQuery = admin
     .from('training_batches')
     .select('id, title, domain, status, start_date, end_date, trainer:trainer_id(full_name, email), coordinator:coordinator_id(full_name, email)')
-    .or(`created_by.eq.${userId},coordinator_id.eq.${userId},trainer_id.eq.${userId}`)
   if (batchId) batchQuery = batchQuery.eq('id', batchId)
+  if (!batchId) batchQuery = batchQuery.in('id', accessibleBatchIds)
   const { data: batches } = await batchQuery.order('created_at', { ascending: false })
   const batchIds = (batches || []).map((b: any) => b.id)
   const batchMap = new Map((batches || []).map((b: any) => [b.id, b]))

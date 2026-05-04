@@ -2,7 +2,7 @@ export function AnimatedTetrahedron() {
   return (
     <div className="flex h-full w-full items-center justify-center">
       <div
-        className="relative h-[68%] w-[68%] max-w-28"
+        className="motion-safe-3d relative h-[68%] w-[68%] max-w-28"
         style={{
           animation: "float 7s ease-in-out infinite",
           willChange: "transform",

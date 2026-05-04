@@ -133,13 +133,26 @@ async function uploadTrainingDocument(admin: ReturnType<typeof createAdminClient
   return `${bucket}/${path}`
 }
 
+async function resolveAutomationActor(admin: ReturnType<typeof createAdminClient>, triggeredBy: string | null) {
+  if (triggeredBy) return triggeredBy
+  const { data } = await admin
+    .from('profiles')
+    .select('id')
+    .in('role', ['admin', 'manager', 'training_coordinator'])
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  return data?.id || null
+}
+
 export async function getTrainingOpsManagerData() {
   const { userId, role } = await requireTrainingStaff()
   const admin = createAdminClient()
 
-  const { data: trainerAssignments } = role === 'trainer'
-    ? await admin.from('training_batch_trainers').select('batch_id').eq('trainer_id', userId)
-    : { data: [] }
+  const { data: trainerAssignments } = await admin
+    .from('training_batch_trainers')
+    .select('batch_id')
+    .eq('trainer_id', userId)
   const assignedBatchIds = (trainerAssignments || []).map((item: any) => item.batch_id)
 
   let batchQuery = admin
@@ -153,12 +166,16 @@ export async function getTrainingOpsManagerData() {
     `)
     .order('created_at', { ascending: false })
 
-  if (role === 'trainer') {
+  if (role === 'admin') {
+    // Admin sees the full TMS estate.
+  } else if (role === 'trainer') {
     const filters = [`trainer_id.eq.${userId}`]
     if (assignedBatchIds.length) filters.push(`id.in.(${assignedBatchIds.join(',')})`)
     batchQuery = batchQuery.or(filters.join(','))
   } else {
-    batchQuery = batchQuery.or(`created_by.eq.${userId},coordinator_id.eq.${userId},trainer_id.eq.${userId}`)
+    const filters = [`created_by.eq.${userId}`, `coordinator_id.eq.${userId}`, `trainer_id.eq.${userId}`]
+    if (assignedBatchIds.length) filters.push(`id.in.(${assignedBatchIds.join(',')})`)
+    batchQuery = batchQuery.or(filters.join(','))
   }
 
   const [batchesRes, trainersRes, employeesRes] = await Promise.all([
@@ -1100,12 +1117,24 @@ export async function createProjectEvaluation(formData: FormData): Promise<ApiRe
   return { data: true }
 }
 
-export async function runTrainingAutomation(formData: FormData): Promise<ApiResponse<boolean>> {
-  const { userId } = await requireManager()
-  const admin = createAdminClient()
-  const runType = asRequiredString(formData.get('run_type'), 'attendance_cutoff')
-  const batchId = asOptionalString(formData.get('batch_id'))
+export type TrainingAutomationRunType = 'attendance_cutoff' | 'absence_streak' | 'assessment_reminder' | 'feedback_reminder'
 
+export async function runTrainingAutomationSweep({
+  runType = 'attendance_cutoff',
+  batchId = null,
+  triggeredBy = null,
+  notes = 'Scheduled governance sweep.',
+}: {
+  runType?: TrainingAutomationRunType
+  batchId?: string | null
+  triggeredBy?: string | null
+  notes?: string
+}) {
+  const admin = createAdminClient()
+  const actorId = await resolveAutomationActor(admin, triggeredBy)
+  if (!actorId) {
+    throw new Error('No admin, manager, or training coordinator profile is available to own the automation audit trail.')
+  }
   const settings = await readGovernanceSettings(admin)
   const now = new Date()
   let notificationsCreated = 0
@@ -1137,7 +1166,7 @@ export async function runTrainingAutomation(formData: FormData): Promise<ApiResp
         channel: 'email',
         delivery_status: 'sent',
         sent_at: new Date().toISOString(),
-        created_by: userId,
+        created_by: actorId,
       }).select('id').single()
 
       // Send real email to coordinator
@@ -1186,7 +1215,7 @@ export async function runTrainingAutomation(formData: FormData): Promise<ApiResp
         channel: 'email',
         delivery_status: 'sent',
         sent_at: new Date().toISOString(),
-        created_by: userId,
+        created_by: actorId,
       }).select('id').single()
 
       // Email every batch member
@@ -1257,7 +1286,7 @@ export async function runTrainingAutomation(formData: FormData): Promise<ApiResp
           channel: 'email',
           delivery_status: 'sent',
           sent_at: new Date().toISOString(),
-          created_by: userId,
+          created_by: actorId,
         }).select('id').single()
 
         // Email coordinator
@@ -1308,7 +1337,7 @@ export async function runTrainingAutomation(formData: FormData): Promise<ApiResp
         channel: 'email',
         delivery_status: 'sent',
         sent_at: new Date().toISOString(),
-        created_by: userId,
+        created_by: actorId,
       }).select('id').single()
 
       // Email every batch member
@@ -1345,8 +1374,23 @@ export async function runTrainingAutomation(formData: FormData): Promise<ApiResp
     batch_id: batchId,
     status: 'completed',
     notifications_created: notificationsCreated,
-    notes: `Manual governance run from operations console.`,
-    triggered_by: userId,
+    notes,
+    triggered_by: actorId,
+  })
+
+  return { notificationsCreated }
+}
+
+export async function runTrainingAutomation(formData: FormData): Promise<ApiResponse<boolean>> {
+  const { userId } = await requireManager()
+  const runType = (asRequiredString(formData.get('run_type'), 'attendance_cutoff') || 'attendance_cutoff') as TrainingAutomationRunType
+  const batchId = asOptionalString(formData.get('batch_id'))
+
+  await runTrainingAutomationSweep({
+    runType,
+    batchId,
+    triggeredBy: userId,
+    notes: 'Manual governance run from operations console.',
   })
 
   revalidatePath('/manager/operations')

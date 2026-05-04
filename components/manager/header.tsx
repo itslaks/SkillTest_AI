@@ -1,18 +1,12 @@
 'use client'
 
-import { Bell, Search, Plus, ChevronDown, HelpCircle, FileQuestion, Users, Brain } from 'lucide-react'
+import { Bell, Search, Plus, HelpCircle, FileQuestion, CalendarDays, FileSpreadsheet, BarChart3, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import type { Profile } from '@/lib/types/database'
 import { signOut } from '@/lib/actions/auth'
 
@@ -40,41 +34,18 @@ export function ManagerHeader({ profile }: ManagerHeaderProps) {
       </div>
 
       <div className="flex items-center gap-1.5">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="sm" className="h-9 gap-1.5 rounded-xl bg-black text-white hover:bg-black/85 shadow-sm hidden sm:flex">
-              <Plus className="h-4 w-4" />
-              <span className="text-sm font-medium">Create</span>
-              <ChevronDown className="h-3.5 w-3.5 opacity-70" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52 rounded-xl shadow-xl border-border/60">
-            <DropdownMenuItem asChild className="rounded-lg cursor-pointer gap-2 py-2.5">
-              <Link href="/manager/quizzes/new" prefetch className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-violet-100 flex items-center justify-center">
-                  <FileQuestion className="h-3.5 w-3.5 text-violet-600" />
-                </div>
-                New Quiz
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild className="rounded-lg cursor-pointer gap-2 py-2.5">
-              <Link href="/manager/employees" prefetch className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center">
-                  <Users className="h-3.5 w-3.5 text-emerald-600" />
-                </div>
-                Import Employees
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild className="rounded-lg cursor-pointer gap-2 py-2.5">
-              <Link href="/manager/analytics" prefetch className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-pink-100 flex items-center justify-center">
-                  <Brain className="h-3.5 w-3.5 text-pink-600" />
-                </div>
-                AI Analysis
-              </Link>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="hidden 2xl:flex items-center gap-2">
+          <HeaderAction href="/manager/operations" icon={CalendarDays} label="Create Batch" hint="Ops" />
+          <HeaderAction href="/manager/operations#attendance" icon={FileSpreadsheet} label="Upload Attendance" hint="Daily" />
+          <HeaderAction href="/manager/operations#assessment" icon={FileQuestion} label="Upload Scores" hint="Excel" />
+          <HeaderAction href="/manager/reports" icon={BarChart3} label="Reports" hint="Export" />
+        </div>
+        <Button size="sm" className="h-9 gap-1.5 rounded-xl bg-black text-white hover:bg-black/85 shadow-sm 2xl:hidden" asChild>
+          <Link href="/manager/operations">
+            <Plus className="h-4 w-4" />
+            <span className="text-sm font-medium">Open Actions</span>
+          </Link>
+        </Button>
 
         <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/60">
           <HelpCircle className="h-4.5 w-4.5" />
@@ -125,5 +96,18 @@ export function ManagerHeader({ profile }: ManagerHeaderProps) {
         </DropdownMenu>
       </div>
     </header>
+  )
+}
+
+function HeaderAction({ href, icon: Icon, label, hint }: { href: string; icon: any; label: string; hint: string }) {
+  return (
+    <Link
+      href={href}
+      className="visible-action inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold"
+    >
+      <Icon className="h-4 w-4 text-sky-600" />
+      <span>{label}</span>
+      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">{hint}</span>
+    </Link>
   )
 }

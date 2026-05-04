@@ -10,24 +10,24 @@ const commandCards = [
 
 export function HeroShowcase() {
   return (
-    <div className="relative min-h-[560px] w-full overflow-hidden rounded-[2rem] border border-black/8 bg-white/55 p-4 shadow-[0_30px_90px_rgba(15,23,42,0.10)] sm:p-5">
+    <div className="relative min-h-[560px] w-full overflow-hidden rounded-[2rem] border border-slate-200 bg-white/88 p-4 shadow-[0_30px_90px_rgba(15,23,42,0.10)] sm:p-5">
       <div className="aura-ring left-8 top-10 h-40 w-40 bg-cyan-400/35" style={{ willChange: "transform" }} />
       <div className="aura-ring bottom-16 right-6 h-48 w-48 bg-blue-600/30" style={{ animationDelay: "1.5s", willChange: "transform" }} />
 
       <div className="relative z-10 grid h-full min-h-[520px] gap-4 sm:grid-cols-2">
         <div className="glass-panel flex min-h-52 flex-col rounded-[1.5rem] p-4">
-          <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.25em] text-zinc-500">
+          <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-600">
             <span>Readiness</span>
             <span>Live</span>
           </div>
-          <div className="mt-4 h-32 rounded-[1.25rem] bg-white/70 p-2">
+          <div className="mt-4 h-32 rounded-[1.25rem] bg-white p-2">
             <AnimatedTetrahedron />
           </div>
           <p className="mt-3 text-sm font-medium text-zinc-900">Learning readiness and training load in one view.</p>
         </div>
 
         <div className="glass-panel flex min-h-52 flex-col rounded-[1.5rem] p-4">
-          <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.25em] text-zinc-500">
+          <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-600">
             <span>Execution</span>
             <span>Realtime</span>
           </div>
@@ -38,7 +38,7 @@ export function HeroShowcase() {
         </div>
 
         <div className="glass-panel flex min-h-52 flex-col rounded-[1.5rem] p-4">
-          <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.25em] text-zinc-500">
+          <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-600">
             <span>Insights</span>
             <span>Live</span>
           </div>
@@ -48,19 +48,19 @@ export function HeroShowcase() {
           <p className="mt-3 text-sm font-medium text-zinc-900">Signals that help managers act sooner.</p>
         </div>
 
-        <div className="glass-panel flex min-h-52 flex-col rounded-[1.5rem] bg-zinc-950 p-4 text-white sm:col-span-2">
+        <div className="maverick-command-panel flex min-h-52 flex-col rounded-[1.5rem] p-4 sm:col-span-2">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-[10px] uppercase tracking-[0.3em] text-white/45">Training Signal Stack</p>
-            <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] uppercase tracking-[0.25em] text-white/70">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-cyan-100">Training Signal Stack</p>
+            <span className="rounded-full bg-white/12 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-white">
               Live View
             </span>
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
             {commandCards.map((card) => (
-              <div key={card.label} className="min-w-0 rounded-[1.15rem] border border-white/10 bg-white/5 p-4">
-                <p className="text-[10px] uppercase tracking-[0.25em] text-white/45">{card.label}</p>
+              <div key={card.label} className="min-w-0 rounded-[1.15rem] border border-white/15 bg-white/10 p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-cyan-100">{card.label}</p>
                 <p className="mt-3 text-xl font-semibold">{card.value}</p>
-                <p className="mt-2 text-xs leading-relaxed text-white/60">{card.detail}</p>
+                <p className="mt-2 text-xs leading-relaxed text-slate-100">{card.detail}</p>
               </div>
             ))}
           </div>

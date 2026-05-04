@@ -14,12 +14,14 @@ export function BatchCandidateImporter({ batches }: { batches: BatchOption[] }) 
   const [rows, setRows] = useState<Record<string, any>[] | null>(null)
   const [fileName, setFileName] = useState('')
   const [message, setMessage] = useState('')
+  const [uploadErrors, setUploadErrors] = useState<Array<{ row?: number; error: string; email?: string; employeeId?: string }>>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   function readFile(file: File) {
     setError('')
     setMessage('')
+    setUploadErrors([])
     setFileName(file.name)
     const reader = new FileReader()
     reader.onload = (event) => {
@@ -52,6 +54,7 @@ export function BatchCandidateImporter({ batches }: { batches: BatchOption[] }) 
       let total = 0
       let successful = 0
       let failed = 0
+      const errors: Array<{ row?: number; error: string; email?: string; employeeId?: string }> = []
       const chunks = chunkRows(rows, CHUNK_SIZE)
       for (let index = 0; index < chunks.length; index++) {
         const response = await fetch('/api/training/batch-candidate-import', {
@@ -64,8 +67,10 @@ export function BatchCandidateImporter({ batches }: { batches: BatchOption[] }) 
         total += payload.totalRecords || chunks[index].length
         successful += payload.successfulRecords || 0
         failed += payload.failedRecords || 0
+        errors.push(...((payload.errors || []).map((item: any) => ({ ...item, row: item.row ? item.row + (index * CHUNK_SIZE) : item.row }))))
       }
       setMessage(`${successful}/${total} candidate rows assigned. ${failed} row(s) need review.`)
+      setUploadErrors(errors)
       setRows(null)
     } catch (err: any) {
       setError(err.message || 'Candidate assignment failed.')
@@ -121,7 +126,21 @@ export function BatchCandidateImporter({ batches }: { batches: BatchOption[] }) 
         </div>
       ) : null}
 
-      {message ? <div className="mt-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700"><CheckCircle2 className="h-4 w-4" />{message}</div> : null}
+      {message ? (
+        <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+          <div className="flex items-center gap-2 font-semibold"><CheckCircle2 className="h-4 w-4" />{message}</div>
+          {uploadErrors.length ? (
+            <div className="mt-2 space-y-1 text-xs text-rose-700">
+              {uploadErrors.slice(0, 8).map((item, index) => (
+                <p key={`${item.row || index}-${item.error}`}>
+                  {item.row ? `Row ${item.row}` : 'Upload'}: {item.error}{item.email ? ` - ${item.email}` : ''}{item.employeeId ? ` - ${item.employeeId}` : ''}
+                </p>
+              ))}
+              {uploadErrors.length > 8 ? <p>{uploadErrors.length - 8} more row issue(s) are available in the upload log.</p> : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       {error ? <div className="mt-4 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700"><XCircle className="h-4 w-4" />{error}</div> : null}
     </div>
   )

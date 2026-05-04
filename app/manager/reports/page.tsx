@@ -23,9 +23,10 @@ import { DownloadReportButton } from '@/components/manager/download-report-butto
 import { QuickDeleteButton } from '@/components/manager/quick-delete-button'
 import { TmsBatchDownloads } from '@/components/manager/tms-batch-downloads'
 import { averageScore, computeTopperScore } from '@/lib/topper'
+import { getAccessibleTrainingBatchIds } from '@/lib/training-access'
 
 export default async function ManagerReportsPage() {
-  const { userId } = await requireManager()
+  const { userId, role } = await requireManager()
 
   const supabase = await createClient()
   const admin = createAdminClient()
@@ -41,11 +42,14 @@ export default async function ManagerReportsPage() {
   const quizzes = quizzesRes.data || []
   const employees = employeesRes.data || []
 
-  const { data: batches } = await admin
-    .from('training_batches')
-    .select('id, title, status, trainer:trainer_id(id, full_name, email)')
-    .or(`created_by.eq.${userId},coordinator_id.eq.${userId},trainer_id.eq.${userId}`)
-    .order('created_at', { ascending: false })
+  const accessibleBatchIds = await getAccessibleTrainingBatchIds(userId, role)
+  const { data: batches } = accessibleBatchIds.length
+    ? await admin
+        .from('training_batches')
+        .select('id, title, status, trainer:trainer_id(id, full_name, email)')
+        .in('id', accessibleBatchIds)
+        .order('created_at', { ascending: false })
+    : { data: [] }
 
   const batchIds = (batches || []).map((batch: any) => batch.id)
   const [membersRes, attendanceRes, projectRes, attemptsRes, feedbackRes, batchTrainersRes, importResultsRes] = await Promise.all([

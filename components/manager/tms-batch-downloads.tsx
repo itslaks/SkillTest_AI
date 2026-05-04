@@ -17,10 +17,12 @@ interface Props {
 }
 
 const statusColor: Record<string, string> = {
+  planned: 'bg-amber-100 text-amber-800 border-amber-200',
+  running: 'bg-emerald-100 text-emerald-800 border-emerald-200',
   active: 'bg-green-100 text-green-800 border-green-200',
   completed: 'bg-blue-100 text-blue-800 border-blue-200',
-  upcoming: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  cancelled: 'bg-red-100 text-red-800 border-red-200',
+  closed: 'bg-zinc-900 text-white border-zinc-900',
+  at_risk: 'bg-red-100 text-red-800 border-red-200',
 }
 
 export function TmsBatchDownloads({ batches }: Props) {
@@ -66,7 +68,7 @@ export function TmsBatchDownloads({ batches }: Props) {
                   </Badge>
                 )}
               </div>
-              <span className="text-xs text-zinc-400 shrink-0 ml-2">Click to expand downloads</span>
+              <span className="text-xs text-zinc-400 shrink-0 ml-2">Open report deck</span>
             </button>
 
             {/* Expandable download buttons */}

@@ -69,7 +69,7 @@ export default async function EmployeeLayout({
           </div>
           <div>
             <p className="text-white font-bold text-sm leading-none tracking-tight">skilltest_ai</p>
-            <p className="text-white/30 text-[10px] mt-0.5 uppercase tracking-widest">Employee</p>
+            <p className="text-white/55 text-[10px] mt-0.5 uppercase tracking-widest">Employee</p>
           </div>
         </div>
 
@@ -110,11 +110,11 @@ export default async function EmployeeLayout({
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-white leading-none truncate">{fullName?.split(' ')[0] || 'Employee'}</p>
-              <p className="text-xs text-white/30 mt-0.5 truncate">{profile?.email || ''}</p>
+              <p className="text-xs text-white/55 mt-0.5 truncate">{profile?.email || ''}</p>
             </div>
           </div>
           <form action={signOut}>
-            <button type="submit" className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/40 hover:text-red-400 hover:bg-red-500/10 transition-all">
+            <button type="submit" className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/65 hover:text-red-300 hover:bg-red-500/10 transition-all">
               <LogOut className="h-4 w-4 shrink-0" />
               Sign Out
             </button>
@@ -123,30 +123,26 @@ export default async function EmployeeLayout({
       </aside>
 
       {/* Mobile top bar */}
-      <header className="md:hidden fixed top-0 left-0 right-0 z-50 h-14 bg-black border-b border-white/5 flex items-center justify-between px-4">
+      <header className="md:hidden fixed top-0 left-0 right-0 z-50 bg-black border-b border-white/5 px-4 py-3">
         <Link href="/employee" className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-white flex items-center justify-center">
             <Sparkles className="w-3.5 h-3.5 text-black" />
           </div>
           <span className="text-white font-bold text-sm">skilltest_ai</span>
         </Link>
-        <nav className="flex items-center gap-1">
+        <nav className="mt-3 grid grid-cols-5 gap-1">
           {navigation.map((item) => (
-            <Link key={item.name} href={item.href} className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/5 transition-all">
+            <Link key={item.name} href={item.href} className="flex flex-col items-center gap-1 rounded-lg px-1 py-2 text-white/70 hover:text-white hover:bg-white/8 transition-all">
               <item.icon className={`h-4 w-4 ${item.color}`} />
+              <span className="text-[10px] font-medium leading-none">{item.name}</span>
             </Link>
           ))}
-          <form action={signOut}>
-            <button type="submit" className="p-2 rounded-lg text-white/40 hover:text-red-400 hover:bg-red-500/10 transition-all">
-              <LogOut className="h-4 w-4" />
-            </button>
-          </form>
         </nav>
       </header>
 
       {/* Main content */}
       <div className="flex-1 md:ml-60">
-        <main className="min-h-screen px-4 md:px-8 py-6 md:py-8 pt-20 md:pt-8">
+        <main className="min-h-screen px-4 md:px-8 py-6 md:py-8 pt-32 md:pt-8">
           {children}
         </main>
       </div>

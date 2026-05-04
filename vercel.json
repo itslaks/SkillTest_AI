@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/training-governance",
+      "schedule": "30 4 * * *"
+    }
+  ]
+}

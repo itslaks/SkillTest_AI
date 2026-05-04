@@ -26,3 +26,26 @@ export async function canAccessTrainingBatch(batchId: string, userId: string, ro
 export async function canTrainerAccessBatch(batchId: string, userId: string) {
   return canAccessTrainingBatch(batchId, userId, 'trainer')
 }
+
+export async function getAccessibleTrainingBatchIds(userId: string, role: UserRole) {
+  const admin = createAdminClient()
+  if (role === 'admin') {
+    const { data } = await admin.from('training_batches').select('id')
+    return (data || []).map((batch: any) => batch.id as string)
+  }
+
+  const { data: ownedBatches } = await admin
+    .from('training_batches')
+    .select('id')
+    .or(`created_by.eq.${userId},coordinator_id.eq.${userId},trainer_id.eq.${userId}`)
+
+  const { data: assignedBatches } = await admin
+    .from('training_batch_trainers')
+    .select('batch_id')
+    .eq('trainer_id', userId)
+
+  return Array.from(new Set([
+    ...(ownedBatches || []).map((batch: any) => batch.id as string),
+    ...(assignedBatches || []).map((assignment: any) => assignment.batch_id as string),
+  ]))
+}

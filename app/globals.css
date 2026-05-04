@@ -109,6 +109,12 @@
   textarea {
     min-width: 0;
     max-width: 100%;
+    color: oklch(0.16 0 0);
+    background-color: rgba(255, 255, 255, 0.96);
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: oklch(0.46 0 0);
   }
   main :where(h1, h2, h3, p, a, span, td, th, label, button) {
     overflow-wrap: anywhere;
@@ -224,13 +230,14 @@
 
   .glass-panel {
     background:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.46)),
-      radial-gradient(circle at top left, rgba(255, 255, 255, 0.7), transparent 42%);
+      linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.9)),
+      radial-gradient(circle at top left, rgba(219, 234, 254, 0.76), transparent 42%);
     backdrop-filter: blur(18px);
-    border: 1px solid rgba(0, 0, 0, 0.08);
+    color: #111827;
+    border: 1px solid rgba(15, 23, 42, 0.12);
     box-shadow:
       0 30px 80px rgba(16, 18, 24, 0.12),
-      inset 0 1px 0 rgba(255, 255, 255, 0.55);
+      inset 0 1px 0 rgba(255, 255, 255, 0.8);
   }
 
   .glass-panel-dark {
@@ -266,6 +273,35 @@
       linear-gradient(135deg, rgba(4, 8, 18, 0.98), rgba(17, 24, 39, 0.98)),
       linear-gradient(90deg, rgba(34, 211, 238, 0.16), transparent 42%),
       linear-gradient(270deg, rgba(245, 158, 11, 0.12), transparent 48%);
+  }
+
+  .maverick-command-panel {
+    color: #ffffff;
+    background:
+      linear-gradient(135deg, rgba(3, 7, 18, 0.98), rgba(15, 23, 42, 0.97)),
+      radial-gradient(circle at top right, rgba(34, 211, 238, 0.22), transparent 28%),
+      radial-gradient(circle at bottom left, rgba(245, 158, 11, 0.14), transparent 26%);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 28px 90px rgba(2, 6, 23, 0.32);
+  }
+
+  .helper-strip {
+    color: #0f172a;
+    background: linear-gradient(135deg, rgba(239, 246, 255, 0.98), rgba(240, 253, 250, 0.96));
+    border: 1px solid rgba(14, 165, 233, 0.18);
+  }
+
+  .visible-action {
+    min-height: 2.5rem;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    background: #ffffff;
+    color: #111827;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  }
+
+  .visible-action:hover {
+    background: #f8fafc;
+    color: #020617;
   }
 
   .maverick-rail-card {
@@ -325,6 +361,12 @@
     will-change: transform;
   }
 
+  .motion-safe-3d {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    transform-style: preserve-3d;
+  }
+
   .float-slow {
     animation: float-slow 8s ease-in-out infinite;
     will-change: transform;
@@ -376,5 +418,16 @@
   .marquee-container {
     overflow: hidden;
     width: 100%;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+      transition-duration: 0.001ms !important;
+    }
   }
 }

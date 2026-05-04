@@ -111,7 +111,7 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
           {!collapsed && (
             <div className="leading-none">
               <span className="font-bold text-[15px] text-white tracking-tight">Maverick TMS</span>
-              <p className="text-[10px] text-white/30 mt-0.5 font-medium tracking-wide uppercase">
+              <p className="text-[10px] text-white/55 mt-0.5 font-medium tracking-wide uppercase">
                 {profile?.role === 'trainer' ? 'Trainer Portal' : profile?.role === 'admin' ? 'Governance' : 'Execution Control'}
               </p>
             </div>
@@ -136,7 +136,7 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
         {navigation.map((group) => (
           <div key={group.section}>
             {!collapsed && (
-              <p className="text-[10px] font-semibold text-white/25 uppercase tracking-widest px-2 mb-1.5">{group.section}</p>
+              <p className="text-[10px] font-semibold text-white/50 uppercase tracking-widest px-2 mb-1.5">{group.section}</p>
             )}
             <div className="space-y-0.5">
               {group.items.filter((item) => {
@@ -161,7 +161,7 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
                       collapsed ? 'justify-center p-2.5' : 'px-3 py-2.5',
                       isActive
                         ? 'bg-white/10 text-white'
-                        : 'text-white/40 hover:text-white/80 hover:bg-white/[0.05]'
+                        : 'text-white/70 hover:text-white hover:bg-white/[0.05]'
                     )}
                   >
                     <div className={cn(
@@ -169,11 +169,14 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
                       collapsed ? 'w-8 h-8' : 'w-7 h-7',
                       isActive ? item.bg : 'bg-white/[0.04] group-hover:bg-white/[0.08]'
                     )}>
-                      <item.icon className={cn('h-4 w-4 shrink-0', isActive ? item.color : 'text-white/40 group-hover:text-white/70')} />
+                      <item.icon className={cn('h-4 w-4 shrink-0', isActive ? item.color : 'text-white/70 group-hover:text-white')} />
                     </div>
                     {!collapsed && (
                       <>
-                        <span className="flex-1 text-left">{item.name}</span>
+                        <span className="flex-1 text-left">
+                          <span className="block text-[13px] font-semibold">{item.name}</span>
+                          <span className="block text-[11px] font-normal text-white/60">{item.description}</span>
+                        </span>
                         {isActive && <div className={cn('w-1.5 h-1.5 rounded-full shrink-0', item.activeBg)} />}
                       </>
                     )}
@@ -194,12 +197,12 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
         <button
           onClick={() => setCollapsed(!collapsed)}
           className={cn(
-            'w-full flex items-center gap-3 px-3 py-2 rounded-xl text-white/30 hover:text-white/70 hover:bg-white/[0.05] transition-colors text-sm',
+            'w-full flex items-center gap-3 px-3 py-2 rounded-xl text-white/65 hover:text-white hover:bg-white/[0.05] transition-colors text-sm',
             collapsed && 'justify-center px-2.5'
           )}
         >
           {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-          {!collapsed && <span>Collapse</span>}
+          {!collapsed && <span>Compact view</span>}
         </button>
 
         {/* User */}
@@ -213,7 +216,7 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <p className="text-[13px] font-semibold text-white/90 truncate">{profile?.full_name || 'Staff'}</p>
-              <p className="text-[11px] text-white/30 truncate">{profile?.email}</p>
+              <p className="text-[11px] text-white/55 truncate">{profile?.email}</p>
             </div>
           )}
         </div>
@@ -223,7 +226,7 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
           <button
             type="submit"
             className={cn(
-              'w-full flex items-center gap-3 px-3 py-2 rounded-xl text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-colors text-sm group',
+              'w-full flex items-center gap-3 px-3 py-2 rounded-xl text-white/65 hover:text-red-300 hover:bg-red-500/10 transition-colors text-sm group',
               collapsed && 'justify-center px-2.5'
             )}
           >

@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  allowedDevOrigins: ['172.31.192.1', 'localhost:3000', '192.168.1.4'],
+  allowedDevOrigins: ['172.31.192.1', 'localhost:3000', '127.0.0.1', '192.168.1.4'],
   images: {
     unoptimized: true,
   },

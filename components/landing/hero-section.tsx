@@ -33,24 +33,29 @@ export function HeroSection() {
 
       <div className="relative z-10 max-w-[1400px] mx-auto px-6 lg:px-12 py-24 lg:py-28">
         <div className="mb-8">
-          <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground">
+          <span className="inline-flex items-center gap-3 rounded-full border border-sky-200 bg-white/90 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">
             <span className="w-8 h-px bg-foreground/30" />
-            Training execution and assessment platform
+            Made for non-technical training teams
           </span>
         </div>
 
         <div className="mb-10">
           <h1 className="text-[clamp(3rem,10vw,8rem)] font-display leading-[0.94] tracking-tight">
             <span className="block">skilltest_ai</span>
-            <span className="block text-foreground/70">for enterprise learning</span>
+            <span className="block text-slate-700">for enterprise learning</span>
           </h1>
         </div>
 
         <div className="grid gap-16 xl:grid-cols-[0.85fr_1.15fr] xl:items-center">
           <div className="space-y-8">
-            <p className="text-xl lg:text-2xl text-muted-foreground leading-relaxed max-w-xl">
-              Manage training batches, schedule sessions, track attendance, run adaptive assessments, and close the loop with feedback and reminders from one platform.
+            <p className="text-xl lg:text-2xl text-slate-700 leading-relaxed max-w-xl">
+              A clear command center for admins, trainers, coordinators, and learners. Every key action is visible: create batches, upload attendance, add scores, send feedback, and download reports.
             </p>
+
+            <div className="helper-strip rounded-2xl p-4 text-sm leading-relaxed shadow-sm">
+              <p className="font-semibold text-slate-950">Simple operating flow</p>
+              <p className="mt-1 text-slate-700">Create batch, assign candidates and trainers, mark attendance, upload scores, review dashboards, then export reports.</p>
+            </div>
 
             <div className="grid gap-4 sm:grid-cols-3">
               {[
@@ -86,8 +91,8 @@ export function HeroSection() {
               </Button>
             </div>
 
-            <p className="text-sm font-mono uppercase tracking-[0.25em] text-muted-foreground">
-              Designed for clear decisions across managers and learners.
+            <p className="text-sm font-mono uppercase tracking-[0.25em] text-slate-600">
+              Designed for clear decisions across every role.
             </p>
           </div>
 
@@ -109,7 +114,7 @@ export function HeroSection() {
               ].map((stat) => (
                 <div key={`${stat.company}-${i}`} className="flex items-baseline gap-4">
                   <span className="text-4xl lg:text-5xl font-display">{stat.value}</span>
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-sm text-slate-600">
                     {stat.label}
                     <span className="block font-mono text-xs mt-1">{stat.company}</span>
                   </span>
