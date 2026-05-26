@@ -4,6 +4,10 @@
 
 SkillTest AI combines intelligent quiz generation, end-to-end training operations, real-time attendance tracking, AI coaching insights, and automated reporting in a single platform designed for non-technical trainers, coordinators, and learners.
 
+## Technical Documentation
+
+For a crisp owner-level explanation of the language, framework, routes, API endpoints, environment variables, scripts, AI providers, and deployment flow, see [docs/TECHNICAL_OVERVIEW.md](docs/TECHNICAL_OVERVIEW.md).
+
 ---
 
 ## What Makes SkillTest AI Different

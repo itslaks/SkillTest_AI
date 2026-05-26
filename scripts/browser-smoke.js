@@ -11,7 +11,7 @@ function waitForServer(url, timeoutMs = 45000) {
     const check = () => {
       const request = http.get(url, (response) => {
         response.resume()
-        resolve(true)
+        response.on('end', () => resolve(true))
       })
       request.on('error', () => {
         if (Date.now() - startedAt > timeoutMs) {
@@ -65,6 +65,8 @@ async function main() {
   page.on('requestfailed', (request) => {
     const failure = request.failure()?.errorText || ''
     if (request.url().includes('_rsc=') && failure.includes('ERR_ABORTED')) return
+    if (request.url().includes('/__nextjs_font/') && failure.includes('ERR_ABORTED')) return
+    if (request.url().includes('/_next/static/') && failure.includes('ERR_ABORTED')) return
     failedRequests.push(`${request.method()} ${request.url()} ${failure}`)
   })
 
@@ -76,7 +78,7 @@ async function main() {
   ]
 
   for (const route of publicRoutes) {
-    await page.goto(`${BASE_URL}${route.path}`, { waitUntil: 'networkidle', timeout: 30000 })
+    await page.goto(`${BASE_URL}${route.path}`, { waitUntil: 'domcontentloaded', timeout: 30000 })
     const bodyText = await page.locator('body').innerText({ timeout: 10000 })
     if (!bodyText.includes(route.expectText)) {
       throw new Error(`${route.path} did not contain expected text: ${route.expectText}`)

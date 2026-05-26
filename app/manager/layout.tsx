@@ -9,7 +9,6 @@ import {
   FileSpreadsheet,
   MessageSquareText,
   Download,
-  Zap,
 } from 'lucide-react'
 
 export default async function ManagerLayout({
