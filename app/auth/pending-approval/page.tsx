@@ -12,7 +12,7 @@ export default function PendingApprovalPage() {
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-orange-600 flex items-center justify-center shadow-lg">
               <Sparkles className="w-6 h-6 text-white" />
             </div>
-            <span className="text-2xl font-bold">SkillTest</span>
+            <span className="text-2xl font-bold">Maverick</span>
           </Link>
         </div>
 

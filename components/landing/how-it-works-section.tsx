@@ -134,7 +134,7 @@ export function HowItWorksSection() {
                   <div className="w-3 h-3 rounded-full bg-background/20" />
                   <div className="w-3 h-3 rounded-full bg-background/20" />
                 </div>
-                <span className="text-xs font-mono text-background/40">skilltest.config</span>
+                <span className="text-xs font-mono text-background/40">maverick.config</span>
               </div>
 
               {/* Content */}

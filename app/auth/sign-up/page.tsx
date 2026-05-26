@@ -80,7 +80,7 @@ export default function SignUpPage() {
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transition-colors duration-500 ${isTrainer ? 'bg-gradient-to-br from-violet-500 to-orange-600' : 'bg-gradient-to-br from-blue-500 to-violet-600'}`}>
             <Sparkles className="w-5 h-5 text-white" />
           </div>
-          <span className="text-2xl font-bold text-white tracking-tight">SkillTest</span>
+          <span className="text-2xl font-bold text-white tracking-tight">Maverick</span>
         </Link>
 
         <div className="relative z-10 space-y-8 max-w-xs">
@@ -129,7 +129,7 @@ export default function SignUpPage() {
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-md ${isTrainer ? 'bg-gradient-to-br from-violet-500 to-orange-600' : 'bg-gradient-to-br from-blue-500 to-violet-600'}`}>
               <Sparkles className="w-4 h-4 text-white" />
             </div>
-            <span className="text-xl font-bold tracking-tight">SkillTest</span>
+            <span className="text-xl font-bold tracking-tight">Maverick</span>
           </Link>
 
           <div className="mb-6">

@@ -64,7 +64,7 @@ export function SecuritySection() {
               safe with us.
             </h2>
             <p className="text-xl text-muted-foreground leading-relaxed mb-12">
-              Corporate training data is sensitive. skilltest_ai is built with enterprise-grade security at every layer, ensuring batch execution records stay private.
+              Corporate training data is sensitive. Maverick is built with enterprise-grade security at every layer, ensuring batch execution records stay private.
             </p>
 
             {/* Highlights */}

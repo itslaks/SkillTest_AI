@@ -24,7 +24,7 @@ const jetbrainsMono = JetBrains_Mono({
 const isVercelDeployment = process.env.VERCEL === '1'
 
 export const metadata: Metadata = {
-  title: 'skilltest_ai - Training Management System',
+  title: 'Maverick Execution Platform - Training Management System',
   description: 'Centralized TMS for batch execution, candidate onboarding, attendance, assessments, trainer coordination, feedback, dashboards, and governance reporting.',
 }
 
