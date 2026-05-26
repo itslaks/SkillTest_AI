@@ -8,44 +8,6 @@ const ALL_DIFFICULTIES: DifficultyLevel[] = ['easy', 'medium', 'hard', 'advanced
 
 type QuestionOption = { text: string; isCorrect: boolean }
 
-// Difficulty-specific prompts to ensure proper question complexity
-const DIFFICULTY_PROMPTS: Record<DifficultyLevel, string> = {
-  easy: `
-    - Questions should test basic recall and fundamental understanding
-    - Use simple, straightforward language
-    - Focus on definitions, basic facts, and simple concepts
-    - Incorrect options should be clearly distinguishable from correct ones
-    - Example types: "What is...?", "Which of the following is...?", "Define..."`,
-  
-  medium: `
-    - Questions should test understanding and application
-    - Require applying knowledge to simple scenarios
-    - Include some analysis of concepts
-    - Incorrect options should be plausible but clearly wrong upon reflection
-    - Example types: "Why does...?", "How would you...?", "What happens when...?"`,
-  
-  hard: `
-    - Questions should test analysis and problem-solving
-    - Require combining multiple concepts
-    - Include scenario-based questions
-    - Incorrect options should be plausible and require careful analysis
-    - Example types: "Analyze...", "Compare and contrast...", "What would be the result of...?"`,
-  
-  advanced: `
-    - Questions should test evaluation and synthesis
-    - Require deep understanding and critical thinking
-    - Include complex scenarios with multiple variables
-    - All options should seem plausible, requiring expert knowledge
-    - Example types: "Evaluate...", "What is the optimal approach...", "In this complex scenario..."`,
-  
-  hardcore: `
-    - Questions should test expert-level mastery
-    - Require integration of advanced concepts across multiple domains
-    - Include edge cases, exceptions, and nuanced scenarios
-    - All options should be highly plausible, only distinguishable by true experts
-    - Example types: "In an edge case where...", "Considering all factors...", "What is the most efficient..."`
-}
-
 /**
  * Dynamically generates MCQs based on the difficulty distribution:
  * - 50% from the selected difficulty
