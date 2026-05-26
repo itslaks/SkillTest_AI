@@ -9,6 +9,7 @@ import {
   FileSpreadsheet,
   MessageSquareText,
   Download,
+  FileCheck2,
 } from 'lucide-react'
 
 export default async function ManagerLayout({
@@ -40,6 +41,7 @@ export default async function ManagerLayout({
               <CmdAction href="/manager/operations#attendance" label="Attendance" icon={ClipboardCheck} />
               <CmdAction href="/manager/operations#assessment" label="Scores" icon={FileSpreadsheet} />
               <CmdAction href="/manager/operations#feedback" label="Feedback" icon={MessageSquareText} />
+              <CmdAction href="/manager/compliance" label="BRD Proof" icon={FileCheck2} />
               <CmdAction href="/manager/reports" label="Reports" icon={Download} />
             </div>
             <div className="ml-auto hidden xl:flex items-center gap-2">

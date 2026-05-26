@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   Crown,
   BookOpen,
+  FileCheck2,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { signOut } from '@/lib/actions/auth'
@@ -44,6 +45,7 @@ const navigation = [
       { name: 'Leaderboard', href: '/manager/leaderboard', icon: Trophy, color: 'text-amber-400', bg: 'bg-amber-400/10', activeBg: 'bg-amber-500', description: 'Rankings & scores' },
       { name: 'Analytics & AI', href: '/manager/analytics', icon: Brain, color: 'text-pink-400', bg: 'bg-pink-400/10', activeBg: 'bg-pink-500', description: 'AI-powered insights' },
       { name: 'Reports', href: '/manager/reports', icon: BarChart3, color: 'text-orange-400', bg: 'bg-orange-400/10', activeBg: 'bg-orange-500', description: 'Download reports' },
+      { name: 'BRD Proof', href: '/manager/compliance', icon: FileCheck2, color: 'text-cyan-300', bg: 'bg-cyan-300/10', activeBg: 'bg-cyan-400', description: 'Requirement coverage' },
       { name: 'Admin Console', href: '/manager/admin', icon: ShieldCheck, color: 'text-yellow-400', bg: 'bg-yellow-400/10', activeBg: 'bg-yellow-500', description: 'Roles & controls' },
     ]
   },
@@ -110,7 +112,7 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
           </div>
           {!collapsed && (
             <div className="leading-none">
-              <span className="font-bold text-[15px] text-white tracking-tight">SkillTest AI</span>
+              <span className="font-bold text-[15px] text-white tracking-tight">Maverick TMS</span>
               <p className="text-[10px] text-white/55 mt-0.5 font-medium tracking-wide uppercase">
                 {profile?.role === 'trainer' ? 'Trainer Portal' : profile?.role === 'admin' ? 'Governance' : 'Manager Console'}
               </p>
