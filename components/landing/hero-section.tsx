@@ -41,8 +41,8 @@ export function HeroSection() {
 
         <div className="mb-10">
           <h1 className="text-[clamp(3rem,10vw,8rem)] font-display leading-[0.94] tracking-tight">
-            <span className="block">SkillTest</span>
-            <span className="block bg-gradient-to-r from-violet-600 to-cyan-500 bg-clip-text text-transparent">AI</span>
+            <span className="block">Maverick</span>
+            <span className="block bg-gradient-to-r from-violet-600 to-cyan-500 bg-clip-text text-transparent">Execution</span>
           </h1>
           <p className="mt-4 text-xl text-slate-600 font-medium max-w-lg">Training management that thinks with you, not just for you.</p>
         </div>
@@ -50,11 +50,11 @@ export function HeroSection() {
         <div className="grid gap-16 xl:grid-cols-[0.85fr_1.15fr] xl:items-center">
           <div className="space-y-8">
             <p className="text-xl lg:text-2xl text-slate-700 leading-relaxed max-w-xl">
-              SkillTest AI combines intelligent quiz generation, training operations, real-time attendance, AI coaching insights, and automated reporting — in one platform built for non-technical teams.
+              Maverick Execution Platform combines batch operations, real-time attendance, assessment imports, trainer scorecards, feedback analytics, and automated reporting in one judge-ready TMS.
             </p>
 
             <div className="helper-strip rounded-2xl p-4 text-sm leading-relaxed shadow-sm">
-              <p className="font-semibold text-slate-950">How SkillTest AI works</p>
+              <p className="font-semibold text-slate-950">How Maverick works</p>
               <p className="mt-1 text-slate-700">Create batch → assign candidates → mark attendance → AI generates quizzes → upload scores → AI analyses results → export reports.</p>
             </div>
 

@@ -81,7 +81,7 @@ export default async function AnalyticsPage() {
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-[10px] uppercase tracking-[0.35em] text-zinc-400">
               <Sparkles className="h-3.5 w-3.5" />
-              SkillTest Intelligence Layer
+              Maverick Intelligence Layer
             </div>
             <h1 className="mt-4 text-3xl font-semibold tracking-tight md:text-5xl">Behavioral AI analytics cockpit</h1>
             <p className="mt-4 max-w-3xl text-sm leading-relaxed text-zinc-400">

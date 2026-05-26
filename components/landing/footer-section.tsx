@@ -44,7 +44,7 @@ export function FooterSection() {
               <div className="w-10 h-10 rounded-lg bg-foreground flex items-center justify-center transition-transform group-hover:rotate-12">
                 <Sparkles className="w-6 h-6 text-background" />
               </div>
-              <span className="text-2xl font-bold">skilltest_ai</span>
+              <span className="text-2xl font-bold">Maverick</span>
             </Link>
             <p className="text-muted-foreground max-w-xs mb-8">
               The gamified employee assessment platform for the modern enterprise.
@@ -87,7 +87,7 @@ export function FooterSection() {
         {/* Bottom */}
         <div className="flex flex-col md:flex-row items-center justify-between pt-12 border-t border-foreground/10 gap-8">
           <p className="text-muted-foreground text-sm font-mono">
-            © 2026 skilltest_ai. All rights reserved.
+            © 2026 Maverick Execution Platform. All rights reserved.
           </p>
           <div className="flex gap-8">
             <Link href="#" className="text-xs text-muted-foreground hover:text-foreground font-mono">

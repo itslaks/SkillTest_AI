@@ -62,7 +62,7 @@ export function PricingSection() {
             <span className="text-stroke">place</span>
           </h2>
           <p className="text-lg text-muted-foreground max-w-xl">
-            From automated governance to massive scale training reporting. skilltest_ai is the complete package.
+            From automated governance to massive scale training reporting. Maverick is the complete package.
           </p>
         </div>
 
