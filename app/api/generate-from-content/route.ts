@@ -33,11 +33,7 @@ export async function POST(request: NextRequest) {
   const distribution = calculateStrictDistribution(difficulty, count)
   const hasAI = !!(process.env.OPENAI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY)
 
-  if (!hasAI) {
-    return NextResponse.json({ error: 'No AI API key configured. Set OPENAI_API_KEY or GOOGLE_GEMINI_API_KEY.' }, { status: 500 })
-  }
-
-  const rawQuestions = await generateFromContentAI(content, distribution, topic)
+  const rawQuestions = hasAI ? await generateFromContentAI(content, distribution, topic) : []
   const questions = ensureContentQuestionCount(rawQuestions, topic || 'Provided content', content, difficulty, count)
 
   if (questions.length === 0) {
@@ -54,7 +50,7 @@ export async function POST(request: NextRequest) {
     options: randomizeOptions(q.options, answerPositionPlan[i]),
     difficulty: q.difficulty,
     explanation: q.explanation || null,
-    is_ai_generated: true,
+    is_ai_generated: hasAI,
     order_index: i,
   }))
 
@@ -71,6 +67,7 @@ export async function POST(request: NextRequest) {
     data, 
     distribution,
     generated: questions.length,
+    method: hasAI ? 'Provider AI' : 'SkillTest_AI local content intelligence',
   })
 }
 
