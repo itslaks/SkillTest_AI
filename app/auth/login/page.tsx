@@ -36,10 +36,10 @@ function LoginContent() {
   return (
     <div className="min-h-screen flex bg-background">
       {/* Left panel */}
-      <div className="hidden lg:flex lg:w-[42%] bg-black relative overflow-hidden flex-col justify-between p-12">
-        <div className="absolute top-0 left-0 w-72 h-72 bg-blue-600/20 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
-        <div className="absolute bottom-0 right-0 w-72 h-72 bg-violet-600/20 rounded-full blur-3xl translate-x-1/2 translate-y-1/2" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl" />
+      <div className="signal-shell dashboard-grid-bg hidden lg:flex lg:w-[42%] bg-black relative overflow-hidden flex-col justify-between p-12">
+        <div className="aura-ring -left-16 -top-16 h-80 w-80 bg-cyan-400/25" />
+        <div className="aura-ring -bottom-16 -right-10 h-80 w-80 bg-violet-500/22" style={{ animationDelay: '1.2s' }} />
+        <div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300 to-transparent" />
 
         <Link href="/" className="relative z-10 flex items-center gap-3 w-fit">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-lg">
@@ -51,9 +51,9 @@ function LoginContent() {
 
         <div className="relative z-10 space-y-8">
           <div>
-            <h2 className="text-4xl font-bold text-white leading-tight mb-4">Welcome back.</h2>
+            <h2 className="font-display text-5xl font-semibold text-white leading-tight mb-4">Welcome back.</h2>
             <p className="text-white/50 text-lg leading-relaxed">
-              One platform, three roles. Everyone picks up right where they left off.
+              SkillTest_AI keeps training execution, learner readiness, and AI insights moving from the same command surface.
             </p>
           </div>
 
@@ -63,7 +63,7 @@ function LoginContent() {
               {
                 icon: Crown,
                 role: 'Admin',
-                desc: 'Full governance control — manage users, roles & platform settings',
+                desc: 'Full governance control - manage users, roles & platform settings',
                 color: 'text-yellow-400',
                 bg: 'bg-yellow-500/10 border-yellow-500/20',
               },
@@ -82,7 +82,7 @@ function LoginContent() {
                 bg: 'bg-cyan-500/10 border-cyan-500/20',
               },
             ].map(item => (
-              <div key={item.role} className={`flex items-center gap-4 rounded-2xl border p-3 ${item.bg}`}>
+              <div key={item.role} className={`signal-card flex items-center gap-4 rounded-2xl border p-3 ${item.bg}`}>
                 <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center shrink-0">
                   <item.icon className={`h-4 w-4 ${item.color}`} />
                 </div>
@@ -116,10 +116,10 @@ function LoginContent() {
 
       {/* Right form panel */}
       <div className="flex-1 flex items-center justify-center p-6 md:p-12 relative overflow-y-auto">
-        <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-primary/5 pointer-events-none" />
-        <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute inset-0 mesh-bg pointer-events-none" />
+        <div className="aura-ring right-8 top-8 h-72 w-72 bg-cyan-300/25 pointer-events-none" />
 
-        <div className="relative z-10 w-full max-w-md py-8">
+        <div className="signal-shell relative z-10 w-full max-w-md rounded-[2rem] border border-zinc-200 bg-white/92 p-6 py-8 shadow-[0_30px_90px_rgba(15,23,42,0.12)] backdrop-blur md:p-8">
           <Link href="/" className="lg:hidden inline-flex items-center gap-2.5 mb-8">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-md">
               <Sparkles className="w-4 h-4 text-white" />
@@ -128,7 +128,7 @@ function LoginContent() {
           </Link>
 
           <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight">Sign in to your account</h1>
+            <h1 className="font-display text-4xl font-semibold tracking-tight">Sign in to your account</h1>
             <p className="text-muted-foreground mt-1.5">Enter your credentials to continue</p>
           </div>
 

@@ -285,7 +285,7 @@ export async function sendPasswordReset(formData: FormData) {
   if (!email) return { error: 'Email is required' };
   const supabase = await createClient();
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${getSiteUrl()}/auth/update-password`,
+    redirectTo: `${getSiteUrl()}/auth/callback?next=/auth/update-password`,
   });
   if (error) return { error: error.message };
   return { success: true };

@@ -38,16 +38,16 @@ export default function SignUpPage() {
   return (
     <div className="min-h-screen flex bg-background">
       {/* Left branding panel */}
-      <div className={`hidden lg:flex lg:w-[42%] relative overflow-hidden flex-col justify-between p-12 transition-colors duration-500 ${isTrainer ? 'bg-[#0d0a1a]' : 'bg-[#0f0f10]'}`}>
+      <div className={`signal-shell dashboard-grid-bg hidden lg:flex lg:w-[42%] relative overflow-hidden flex-col justify-between p-12 transition-colors duration-500 ${isTrainer ? 'bg-[#0d0a1a]' : 'bg-[#0f0f10]'}`}>
         {/* Animated gradient blobs */}
-        <div className={`absolute top-0 left-0 w-96 h-96 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 transition-colors duration-500 ${isTrainer ? 'bg-violet-600/25' : 'bg-blue-600/20'}`} />
-        <div className={`absolute bottom-0 right-0 w-96 h-96 rounded-full blur-3xl translate-x-1/2 translate-y-1/2 transition-colors duration-500 ${isTrainer ? 'bg-orange-600/20' : 'bg-violet-600/20'}`} />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full blur-3xl opacity-30 bg-indigo-500/20" />
+        <div className={`aura-ring -left-16 -top-16 h-96 w-96 transition-colors duration-500 ${isTrainer ? 'bg-violet-500/25' : 'bg-cyan-400/24'}`} />
+        <div className={`aura-ring -bottom-16 -right-10 h-96 w-96 transition-colors duration-500 ${isTrainer ? 'bg-orange-500/20' : 'bg-violet-500/22'}`} style={{ animationDelay: '1.2s' }} />
+        <div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300 to-transparent" />
 
         {/* 3D floating card element */}
         <div className="absolute right-8 top-1/2 -translate-y-1/2 perspective-1000">
           <div
-            className="w-52 h-64 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-sm p-5 shadow-2xl"
+            className="signal-card w-52 h-64 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-sm p-5 shadow-2xl"
             style={{
               transform: 'rotateY(-15deg) rotateX(5deg)',
               transformStyle: 'preserve-3d',
@@ -86,8 +86,8 @@ export default function SignUpPage() {
 
         <div className="relative z-10 space-y-8 max-w-xs">
           <div>
-            <h2 className="text-4xl font-bold text-white leading-tight mb-4">
-              {isTrainer ? 'Train smarter,\nnot harder.' : 'Your skills,\nmeasured right.'}
+            <h2 className="font-display text-5xl font-semibold text-white leading-tight mb-4">
+              {isTrainer ? <>Train smarter,<br />not harder.</> : <>Your skills,<br />measured right.</>}
             </h2>
             <p className="text-white/50 text-base leading-relaxed">
               {isTrainer
@@ -121,10 +121,10 @@ export default function SignUpPage() {
 
       {/* Right form panel */}
       <div className="flex-1 flex items-center justify-center p-6 md:p-12 relative overflow-y-auto">
-        <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-primary/5 pointer-events-none" />
-        <div className={`absolute top-0 right-0 w-80 h-80 rounded-full blur-3xl pointer-events-none transition-colors duration-500 ${isTrainer ? 'bg-violet-500/5' : 'bg-blue-500/5'}`} />
+        <div className="absolute inset-0 mesh-bg pointer-events-none" />
+        <div className={`aura-ring right-8 top-8 h-72 w-72 pointer-events-none transition-colors duration-500 ${isTrainer ? 'bg-violet-300/25' : 'bg-cyan-300/25'}`} />
 
-        <div className="relative z-10 w-full max-w-md py-8">
+        <div className="signal-shell relative z-10 w-full max-w-md rounded-[2rem] border border-zinc-200 bg-white/92 p-6 py-8 shadow-[0_30px_90px_rgba(15,23,42,0.12)] backdrop-blur md:p-8">
           {/* Mobile logo */}
           <Link href="/" className="lg:hidden inline-flex items-center gap-2.5 mb-8">
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-md ${isTrainer ? 'bg-gradient-to-br from-violet-500 to-orange-600' : 'bg-gradient-to-br from-blue-500 to-violet-600'}`}>
@@ -134,7 +134,7 @@ export default function SignUpPage() {
           </Link>
 
           <div className="mb-6">
-            <h1 className="text-3xl font-bold tracking-tight">Create your account</h1>
+            <h1 className="font-display text-4xl font-semibold tracking-tight">Create your account</h1>
             <p className="text-muted-foreground mt-1.5">Choose your role to get started</p>
           </div>
 
@@ -194,7 +194,8 @@ export default function SignUpPage() {
           <form onSubmit={handleSignUp} className="space-y-4">
             {error && (
               <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
-                <span className="shrink-0">⚠️</span>{error}
+                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{error}</span>
               </div>
             )}
 
