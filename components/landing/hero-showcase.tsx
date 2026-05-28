@@ -50,7 +50,7 @@ export function HeroShowcase() {
 
         <div className="maverick-command-panel flex min-h-52 flex-col rounded-[1.5rem] p-4 sm:col-span-2">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-cyan-100">Training Signal Stack</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-cyan-100">SkillTest_AI Signal Stack</p>
             <span className="rounded-full bg-white/12 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-white">
               Live View
             </span>

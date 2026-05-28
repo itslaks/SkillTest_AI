@@ -17,7 +17,7 @@ const securityFeatures = [
   {
     icon: Eye,
     title: "Audit Logs",
-    description: "Every action—from quiz creation to score modification—is tracked and logged.",
+    description: "Every action from quiz creation to score modification is tracked and logged.",
   },
   {
     icon: FileCheck,
@@ -64,7 +64,7 @@ export function SecuritySection() {
               safe with us.
             </h2>
             <p className="text-xl text-muted-foreground leading-relaxed mb-12">
-              Corporate training data is sensitive. Maverick is built with enterprise-grade security at every layer, ensuring batch execution records stay private.
+              Corporate training data is sensitive. SkillTest_AI is built with enterprise-grade security at every layer, ensuring batch execution records stay private.
             </p>
 
             {/* Highlights */}

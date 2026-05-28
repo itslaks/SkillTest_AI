@@ -94,7 +94,7 @@ export function MetricsSection() {
   }, []);
 
   return (
-    <section id="why-maverick" ref={sectionRef} className="relative overflow-hidden py-24 lg:py-32 border-y border-foreground/10 bg-[radial-gradient(circle_at_top,rgba(15,23,42,0.06),transparent_35%),linear-gradient(180deg,rgba(255,255,255,0.88),rgba(244,244,245,0.96))]">
+    <section id="why-skilltest-ai" ref={sectionRef} className="relative overflow-hidden py-24 lg:py-32 border-y border-foreground/10 bg-[radial-gradient(circle_at_top,rgba(15,23,42,0.06),transparent_35%),linear-gradient(180deg,rgba(255,255,255,0.88),rgba(244,244,245,0.96))]">
       <div className="pointer-events-none absolute inset-x-0 top-10 mx-auto h-56 max-w-5xl rounded-full bg-blue-300/20 blur-3xl" />
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
         {/* Header */}
