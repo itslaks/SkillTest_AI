@@ -133,7 +133,7 @@ export async function GET() {
     XLSX.utils.book_append_sheet(wb, wsEmployees, 'Employee Stats')
 
     const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
-    const filename = `maverick-report-${new Date().toISOString().split('T')[0]}.xlsx`
+    const filename = `skilltest-ai-mavericks-report-${new Date().toISOString().split('T')[0]}.xlsx`
 
     return new NextResponse(buffer, {
       headers: {

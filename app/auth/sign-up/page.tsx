@@ -81,6 +81,7 @@ export default function SignUpPage() {
             <Sparkles className="w-5 h-5 text-white" />
           </div>
           <span className="text-2xl font-bold text-white tracking-tight">SkillTest_AI</span>
+          <span className="rounded-full border border-white/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-widest text-white/55">Mavericks Execution Platform</span>
         </Link>
 
         <div className="relative z-10 space-y-8 max-w-xs">

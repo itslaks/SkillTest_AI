@@ -3,6 +3,7 @@ import { requireManagerForApi } from '@/lib/rbac'
 import { createAdminClient } from '@/lib/supabase/server'
 import { canAccessTrainingBatch } from '@/lib/training-access'
 import { averageScore, computeTopperScore, isTopper, normalizeTopperWeights } from '@/lib/topper'
+import { PRODUCT_NAME } from '@/lib/branding'
 
 /**
  * PDF export for batch reports using jsPDF + jspdf-autotable.
@@ -365,14 +366,14 @@ export async function GET(request: NextRequest) {
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i)
     doc.setFontSize(7); doc.setTextColor(150, 150, 150); doc.setFont('helvetica', 'normal')
-    doc.text(`Maverick Execution Platform - Confidential | Page ${i} of ${pageCount}`, 14, 207)
+    doc.text(`${PRODUCT_NAME} - Confidential | Page ${i} of ${pageCount}`, 14, 207)
     doc.text(`Generated ${timestamp}`, 200, 207)
   }
 
   const pdfBytes = doc.output('arraybuffer')
   const buffer = Buffer.from(pdfBytes)
   const ts = new Date().toISOString().split('T')[0]
-  const filename = `maverick-tms-${reportType}-report-${ts}.pdf`
+  const filename = `skilltest-ai-mavericks-${reportType}-report-${ts}.pdf`
 
   return new NextResponse(buffer, {
     headers: {

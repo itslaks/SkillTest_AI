@@ -45,7 +45,7 @@ export default async function AdminConsolePage() {
             <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-yellow-400 flex items-center justify-center text-[9px] font-bold text-yellow-900">TMS</div>
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-[0.35em] text-yellow-400/80 mb-1">Maverick TMS - Full Control</p>
+            <p className="text-[10px] uppercase tracking-[0.35em] text-yellow-400/80 mb-1">SkillTest_AI: Mavericks Execution Platform</p>
             <h1 className="text-2xl md:text-4xl font-bold tracking-tight">Admin Governance Console</h1>
             <p className="mt-1 text-sm text-zinc-400">
               Approve trainer accounts, manage roles, configure thresholds, and review audit logs.

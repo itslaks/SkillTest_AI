@@ -47,7 +47,7 @@ export function FooterSection() {
               <span className="text-2xl font-bold">SkillTest_AI</span>
             </Link>
             <p className="text-muted-foreground max-w-xs mb-8">
-              The Mavericks Execution Platform for modern training teams.
+              SkillTest_AI: Mavericks Execution Platform for modern training teams.
             </p>
             <div className="flex gap-4">
               <a href="https://twitter.com" aria-label="Open SkillTest_AI on Twitter" className="p-2 border border-foreground/10 hover:border-foreground/30 transition-colors">

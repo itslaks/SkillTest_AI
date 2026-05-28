@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       [
         {
           role: 'system',
-          content: 'You are a learning coach inside Maverick Execution Platform. Give one short, encouraging, personalised recommendation (max 2 sentences). Be direct and practical, not generic.',
+          content: 'You are a learning coach inside SkillTest_AI: Mavericks Execution Platform. Give one short, encouraging, personalised recommendation (max 2 sentences). Be direct and practical, not generic.',
         },
         { role: 'user', content: context },
       ],

@@ -1,4 +1,4 @@
--- Training operations expansion for the Maverick Execution Platform brief.
+-- Training operations expansion for SkillTest_AI: Mavericks Execution Platform.
 -- Adds batch lifecycle, trainer coordination, attendance, reminders, and structured feedback.
 
 CREATE TABLE IF NOT EXISTS training_batches (
