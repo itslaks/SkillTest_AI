@@ -16,19 +16,19 @@ const footerLinks = [
   {
     title: "Resources",
     links: [
-      { name: "Documentation", href: "#" },
-      { name: "Manager Guide", href: "#" },
-      { name: "Employee FAQ", href: "#" },
-      { name: "API Reference", href: "#" },
+      { name: "Managers", href: "#managers" },
+      { name: "Highlights", href: "#highlights" },
+      { name: "Sign in", href: "/auth/login" },
+      { name: "Create account", href: "/auth/sign-up" },
     ],
   },
   {
     title: "Company",
     links: [
-      { name: "About Us", href: "#" },
-      { name: "Privacy Policy", href: "#" },
-      { name: "Terms of Service", href: "#" },
-      { name: "Contact", href: "#" },
+      { name: "About SkillTest_AI", href: "#why-skilltest-ai" },
+      { name: "Security", href: "#security" },
+      { name: "Terms", href: "/auth/sign-up" },
+      { name: "Contact", href: "mailto:hello@skilltest.ai" },
     ],
   },
 ];
@@ -44,19 +44,19 @@ export function FooterSection() {
               <div className="w-10 h-10 rounded-lg bg-foreground flex items-center justify-center transition-transform group-hover:rotate-12">
                 <Sparkles className="w-6 h-6 text-background" />
               </div>
-              <span className="text-2xl font-bold">Maverick</span>
+              <span className="text-2xl font-bold">SkillTest_AI</span>
             </Link>
             <p className="text-muted-foreground max-w-xs mb-8">
-              The gamified employee assessment platform for the modern enterprise.
+              The Mavericks Execution Platform for modern training teams.
             </p>
             <div className="flex gap-4">
-              <a href="#" className="p-2 border border-foreground/10 hover:border-foreground/30 transition-colors">
+              <a href="https://twitter.com" aria-label="Open SkillTest_AI on Twitter" className="p-2 border border-foreground/10 hover:border-foreground/30 transition-colors">
                 <Twitter className="w-5 h-5 text-muted-foreground hover:text-foreground" />
               </a>
-              <a href="#" className="p-2 border border-foreground/10 hover:border-foreground/30 transition-colors">
+              <a href="https://linkedin.com" aria-label="Open SkillTest_AI on LinkedIn" className="p-2 border border-foreground/10 hover:border-foreground/30 transition-colors">
                 <Linkedin className="w-5 h-5 text-muted-foreground hover:text-foreground" />
               </a>
-              <a href="#" className="p-2 border border-foreground/10 hover:border-foreground/30 transition-colors">
+              <a href="https://github.com" aria-label="Open SkillTest_AI on GitHub" className="p-2 border border-foreground/10 hover:border-foreground/30 transition-colors">
                 <Github className="w-5 h-5 text-muted-foreground hover:text-foreground" />
               </a>
             </div>
@@ -87,16 +87,16 @@ export function FooterSection() {
         {/* Bottom */}
         <div className="flex flex-col md:flex-row items-center justify-between pt-12 border-t border-foreground/10 gap-8">
           <p className="text-muted-foreground text-sm font-mono">
-            © 2026 Maverick Execution Platform. All rights reserved.
+            (c) 2026 SkillTest_AI. All rights reserved.
           </p>
           <div className="flex gap-8">
-            <Link href="#" className="text-xs text-muted-foreground hover:text-foreground font-mono">
+            <Link href="#security" className="text-xs text-muted-foreground hover:text-foreground font-mono">
               Privacy
             </Link>
-            <Link href="#" className="text-xs text-muted-foreground hover:text-foreground font-mono">
+            <Link href="/auth/sign-up" className="text-xs text-muted-foreground hover:text-foreground font-mono">
               Terms
             </Link>
-            <Link href="#" className="text-xs text-muted-foreground hover:text-foreground font-mono">
+            <Link href="#highlights" className="text-xs text-muted-foreground hover:text-foreground font-mono">
               Cookies
             </Link>
           </div>

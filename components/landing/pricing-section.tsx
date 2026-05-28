@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowRight, Check } from "lucide-react";
+import Link from "next/link";
 
 const capabilities = [
   {
@@ -62,7 +63,7 @@ export function PricingSection() {
             <span className="text-stroke">place</span>
           </h2>
           <p className="text-lg text-muted-foreground max-w-xl">
-            From automated governance to massive scale training reporting. Maverick is the complete package.
+            From automated governance to massive scale training reporting. SkillTest_AI is the complete package.
           </p>
         </div>
 
@@ -105,17 +106,17 @@ export function PricingSection() {
                 ))}
               </ul>
 
-              {/* CTA Simulation */}
-              <div
+              <Link
+                href="/auth/sign-up"
                 className={`w-full py-4 flex items-center justify-center gap-2 text-sm font-medium transition-all group ${
                   item.popular
                     ? "bg-foreground text-primary-foreground hover:bg-foreground/90"
                     : "border border-foreground/20 text-foreground hover:border-foreground hover:bg-foreground/5"
-                } cursor-default`}
+                }`}
               >
                 {item.cta}
                 <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-              </div>
+              </Link>
             </div>
           ))}
         </div>
