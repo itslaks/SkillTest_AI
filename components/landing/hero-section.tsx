@@ -5,7 +5,7 @@ import Link from "next/link";
 
 export function HeroSection() {
   return (
-    <section className="relative min-h-[92vh] flex flex-col justify-center overflow-hidden">
+    <section className="relative flex min-h-[96vh] flex-col justify-center overflow-hidden pt-24 md:pt-28">
       <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-30">
         {[...Array(8)].map((_, i) => (
           <div
@@ -31,29 +31,33 @@ export function HeroSection() {
         ))}
       </div>
 
-      <div className="relative z-10 max-w-[1400px] mx-auto px-6 lg:px-12 py-24 lg:py-28">
-        <div className="mb-8">
+      <div className="pointer-events-none absolute left-1/2 top-10 z-0 -translate-x-1/2 select-none font-display text-[clamp(5rem,18vw,18rem)] leading-none text-violet-500/10 blur-[0.5px]">
+        SkillTest_AI
+      </div>
+
+      <div className="relative z-10 max-w-[1400px] mx-auto px-6 lg:px-12 pb-16 pt-8 lg:pb-20 lg:pt-10">
+        <div className="mb-8 hero-rise" style={{ animationDelay: "80ms" }}>
           <span className="inline-flex items-center gap-3 rounded-full border border-violet-200 bg-white/90 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">
             <span className="h-2 w-2 rounded-full bg-violet-500 animate-pulse" />
             SkillTest_AI: Mavericks Execution Platform
           </span>
         </div>
 
-        <div className="mb-10">
-          <h1 className="text-[clamp(3rem,10vw,8rem)] font-display leading-[0.94] tracking-tight">
+        <div className="mb-10 hero-rise" style={{ animationDelay: "160ms" }}>
+          <h1 className="max-w-[920px] text-[clamp(3rem,9vw,7.4rem)] font-display leading-[0.94] tracking-tight text-slate-950">
             <span className="block">SkillTest_AI</span>
-            <span className="block bg-gradient-to-r from-violet-600 to-cyan-500 bg-clip-text text-transparent">Execution</span>
+            <span className="block bg-gradient-to-r from-violet-600 via-blue-600 to-cyan-500 bg-clip-text text-transparent">Execution</span>
           </h1>
           <p className="mt-4 text-xl text-slate-600 font-medium max-w-lg">Training management that thinks with you, not just for you.</p>
         </div>
 
         <div className="grid gap-16 xl:grid-cols-[0.85fr_1.15fr] xl:items-center">
-          <div className="space-y-8">
+          <div className="space-y-8 hero-rise" style={{ animationDelay: "240ms" }}>
             <p className="text-xl lg:text-2xl text-slate-700 leading-relaxed max-w-xl">
               SkillTest_AI: Mavericks Execution Platform brings batch operations, real-time attendance, assessment imports, trainer scorecards, feedback analytics, and automated reporting into one judge-ready TMS.
             </p>
 
-            <div className="helper-strip rounded-2xl p-4 text-sm leading-relaxed shadow-sm">
+            <div className="helper-strip signal-sheen rounded-2xl p-4 text-sm leading-relaxed shadow-sm">
               <p className="font-semibold text-slate-950">How SkillTest_AI works</p>
               <p className="mt-1 text-slate-700">Create batch - assign candidates - mark attendance - AI generates quizzes - upload scores - AI analyses results - export reports.</p>
             </div>
@@ -64,7 +68,7 @@ export function HeroSection() {
                 { label: "Operations", value: "End-to-End" },
                 { label: "Insights", value: "Real-time" },
               ].map((item) => (
-                <div key={item.label} className="rounded-2xl glass-panel p-4">
+                <div key={item.label} className="rounded-2xl glass-panel signal-card p-4">
                   <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">{item.label}</p>
                   <p className="mt-3 text-lg font-semibold text-zinc-950">{item.value}</p>
                 </div>
@@ -97,7 +101,7 @@ export function HeroSection() {
             </p>
           </div>
 
-          <div>
+          <div className="hero-rise" style={{ animationDelay: "320ms" }}>
             <HeroShowcase />
           </div>
         </div>
