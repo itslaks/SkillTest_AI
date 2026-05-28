@@ -1,4 +1,4 @@
--- BRD completion pass for Maverick Execution Platform - TMS.
+-- BRD completion pass for SkillTest_AI: Mavericks Execution Platform - TMS.
 -- Adds multi-trainer assignment, attendance versioning, assessment governance,
 -- project evaluation evidence, admin audit surface, and RLS policies for TMS tables.
 

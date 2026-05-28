@@ -8,9 +8,8 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Cell,
 } from 'recharts'
-import { Users, TrendingUp, Star, Award } from 'lucide-react'
+import { Users, TrendingUp, Award } from 'lucide-react'
 
 interface TrainerMetric {
   id: string

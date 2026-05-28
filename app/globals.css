@@ -1,5 +1,4 @@
 @import 'tailwindcss';
-@import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -133,10 +132,12 @@
   
   .marquee {
     animation: marquee 30s linear infinite;
+    will-change: transform;
   }
   
   .marquee-reverse {
     animation: marquee-reverse 25s linear infinite;
+    will-change: transform;
   }
 
   @keyframes marquee {
@@ -164,6 +165,43 @@
   
   .hover-lift:hover {
     transform: translateY(-4px);
+  }
+
+  .perspective-1000 {
+    perspective: 1000px;
+  }
+
+  .motion-reveal {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0);
+    transition:
+      opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: opacity, transform;
+  }
+
+  .motion-reveal.is-visible,
+  .motion-reveal[data-visible='true'] {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+
+  .motion-hover {
+    transform: translate3d(0, 0, 0);
+    transition:
+      transform 0.22s ease,
+      box-shadow 0.22s ease,
+      border-color 0.22s ease,
+      background-color 0.22s ease;
+  }
+
+  .motion-hover:hover {
+    transform: translate3d(0, -3px, 0);
+  }
+
+  .hero-rise {
+    animation: hero-rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+    will-change: opacity, transform, filter;
   }
   
   .letter-spin {
@@ -204,6 +242,19 @@
     }
   }
 
+  @keyframes hero-rise {
+    0% {
+      opacity: 0;
+      filter: blur(18px);
+      transform: translate3d(0, 26px, 0) scale(0.985);
+    }
+    100% {
+      opacity: 1;
+      filter: blur(0);
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+  }
+
   .noise-overlay {
     position: relative;
     isolation: isolate;
@@ -238,6 +289,58 @@
     box-shadow:
       0 30px 80px rgba(16, 18, 24, 0.12),
       inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  }
+
+  .signal-shell {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .signal-shell::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(115deg, transparent 18%, rgba(34, 211, 238, 0.14), transparent 46%),
+      radial-gradient(circle at 75% 10%, rgba(124, 58, 237, 0.14), transparent 26%);
+    background-size: 220% 220%, auto;
+    animation: signal-scan 9s ease-in-out infinite;
+  }
+
+  .signal-shell > * {
+    z-index: 1;
+  }
+
+  .signal-card {
+    transform: translate3d(0, 0, 0);
+    transition:
+      transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.3s ease,
+      border-color 0.3s ease,
+      background-color 0.3s ease;
+  }
+
+  .signal-card:hover {
+    transform: translate3d(0, -5px, 0);
+    border-color: rgba(14, 165, 233, 0.34);
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.16);
+  }
+
+  .signal-sheen {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .signal-sheen::after {
+    content: '';
+    position: absolute;
+    inset: -120% -40%;
+    background: linear-gradient(115deg, transparent 42%, rgba(255,255,255,0.44), transparent 58%);
+    transform: translateX(-65%) rotate(10deg);
+    animation: sheen-pass 6.8s ease-in-out infinite;
+    pointer-events: none;
   }
 
   .glass-panel-dark {
@@ -359,6 +462,7 @@
     opacity: 0.45;
     animation: drift 10s ease-in-out infinite;
     will-change: transform;
+    transform: translate3d(0, 0, 0);
   }
 
   .motion-safe-3d {
@@ -415,6 +519,31 @@
     }
   }
 
+  @keyframes signal-scan {
+    0%, 100% {
+      background-position: 0% 50%, 50% 50%;
+      opacity: 0.5;
+    }
+    50% {
+      background-position: 100% 50%, 50% 50%;
+      opacity: 0.95;
+    }
+  }
+
+  @keyframes sheen-pass {
+    0%, 38% {
+      transform: translateX(-72%) rotate(10deg);
+      opacity: 0;
+    }
+    52% {
+      opacity: 1;
+    }
+    68%, 100% {
+      transform: translateX(72%) rotate(10deg);
+      opacity: 0;
+    }
+  }
+
   .marquee-container {
     overflow: hidden;
     width: 100%;
@@ -429,9 +558,16 @@
       scroll-behavior: auto !important;
       transition-duration: 0.001ms !important;
     }
+
+    .motion-reveal,
+    .motion-reveal.is-visible,
+    .motion-reveal[data-visible='true'] {
+      opacity: 1 !important;
+      transform: none !important;
+    }
   }
 
-  /* ── Maverick TMS — Distinctive UI System ─────────────────── */
+  /* SkillTest_AI: Mavericks Execution Platform UI system */
 
   /* Asymmetric command cockpit layout */
   .tms-cockpit-grid {

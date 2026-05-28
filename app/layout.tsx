@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { Instrument_Sans, Instrument_Serif, JetBrains_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/toaster'
+import { PRODUCT_NAME } from '@/lib/branding'
 import './globals.css'
 
 const instrumentSans = Instrument_Sans({ 
@@ -24,8 +25,8 @@ const jetbrainsMono = JetBrains_Mono({
 const isVercelDeployment = process.env.VERCEL === '1'
 
 export const metadata: Metadata = {
-  title: 'skilltest_ai - Training Management System',
-  description: 'Centralized TMS for batch execution, candidate onboarding, attendance, assessments, trainer coordination, feedback, dashboards, and governance reporting.',
+  title: PRODUCT_NAME,
+  description: 'SkillTest_AI: Mavericks Execution Platform is a Training Management System for batch execution, candidate onboarding, attendance, assessments, trainer coordination, feedback, dashboards, and governance reporting.',
 }
 
 export default function RootLayout({
@@ -34,8 +35,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <body className={`${instrumentSans.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
+    <html lang="en" className={`${instrumentSans.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable}`}>
+      <body className="font-sans antialiased">
         {children}
         <Toaster />
         {isVercelDeployment && <Analytics />}

@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
-import { ArrowLeft, CheckCircle2, KeyRound, ShieldCheck, Sparkles } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Eye, EyeOff, KeyRound, ShieldCheck, Sparkles } from "lucide-react";
 
 function recoveryErrorMessage(message?: string) {
   if (!message) return "This password reset link is invalid or expired.";
@@ -21,6 +21,8 @@ function UpdatePasswordForm() {
   const [success, setSuccess] = useState<string | null>(null);
   const [isCheckingLink, setIsCheckingLink] = useState(true);
   const [isRecoveryReady, setIsRecoveryReady] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -36,8 +38,10 @@ function UpdatePasswordForm() {
       const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
       const accessToken = hash.get("access_token");
       const refreshToken = hash.get("refresh_token");
+      const hashError = hash.get("error_description") || hash.get("error");
 
       try {
+        if (hashError) throw new Error(hashError);
         if (accessToken && refreshToken) {
           const { error } = await supabase.auth.setSession({
             access_token: accessToken,
@@ -139,10 +143,11 @@ function UpdatePasswordForm() {
   }
 
   return (
-    <div className="min-h-screen grid bg-background lg:grid-cols-[1fr_1fr]">
-      <div className="hidden lg:flex flex-col justify-between bg-black p-12 text-white relative overflow-hidden">
-        <div className="absolute top-0 left-0 h-72 w-72 -translate-x-1/3 -translate-y-1/3 rounded-full bg-emerald-500/25 blur-3xl" />
-        <div className="absolute bottom-0 right-0 h-72 w-72 translate-x-1/3 translate-y-1/3 rounded-full bg-blue-500/20 blur-3xl" />
+    <div className="grid min-h-screen bg-background lg:grid-cols-[0.95fr_1.05fr]">
+      <div className="signal-shell hidden flex-col justify-between overflow-hidden bg-black p-12 text-white lg:flex dashboard-grid-bg">
+        <div className="aura-ring -left-16 -top-16 h-80 w-80 bg-emerald-400/24" />
+        <div className="aura-ring -bottom-16 -right-10 h-80 w-80 bg-blue-500/22" style={{ animationDelay: "1.2s" }} />
+        <div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300 to-transparent" />
 
         <Link href="/auth/login" className="relative z-10 inline-flex items-center gap-2 text-sm text-white/70 hover:text-white">
           <ArrowLeft className="h-4 w-4" />
@@ -150,8 +155,11 @@ function UpdatePasswordForm() {
         </Link>
 
         <div className="relative z-10 max-w-lg">
-          <p className="text-[11px] uppercase tracking-[0.35em] text-white/40">Secure Update</p>
-          <h1 className="mt-4 text-5xl font-semibold tracking-tight">Set your new password.</h1>
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.3em] text-emerald-100">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Recovery Protected
+          </div>
+          <h1 className="mt-5 max-w-md font-display text-5xl font-semibold leading-tight tracking-tight">Set your new password.</h1>
           <p className="mt-5 text-base leading-relaxed text-white/65">
             We verify your recovery link first, then unlock password update for your account.
           </p>
@@ -163,7 +171,7 @@ function UpdatePasswordForm() {
             { icon: KeyRound, title: "Password update", body: "Choose a strong password with at least 8 characters." },
             { icon: ShieldCheck, title: "Safe redirect", body: "After success, you return to sign in with the new password." },
           ].map((item) => (
-            <div key={item.title} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div key={item.title} className="signal-card rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="flex items-start gap-3">
                 <div className="rounded-xl bg-white/10 p-2">
                   <item.icon className="h-4 w-4 text-emerald-300" />
@@ -178,8 +186,9 @@ function UpdatePasswordForm() {
         </div>
       </div>
 
-      <div className="flex items-center justify-center p-6 md:p-10">
-        <div className="w-full max-w-lg rounded-[2rem] border border-zinc-200 bg-white p-8 shadow-xl">
+      <div className="relative flex items-center justify-center overflow-hidden p-6 md:p-10">
+        <div className="absolute inset-0 mesh-bg opacity-80" />
+        <div className="signal-shell relative w-full max-w-lg rounded-[2rem] border border-zinc-200 bg-white/92 p-8 shadow-[0_30px_90px_rgba(15,23,42,0.12)] backdrop-blur">
           <div className="mb-8">
             <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-emerald-700">
               <ShieldCheck className="h-3.5 w-3.5" />
@@ -194,7 +203,10 @@ function UpdatePasswordForm() {
           <form action={handleUpdate} className="space-y-5">
             {error && (
               <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                {error}
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>{error}</span>
+                </div>
               </div>
             )}
             {success && (
@@ -214,30 +226,52 @@ function UpdatePasswordForm() {
 
             <div className="space-y-2">
               <label htmlFor="password" className="block text-sm font-semibold text-zinc-800">New password</label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                required
-                minLength={8}
-                placeholder="Use at least 8 characters"
-                disabled={isCheckingLink || !isRecoveryReady}
-                className="h-12 rounded-2xl"
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  minLength={8}
+                  placeholder="Use at least 8 characters"
+                  disabled={isCheckingLink || !isRecoveryReady}
+                  className="h-12 rounded-2xl pr-12"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((value) => !value)}
+                  disabled={isCheckingLink || !isRecoveryReady}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 disabled:opacity-40"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
 
             <div className="space-y-2">
               <label htmlFor="confirm_password" className="block text-sm font-semibold text-zinc-800">Confirm password</label>
-              <Input
-                id="confirm_password"
-                name="confirm_password"
-                type="password"
-                required
-                minLength={8}
-                placeholder="Repeat the new password"
-                disabled={isCheckingLink || !isRecoveryReady}
-                className="h-12 rounded-2xl"
-              />
+              <div className="relative">
+                <Input
+                  id="confirm_password"
+                  name="confirm_password"
+                  type={showConfirmPassword ? "text" : "password"}
+                  required
+                  minLength={8}
+                  placeholder="Repeat the new password"
+                  disabled={isCheckingLink || !isRecoveryReady}
+                  className="h-12 rounded-2xl pr-12"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((value) => !value)}
+                  disabled={isCheckingLink || !isRecoveryReady}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 disabled:opacity-40"
+                  aria-label={showConfirmPassword ? "Hide confirmation password" : "Show confirmation password"}
+                >
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
               <p className="text-xs text-zinc-500">Tip: use a memorable passphrase if your company policy allows it.</p>
             </div>
 

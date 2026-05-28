@@ -138,7 +138,7 @@ export async function GET() {
   return new NextResponse(buffer, {
     headers: {
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="maverick-tms-comprehensive-report-${timestamp}.xlsx"`,
+      'Content-Disposition': `attachment; filename="skilltest-ai-mavericks-comprehensive-report-${timestamp}.xlsx"`,
     },
   })
 }

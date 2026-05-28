@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
-import { ArrowLeft, CheckCircle2, KeyRound, Mail, ShieldCheck } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, KeyRound, Mail, ShieldCheck, Sparkles } from "lucide-react";
 
 export default function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null);
@@ -24,10 +24,16 @@ export default function ResetPasswordPage() {
         return;
       }
 
-      const supabase = createClient();
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/update-password`,
-      });
+      let supabase;
+      try {
+        supabase = createClient();
+      } catch {
+        setError("Supabase is not configured. Add real Supabase URL and anon key values, then restart the app.");
+        return;
+      }
+
+      const redirectTo = `${window.location.origin}/auth/callback?next=/auth/update-password`;
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
 
       if (error) setError("We could not send a reset link right now. Please check the email and try again.");
       else setSuccess("Reset link sent. Open it in this same browser, then set your new password.");
@@ -35,10 +41,11 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen grid bg-background lg:grid-cols-[1fr_1fr]">
-      <div className="hidden lg:flex flex-col justify-between bg-black p-12 text-white relative overflow-hidden">
-        <div className="absolute top-0 left-0 h-72 w-72 -translate-x-1/3 -translate-y-1/3 rounded-full bg-blue-500/25 blur-3xl" />
-        <div className="absolute bottom-0 right-0 h-72 w-72 translate-x-1/3 translate-y-1/3 rounded-full bg-violet-500/20 blur-3xl" />
+    <div className="grid min-h-screen bg-background lg:grid-cols-[0.95fr_1.05fr]">
+      <div className="signal-shell hidden flex-col justify-between overflow-hidden bg-black p-12 text-white lg:flex dashboard-grid-bg">
+        <div className="aura-ring -left-16 -top-16 h-80 w-80 bg-cyan-400/25" />
+        <div className="aura-ring -bottom-16 -right-10 h-80 w-80 bg-violet-500/22" style={{ animationDelay: "1.2s" }} />
+        <div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300 to-transparent" />
 
         <Link href="/auth/login" className="relative z-10 inline-flex items-center gap-2 text-sm text-white/70 hover:text-white">
           <ArrowLeft className="h-4 w-4" />
@@ -46,10 +53,13 @@ export default function ResetPasswordPage() {
         </Link>
 
         <div className="relative z-10 max-w-lg">
-          <p className="text-[11px] uppercase tracking-[0.35em] text-white/40">Account Recovery</p>
-          <h1 className="mt-4 text-5xl font-semibold tracking-tight">Get back in quickly.</h1>
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.3em] text-cyan-100">
+            <Sparkles className="h-3.5 w-3.5" />
+            SkillTest_AI Recovery
+          </div>
+          <h1 className="mt-5 max-w-md font-display text-5xl font-semibold leading-tight tracking-tight">Get back in quickly.</h1>
           <p className="mt-5 text-base leading-relaxed text-white/65">
-            Enter your work email and we&apos;ll send you a secure reset link. The link opens directly in the password update screen.
+            Enter your work email and SkillTest_AI will route the secure reset link through the verified auth callback before unlocking password update.
           </p>
         </div>
 
@@ -59,7 +69,7 @@ export default function ResetPasswordPage() {
             { icon: KeyRound, title: "2. Open the reset link", body: "The link sends you to the password change screen." },
             { icon: ShieldCheck, title: "3. Set a new password", body: "Use at least 8 characters for better security." },
           ].map((item) => (
-            <div key={item.title} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div key={item.title} className="signal-card rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="flex items-start gap-3">
                 <div className="rounded-xl bg-white/10 p-2">
                   <item.icon className="h-4 w-4 text-blue-300" />
@@ -74,8 +84,9 @@ export default function ResetPasswordPage() {
         </div>
       </div>
 
-      <div className="flex items-center justify-center p-6 md:p-10">
-        <div className="w-full max-w-lg rounded-[2rem] border border-zinc-200 bg-white p-8 shadow-xl">
+      <div className="relative flex items-center justify-center overflow-hidden p-6 md:p-10">
+        <div className="absolute inset-0 mesh-bg opacity-80" />
+        <div className="signal-shell relative w-full max-w-lg rounded-[2rem] border border-zinc-200 bg-white/92 p-8 shadow-[0_30px_90px_rgba(15,23,42,0.12)] backdrop-blur">
           <div className="mb-8">
             <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-blue-700">
               <Mail className="h-3.5 w-3.5" />
@@ -90,7 +101,10 @@ export default function ResetPasswordPage() {
           <form onSubmit={handleReset} className="space-y-5">
             {error && (
               <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                {error}
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>{error}</span>
+                </div>
               </div>
             )}
             {success && (

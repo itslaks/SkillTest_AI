@@ -7,19 +7,19 @@ const steps = [
     number: "I",
     title: "Upload your team",
     description: "Managers upload an Excel file with employee email, name, and domain. The system automatically categorizes employees based on their domain.",
-    detail: "Supported columns:\n• Employee Email\n• Full Name\n• Domain / Department\n\nAuto-categorization enabled",
+    detail: "Supported columns:\n- Employee Email\n- Full Name\n- Domain / Department\n\nAuto-categorization enabled",
   },
   {
     number: "II",
     title: "Create a quiz",
     description: "Define the topic, select a difficulty level, set the number of questions, and attach a feedback form link. AI dynamically generates MCQs.",
-    detail: "Quiz Configuration:\n• Topic & Description\n• Difficulty Level\n• Question Count\n• Feedback Form URL\n• Time Limit (minutes)",
+    detail: "Quiz Configuration:\n- Topic & Description\n- Difficulty Level\n- Question Count\n- Feedback Form URL\n- Time Limit (minutes)",
   },
   {
     number: "III",
     title: "Assess & rank",
     description: "Employees take the test through a smooth, gamified interface. Scores are calculated automatically and a dynamic leaderboard is generated.",
-    detail: "After Completion:\n• Auto-scored results\n• Time-based tie-breaking\n• Dynamic leaderboard\n• Excel export available\n• Feedback form shown",
+    detail: "After Completion:\n- Auto-scored results\n- Time-based tie-breaking\n- Dynamic leaderboard\n- Excel export available\n- Feedback form shown",
   },
 ];
 
@@ -110,12 +110,7 @@ export function HowItWorksSection() {
                     {/* Progress indicator */}
                     {activeStep === index && (
                       <div className="mt-4 h-px bg-background/20 overflow-hidden">
-                        <div 
-                          className="h-full bg-background w-0"
-                          style={{
-                            animation: 'progress 5s linear forwards'
-                          }}
-                        />
+                        <div key={activeStep} className="how-progress-bar h-full bg-background" />
                       </div>
                     )}
                   </div>
@@ -134,7 +129,7 @@ export function HowItWorksSection() {
                   <div className="w-3 h-3 rounded-full bg-background/20" />
                   <div className="w-3 h-3 rounded-full bg-background/20" />
                 </div>
-                <span className="text-xs font-mono text-background/40">skilltest.config</span>
+                <span className="text-xs font-mono text-background/40">skilltest_ai.config</span>
               </div>
 
               {/* Content */}
@@ -177,9 +172,14 @@ export function HowItWorksSection() {
       </div>
 
       <style jsx>{`
-        @keyframes progress {
+        @keyframes howProgress {
           from { width: 0%; }
           to { width: 100%; }
+        }
+
+        .how-progress-bar {
+          width: 0%;
+          animation: howProgress 5s linear forwards;
         }
         
         .code-line-reveal {

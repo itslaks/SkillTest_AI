@@ -68,7 +68,7 @@ export default async function EmployeeLayout({
             <Sparkles className="w-4 h-4 text-black" />
           </div>
           <div>
-            <p className="text-white font-bold text-sm leading-none tracking-tight">SkillTest AI</p>
+            <p className="text-white font-bold text-sm leading-none tracking-tight">SkillTest_AI</p>
             <p className="text-white/55 text-[10px] mt-0.5 uppercase tracking-widest">Learner</p>
           </div>
         </div>
@@ -128,7 +128,7 @@ export default async function EmployeeLayout({
           <div className="w-7 h-7 rounded-lg bg-white flex items-center justify-center">
             <Sparkles className="w-3.5 h-3.5 text-black" />
           </div>
-          <span className="text-white font-bold text-sm">SkillTest AI</span>
+          <span className="text-white font-bold text-sm">SkillTest_AI</span>
         </Link>
         <nav className="mt-3 grid grid-cols-5 gap-1">
           {navigation.map((item) => (

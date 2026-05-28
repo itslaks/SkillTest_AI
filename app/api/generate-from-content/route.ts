@@ -8,44 +8,6 @@ const ALL_DIFFICULTIES: DifficultyLevel[] = ['easy', 'medium', 'hard', 'advanced
 
 type QuestionOption = { text: string; isCorrect: boolean }
 
-// Difficulty-specific prompts to ensure proper question complexity
-const DIFFICULTY_PROMPTS: Record<DifficultyLevel, string> = {
-  easy: `
-    - Questions should test basic recall and fundamental understanding
-    - Use simple, straightforward language
-    - Focus on definitions, basic facts, and simple concepts
-    - Incorrect options should be clearly distinguishable from correct ones
-    - Example: "What is...?", "Which of the following is...?", "Define..."`,
-  
-  medium: `
-    - Questions should test understanding and application
-    - Require applying knowledge to simple scenarios
-    - Include some analysis of concepts
-    - Incorrect options should be plausible but clearly wrong upon reflection
-    - Example: "Why does...?", "How would you...?", "What happens when...?"`,
-  
-  hard: `
-    - Questions should test analysis and problem-solving
-    - Require combining multiple concepts
-    - Include scenario-based questions
-    - Incorrect options should be plausible and require careful analysis to eliminate
-    - Example: "Analyze...", "Compare and contrast...", "What would be the result of...?"`,
-  
-  advanced: `
-    - Questions should test evaluation and synthesis
-    - Require deep understanding and critical thinking
-    - Include complex scenarios with multiple variables
-    - All options should seem plausible, requiring expert knowledge to identify correct answer
-    - Example: "Evaluate...", "What is the optimal approach for...", "In this complex scenario..."`,
-  
-  hardcore: `
-    - Questions should test expert-level mastery
-    - Require integration of advanced concepts across multiple domains
-    - Include edge cases, exceptions, and nuanced scenarios
-    - All options should be highly plausible, only distinguishable by true experts
-    - Example: "In an edge case where...", "Considering all factors...", "What is the most efficient..."`
-}
-
 /**
  * Generate questions from provided content with strict difficulty enforcement
  */
@@ -71,11 +33,7 @@ export async function POST(request: NextRequest) {
   const distribution = calculateStrictDistribution(difficulty, count)
   const hasAI = !!(process.env.OPENAI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY)
 
-  if (!hasAI) {
-    return NextResponse.json({ error: 'No AI API key configured. Set OPENAI_API_KEY or GOOGLE_GEMINI_API_KEY.' }, { status: 500 })
-  }
-
-  const rawQuestions = await generateFromContentAI(content, distribution, topic)
+  const rawQuestions = hasAI ? await generateFromContentAI(content, distribution, topic) : []
   const questions = ensureContentQuestionCount(rawQuestions, topic || 'Provided content', content, difficulty, count)
 
   if (questions.length === 0) {
@@ -92,7 +50,7 @@ export async function POST(request: NextRequest) {
     options: randomizeOptions(q.options, answerPositionPlan[i]),
     difficulty: q.difficulty,
     explanation: q.explanation || null,
-    is_ai_generated: true,
+    is_ai_generated: hasAI,
     order_index: i,
   }))
 
@@ -109,6 +67,7 @@ export async function POST(request: NextRequest) {
     data, 
     distribution,
     generated: questions.length,
+    method: hasAI ? 'Provider AI' : 'SkillTest_AI local content intelligence',
   })
 }
 
@@ -178,209 +137,6 @@ ${truncated}`
     console.error('AI content generation failed:', e)
     return []
   }
-}
-
-async function generateFromContentOpenAI(
-  apiKey: string, 
-  content: string, 
-  distribution: Record<DifficultyLevel, number>,
-  topic?: string
-) {
-  const questions: any[] = []
-  
-  // Truncate content if too long (keep most relevant parts)
-  const maxContentLength = 12000
-  const truncatedContent = content.length > maxContentLength 
-    ? content.substring(0, maxContentLength) + '...[content truncated]'
-    : content
-
-  for (const [diff, count] of Object.entries(distribution)) {
-    if (count === 0) continue
-
-    const difficultyGuidelines = DIFFICULTY_PROMPTS[diff as DifficultyLevel]
-
-    try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [{
-            role: 'system',
-            content: `You are an expert quiz question generator. You MUST create questions at EXACTLY the specified difficulty level. 
-            
-CRITICAL: The difficulty level MUST be strictly followed. Do not make questions easier or harder than specified.
-
-You will be given content to base questions on. Extract key concepts and create challenging, relevant multiple-choice questions.`
-          }, {
-            role: 'user',
-            content: `Generate EXACTLY ${count} multiple choice questions at "${diff.toUpperCase()}" difficulty level.
-
-${topic ? `Topic/Subject: ${topic}` : ''}
-
-DIFFICULTY REQUIREMENTS FOR ${diff.toUpperCase()}:
-${difficultyGuidelines}
-
-CONTENT TO BASE QUESTIONS ON:
----
-${truncatedContent}
----
-
-REQUIREMENTS:
-1. Questions MUST be directly based on the provided content
-2. Questions MUST match the ${diff.toUpperCase()} difficulty level exactly
-3. Each question must have exactly 4 options with only ONE correct answer
-4. Include a brief explanation for the correct answer
-5. Make incorrect options plausible but clearly wrong for someone who knows the material
-6. Do not use outside knowledge unless the content itself clearly supports it
-7. Avoid duplicate questions and spread questions across different parts of the content
-8. Avoid vague wording like "according to the passage"; ask concrete, job-ready questions
-
-Return a JSON array where each item has:
-- "question_text": the question (challenging and specific to content)
-- "options": array of exactly 4 objects with "text" (string) and "isCorrect" (boolean, exactly one true). Randomize the correct answer position across A, B, C, and D.
-- "explanation": brief explanation of why the correct answer is right
-- "difficulty": "${diff}"
-
-Return ONLY valid JSON, no markdown code blocks.`
-          }],
-          temperature: 0.7,
-          max_tokens: 4000,
-        }),
-      })
-
-      const data = await response.json()
-      
-      if (data.error) {
-        console.error('OpenAI API error:', data.error)
-        continue
-      }
-
-      const content = data.choices?.[0]?.message?.content || '[]'
-      
-      // Clean up response and parse JSON
-      let cleanedContent = content
-        .replace(/```json\n?/g, '')
-        .replace(/```\n?/g, '')
-        .trim()
-      
-      try {
-        const parsed = JSON.parse(cleanedContent)
-        const validQuestions = normalizeQuestions(Array.isArray(parsed) ? parsed : [parsed], diff as DifficultyLevel)
-        
-        questions.push(...validQuestions)
-        if (validQuestions.length < count) {
-          questions.push(...buildContentFallbackQuestions(topic || 'Provided content', truncatedContent, diff as DifficultyLevel, count - validQuestions.length))
-        }
-      } catch (parseError) {
-        console.error('Failed to parse OpenAI response:', parseError)
-        questions.push(...buildContentFallbackQuestions(topic || 'Provided content', truncatedContent, diff as DifficultyLevel, count))
-      }
-    } catch (e) {
-      console.error('OpenAI generation error:', e)
-      questions.push(...buildContentFallbackQuestions(topic || 'Provided content', truncatedContent, diff as DifficultyLevel, count))
-    }
-  }
-
-  return questions
-}
-
-async function generateFromContentGemini(
-  apiKey: string, 
-  content: string, 
-  distribution: Record<DifficultyLevel, number>,
-  topic?: string
-) {
-  const questions: any[] = []
-  
-  const maxContentLength = 10000
-  const truncatedContent = content.length > maxContentLength 
-    ? content.substring(0, maxContentLength) + '...[content truncated]'
-    : content
-
-  for (const [diff, count] of Object.entries(distribution)) {
-    if (count === 0) continue
-
-    const difficultyGuidelines = DIFFICULTY_PROMPTS[diff as DifficultyLevel]
-
-    try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{
-              parts: [{
-                text: `You are an expert quiz question generator. Generate EXACTLY ${count} multiple choice questions at "${diff.toUpperCase()}" difficulty level.
-
-${topic ? `Topic/Subject: ${topic}` : ''}
-
-DIFFICULTY REQUIREMENTS FOR ${diff.toUpperCase()}:
-${difficultyGuidelines}
-
-CRITICAL: Questions MUST match the ${diff.toUpperCase()} difficulty level exactly. Do not make them easier or harder.
-
-CONTENT TO BASE QUESTIONS ON:
----
-${truncatedContent}
----
-
-REQUIREMENTS:
-1. Questions MUST be directly based on the provided content
-2. Each question must have exactly 4 options with only ONE correct answer
-3. Include a brief explanation for the correct answer
-4. Do not use outside knowledge unless the content itself clearly supports it
-5. Avoid duplicate questions and spread questions across different parts of the content
-6. Avoid vague wording like "according to the passage"; ask concrete, job-ready questions
-
-Return a JSON array where each item has:
-- "question_text": the question
-- "options": array of exactly 4 objects with "text" (string) and "isCorrect" (boolean, exactly one true). Randomize the correct answer position across A, B, C, and D.
-- "explanation": brief explanation
-- "difficulty": "${diff}"
-
-Return ONLY valid JSON, no markdown.`
-              }]
-            }],
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 4000,
-            }
-          }),
-        }
-      )
-
-      const data = await response.json()
-      const responseContent = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]'
-      
-      let cleanedContent = responseContent
-        .replace(/```json\n?/g, '')
-        .replace(/```\n?/g, '')
-        .trim()
-
-      try {
-        const parsed = JSON.parse(cleanedContent)
-        const validQuestions = normalizeQuestions(Array.isArray(parsed) ? parsed : [parsed], diff as DifficultyLevel)
-        
-        questions.push(...validQuestions)
-        if (validQuestions.length < count) {
-          questions.push(...buildContentFallbackQuestions(topic || 'Provided content', truncatedContent, diff as DifficultyLevel, count - validQuestions.length))
-        }
-      } catch (parseError) {
-        console.error('Failed to parse Gemini response:', parseError)
-        questions.push(...buildContentFallbackQuestions(topic || 'Provided content', truncatedContent, diff as DifficultyLevel, count))
-      }
-    } catch (e) {
-      console.error('Gemini generation error:', e)
-      questions.push(...buildContentFallbackQuestions(topic || 'Provided content', truncatedContent, diff as DifficultyLevel, count))
-    }
-  }
-
-  return questions
 }
 
 function createAnswerPositionPlan(count: number) {

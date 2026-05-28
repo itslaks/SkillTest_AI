@@ -6,7 +6,6 @@ import {
   Cell,
   Tooltip,
   ResponsiveContainer,
-  Legend,
 } from 'recharts'
 
 interface FeedbackSentimentChartProps {
@@ -29,8 +28,8 @@ function CustomTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null
   const item = payload[0]
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white px-3 py-2 shadow-lg text-xs font-medium text-zinc-900">
-      <span className="mr-2" style={{ color: item.payload.fill }}>●</span>
+    <div className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-900 shadow-lg">
+      <span className="mr-2 inline-block h-2 w-2 rounded-full" style={{ background: item.payload.fill }} />
       {item.name}: <strong>{item.value}</strong> ({item.payload.pct}%)
     </div>
   )
@@ -43,17 +42,17 @@ function CustomLegend({ positive, neutral, negative, total }: { positive: number
     { label: 'Negative', value: negative, color: SENTIMENT_COLORS.Negative },
   ]
   return (
-    <div className="flex flex-col gap-2 justify-center">
+    <div className="flex flex-col justify-center gap-2">
       {items.map((item) => {
         const pct = total ? Math.round((item.value / total) * 100) : 0
         return (
           <div key={item.label} className="flex items-center gap-2 text-xs">
-            <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: item.color }} />
-            <span className="text-zinc-600 w-14">{item.label}</span>
-            <div className="flex-1 h-1.5 rounded-full bg-zinc-100 overflow-hidden">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: item.color }} />
+            <span className="w-14 text-zinc-600">{item.label}</span>
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-100">
               <div className="h-full rounded-full" style={{ width: `${pct}%`, background: item.color }} />
             </div>
-            <span className="font-semibold text-zinc-800 w-8 text-right">{item.value}</span>
+            <span className="w-8 text-right font-semibold text-zinc-800">{item.value}</span>
           </div>
         )
       })}
@@ -83,7 +82,7 @@ export function FeedbackSentimentChart({
 
   return (
     <div className="rounded-[1.5rem] border border-zinc-200 bg-white p-5 shadow-sm">
-      <div className="flex items-center justify-between gap-3 mb-4">
+      <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Feedback sentiment</p>
           <p className="mt-1 text-sm text-zinc-500">{total} response{total !== 1 ? 's' : ''} collected</p>
@@ -121,9 +120,9 @@ export function FeedbackSentimentChart({
             </PieChart>
           </ResponsiveContainer>
           {hasData && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <p className="text-xl font-bold text-zinc-950 leading-none">{total}</p>
-              <p className="text-[10px] text-zinc-500 mt-0.5">total</p>
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+              <p className="text-xl font-bold leading-none text-zinc-950">{total}</p>
+              <p className="mt-0.5 text-[10px] text-zinc-500">total</p>
             </div>
           )}
         </div>

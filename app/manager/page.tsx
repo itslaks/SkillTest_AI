@@ -8,7 +8,6 @@ import { DashboardSignalShowcase } from '@/components/insights/dashboard-signal-
 import {
   FileQuestion,
   Users,
-  TrendingUp,
   Clock,
   Plus,
   ArrowRight,
@@ -22,8 +21,6 @@ import {
   ShieldAlert,
   CalendarDays,
   Activity,
-  Target,
-  Zap,
 } from 'lucide-react'
 import { getQuizStats } from '@/lib/actions/quiz'
 import { getTrainingOpsManagerData } from '@/lib/actions/training'
@@ -103,6 +100,12 @@ export default async function ManagerDashboard() {
   const quietActiveQuizzes = (allQuizzes || []).filter((quiz: any) => quiz.is_active && (attemptsByQuiz.get(quiz.id) || 0) === 0)
   const inactiveEmployees = (employees || []).filter((employee: any) => !attemptedUserIds.has(employee.id))
   const lowScoreAttempts = (allAttempts || []).filter((attempt: any) => (attempt.score || 0) < 50)
+  const activeQuizCount = (allQuizzes || []).filter((quiz: any) => quiz.is_active).length
+  const draftQuizCount = (allQuizzes || []).length - activeQuizCount
+  const completionCoverage = employees?.length ? Math.round((attemptedUserIds.size / employees.length) * 100) : 0
+  const averageCompletedScore = allAttempts?.length
+    ? Math.round(allAttempts.reduce((sum: number, attempt: any) => sum + Number(attempt.score || 0), 0) / allAttempts.length)
+    : 0
 
   const actionItems = [
     {
@@ -187,13 +190,14 @@ export default async function ManagerDashboard() {
   return (
     <div className="space-y-8">
       {/* Welcome Section */}
-      <div className="relative overflow-hidden rounded-[2rem] border border-zinc-900 bg-black p-6 md:p-8 text-white shadow-[0_40px_120px_rgba(0,0,0,0.55)] dashboard-grid-bg">
-        <div className="absolute top-0 right-0 -mt-20 -mr-20 w-80 h-80 bg-white/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-80 h-80 bg-white/5 rounded-full blur-3xl" />
+      <div className="signal-shell relative overflow-hidden rounded-[2rem] border border-cyan-300/20 bg-black p-6 md:p-8 text-white shadow-[0_40px_120px_rgba(0,0,0,0.55)] dashboard-grid-bg">
+        <div className="aura-ring -right-8 -top-8 h-72 w-72 bg-cyan-400/25" />
+        <div className="aura-ring -bottom-16 -left-10 h-80 w-80 bg-violet-500/20" style={{ animationDelay: '1.2s' }} />
+        <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300 to-transparent" />
         {role === 'trainer' && (
           <div className="absolute top-0 right-0 -mt-16 -mr-16 w-64 h-64 bg-violet-500/15 rounded-full blur-3xl" />
         )}
-        <div className="relative z-10">
+        <div className="relative z-10 grid gap-6 lg:grid-cols-[1fr_0.72fr] lg:items-end">
           <div>
             <div className="flex items-center gap-2 mb-3">
               <div className={`px-3 py-1 rounded-full text-xs font-semibold tracking-wide uppercase ${
@@ -202,20 +206,20 @@ export default async function ManagerDashboard() {
                 {role === 'trainer' ? 'Trainer Dashboard' : 'Manager Dashboard'}
               </div>
             </div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-2">
-              Welcome back, {profile?.full_name?.split(' ')[0] || 'Manager'}!
+            <h1 className="max-w-2xl text-3xl font-display leading-tight tracking-tight md:text-5xl">
+              Welcome back, {profile?.full_name?.split(' ')[0] || 'Manager'}.
             </h1>
-            <p className="text-white/75 max-w-md text-sm md:text-base">
+            <p className="mt-3 max-w-xl text-sm leading-relaxed text-cyan-50/75 md:text-base">
               {role === 'trainer'
-                ? 'Manage your training batches, sessions, and track student performance.'
-                : "Here's an overview of your assessments and employee performance today."
+                ? 'SkillTest_AI is watching batch rhythm, attendance signals, and assessment momentum so trainers can act before risks become outcomes.'
+                : 'SkillTest_AI turns assessments, batches, attendance, and behavior signals into one live command surface.'
               }
             </p>
             <div className="mt-6 flex gap-2 flex-wrap">
               <Button
                 asChild
                 size="lg"
-                className="bg-white text-blue-700 hover:bg-blue-50 shadow-lg font-semibold"
+                className="rounded-full bg-white text-slate-950 hover:bg-cyan-50 shadow-lg font-semibold"
               >
                 <Link href="/manager/quizzes/new">
                   <Plus className="mr-2 h-5 w-5" />
@@ -226,7 +230,7 @@ export default async function ManagerDashboard() {
                 asChild
                 variant="outline"
                 size="lg"
-                className="border-white/30 text-white hover:bg-white/10 bg-white/10"
+                className="rounded-full border-white/30 text-white hover:bg-white/10 bg-white/10"
               >
                 <Link href="/manager/operations">
                   <CalendarDays className="mr-2 h-4 w-4" />
@@ -235,34 +239,48 @@ export default async function ManagerDashboard() {
               </Button>
             </div>
           </div>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: 'AI Layer', value: 'Live' },
+              { label: 'Ops Pulse', value: `${tmsSummary?.attendanceRate ?? 0}%` },
+              { label: 'Alerts', value: `${tmsSummary ? tmsSummary.attendanceDueToday + tmsSummary.absenceAlerts + tmsSummary.negativeFeedbackCount : 0}` },
+            ].map((item) => (
+              <div key={item.label} className="signal-card rounded-2xl border border-white/15 bg-white/10 p-4 text-white">
+                <p className="text-[10px] uppercase tracking-[0.25em] text-cyan-100/70">{item.label}</p>
+                <p className="mt-3 text-2xl font-semibold">{item.value}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
-        <Card className="glass-panel spotlight-card border-black/5 shadow-[0_30px_80px_rgba(15,23,42,0.08)]">
+        <Card className="signal-shell glass-panel spotlight-card border-black/5 shadow-[0_30px_80px_rgba(15,23,42,0.08)]">
           <CardHeader>
-            <CardTitle className="text-lg">Presentation Edge</CardTitle>
+            <CardTitle className="text-lg">Manager Command Summary</CardTitle>
             <CardDescription>
-              These screens carry the same restrained design confidence as the landing page and the real product workflow.
+              A quick read on readiness, coverage, and quiz supply before you drill into reports.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-3">
             {[
-              'Layered dark surfaces create depth on the first manager impression.',
-              'Interactive-feeling ambient motion comes from scene objects, not gimmicks.',
-              'Operational content still stays readable and presentation-ready.',
+              { label: 'Completion coverage', value: `${completionCoverage}%`, detail: `${attemptedUserIds.size}/${employees?.length || 0} employees have completed at least one quiz` },
+              { label: 'Average score', value: `${averageCompletedScore}%`, detail: `${allAttempts?.length || 0} completed attempt(s) across your quizzes` },
+              { label: 'Quiz supply', value: `${activeQuizCount}/${draftQuizCount}`, detail: 'Active quizzes / drafts waiting in your library' },
             ].map((item) => (
-              <div key={item} className="rounded-[1.4rem] border border-black/6 bg-white/70 p-4 text-sm text-zinc-600">
-                {item}
+              <div key={item.label} className="signal-card rounded-[1.4rem] border border-black/6 bg-white/75 p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-zinc-500">{item.label}</p>
+                <p className="mt-3 text-3xl font-bold text-black">{item.value}</p>
+                <p className="mt-2 text-sm leading-relaxed text-zinc-600">{item.detail}</p>
               </div>
             ))}
           </CardContent>
         </Card>
         <DashboardSignalShowcase
           theme="light"
-          badge="Ops + AI Layer"
-          title="The product screens show interface craft beyond the landing page."
-          subtitle="The actual workflow pages stay refined, useful, and connected."
+          badge="Live Ops Layer"
+          title={priorityAction ? priorityAction.title : 'No urgent manager action is pending.'}
+          subtitle={priorityAction ? priorityAction.detail : 'Your quiz library, learner coverage, and training signals are currently in a healthy operating band.'}
         />
       </div>
 
@@ -281,7 +299,7 @@ export default async function ManagerDashboard() {
       {/* Stats Grid */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         {statCards.map((stat) => (
-          <Card key={stat.title} className={`relative overflow-hidden bg-gradient-to-br ${stat.bgGradient} ${stat.border} spotlight-card shadow-sm hover:shadow-md transition-shadow`}>
+          <Card key={stat.title} className={`signal-card relative overflow-hidden bg-gradient-to-br ${stat.bgGradient} ${stat.border} spotlight-card shadow-sm hover:shadow-md transition-shadow`}>
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
               <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
                 {stat.title}
@@ -310,9 +328,9 @@ export default async function ManagerDashboard() {
       <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <Card className="border-zinc-200 bg-white shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg">Quick Start Guide</CardTitle>
+            <CardTitle className="text-lg">Recommended Operating Flow</CardTitle>
             <CardDescription>
-              A simple manager flow to get value from the platform without technical setup knowledge.
+              The shortest path from setup to measurable training outcomes.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2">
@@ -333,17 +351,17 @@ export default async function ManagerDashboard() {
 
         <Card className="border-zinc-200 bg-white shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg">Color Legend</CardTitle>
+            <CardTitle className="text-lg">System Health</CardTitle>
             <CardDescription>
-              Fast visual cues so a manager can know what needs attention immediately.
+              The signals that usually decide what you should do next.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {[
-              { label: 'Blue', meaning: 'Informational guidance and setup help', tone: 'bg-blue-500' },
-              { label: 'Green', meaning: 'Healthy, ready, or completed successfully', tone: 'bg-emerald-500' },
-              { label: 'Amber', meaning: 'Needs review soon or low-score coaching opportunity', tone: 'bg-amber-500' },
-              { label: 'Violet', meaning: 'AI and advanced intelligence insights', tone: 'bg-violet-500' },
+              { label: 'Learner coverage', meaning: `${completionCoverage}% of employees have at least one completed attempt.`, tone: completionCoverage >= 70 ? 'bg-emerald-500' : completionCoverage >= 35 ? 'bg-amber-500' : 'bg-rose-500' },
+              { label: 'Draft readiness', meaning: `${readyDrafts.length} draft(s) are ready to publish.`, tone: readyDrafts.length ? 'bg-blue-500' : 'bg-zinc-400' },
+              { label: 'Question quality', meaning: `${lowQuestionQuizzes.length} quiz(zes) have fewer than 5 questions.`, tone: lowQuestionQuizzes.length ? 'bg-amber-500' : 'bg-emerald-500' },
+              { label: 'Coaching need', meaning: `${lowScoreAttempts.length} completed attempt(s) are below 50%.`, tone: lowScoreAttempts.length ? 'bg-rose-500' : 'bg-emerald-500' },
             ].map((item) => (
               <div key={item.label} className="flex items-start gap-3 rounded-2xl border border-zinc-200 p-4">
                 <div className={`mt-0.5 h-3 w-3 rounded-full ${item.tone}`} />
@@ -359,19 +377,23 @@ export default async function ManagerDashboard() {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {[
-          'Cognitive Load Detector',
-          'Emotional State Inference',
-          'Batch DNA Fingerprint',
-          'Trainer Impact Score',
+          { title: 'Activate ready drafts', value: `${readyDrafts.length}`, detail: 'Publish prepared assessments once assignments are confirmed.' },
+          { title: 'Repair quiz depth', value: `${lowQuestionQuizzes.length}`, detail: 'Add questions to thin assessments before they reach learners.' },
+          { title: 'Nudge quiet quizzes', value: `${quietActiveQuizzes.length}`, detail: 'Active quizzes with no completions need reminders or reassignment.' },
+          { title: 'Coach low scores', value: `${lowScoreAttempts.length}`, detail: 'Use reports to assign follow-up learning for weak attempts.' },
         ].map((feature, index) => (
-          <div key={feature} className={`rounded-[1.5rem] border p-4 shadow-sm ${
+          <div key={feature.title} className={`rounded-[1.5rem] border p-4 shadow-sm ${
             index === 0 ? 'border-blue-100 bg-blue-50' :
             index === 1 ? 'border-rose-100 bg-rose-50' :
             index === 2 ? 'border-violet-100 bg-violet-50' :
             'border-amber-100 bg-amber-50'
           }`}>
-            <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">AI Surface</p>
-            <p className="mt-3 font-semibold text-black">{feature}</p>
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Priority</p>
+              <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-black shadow-sm">{feature.value}</span>
+            </div>
+            <p className="mt-3 font-semibold text-black">{feature.title}</p>
+            <p className="mt-1 text-sm leading-relaxed text-zinc-600">{feature.detail}</p>
           </div>
         ))}
       </div>

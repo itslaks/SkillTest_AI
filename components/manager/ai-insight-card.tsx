@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Sparkles, RefreshCw } from 'lucide-react'
-import type { InsightType } from '@/app/api/ai-insight/route'
+import type { InsightType } from '@/lib/backend/entities/ai.entity'
 
 interface AiInsightCardProps {
   type: InsightType

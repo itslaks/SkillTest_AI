@@ -9,7 +9,7 @@ import Link from "next/link";
 const navLinks = [
   { name: "Features", href: "#features" },
   { name: "How it works", href: "#how-it-works" },
-  { name: "Why skilltest_ai", href: "#why-skilltest" },
+  { name: "Why SkillTest_AI", href: "#why-skilltest-ai" },
 ];
 
 export function Navigation() {
@@ -55,14 +55,14 @@ export function Navigation() {
         }`}
       >
         <div 
-          className={`flex items-center justify-between transition-all duration-500 px-6 lg:px-8 ${
+          className={`flex items-center justify-between gap-3 transition-all duration-500 px-6 lg:px-8 ${
             isScrolled ? "h-14" : "h-20"
           }`}
         >
           {/* Logo */}
-          <a href="#" className="flex items-center gap-2 group">
-            <span className={`font-display tracking-tight transition-all duration-500 ${isScrolled ? "text-xl" : "text-2xl"}`}>skilltest_ai</span>
-            <span className={`text-muted-foreground font-mono transition-all duration-500 ${isScrolled ? "text-[10px] mt-0.5" : "text-xs mt-1"}`}>TM</span>
+          <a href="#" className="group flex min-w-0 flex-1 items-center gap-2">
+            <span className={`whitespace-nowrap font-display tracking-tight transition-all duration-500 ${isScrolled ? "text-xl" : "text-2xl"}`}>SkillTest_AI</span>
+            <span className={`hidden whitespace-nowrap text-muted-foreground font-mono transition-all duration-500 sm:inline ${isScrolled ? "text-[10px] mt-0.5" : "text-xs mt-1"}`}>Mavericks Execution Platform</span>
           </a>
 
           {/* Desktop Navigation */}
@@ -97,7 +97,7 @@ export function Navigation() {
           {/* Mobile Menu Button */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="md:hidden inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm"
+            className="inline-flex min-w-[5.75rem] shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-slate-200 bg-white/90 px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm md:hidden"
             aria-label="Toggle menu"
           >
             <span>Menu</span>

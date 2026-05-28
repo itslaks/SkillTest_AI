@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 const testimonials = [
   {
-    quote: "skilltest_ai transformed our training execution. Attendance, assessments, feedback, and trainer signals finally live in one place.",
+    quote: "SkillTest_AI transformed our training execution. Attendance, assessments, feedback, and trainer signals finally live in one place.",
     author: "Priya Sharma",
     role: "L&D Manager",
     company: "TechForward Solutions",

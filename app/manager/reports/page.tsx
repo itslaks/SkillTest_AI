@@ -24,7 +24,6 @@ import { QuickDeleteButton } from '@/components/manager/quick-delete-button'
 import { TmsBatchDownloads } from '@/components/manager/tms-batch-downloads'
 import { OpsAutoRefresh } from '@/components/manager/ops-auto-refresh'
 import { TrainerPerformancePanel } from '@/components/manager/trainer-performance-panel'
-import { FeedbackSentimentChart } from '@/components/manager/feedback-sentiment-chart'
 import { AiInsightCard } from '@/components/manager/ai-insight-card'
 import { averageScore, computeTopperScore } from '@/lib/topper'
 import { getAccessibleTrainingBatchIds } from '@/lib/training-access'
@@ -171,7 +170,7 @@ export default async function ManagerReportsPage() {
       <section className="rounded-[2rem] border border-zinc-900 bg-black p-6 text-white shadow-[0_32px_90px_rgba(0,0,0,0.42)] md:p-8 dashboard-grid-bg maverick-command-band">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.35em] text-cyan-300/80">Maverick TMS Evidence Desk</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.35em] text-cyan-300/80">SkillTest_AI: Mavericks Execution Platform Evidence Desk</p>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight md:text-5xl">Reports that prove execution, not just export data</h1>
           <p className="mt-3 max-w-3xl text-sm leading-relaxed text-zinc-400">Attendance, assessment, feedback, topper, automation, and consolidated batch reporting are grouped for audit-ready walkthroughs.</p>
         </div>
@@ -180,6 +179,12 @@ export default async function ManagerReportsPage() {
             <a href="/api/export/comprehensive-report">
               <FileSpreadsheet className="mr-2 h-4 w-4" />
               Full TMS Report (Excel)
+            </a>
+          </Button>
+          <Button variant="outline" asChild>
+            <a href="/api/reports/training-ops/download">
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
+              BRD Evidence Pack
             </a>
           </Button>
           <Button variant="outline" asChild>

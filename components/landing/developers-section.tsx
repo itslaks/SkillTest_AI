@@ -122,7 +122,7 @@ export function DevelopersSection() {
               <span className="text-muted-foreground">Effortless workflow.</span>
             </h2>
             <p className="text-xl text-muted-foreground mb-12 leading-relaxed">
-              skilltest_ai provides training teams with a unified workspace to manage batches, candidates, trainers, attendance, assessments, and actionable insights.
+              SkillTest_AI gives training teams a unified workspace to manage batches, candidates, trainers, attendance, assessments, and actionable insights.
             </p>
             
             {/* Features */}

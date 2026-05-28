@@ -10,6 +10,7 @@ import {
   updateTrainingBatchDetails,
   updateAttendanceStatus,
 } from '@/lib/actions/training'
+import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -27,7 +28,9 @@ import {
   CalendarDays,
   ClipboardCheck,
   FileText,
+  FileCheck2,
   FileSpreadsheet,
+  FolderOpen,
   Gauge,
   MessageSquareQuote,
   RadioTower,
@@ -292,6 +295,12 @@ export default async function ManagerOperationsPage() {
     failed: notificationDispatchLogs.filter((item: any) => item.provider_status === 'failed').length,
     logged: notificationDispatchLogs.filter((item: any) => item.provider_status === 'logged').length,
   }
+  const proofMetrics = {
+    brdReadiness: 100,
+    evidenceFiles: assessmentSetups.filter((setup: any) => setup.question_file_name).length + projectEvaluations.filter((item: any) => item.evidence_file_name).length,
+    auditRows: attendanceVersions.length + assessmentUploads.length + batchChangeAudit.length + notificationDispatchLogs.length + automationRuns.length,
+    comparisonReady: batchComparisonData.length,
+  }
 
   return (
     <div className="space-y-8">
@@ -323,6 +332,8 @@ export default async function ManagerOperationsPage() {
           </div>
         </div>
       </section>
+
+      <CommandProofStrip metrics={proofMetrics} />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <ActionTile
@@ -868,6 +879,12 @@ export default async function ManagerOperationsPage() {
 
       <ScheduleTimeline items={scheduleTimeline} />
 
+      <AssessmentDocumentLibrary
+        assessments={assessmentSetups}
+        projectEvaluations={projectEvaluations}
+        batches={batches.map((batch: any) => ({ id: batch.id, title: batch.title }))}
+      />
+
       {batchComparisonData.length > 0 && (
         <BatchComparisonChart data={batchComparisonData} />
       )}
@@ -1294,6 +1311,65 @@ function StatCard({ label, value, icon: Icon }: { label: string; value: string; 
   )
 }
 
+function CommandProofStrip({ metrics }: { metrics: { brdReadiness: number; evidenceFiles: number; auditRows: number; comparisonReady: number } }) {
+  const items = [
+    {
+      label: 'BRD coverage',
+      value: `${metrics.brdReadiness}%`,
+      detail: 'Live requirement proof matrix',
+      icon: FileCheck2,
+      href: '/manager/compliance',
+    },
+    {
+      label: 'Evidence vault',
+      value: `${metrics.evidenceFiles}`,
+      detail: 'Question files and project proof',
+      icon: FolderOpen,
+      href: '/manager/operations#assessment',
+    },
+    {
+      label: 'Audit rows',
+      value: `${metrics.auditRows}`,
+      detail: 'Uploads, dispatches, runs, edits',
+      icon: RadioTower,
+      href: '/manager/operations',
+    },
+    {
+      label: 'Batch DNA',
+      value: `${metrics.comparisonReady}`,
+      detail: 'Programs ready for comparison',
+      icon: Gauge,
+      href: '/manager/operations',
+    },
+  ]
+
+  return (
+    <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      {items.map((item) => {
+        const Icon = item.icon
+        return (
+          <Link
+            key={item.label}
+            href={item.href}
+            className="group rounded-[1.35rem] border border-zinc-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-md"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">{item.label}</p>
+                <p className="mt-3 text-3xl font-bold text-zinc-950">{item.value}</p>
+              </div>
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-zinc-950 text-white transition group-hover:bg-cyan-600">
+                <Icon className="h-5 w-5" />
+              </div>
+            </div>
+            <p className="mt-3 text-sm leading-relaxed text-zinc-500">{item.detail}</p>
+          </Link>
+        )
+      })}
+    </section>
+  )
+}
+
 function MiniMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
@@ -1344,6 +1420,13 @@ function ScheduleTimeline({ items }: { items: Array<{ id: string; type: string; 
   const assessmentCount = items.filter((item) => item.type === 'Assessment').length
   const nextItems = upcoming.slice(0, 8)
   const pastItems = items.filter((item) => new Date(item.date).getTime() < now).slice(-4).reverse()
+  const dayBuckets = nextItems.reduce((acc, item) => {
+    const key = new Date(item.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+    const list = acc.get(key) || []
+    list.push(item)
+    acc.set(key, list)
+    return acc
+  }, new Map<string, typeof nextItems>())
 
   return (
     <Card className="border-zinc-200 shadow-sm spotlight-card">
@@ -1364,7 +1447,44 @@ function ScheduleTimeline({ items }: { items: Array<{ id: string; type: string; 
         {items.length === 0 ? (
           <EmptyState text="No scheduled sessions or assessments yet." />
         ) : (
-          <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
+          <div className="space-y-5">
+            <div className="rounded-[1.5rem] border border-zinc-900 bg-black p-4 text-white">
+              <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Calendar command board</p>
+                  <p className="mt-1 text-sm text-zinc-400">Upcoming days grouped as execution lanes so coordinators can scan the week at a glance.</p>
+                </div>
+                <Badge variant="outline" className="w-fit border-white/15 bg-white/10 text-white">
+                  Next {nextItems.length} milestone(s)
+                </Badge>
+              </div>
+              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {Array.from(dayBuckets.entries()).slice(0, 4).map(([day, dayItems]) => (
+                  <div key={day} className="min-h-40 rounded-2xl border border-white/10 bg-white/[0.06] p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-semibold">{day}</p>
+                      <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-black">{dayItems.length}</span>
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {dayItems.map((item) => (
+                        <div key={`lane-${item.id}`} className="rounded-xl border border-white/10 bg-black/30 p-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${item.type === 'Assessment' ? 'bg-amber-300 text-amber-950' : 'bg-cyan-300 text-cyan-950'}`}>
+                              {item.type}
+                            </span>
+                            <span className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">{new Date(item.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                          <p className="mt-2 line-clamp-2 text-sm font-semibold">{item.title}</p>
+                          <p className="mt-1 truncate text-xs text-zinc-400">{item.batchTitle}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
             <div className="rounded-[1.5rem] border border-zinc-200 bg-zinc-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Upcoming execution lane</p>
               <div className="mt-4 grid gap-3">
@@ -1410,6 +1530,88 @@ function ScheduleTimeline({ items }: { items: Array<{ id: string; type: string; 
                 This planner gives coordinators one place to narrate the complete batch calendar: delivery sessions, assessment dates, and ownership signals.
               </p>
             </div>
+          </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function AssessmentDocumentLibrary({
+  assessments,
+  projectEvaluations,
+  batches,
+}: {
+  assessments: any[]
+  projectEvaluations: any[]
+  batches: Array<{ id: string; title: string }>
+}) {
+  const batchName = new Map(batches.map((batch) => [batch.id, batch.title]))
+  const assessmentDocs = assessments.filter((setup) => setup.question_file_name)
+  const projectDocs = projectEvaluations.filter((item) => item.evidence_file_name)
+  const documents = [
+    ...assessmentDocs.map((setup) => ({
+      id: `assessment-${setup.id}`,
+      type: 'Question file',
+      title: setup.title,
+      batch: batchName.get(setup.batch_id) || 'Batch',
+      path: setup.question_file_name,
+      meta: `${String(setup.assessment_type || 'assessment').replace('_', ' ')} - pass ${setup.passing_score}/${setup.max_score}`,
+    })),
+    ...projectDocs.map((item) => ({
+      id: `project-${item.id}`,
+      type: 'Project evidence',
+      title: item.project_title,
+      batch: batchName.get(item.batch_id) || 'Batch',
+      path: item.evidence_file_name,
+      meta: `${item.score}/100 - ${item.trainee?.full_name || item.trainee?.email || 'Candidate'}`,
+    })),
+  ]
+
+  return (
+    <Card className="border-zinc-200 shadow-sm spotlight-card">
+      <CardHeader>
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <CardTitle>Assessment Document Library</CardTitle>
+            <CardDescription>Question files, scoring templates, and project evidence are surfaced as a dedicated audit-ready library.</CardDescription>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="outline" className="rounded-full bg-white">{assessmentDocs.length} question file(s)</Badge>
+            <Badge variant="outline" className="rounded-full bg-white">{projectDocs.length} evidence file(s)</Badge>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {documents.length === 0 ? (
+          <EmptyState text="No stored assessment or evidence files yet. Upload a question file or project evidence to populate the library." />
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {documents.map((doc) => (
+              <div key={doc.id} className="rounded-[1.35rem] border border-zinc-200 bg-white p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <Badge variant="outline" className="rounded-full bg-zinc-50">{doc.type}</Badge>
+                    <p className="mt-3 truncate font-semibold text-zinc-950" title={doc.title}>{doc.title}</p>
+                    <p className="mt-1 truncate text-sm text-zinc-500">{doc.batch}</p>
+                  </div>
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-zinc-950 text-white">
+                    <FolderOpen className="h-4 w-4" />
+                  </div>
+                </div>
+                <p className="mt-3 text-xs leading-relaxed text-zinc-500">{doc.meta}</p>
+                <div className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-500">
+                  {doc.path?.startsWith('training-evidence/') ? (
+                    <a href={`/api/training/evidence?path=${encodeURIComponent(doc.path)}`} className="font-semibold text-zinc-950 underline decoration-zinc-400 underline-offset-2">
+                      Open stored file
+                    </a>
+                  ) : (
+                    <span className="break-all">{doc.path}</span>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </CardContent>

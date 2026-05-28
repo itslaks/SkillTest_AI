@@ -2,7 +2,7 @@ import { getAvailableQuizzes } from '@/lib/actions/employee'
 import { Button } from '@/components/ui/button'
 import { ReadinessMeter } from '@/components/insights/readiness-meter'
 import Link from 'next/link'
-import { Brain, Clock, FileQuestion, Play, ShieldAlert, Trophy } from 'lucide-react'
+import { Brain, Clock, FileQuestion, Play, Trophy } from 'lucide-react'
 
 export default async function EmployeeQuizzesPage() {
   const { data: quizzes } = await getAvailableQuizzes()

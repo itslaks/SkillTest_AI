@@ -10,12 +10,13 @@ const commandCards = [
 
 export function HeroShowcase() {
   return (
-    <div className="relative min-h-[560px] w-full overflow-hidden rounded-[2rem] border border-slate-200 bg-white/88 p-4 shadow-[0_30px_90px_rgba(15,23,42,0.10)] sm:p-5">
+    <div className="signal-shell relative min-h-[560px] w-full overflow-hidden rounded-[2rem] border border-slate-200 bg-white/88 p-4 shadow-[0_30px_90px_rgba(15,23,42,0.10)] sm:p-5">
       <div className="aura-ring left-8 top-10 h-40 w-40 bg-cyan-400/35" style={{ willChange: "transform" }} />
       <div className="aura-ring bottom-16 right-6 h-48 w-48 bg-blue-600/30" style={{ animationDelay: "1.5s", willChange: "transform" }} />
+      <div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300 to-transparent opacity-80" />
 
       <div className="relative z-10 grid h-full min-h-[520px] gap-4 sm:grid-cols-2">
-        <div className="glass-panel flex min-h-52 flex-col rounded-[1.5rem] p-4">
+        <div className="glass-panel signal-card float-slow flex min-h-52 flex-col rounded-[1.5rem] p-4">
           <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-600">
             <span>Readiness</span>
             <span>Live</span>
@@ -26,7 +27,7 @@ export function HeroShowcase() {
           <p className="mt-3 text-sm font-medium text-zinc-900">Learning readiness and training load in one view.</p>
         </div>
 
-        <div className="glass-panel flex min-h-52 flex-col rounded-[1.5rem] p-4">
+        <div className="glass-panel signal-card float-delayed flex min-h-52 flex-col rounded-[1.5rem] p-4">
           <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-600">
             <span>Execution</span>
             <span>Realtime</span>
@@ -37,7 +38,7 @@ export function HeroShowcase() {
           <p className="mt-3 text-sm font-medium text-zinc-900">Attendance, reminders, and session load kept visible.</p>
         </div>
 
-        <div className="glass-panel flex min-h-52 flex-col rounded-[1.5rem] p-4">
+        <div className="glass-panel signal-card float-slow flex min-h-52 flex-col rounded-[1.5rem] p-4" style={{ animationDelay: "700ms" }}>
           <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-600">
             <span>Insights</span>
             <span>Live</span>
@@ -48,9 +49,9 @@ export function HeroShowcase() {
           <p className="mt-3 text-sm font-medium text-zinc-900">Signals that help managers act sooner.</p>
         </div>
 
-        <div className="maverick-command-panel flex min-h-52 flex-col rounded-[1.5rem] p-4 sm:col-span-2">
+        <div className="maverick-command-panel signal-sheen flex min-h-52 flex-col rounded-[1.5rem] p-4 sm:col-span-2">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-cyan-100">Training Signal Stack</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-cyan-100">SkillTest_AI Signal Stack</p>
             <span className="rounded-full bg-white/12 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-white">
               Live View
             </span>
