@@ -46,7 +46,7 @@ export function AiLearnRecommend({ stats, quizzes, retentionRisk }: AiLearnRecom
       <div className="flex items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-600">
           <Sparkles className="h-3.5 w-3.5" />
-          Maverick Coach
+          SkillTest_AI Coach
         </div>
         <button
           onClick={fetch_recommendation}

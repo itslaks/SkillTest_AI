@@ -35,7 +35,7 @@ export function HeroSection() {
         <div className="mb-8">
           <span className="inline-flex items-center gap-3 rounded-full border border-violet-200 bg-white/90 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">
             <span className="h-2 w-2 rounded-full bg-violet-500 animate-pulse" />
-            Category: Mavericks Execution Platform
+            SkillTest_AI: Mavericks Execution Platform
           </span>
         </div>
 
@@ -50,7 +50,7 @@ export function HeroSection() {
         <div className="grid gap-16 xl:grid-cols-[0.85fr_1.15fr] xl:items-center">
           <div className="space-y-8">
             <p className="text-xl lg:text-2xl text-slate-700 leading-relaxed max-w-xl">
-              SkillTest_AI brings the Mavericks Execution Platform category to batch operations, real-time attendance, assessment imports, trainer scorecards, feedback analytics, and automated reporting in one judge-ready TMS.
+              SkillTest_AI: Mavericks Execution Platform brings batch operations, real-time attendance, assessment imports, trainer scorecards, feedback analytics, and automated reporting into one judge-ready TMS.
             </p>
 
             <div className="helper-strip rounded-2xl p-4 text-sm leading-relaxed shadow-sm">

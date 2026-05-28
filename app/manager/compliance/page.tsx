@@ -5,6 +5,7 @@ import {
   CalendarDays,
   CheckCircle2,
   ClipboardCheck,
+  Download,
   FileCheck2,
   FileSpreadsheet,
   FolderOpen,
@@ -167,7 +168,7 @@ export default async function CompliancePage() {
             <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-cyan-100">
               BRD Proof Matrix
             </div>
-            <h1 className="mt-5 text-3xl font-semibold tracking-tight md:text-5xl">Maverick Execution Platform compliance cockpit</h1>
+            <h1 className="mt-5 text-3xl font-semibold tracking-tight md:text-5xl">SkillTest_AI: Mavericks Execution Platform compliance cockpit</h1>
             <p className="mt-4 max-w-2xl text-sm leading-relaxed text-zinc-400">
               A live, judge-ready map from BRD requirements to working screens, exports, automation logs, and evidence records.
             </p>
@@ -180,6 +181,12 @@ export default async function CompliancePage() {
               </Button>
               <Button asChild variant="outline" className="rounded-full border-white/15 bg-white/5 text-white hover:bg-white/10">
                 <Link href="/manager/reports">View reports</Link>
+              </Button>
+              <Button asChild variant="outline" className="rounded-full border-cyan-300/30 bg-cyan-300/10 text-cyan-50 hover:bg-cyan-300/15">
+                <a href="/api/reports/training-ops/download">
+                  Evidence pack
+                  <Download className="ml-2 h-4 w-4" />
+                </a>
               </Button>
             </div>
           </div>
@@ -257,14 +264,29 @@ export default async function CompliancePage() {
 
           <Card className="border-zinc-200 shadow-sm">
             <CardHeader>
-              <CardTitle>Current Weak Spots</CardTitle>
-              <CardDescription>These are data readiness items, not missing product capability.</CardDescription>
+              <CardTitle>Demo Data Checklist</CardTitle>
+              <CardDescription>Complete these before judging to make every BRD proof tile glow with live evidence.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-zinc-600">
               <GapNote ready={data.batches.length >= 2} text="Add at least two populated batches to make the comparison radar impressive." />
               <GapNote ready={assessmentDocuments + projectEvidence > 0} text="Upload real assessment/question and evidence files so the evidence vault has judge-visible artifacts." />
               <GapNote ready={feedbackCoverage > 0} text="Collect feedback responses to light up sentiment and trainer effectiveness analytics." />
               <GapNote ready={notificationCoverage > 0} text="Run the governance automation checks once to create notification dispatch proof." />
+            </CardContent>
+          </Card>
+
+          <Card className="border-cyan-200 bg-cyan-50/70 shadow-sm">
+            <CardHeader>
+              <CardTitle>One-Click Evidence Pack</CardTitle>
+              <CardDescription>The workbook includes BRD coverage, batch data, upload logs, notifications, automation, feedback, toppers, and a demo runbook.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              <Button asChild className="rounded-full bg-black text-white hover:bg-zinc-800">
+                <a href="/api/reports/training-ops/download">Download Excel evidence pack</a>
+              </Button>
+              <Button asChild variant="outline" className="rounded-full bg-white">
+                <a href="/api/reports/training-ops/pdf">Download executive PDF</a>
+              </Button>
             </CardContent>
           </Card>
         </div>

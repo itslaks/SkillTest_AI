@@ -1,10 +1,10 @@
-# SkillTest AI Technical Overview
+# SkillTest_AI: Mavericks Execution Platform Technical Overview
 
-This document is a compact owner guide for the SkillTest AI codebase. It explains what the app is built with, how it is organized, what APIs exist, and how to run, test, and deploy it.
+This document is a compact owner guide for the SkillTest_AI: Mavericks Execution Platform codebase. It explains what the app is built with, how it is organized, what APIs exist, and how to run, test, and deploy it.
 
 ## 1. Product Summary
 
-SkillTest AI is a web-based training management and assessment platform. It supports:
+SkillTest_AI: Mavericks Execution Platform is a web-based training management and assessment platform. It supports:
 
 - Public landing and authentication pages.
 - Admin, manager, training coordinator, trainer, and employee roles.
@@ -15,6 +15,7 @@ SkillTest AI is a web-based training management and assessment platform. It supp
 - Feedback windows, feedback sentiment charts, and training reports.
 - AI-powered quiz generation, manager insights, employee recommendations, and assessment chat.
 - Excel and PDF exports for operations, reports, attendance, feedback, assessments, employees, and leaderboards.
+- A BRD proof matrix and evidence pack export for contest and judge walkthroughs.
 
 ## 2. Language And Framework
 
@@ -372,4 +373,3 @@ Recent updates included:
 - Manager dashboard changed from presentation copy to actionable operational metrics.
 - Smoke test made more reliable for Next dev mode on Windows.
 - Dead legacy AI provider functions removed from content question generation after consolidation through `lib/ai.ts`.
-

@@ -1,8 +1,8 @@
-# SkillTest AI
+# SkillTest_AI: Mavericks Execution Platform
 
-**AI-powered Training Management System** — built for enterprise learning teams who need real operations, not just dashboards.
+**AI-powered Training Management System** - built for enterprise learning teams who need real operations, governance proof, and contest-ready evidence, not just dashboards.
 
-SkillTest AI combines intelligent quiz generation, end-to-end training operations, real-time attendance tracking, AI coaching insights, and automated reporting in a single platform designed for non-technical trainers, coordinators, and learners.
+SkillTest_AI: Mavericks Execution Platform combines intelligent quiz generation, end-to-end training operations, real-time attendance tracking, AI coaching insights, BRD proof, and automated reporting in a single platform designed for non-technical trainers, coordinators, and learners.
 
 ## Technical Documentation
 
@@ -10,7 +10,7 @@ For a crisp owner-level explanation of the language, framework, routes, API endp
 
 ---
 
-## What Makes SkillTest AI Different
+## What Makes SkillTest_AI Different
 
 | Capability | Details |
 |---|---|
@@ -26,6 +26,7 @@ For a crisp owner-level explanation of the language, framework, routes, API endp
 | **Feedback System** | Coordinator-controlled feedback windows → employee submission → AI sentiment analysis for managers. |
 | **Gamification** | Points, streaks, badges, and live leaderboard for learners. |
 | **Notifications** | Email (Resend) + in-app notifications for sessions, reminders, and alerts. |
+| **BRD Evidence Pack** | `/manager/compliance` maps BRD requirements to live screens and `/api/reports/training-ops/download` exports a one-click judge workbook. |
 
 ---
 

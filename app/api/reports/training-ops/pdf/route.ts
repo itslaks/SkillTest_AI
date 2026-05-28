@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireManagerForApi } from '@/lib/rbac'
 import { NextResponse } from 'next/server'
+import { PRODUCT_NAME } from '@/lib/branding'
 
 export async function GET() {
   const auth = await requireManagerForApi()
@@ -35,7 +36,7 @@ export async function GET() {
   const dispatchLogged = dispatchLogs.filter((item: any) => item.provider_status === 'logged').length
 
   const lines = [
-    'Maverick Execution Platform - Training Ops PDF Report',
+    `${PRODUCT_NAME} - Training Ops PDF Report`,
     `Generated: ${new Date().toLocaleString()}`,
     '',
     `Batches covered: ${batches?.length || 0}`,
@@ -62,7 +63,7 @@ export async function GET() {
   return new NextResponse(Buffer.from(pdf, 'binary'), {
     headers: {
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="maverick-training-ops-${new Date().toISOString().slice(0, 10)}.pdf"`,
+      'Content-Disposition': `attachment; filename="skilltest-ai-mavericks-training-ops-${new Date().toISOString().slice(0, 10)}.pdf"`,
     },
   })
 }

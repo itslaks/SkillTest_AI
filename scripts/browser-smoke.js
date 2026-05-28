@@ -2,7 +2,7 @@ const { chromium } = require('@playwright/test')
 const { spawn } = require('child_process')
 const http = require('http')
 
-const BASE_URL = process.env.SMOKE_BASE_URL || 'http://localhost:3002'
+const BASE_URL = process.env.SMOKE_BASE_URL || 'http://localhost:3000'
 let devServer = null
 
 function waitForServer(url, timeoutMs = 45000) {
@@ -39,10 +39,11 @@ async function ensureServer() {
   const url = new URL(BASE_URL)
   const port = url.port || (url.protocol === 'https:' ? '443' : '80')
   const command = process.platform === 'win32' ? 'npm.cmd' : 'npm'
-  devServer = spawn(command, ['run', 'dev', '--', '-p', port], {
+  devServer = spawn(command, ['run', 'dev', '--', '--port', port], {
     cwd: process.cwd(),
     env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],
+    shell: process.platform === 'win32',
   })
 
   devServer.stdout.on('data', (chunk) => process.stdout.write(chunk))
@@ -71,7 +72,7 @@ async function main() {
 
   try {
     const publicRoutes = [
-      { path: '/', expectText: 'Maverick' },
+      { path: '/', expectText: 'SkillTest_AI' },
       { path: '/auth/login', expectText: 'Welcome back' },
       { path: '/auth/sign-up', expectText: 'Create' },
       { path: '/auth/reset-password', expectText: 'Reset' },

@@ -241,7 +241,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
             <div className="space-y-6">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-[10px] uppercase tracking-[0.35em] text-zinc-400">
                 <Sparkles className="h-3.5 w-3.5" />
-                Adaptive Maverick Session
+                Adaptive SkillTest_AI Session
               </div>
               <div>
                 <h1 className="text-4xl font-semibold tracking-tight md:text-5xl">{quiz.title}</h1>
@@ -398,7 +398,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
             <CardHeader className="border-b border-white/10 bg-white/[0.03]">
               <div className="flex items-center justify-between">
                 <Badge className="border-white/10 bg-white/10 capitalize text-white">{currentQuestion?.difficulty}</Badge>
-                <span className="text-xs uppercase tracking-[0.3em] text-zinc-500">Maverick Live</span>
+                <span className="text-xs uppercase tracking-[0.3em] text-zinc-500">SkillTest_AI Live</span>
               </div>
               <CardTitle className="mt-4 text-2xl leading-relaxed">{currentQuestion?.question_text}</CardTitle>
             </CardHeader>

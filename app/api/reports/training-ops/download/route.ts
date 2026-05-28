@@ -2,6 +2,7 @@ import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { requireManagerForApi } from '@/lib/rbac'
 import { NextResponse } from 'next/server'
 import { averageScore, computeTopperScore } from '@/lib/topper'
+import { PRODUCT_NAME } from '@/lib/branding'
 import * as XLSX from 'xlsx'
 
 export async function GET() {
@@ -137,6 +138,16 @@ export async function GET() {
   const feedbackByBatch = groupBy(feedback, 'batch_id')
 
   const wb = XLSX.utils.book_new()
+
+  addSheet(wb, 'Evidence Pack Cover', [
+    {
+      Product: PRODUCT_NAME,
+      Artifact: 'Contest Evidence Pack',
+      Generated_At: new Date().toLocaleString(),
+      Purpose: 'One workbook proving BRD coverage, operational execution, auditability, and reporting readiness.',
+      Primary_Demo_Route: '/manager/compliance',
+    },
+  ])
 
   const batchRows = (batches || []).map((batch: any) => {
     const batchMembers = membersByBatch.get(batch.id) || []
@@ -277,8 +288,38 @@ export async function GET() {
     'Run At': item.created_at ? new Date(item.created_at).toLocaleString() : 'N/A',
   })))
 
+  addSheet(wb, 'BRD Coverage Matrix', buildBrdCoverageRows({
+    batches: batches || [],
+    members,
+    sessions,
+    attendance,
+    uploads,
+    assessmentSetups: assessmentSetupRes.data || [],
+    projectEvaluations: projectRes.data || [],
+    feedback,
+    notifications,
+    dispatchLogs: notificationDispatchLogs,
+    automationRuns: automationRes.data || [],
+  }))
+
+  addSheet(wb, 'Contest Demo Runbook', [
+    { Step: 1, Judge_Action: 'Open BRD Proof', Route: '/manager/compliance', Proof: 'Live requirement matrix, readiness score, demo data checklist, and links into working screens.' },
+    { Step: 2, Judge_Action: 'Open Operations', Route: '/manager/operations', Proof: 'Create/edit batches, assign trainers, upload candidates, schedule sessions, mark attendance, upload scores, trigger feedback.' },
+    { Step: 3, Judge_Action: 'Run Governance', Route: '/manager/operations#feedback', Proof: 'Attendance cut-off, absence streak, assessment reminder, and feedback reminder automation logs.' },
+    { Step: 4, Judge_Action: 'Open Reports', Route: '/manager/reports', Proof: 'Excel/PDF reports for attendance, assessment, feedback, toppers, and consolidated candidate status filters.' },
+    { Step: 5, Judge_Action: 'Download Evidence Pack', Route: '/api/reports/training-ops/download', Proof: 'This workbook packages batch data, audit logs, reports, BRD coverage, and demo runbook in one file.' },
+  ])
+
+  addSheet(wb, 'Judge Winning Signals', [
+    { Signal: 'Exact BRD Fit', Evidence: 'Coverage matrix maps sections 5.1 to 6.4 to live data and screens.' },
+    { Signal: 'Operational Discipline', Evidence: 'Cut-off, late reason, absence streak, notification dispatch, and automation runs are logged.' },
+    { Signal: 'Scale Readiness', Evidence: 'Chunked importers and 20,000-row fixture scripts demonstrate high-volume upload readiness.' },
+    { Signal: 'Auditability', Evidence: 'Attendance versions, batch change audit, assessment upload logs, notification dispatch logs, and evidence files are exportable.' },
+    { Signal: 'Executive Story', Evidence: 'Dashboards combine batch health, trainer scorecards, comparison radar, feedback analytics, and topper transparency.' },
+  ])
+
   const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
-  const filename = `maverick-tms-training-ops-${new Date().toISOString().slice(0, 10)}.xlsx`
+  const filename = `skilltest-ai-mavericks-evidence-pack-${new Date().toISOString().slice(0, 10)}.xlsx`
 
   return new NextResponse(buffer, {
     headers: {
@@ -286,6 +327,78 @@ export async function GET() {
       'Content-Disposition': `attachment; filename="${filename}"`,
     },
   })
+}
+
+function buildBrdCoverageRows(data: {
+  batches: any[]
+  members: any[]
+  sessions: any[]
+  attendance: any[]
+  uploads: any[]
+  assessmentSetups: any[]
+  projectEvaluations: any[]
+  feedback: any[]
+  notifications: any[]
+  dispatchLogs: any[]
+  automationRuns: any[]
+}) {
+  const auditRows = data.uploads.length + data.dispatchLogs.length + data.automationRuns.length
+  return [
+    {
+      BRD_Section: '5.1 Training Batch Management',
+      Status: data.batches.length ? 'Covered' : 'Needs demo data',
+      Evidence: `${data.batches.length} batches, ${data.members.length} candidate assignments, ${data.sessions.length} sessions.`,
+      Exceeds_Baseline: 'Multi-trainer assignment and lifecycle audit are available in operations.',
+    },
+    {
+      BRD_Section: '5.2 Attendance Tracker',
+      Status: data.attendance.length || data.uploads.length ? 'Covered' : 'Needs demo data',
+      Evidence: `${data.attendance.length} attendance rows, ${data.uploads.length} attendance upload logs.`,
+      Exceeds_Baseline: 'Manual entry, Excel upload, cut-off late reason, validation errors, and absence automation.',
+    },
+    {
+      BRD_Section: '5.3 Assessment Score Tracker',
+      Status: data.assessmentSetups.length || data.projectEvaluations.length ? 'Covered' : 'Needs demo data',
+      Evidence: `${data.assessmentSetups.length} assessment setups, ${data.projectEvaluations.length} project evaluations.`,
+      Exceeds_Baseline: 'Question/evidence files, passing scores, and score import audit logs.',
+    },
+    {
+      BRD_Section: '5.4 Notifications & Alerts',
+      Status: data.notifications.length || data.dispatchLogs.length ? 'Covered' : 'Needs automation run',
+      Evidence: `${data.notifications.length} notifications, ${data.dispatchLogs.length} provider dispatch logs.`,
+      Exceeds_Baseline: 'Recipient-level delivery evidence distinguishes sent, failed, and logged states.',
+    },
+    {
+      BRD_Section: '5.5 Feedback Management',
+      Status: data.feedback.length ? 'Covered' : 'Needs feedback responses',
+      Evidence: `${data.feedback.length} feedback responses.`,
+      Exceeds_Baseline: 'Content quality, trainer effectiveness, sentiment, and action item reporting.',
+    },
+    {
+      BRD_Section: '5.6 Dashboards & Metrics',
+      Status: data.batches.length ? 'Covered' : 'Needs demo data',
+      Evidence: 'Operations, reports, analytics, and employee training dashboards are implemented.',
+      Exceeds_Baseline: 'Batch comparison radar and trainer impact scorecards go beyond standard dashboards.',
+    },
+    {
+      BRD_Section: '5.7 Reports & Downloads',
+      Status: 'Covered',
+      Evidence: 'Attendance, assessment, feedback, topper, consolidated, PDF, and evidence pack exports.',
+      Exceeds_Baseline: 'This workbook acts as a one-click contest evidence pack.',
+    },
+    {
+      BRD_Section: '5.8 Topper Identification',
+      Status: 'Covered',
+      Evidence: 'Configurable assessment/project weights and minimum attendance exported with formula.',
+      Exceeds_Baseline: 'Transparent, reproducible ranking is visible in reports and exports.',
+    },
+    {
+      BRD_Section: '6 Non-Functional Requirements',
+      Status: auditRows ? 'Covered' : 'Needs demo data',
+      Evidence: `${auditRows} audit/evidence rows in this evidence pack; RBAC guards and scoped access are implemented.`,
+      Exceeds_Baseline: '20,000-row fixture scripts and chunked importers support scale proof.',
+    },
+  ]
 }
 
 function groupBy(items: any[], key: string) {
