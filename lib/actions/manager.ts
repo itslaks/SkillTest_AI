@@ -469,10 +469,28 @@ export async function updateCertificateRule(formData: FormData) {
   const enabled = String(formData.get('enabled') || '') === 'on'
   const minScore = Math.min(100, Math.max(0, Number(formData.get('min_score') || 70)))
   const title = String(formData.get('title') || 'Certificate of Achievement').trim()
+  const certificateName = String(formData.get('certificate_name') || title || 'Course Completion Certificate').trim()
   const message = String(formData.get('message') || '').trim()
+  const templateAccentColor = String(formData.get('template_accent_color') || '#d97706').trim()
+  const templateNotes = String(formData.get('template_notes') || '').trim()
+  const existingTemplate = String(formData.get('existing_template_image_url') || '').trim()
+  const templateFile = formData.get('template_file')
 
   if (!quizId) return { error: 'Quiz is required.' }
   if (!title) return { error: 'Certificate title is required.' }
+  if (!certificateName) return { error: 'Certificate name is required.' }
+
+  let templateImageUrl = existingTemplate || null
+  if (templateFile instanceof File && templateFile.size > 0) {
+    if (!templateFile.type.startsWith('image/')) {
+      return { error: 'Certificate template must be an image file.' }
+    }
+    if (templateFile.size > 1_500_000) {
+      return { error: 'Certificate template image must be below 1.5 MB.' }
+    }
+    const bytes = Buffer.from(await templateFile.arrayBuffer())
+    templateImageUrl = `data:${templateFile.type};base64,${bytes.toString('base64')}`
+  }
 
   const { error } = await admin
     .from('certificate_rules')
@@ -481,7 +499,11 @@ export async function updateCertificateRule(formData: FormData) {
       enabled,
       min_score: minScore,
       title,
+      certificate_name: certificateName,
       message: message || null,
+      template_image_url: templateImageUrl,
+      template_accent_color: templateAccentColor || '#d97706',
+      template_notes: templateNotes || null,
       created_by: userId,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'quiz_id' })

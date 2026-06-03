@@ -1,5 +1,15 @@
--- Backfill certificates for old completed quiz attempts after migration 030.
--- Run this after admins have enabled certificate rules for the quizzes.
+-- 031_backfill_old_certificates.sql
+-- Enhances certificate personalization and backfills old completed quiz attempts.
+-- Run this after migration 030 and after admins have enabled certificate rules.
+
+ALTER TABLE public.certificate_rules
+  ADD COLUMN IF NOT EXISTS certificate_name TEXT DEFAULT 'Course Completion Certificate',
+  ADD COLUMN IF NOT EXISTS template_image_url TEXT,
+  ADD COLUMN IF NOT EXISTS template_accent_color TEXT DEFAULT '#d97706',
+  ADD COLUMN IF NOT EXISTS template_notes TEXT;
+
+COMMENT ON COLUMN public.certificate_rules.min_score IS 'Admin-configured certificate threshold. Examples: 70, 80, 90, 95.';
+COMMENT ON COLUMN public.certificate_rules.template_image_url IS 'Optional admin-uploaded certificate format/background. Employee and course details are rendered dynamically by the app.';
 
 INSERT INTO public.certificates (
   rule_id,
@@ -16,7 +26,7 @@ SELECT
   attempt.quiz_id,
   attempt.user_id,
   attempt.id,
-  COALESCE(rule.title, 'Certificate of Achievement'),
+  COALESCE(rule.certificate_name, rule.title, 'Course Completion Certificate'),
   COALESCE(rule.message, 'Awarded for meeting the certification score threshold.'),
   attempt.score,
   rule.created_by

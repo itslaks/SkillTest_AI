@@ -65,7 +65,7 @@ The application is designed for **admins, managers, training coordinators, train
 | 🧑‍💼 Profile Dashboards | Search anyone by name, email, employee ID, domain, or role and view quiz, badge, certificate, attendance, and training history |
 | 🖼️ Profile Photos | Users can upload a small profile photo or choose from 15 built-in default face avatars |
 | 🧭 Smart Domain Assignment | Filter large employee lists by vertical/domain with color-coded chips before assigning quizzes |
-| 🏅 Certificates | Admin-only certificate automation for score thresholds and automatic issuing |
+| 🏅 Certificates | Admin-only certificate automation with flexible score thresholds, uploaded certificate formats, personalized employee/course names, and automatic issuing |
 | 🎖️ Badge Universe | 250+ styled badges across 12+ categories with color, rarity, and shape metadata |
 | ✉️ Email Automation | Assignment and completion emails through SMTP or Resend, including score, badge, and certificate updates |
 | 🤖 Manager Command Chatbot | Floating DB-aware chatbot for admins/trainers to ask about quiz, employee, badge, certificate, and attendance performance |
@@ -288,7 +288,7 @@ Run the SQL scripts in `scripts/` in numeric order.
 |---|---|
 | `029_sync_quiz_status_visibility.sql` | Synchronizes `quizzes.status` and `quizzes.is_active`, making quiz visibility consistent for employees |
 | `030_certificates_badge_expansion.sql` | Adds certificate automation tables, certificate issuing trigger, badge style columns, and 260 seeded badges |
-| `031_backfill_old_certificates.sql` | Issues missing certificates for old completed attempts that already meet enabled certificate rules |
+| `031_backfill_old_certificates.sql` | Adds certificate template personalization fields and issues missing certificates for old completed attempts that already meet enabled certificate rules |
 
 ### ⚠️ Important Database Notes
 
@@ -300,7 +300,7 @@ Run the SQL scripts in `scripts/` in numeric order.
 | Notifications | Migration `028` expands notification delivery statuses |
 | Training Governance | Migrations `020` through `028` add training operations, audit, feedback, and notification controls |
 | Certificates | Migration `030` creates `certificate_rules` and `certificates`; admin certificate controls require this migration |
-| Old Quiz Certificates | Enable certificate rules in `/manager/admin`, then run migration `031` to backfill old attempts |
+| Old Quiz Certificates | Enable certificate rules in `/manager/admin`, set threshold/template, then run migration `031` to backfill old attempts |
 
 ---
 
@@ -350,6 +350,7 @@ ALLOW_DEMO_SEED_CREDENTIALS=1 node scripts/seed_admin.js
 | `/profiles` | Authenticated users | Search employee/trainer/admin profiles by name, email, employee ID, domain, or role |
 | `/profiles/[id]` | Authenticated users | Profile dashboard with quiz, badge, certificate, attendance, and training history |
 | `/profile/settings` | Authenticated users | Update display name, domain, department, and profile avatar |
+| `/certificates/[id]` | Authenticated users | Professional certificate view with uploaded template, employee name, course name, score, and print/download |
 | `/manager/analytics` | Manager | Assessment analyzer and AI chat |
 | `/manager/employees` | Manager | Employee import, export, edit, delete, quiz assignment |
 | `/manager/leaderboard` | Manager | Quiz and cumulative leaderboard |

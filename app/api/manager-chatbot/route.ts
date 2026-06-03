@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
     { data: profiles },
     { data: badges },
     { data: certificates },
+    { data: certificateRules },
     { data: attendance },
   ] = await Promise.all([
     admin
@@ -48,6 +49,10 @@ export async function POST(request: NextRequest) {
       .select('user_id, quiz_id, title, score, issued_at')
       .limit(250),
     admin
+      .from('certificate_rules')
+      .select('quiz_id, enabled, min_score, title, certificate_name, quizzes:quiz_id(title, topic)')
+      .limit(120),
+    admin
       .from('session_attendance')
       .select('user_id, status, session:session_id(batch_id, title, session_date)')
       .limit(500),
@@ -59,6 +64,7 @@ export async function POST(request: NextRequest) {
     profiles: profiles || [],
     badges: badges || [],
     certificates: certificates || [],
+    certificateRules: certificateRules || [],
     attendance: attendance || [],
   })
 
@@ -112,6 +118,9 @@ function buildChatbotContext(data: Record<string, any[]>) {
   const certSummary = data.certificates.slice(0, 60).map((cert) =>
     `${cert.user_id}|${cert.title}|${cert.score}%|${cert.issued_at}`
   )
+  const certRuleSummary = data.certificateRules.slice(0, 80).map((rule) =>
+    `${rule.quizzes?.title || rule.quiz_id}|${rule.quizzes?.topic || 'General'}|enabled=${rule.enabled}|min=${rule.min_score}|name=${rule.certificate_name || rule.title}`
+  )
 
   return [
     'ATTEMPTS name|empId|domain|quiz|topic|score|correct|points',
@@ -122,6 +131,8 @@ function buildChatbotContext(data: Record<string, any[]>) {
     badgeSummary.join('\n') || 'none',
     'CERTIFICATES userId|title|score|issued',
     certSummary.join('\n') || 'none',
+    'CERTIFICATE_RULES quiz|topic|enabled|minScore|certificateName',
+    certRuleSummary.join('\n') || 'none',
   ].join('\n')
 }
 

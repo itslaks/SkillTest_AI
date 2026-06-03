@@ -76,7 +76,7 @@ export async function getProfileDashboard(profileId: string) {
       .limit(50),
     admin
       .from('certificates')
-      .select('*, quiz:quiz_id(title, topic)')
+      .select('*, quiz:quiz_id(title, topic), rule:rule_id(certificate_name, template_image_url, template_accent_color, template_notes)')
       .eq('user_id', profileId)
       .order('issued_at', { ascending: false })
       .limit(20),

@@ -134,10 +134,11 @@ export default async function ProfileDashboardPage({ params }: { params: Promise
               )
             })}
             {certificates.map((certificate: any) => (
-              <div key={certificate.id} className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
-                <p className="font-semibold">{certificate.title}</p>
+              <Link key={certificate.id} href={`/certificates/${certificate.id}`} className="block rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900 transition hover:border-amber-300 hover:bg-amber-100">
+                <p className="font-semibold">{certificate.rule?.certificate_name || certificate.title}</p>
                 <p className="text-xs">Issued for {certificate.quiz?.title || 'assessment'} on {new Date(certificate.issued_at).toLocaleDateString()}</p>
-              </div>
+                <p className="mt-2 text-[11px] font-semibold uppercase tracking-wider text-amber-700">View certificate</p>
+              </Link>
             ))}
             {badges.length === 0 && certificates.length === 0 && <EmptyLine text="No badges or certificates yet." />}
           </div>
