@@ -43,16 +43,20 @@ export function HeroSection() {
           </span>
         </div>
 
-        <div className="mb-10 hero-rise" style={{ animationDelay: "160ms" }}>
-          <h1 className="max-w-[920px] text-[clamp(3rem,9vw,7.4rem)] font-display leading-[0.94] tracking-tight text-slate-950">
-            <span className="block">SkillTest_AI</span>
-            <span className="block bg-gradient-to-r from-violet-600 via-blue-600 to-cyan-500 bg-clip-text text-transparent">Execution</span>
-          </h1>
-          <p className="mt-4 text-xl text-slate-600 font-medium max-w-lg">Training management that thinks with you, not just for you.</p>
-        </div>
-
-        <div className="grid gap-16 xl:grid-cols-[0.85fr_1.15fr] xl:items-center">
+        <div className="grid gap-12 xl:grid-cols-[0.82fr_1.18fr] xl:items-center">
           <div className="space-y-8 hero-rise" style={{ animationDelay: "240ms" }}>
+            <div>
+              <h1 className="max-w-[780px] text-[clamp(3rem,8.2vw,7rem)] font-display leading-[0.94] tracking-tight text-slate-950">
+                <span className="block">SkillTest_AI</span>
+                <span className="block bg-gradient-to-r from-violet-600 via-blue-600 to-cyan-500 bg-clip-text text-transparent">Execution</span>
+              </h1>
+              <p className="mt-4 max-w-lg text-xl font-medium text-slate-600">Training management that thinks with you, not just for you.</p>
+            </div>
+
+            <div className="xl:hidden">
+              <HeroShowcase />
+            </div>
+
             <p className="text-xl lg:text-2xl text-slate-700 leading-relaxed max-w-xl">
               SkillTest_AI: Mavericks Execution Platform brings batch operations, real-time attendance, assessment imports, trainer scorecards, feedback analytics, and automated reporting into one judge-ready TMS.
             </p>
@@ -101,7 +105,7 @@ export function HeroSection() {
             </p>
           </div>
 
-          <div className="hero-rise" style={{ animationDelay: "320ms" }}>
+          <div className="hidden hero-rise xl:block" style={{ animationDelay: "320ms" }}>
             <HeroShowcase />
           </div>
         </div>
