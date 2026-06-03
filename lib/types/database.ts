@@ -77,6 +77,10 @@ export interface Badge {
   icon: string | null
   criteria: Record<string, unknown> | null
   points: number
+  category?: string | null
+  color?: string | null
+  shape?: string | null
+  rarity?: string | null
   created_at: string
 }
 
@@ -475,6 +479,13 @@ export interface ReadinessInsight {
 export interface AttemptInsight {
   averageAnswerTime: number
   easyQuestionOverloadCount: number
+  fastGuessCount: number
+  slowStruggleCount: number
+  timeVariance: number
+  focusScore: number
+  confidenceScore: number
+  riskLevel: 'low' | 'medium' | 'high'
+  behaviorTags: string[]
   cognitiveLoadDetected: boolean
   panicModeDetected: boolean
   panicStreak: number

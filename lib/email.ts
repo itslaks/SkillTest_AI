@@ -3,9 +3,11 @@
  * Uses RESEND_API_KEY env var. Falls back to console logging in development.
  */
 import { Resend } from 'resend'
+import nodemailer from 'nodemailer'
 import { PRODUCT_EMAIL_FROM, PRODUCT_NAME, PRODUCT_TMS_LABEL } from '@/lib/branding'
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
+const smtpConfigured = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS)
 
 export interface SendEmailOptions {
   to: string | string[]
@@ -17,6 +19,31 @@ export interface SendEmailOptions {
 
 export async function sendEmail(options: SendEmailOptions): Promise<{ success: boolean; error?: string }> {
   const from = options.from ?? (process.env.EMAIL_FROM ?? PRODUCT_EMAIL_FROM)
+
+  if (smtpConfigured) {
+    try {
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: Number(process.env.SMTP_PORT || 587),
+        secure: process.env.SMTP_SECURE === 'true',
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+      })
+
+      await transporter.sendMail({
+        from,
+        to: Array.isArray(options.to) ? options.to.join(',') : options.to,
+        subject: options.subject,
+        html: options.html,
+      })
+      return { success: true }
+    } catch (err: any) {
+      console.error('[SMTP EMAIL ERROR]', err)
+      return { success: false, error: err.message }
+    }
+  }
 
   if (!resend) {
     // Dev / no-key fallback: log to console so testing is unblocked
@@ -183,5 +210,59 @@ export function buildUploadConfirmationEmail(opts: {
       <a href="${process.env.NEXT_PUBLIC_APP_URL ?? 'https://skilltest.ai'}/manager/operations" style="display:inline-block;background:#000;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:8px;">Open Operations Console</a>
     </div>
     <p style="color:#a1a1aa;font-size:12px;margin-top:16px;text-align:center;">${PRODUCT_NAME} | Upload Notification</p>
+  </div>`
+}
+
+export function buildQuizAssignedEmail(opts: {
+  employeeName?: string | null
+  quizTitle: string
+  topic: string
+  difficulty: string
+  dueDate?: string | null
+}) {
+  return `
+  <div style="font-family:system-ui,sans-serif;max-width:620px;margin:0 auto;padding:24px;background:#f8fafc;">
+    <div style="background:#050505;color:#fff;padding:24px;border-radius:18px 18px 0 0;">
+      <p style="margin:0;color:#8b5cf6;font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;">SkillTest_AI Assignment</p>
+      <h1 style="margin:10px 0 0;font-size:24px;">New quiz assigned</h1>
+    </div>
+    <div style="background:#fff;border:1px solid #e5e7eb;border-top:0;padding:24px;border-radius:0 0 18px 18px;">
+      <p>Hi ${opts.employeeName || 'Learner'},</p>
+      <p>You have been assigned <strong>${opts.quizTitle}</strong>.</p>
+      <table style="width:100%;border-collapse:collapse;margin:18px 0;">
+        <tr><td style="padding:10px;background:#f3f4f6;font-weight:700;">Topic</td><td style="padding:10px;background:#fafafa;">${opts.topic}</td></tr>
+        <tr><td style="padding:10px;background:#f3f4f6;font-weight:700;">Difficulty</td><td style="padding:10px;background:#fafafa;">${opts.difficulty}</td></tr>
+        <tr><td style="padding:10px;background:#f3f4f6;font-weight:700;">Due</td><td style="padding:10px;background:#fafafa;">${opts.dueDate || 'As scheduled by your trainer'}</td></tr>
+      </table>
+      <a href="${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/employee/quizzes" style="display:inline-block;background:#000;color:#fff;padding:12px 20px;border-radius:999px;text-decoration:none;font-weight:700;">Open Quiz</a>
+    </div>
+  </div>`
+}
+
+export function buildQuizCompletedEmail(opts: {
+  employeeName?: string | null
+  quizTitle: string
+  score: number
+  points: number
+  badgesEarned?: number
+  certificateIssued?: boolean
+}) {
+  return `
+  <div style="font-family:system-ui,sans-serif;max-width:620px;margin:0 auto;padding:24px;background:#f8fafc;">
+    <div style="background:#111827;color:#fff;padding:24px;border-radius:18px 18px 0 0;">
+      <p style="margin:0;color:#22c55e;font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;">SkillTest_AI Result</p>
+      <h1 style="margin:10px 0 0;font-size:24px;">Quiz completed</h1>
+    </div>
+    <div style="background:#fff;border:1px solid #e5e7eb;border-top:0;padding:24px;border-radius:0 0 18px 18px;">
+      <p>Hi ${opts.employeeName || 'Learner'},</p>
+      <p>Your result for <strong>${opts.quizTitle}</strong> is ready.</p>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:18px 0;">
+        <div style="padding:16px;border-radius:14px;background:#ecfdf5;color:#065f46;"><strong style="font-size:24px;">${opts.score}%</strong><br/>Score</div>
+        <div style="padding:16px;border-radius:14px;background:#eef2ff;color:#3730a3;"><strong style="font-size:24px;">${opts.points}</strong><br/>Points</div>
+      </div>
+      <p>${opts.badgesEarned ? `You unlocked ${opts.badgesEarned} badge(s).` : 'Keep going to unlock more badges.'}</p>
+      ${opts.certificateIssued ? '<p style="color:#b45309;font-weight:700;">A certificate has been issued for this result.</p>' : ''}
+      <a href="${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/employee/quizzes" style="display:inline-block;background:#000;color:#fff;padding:12px 20px;border-radius:999px;text-decoration:none;font-weight:700;">View Result</a>
+    </div>
   </div>`
 }

@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { requireTrainingStaff } from '@/lib/rbac'
 import { ManagerSidebar } from '@/components/manager/sidebar'
 import { ManagerHeader } from '@/components/manager/header'
+import { ManagerCommandChatbot } from '@/components/manager/manager-command-chatbot'
 import Link from 'next/link'
 import {
   CalendarDays,
@@ -54,6 +55,7 @@ export default async function ManagerLayout({
           {children}
         </main>
       </div>
+      <ManagerCommandChatbot />
     </div>
   )
 }

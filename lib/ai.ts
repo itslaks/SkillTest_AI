@@ -13,6 +13,8 @@ export interface AIOptions {
 
 const OPENAI_DEFAULT_MODEL = 'gpt-4o-mini'
 const OPENAI_BASE = 'https://api.openai.com/v1/chat/completions'
+const GROQ_DEFAULT_MODEL = 'llama-3.3-70b-versatile'
+const GROQ_BASE = 'https://api.groq.com/openai/v1/chat/completions'
 const GEMINI_BASE =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
 
@@ -59,14 +61,42 @@ export async function callGemini(prompt: string, opts: AIOptions = {}): Promise<
   return json.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
 }
 
+/** Call Groq's OpenAI-compatible chat completions endpoint. Throws on network/API error. */
+export async function callGroq(
+  messages: AIMessage[],
+  opts: AIOptions = {}
+): Promise<string> {
+  const key = process.env.GROQ_API_KEY
+  if (!key) throw new Error('GROQ_API_KEY not configured')
+
+  const res = await fetch(GROQ_BASE, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+    body: JSON.stringify({
+      model: opts.model ?? process.env.GROQ_MODEL ?? GROQ_DEFAULT_MODEL,
+      messages,
+      max_tokens: opts.maxTokens ?? 800,
+      temperature: opts.temperature ?? 0.4,
+    }),
+  })
+
+  const json = await res.json()
+  if (!res.ok || json.error) throw new Error(json.error?.message ?? `Groq ${res.status}`)
+  return json.choices?.[0]?.message?.content ?? ''
+}
+
 /** Pick whichever AI provider is configured, OpenAI preferred. */
 export async function callAI(
   messages: AIMessage[],
   opts: AIOptions = {}
-): Promise<{ text: string; provider: 'openai' | 'gemini' }> {
+): Promise<{ text: string; provider: 'openai' | 'groq' | 'gemini' }> {
   if (process.env.OPENAI_API_KEY) {
     const text = await callOpenAI(messages, opts)
     return { text, provider: 'openai' }
+  }
+  if (process.env.GROQ_API_KEY) {
+    const text = await callGroq(messages, opts)
+    return { text, provider: 'groq' }
   }
   if (process.env.GOOGLE_GEMINI_API_KEY) {
     // Flatten messages into a single prompt for Gemini
@@ -74,7 +104,7 @@ export async function callAI(
     const text = await callGemini(prompt, opts)
     return { text, provider: 'gemini' }
   }
-  throw new Error('No AI provider configured. Set OPENAI_API_KEY or GOOGLE_GEMINI_API_KEY.')
+  throw new Error('No AI provider configured. Set OPENAI_API_KEY, GROQ_API_KEY, or GOOGLE_GEMINI_API_KEY.')
 }
 
 /**

@@ -217,7 +217,7 @@ export default function NewQuizPage() {
         }
       }
       // Redirect to quiz detail page for review
-      router.push(`/manager/quizzes/${quizId}`)
+      router.push(`/manager/quizzes/${quizId}?assign=1`)
     })
   }
 

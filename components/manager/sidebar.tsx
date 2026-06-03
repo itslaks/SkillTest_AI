@@ -37,6 +37,7 @@ const navigation = [
       { name: 'Training Ops', href: '/manager/operations', icon: CalendarDays, color: 'text-cyan-400', bg: 'bg-cyan-400/10', activeBg: 'bg-cyan-500', description: 'Batches & sessions' },
       { name: 'Quizzes', href: '/manager/quizzes', icon: FileQuestion, color: 'text-violet-400', bg: 'bg-violet-400/10', activeBg: 'bg-violet-500', description: 'Manage assessments' },
       { name: 'Employees', href: '/manager/employees', icon: Users, color: 'text-emerald-400', bg: 'bg-emerald-400/10', activeBg: 'bg-emerald-500', description: 'Team management' },
+      { name: 'Profiles', href: '/profiles', icon: Users, color: 'text-indigo-400', bg: 'bg-indigo-400/10', activeBg: 'bg-indigo-500', description: 'People search' },
     ]
   },
   {

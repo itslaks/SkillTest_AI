@@ -10,7 +10,9 @@ import {
   Clock,
   Crown,
   Gauge,
+  Radar,
   Snowflake,
+  Target,
 } from 'lucide-react'
 
 export default async function QuizResultsPage({ params }: { params: Promise<{ quizId: string }> }) {
@@ -96,6 +98,11 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
                 body={`Fast wrong streak: ${behavior.panicStreak}`}
               />
               <InsightRow
+                title="Focus confidence"
+                value={`${behavior.focusScore}/${behavior.confidenceScore}`}
+                body={`Risk level: ${behavior.riskLevel}. Variance score: ${behavior.timeVariance}`}
+              />
+              <InsightRow
                 title="Next recommended difficulty"
                 value={behavior.suggestedNextDifficulty}
                 body={behavior.masterySignal}
@@ -170,6 +177,30 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
             </CardContent>
           </Card>
 
+          <Card className="border-zinc-200 bg-white">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Radar className="h-4 w-4" />
+                Behavioral signal board
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <BehaviorMetric label="Focus" value={`${behavior.focusScore}%`} />
+              <BehaviorMetric label="Confidence" value={`${behavior.confidenceScore}%`} />
+              <BehaviorMetric label="Fast guesses" value={`${behavior.fastGuessCount}`} />
+              <BehaviorMetric label="Slow struggles" value={`${behavior.slowStruggleCount}`} />
+              {behavior.behaviorTags.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-2">
+                  {behavior.behaviorTags.map((tag) => (
+                    <Badge key={tag} variant="outline" className="rounded-full border-zinc-300 capitalize">
+                      {tag.replace(/-/g, ' ')}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {retentionCheck && (
             <Card className="border-zinc-200 bg-zinc-50">
               <CardHeader>
@@ -229,6 +260,18 @@ function InsightRow({
         </span>
       </div>
       <p className="mt-2 text-zinc-400">{body}</p>
+    </div>
+  )
+}
+
+function BehaviorMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between rounded-[1.25rem] border border-zinc-200 bg-zinc-50 px-4 py-3">
+      <span className="flex items-center gap-2 font-medium text-zinc-700">
+        <Target className="h-3.5 w-3.5" />
+        {label}
+      </span>
+      <span className="font-semibold text-black">{value}</span>
     </div>
   )
 }

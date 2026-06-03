@@ -37,7 +37,7 @@ The application is designed for **admins, managers, training coordinators, train
 | Main Value | Runs training operations and proves execution quality with reports, audit trails, and AI insights |
 | Deployment Target | Vercel-compatible Next.js app |
 | Database/Auth | Supabase PostgreSQL, Supabase Auth, Row-Level Security |
-| AI Providers | OpenAI first, Google Gemini fallback |
+| AI Providers | OpenAI first, Groq fallback, Google Gemini fallback |
 
 ### 🎯 Use Cases
 
@@ -62,13 +62,19 @@ The application is designed for **admins, managers, training coordinators, train
 | 🧠 AI Manager Insights | Short coaching recommendations for batch health, attendance, trainer performance, and quiz outcomes |
 | 🎓 AI Learner Coach | Personalized recommendations based on streaks, quiz history, readiness, and retention signals |
 | 📊 Assessment Analyzer | Upload assessment results and chat with AI about scores, weak areas, and remediation |
+| 🧑‍💼 Profile Dashboards | Search anyone by name, email, employee ID, domain, or role and view quiz, badge, certificate, attendance, and training history |
+| 🧭 Smart Domain Assignment | Filter large employee lists by vertical/domain with color-coded chips before assigning quizzes |
+| 🏅 Certificates | Admin-only certificate automation for score thresholds and automatic issuing |
+| 🎖️ Badge Universe | 250+ styled badges across 12+ categories with color, rarity, and shape metadata |
+| ✉️ Email Automation | Assignment and completion emails through SMTP or Resend, including score, badge, and certificate updates |
+| 🤖 Manager Command Chatbot | Floating DB-aware chatbot for admins/trainers to ask about quiz, employee, badge, certificate, and attendance performance |
 | 🧑‍🏫 Training Operations | Batch creation, trainer assignment, sessions, attendance, assessments, feedback, reports |
 | ✅ Attendance Governance | Cutoff enforcement, late reason capture, version history, bulk import |
 | 📥 Import Workflows | Employee imports, batch candidate imports, attendance imports, assessment score imports |
 | 🏆 Gamification | Points, streaks, badges, live leaderboards, cumulative reports |
 | 📄 Reports | Excel and PDF exports for training operations, employees, attendance, assessments, feedback, toppers |
 | 🔐 RBAC | Admin, manager, training coordinator, trainer, and employee access boundaries |
-| 📬 Notifications | In-app and email notification workflows through Resend |
+| 📬 Notifications | In-app and email notification workflows through SMTP or Resend |
 | 🧾 BRD Evidence Pack | `/manager/compliance` plus downloadable evidence workbook for judge/client review |
 
 ---
@@ -106,8 +112,8 @@ The application is designed for **admins, managers, training coordinators, train
 | UI | React 19, Tailwind CSS 4, shadcn/Radix-style components |
 | Auth | Supabase Auth |
 | Database | Supabase PostgreSQL with Row-Level Security |
-| AI | OpenAI Chat Completions, Google Gemini fallback |
-| Email | Resend |
+| AI | OpenAI Chat Completions, Groq OpenAI-compatible fallback, Google Gemini fallback |
+| Email | SMTP via Nodemailer or Resend |
 | Excel | SheetJS `xlsx` |
 | PDF | `jspdf`, `jspdf-autotable` |
 | Charts | Recharts |
@@ -153,10 +159,10 @@ route.ts -> controller -> service -> repository -> database
 |---|---|
 | `lib/rbac.ts` | Central role checks and redirects |
 | `lib/training-access.ts` | Batch-level access checks |
-| `lib/ai.ts` | Shared OpenAI/Gemini utility |
+| `lib/ai.ts` | Shared OpenAI/Groq/Gemini utility |
 | `lib/topper.ts` | Topper score calculations |
 | `lib/leaderboard.ts` | Leaderboard aggregation |
-| `lib/email.ts` | Resend email helpers |
+| `lib/email.ts` | SMTP/Resend email helpers |
 | `lib/security/env.ts` | Runtime environment validation |
 | `lib/security/validation.ts` | Zod schemas for user input |
 
@@ -172,7 +178,7 @@ route.ts -> controller -> service -> repository -> database
 | npm | Included with Node |
 | Supabase | Project URL, anon key, service role key |
 | OpenAI or Gemini | Optional but required for AI features |
-| Resend | Optional but required for email delivery |
+| SMTP account or Resend | Optional but required for email delivery |
 | Git | Required for pushing changes |
 
 ### 📦 Install
@@ -221,7 +227,14 @@ Create `.env.local` in the project root.
 | `NEXT_PUBLIC_SITE_URL` | Optional | Alternate site URL |
 | `NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL` | Optional | Local auth callback override |
 | `OPENAI_API_KEY` | Optional | Primary AI provider |
+| `GROQ_API_KEY` | Optional | Fast AI fallback provider |
+| `GROQ_MODEL` | Optional | Groq model override, defaults to `llama-3.3-70b-versatile` |
 | `GOOGLE_GEMINI_API_KEY` | Optional | Fallback AI provider |
+| `SMTP_HOST` | Optional | SMTP host for free email sending, e.g. Gmail SMTP |
+| `SMTP_PORT` | Optional | SMTP port, usually `587` |
+| `SMTP_USER` | Optional | SMTP username/email |
+| `SMTP_PASS` | Optional | SMTP app password |
+| `SMTP_SECURE` | Optional | Set `true` for port `465`, otherwise `false` |
 | `RESEND_API_KEY` | Optional | Email sending |
 | `EMAIL_FROM` | Optional | Sender identity for Resend |
 | `CRON_SECRET` | Production | Protects governance cron endpoint |
@@ -238,8 +251,15 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 OPENAI_API_KEY=your-openai-key
+GROQ_API_KEY=your-groq-key
+GROQ_MODEL=llama-3.3-70b-versatile
 GOOGLE_GEMINI_API_KEY=your-gemini-key
 
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=you@gmail.com
+SMTP_PASS=your-gmail-app-password
+SMTP_SECURE=false
 RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
 EMAIL_FROM="Maverick TMS <noreply@yourdomain.com>"
 
@@ -257,15 +277,16 @@ Run the SQL scripts in `scripts/` in numeric order.
 
 | Scenario | What To Run |
 |---|---|
-| Fresh Supabase project | Run `001` through `029` |
-| Existing DB already at `028` | Run only `029_sync_quiz_status_visibility.sql` |
-| Current project state | Migration `029` has already been executed in Supabase |
+| Fresh Supabase project | Run `001` through `030` |
+| Existing DB already at `029` | Run only `030_certificates_badge_expansion.sql` |
+| Current project state | Migration `029` has already been executed in Supabase; run `030` next |
 
 ### 🧾 Latest Migration
 
 | Migration | Purpose |
 |---|---|
 | `029_sync_quiz_status_visibility.sql` | Synchronizes `quizzes.status` and `quizzes.is_active`, making quiz visibility consistent for employees |
+| `030_certificates_badge_expansion.sql` | Adds certificate automation tables, certificate issuing trigger, badge style columns, and 260 seeded badges |
 
 ### ⚠️ Important Database Notes
 
@@ -276,6 +297,7 @@ Run the SQL scripts in `scripts/` in numeric order.
 | Trainer Approval | Migration `025` adds `approval_status` and `rejection_reason` |
 | Notifications | Migration `028` expands notification delivery statuses |
 | Training Governance | Migrations `020` through `028` add training operations, audit, feedback, and notification controls |
+| Certificates | Migration `030` creates `certificate_rules` and `certificates`; admin certificate controls require this migration |
 
 ---
 
@@ -322,6 +344,8 @@ ALLOW_DEMO_SEED_CREDENTIALS=1 node scripts/seed_admin.js
 |---|---|---|
 | `/manager` | Manager/training staff | Command dashboard and live TMS summary |
 | `/manager/admin` | Admin | Trainer approvals and user governance |
+| `/profiles` | Authenticated users | Search employee/trainer/admin profiles by name, email, employee ID, domain, or role |
+| `/profiles/[id]` | Authenticated users | Profile dashboard with quiz, badge, certificate, attendance, and training history |
 | `/manager/analytics` | Manager | Assessment analyzer and AI chat |
 | `/manager/employees` | Manager | Employee import, export, edit, delete, quiz assignment |
 | `/manager/leaderboard` | Manager | Quiz and cumulative leaderboard |
@@ -358,6 +382,7 @@ ALLOW_DEMO_SEED_CREDENTIALS=1 node scripts/seed_admin.js
 |---|---|---|
 | `GET` | `/api/ai-status` | AI provider availability |
 | `POST` | `/api/ai-chat` | Chat with assessment dataset |
+| `POST` | `/api/manager-chatbot` | Admin/trainer DB-aware command chatbot |
 | `POST` | `/api/ai-insight` | Manager dashboard coaching insight |
 | `POST` | `/api/ai-recommend` | Employee learning recommendation |
 | `POST` | `/api/generate-questions` | Generate topic-based MCQs |
@@ -413,7 +438,7 @@ All provider calls go through `lib/ai.ts`.
 
 | Feature | Provider Flow | Token Cap |
 |---|---|---:|
-| Topic quiz generation | OpenAI if configured, otherwise Gemini, otherwise template fallback | 4000 |
+| Topic quiz generation | OpenAI if configured, otherwise Groq, otherwise Gemini, otherwise template fallback | 4000 |
 | Content quiz generation | Extract content, generate JSON MCQs, fallback to content-based local questions | 4000 |
 | Manager insight | Compact operational prompt | 200 |
 | Employee recommendation | Learner stats and risk prompt | 150 |
@@ -423,7 +448,7 @@ All provider calls go through `lib/ai.ts`.
 
 | Control | Implementation |
 |---|---|
-| Provider selection | OpenAI preferred, Gemini fallback |
+| Provider selection | OpenAI preferred, Groq fallback, Gemini fallback |
 | JSON cleanup | `stripCodeFences()` removes markdown fences |
 | Assessment compression | `buildCompactAssessmentContext()` caps and compresses rows |
 | Difficulty preservation | AI difficulty is validated against allowed levels |
@@ -481,11 +506,11 @@ npx playwright install chromium
 
 | Item | Required |
 |---|---:|
-| Supabase migrations through `029` applied | ✅ |
+| Supabase migrations through `030` applied | ✅ |
 | Real Supabase URL/anon/service keys configured | ✅ |
 | `CRON_SECRET` configured | Recommended |
 | AI provider key configured | Recommended |
-| Resend key configured | Recommended |
+| SMTP or Resend configured | Recommended |
 | Demo seed credentials disabled | ✅ |
 | Admin/trainer seed passwords stored securely | ✅ |
 
@@ -512,7 +537,7 @@ npx playwright install chromium
 |---|---|---|
 | `Supabase is not configured` | Missing/placeholder env vars | Fill `.env.local` with real Supabase values |
 | Employees cannot see quiz | Quiz not active or not assigned | Confirm assignment and `status = active`; migration `029` syncs visibility |
-| AI generation unavailable | No AI provider key | Set `OPENAI_API_KEY` or `GOOGLE_GEMINI_API_KEY` |
+| AI generation unavailable | No AI provider key | Set `OPENAI_API_KEY`, `GROQ_API_KEY`, or `GOOGLE_GEMINI_API_KEY` |
 | Smoke test fails for browser | Playwright browser missing | Run `npx playwright install chromium` |
 | Trainer cannot upload | Trainer not assigned to batch | Assign trainer in training operations |
 | Cron returns 401 | Missing/wrong bearer token | Send `Authorization: Bearer <CRON_SECRET>` |

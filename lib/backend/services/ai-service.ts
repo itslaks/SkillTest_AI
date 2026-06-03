@@ -17,19 +17,22 @@ const INSIGHT_PROMPTS: Record<InsightType, string> = {
 
 export function getAIProviderStatus(): AIProviderStatus {
   const hasOpenAI = Boolean(process.env.OPENAI_API_KEY)
+  const hasGroq = Boolean(process.env.GROQ_API_KEY)
   const hasGemini = Boolean(process.env.GOOGLE_GEMINI_API_KEY)
 
   return {
     hasOpenAI,
+    hasGroq,
     hasGemini,
     hasAnyAI: true,
-    hasExternalAI: hasOpenAI || hasGemini,
+    hasExternalAI: hasOpenAI || hasGroq || hasGemini,
     providers: [
       ...(hasOpenAI ? ['OpenAI'] : []),
+      ...(hasGroq ? ['Groq'] : []),
       ...(hasGemini ? ['Google Gemini'] : []),
-      ...(hasOpenAI || hasGemini ? [] : ['SkillTest_AI local intelligence']),
+      ...(hasOpenAI || hasGroq || hasGemini ? [] : ['SkillTest_AI local intelligence']),
     ],
-    activeProvider: hasOpenAI ? 'openai' : hasGemini ? 'gemini' : 'skilltest_ai_local',
+    activeProvider: hasOpenAI ? 'openai' : hasGroq ? 'groq' : hasGemini ? 'gemini' : 'skilltest_ai_local',
   }
 }
 

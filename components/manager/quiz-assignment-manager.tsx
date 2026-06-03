@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
+import Link from 'next/link'
 import {
   Dialog,
   DialogContent,
@@ -15,8 +17,9 @@ import {
 } from '@/components/ui/dialog'
 import { Spinner } from '@/components/ui/spinner'
 import { assignQuizToEmployees, unassignQuizFromEmployee } from '@/lib/actions/manager'
-import { UserPlus, X, Check, Users, Download, ClipboardList } from 'lucide-react'
+import { UserPlus, X, Check, Users, Download, ClipboardList, Search, Filter, Fingerprint } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { getDomainColor } from '@/lib/domain-colors'
 
 interface Employee {
   id: string
@@ -24,6 +27,7 @@ interface Employee {
   email: string
   employee_id: string | null
   department: string | null
+  domain?: string | null
 }
 
 interface Quiz {
@@ -51,6 +55,8 @@ interface QuizAssignmentManagerProps {
 export function QuizAssignmentManager({ quizzes, employees, assignments, autoOpen }: QuizAssignmentManagerProps) {
   const [selectedQuiz] = useState<string>(quizzes.length > 0 ? quizzes[0].id : '')
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([])
+  const [query, setQuery] = useState('')
+  const [selectedDomain, setSelectedDomain] = useState<string>('all')
   const [isOpen, setIsOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const { toast } = useToast()
@@ -68,6 +74,16 @@ export function QuizAssignmentManager({ quizzes, employees, assignments, autoOpe
     .map((a) => a.user_id)
 
   const unassignedEmployees = employees.filter((e) => !assignedForQuiz.includes(e.id))
+  const domains = Array.from(new Set(employees.map((emp) => emp.domain || emp.department || 'General'))).sort()
+  const filteredUnassignedEmployees = unassignedEmployees.filter((emp) => {
+    const domain = emp.domain || emp.department || 'General'
+    const term = query.trim().toLowerCase()
+    const matchesDomain = selectedDomain === 'all' || domain === selectedDomain
+    const matchesSearch = !term || [emp.full_name, emp.email, emp.employee_id, emp.department, emp.domain]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(term))
+    return matchesDomain && matchesSearch
+  })
 
   function handleToggleEmployee(empId: string) {
     setSelectedEmployees((prev) =>
@@ -76,10 +92,10 @@ export function QuizAssignmentManager({ quizzes, employees, assignments, autoOpe
   }
 
   function handleSelectAll() {
-    if (selectedEmployees.length === unassignedEmployees.length) {
+    if (selectedEmployees.length === filteredUnassignedEmployees.length) {
       setSelectedEmployees([])
     } else {
-      setSelectedEmployees(unassignedEmployees.map((e) => e.id))
+      setSelectedEmployees(filteredUnassignedEmployees.map((e) => e.id))
     }
   }
 
@@ -165,11 +181,21 @@ export function QuizAssignmentManager({ quizzes, employees, assignments, autoOpe
                       {emp?.full_name?.charAt(0) || emp?.email?.charAt(0) || '?'}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{emp?.full_name || 'Unnamed'}</p>
+                      <Link href={emp?.id ? `/profiles/${emp.id}` : '#'} className="text-sm font-medium truncate hover:underline">
+                        {emp?.full_name || 'Unnamed'}
+                      </Link>
                       <p className="text-xs text-muted-foreground truncate">{emp?.email}</p>
                     </div>
-                    {emp?.department && (
-                      <Badge variant="outline" className="text-[10px] shrink-0">{emp.department}</Badge>
+                    {emp?.employee_id && (
+                      <Badge variant="outline" className="hidden shrink-0 text-[10px] sm:inline-flex">
+                        <Fingerprint className="mr-1 h-3 w-3" />
+                        {emp.employee_id}
+                      </Badge>
+                    )}
+                    {(emp?.domain || emp?.department) && (
+                      <Badge variant="outline" className={`text-[10px] shrink-0 ${getDomainColor(emp.domain || emp.department || 'General').badge}`}>
+                        {emp.domain || emp.department}
+                      </Badge>
                     )}
                     <span className="text-[10px] text-muted-foreground shrink-0 hidden sm:block">
                       {new Date(a.assigned_at).toLocaleDateString()}
@@ -206,14 +232,52 @@ export function QuizAssignmentManager({ quizzes, employees, assignments, autoOpe
               </p>
             ) : (
               <>
+                <div className="space-y-3 border-b border-border/50 pb-3">
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      placeholder="Search name, employee ID, email, domain, vertical"
+                      className="h-10 rounded-xl pl-9"
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDomain('all')}
+                      className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-semibold ${selectedDomain === 'all' ? 'border-black bg-black text-white' : 'border-zinc-200 bg-white text-zinc-600'}`}
+                    >
+                      <Filter className="h-3 w-3" />
+                      All ({unassignedEmployees.length})
+                    </button>
+                    {domains.map((domain) => {
+                      const style = getDomainColor(domain)
+                      const count = unassignedEmployees.filter((emp) => (emp.domain || emp.department || 'General') === domain).length
+                      return (
+                        <button
+                          key={domain}
+                          type="button"
+                          onClick={() => setSelectedDomain(domain)}
+                          className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${selectedDomain === domain ? style.badge : 'border-zinc-200 bg-white text-zinc-600'}`}
+                        >
+                          {domain} ({count})
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
                 <div className="flex items-center gap-2 px-2 py-2 mb-1 border-b border-border/50">
                   <Checkbox
-                    checked={selectedEmployees.length === unassignedEmployees.length && unassignedEmployees.length > 0}
+                    checked={selectedEmployees.length === filteredUnassignedEmployees.length && filteredUnassignedEmployees.length > 0}
                     onCheckedChange={handleSelectAll}
                   />
-                  <span className="text-sm font-medium">Select All ({unassignedEmployees.length})</span>
+                  <span className="text-sm font-medium">Select visible ({filteredUnassignedEmployees.length})</span>
                 </div>
-                {unassignedEmployees.map((emp) => (
+                {filteredUnassignedEmployees.map((emp) => {
+                  const domain = emp.domain || emp.department || 'General'
+                  const style = getDomainColor(domain)
+                  return (
                   <label
                     key={emp.id}
                     className="flex items-center gap-3 px-2 py-2.5 rounded-xl hover:bg-muted/40 cursor-pointer transition-colors"
@@ -222,18 +286,22 @@ export function QuizAssignmentManager({ quizzes, employees, assignments, autoOpe
                       checked={selectedEmployees.includes(emp.id)}
                       onCheckedChange={() => handleToggleEmployee(emp.id)}
                     />
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-violet-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                    <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${style.gradient} flex items-center justify-center text-white text-xs font-bold shrink-0`}>
                       {emp.full_name?.charAt(0) || emp.email.charAt(0)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{emp.full_name || 'Unnamed'}</p>
                       <p className="text-xs text-muted-foreground truncate">{emp.email}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">ID: {emp.employee_id || 'not set'}</p>
                     </div>
-                    {emp.department && (
-                      <Badge variant="outline" className="text-[10px] shrink-0">{emp.department}</Badge>
+                    {domain && (
+                      <Badge variant="outline" className={`text-[10px] shrink-0 ${style.badge}`}>{domain}</Badge>
                     )}
                   </label>
-                ))}
+                )})}
+                {filteredUnassignedEmployees.length === 0 && (
+                  <p className="py-8 text-center text-sm text-muted-foreground">No employees match the selected search/filter.</p>
+                )}
               </>
             )}
           </div>

@@ -5,6 +5,7 @@ import { requireAdmin, requireManager } from '@/lib/rbac'
 import { revalidatePath } from 'next/cache'
 import type { ApiResponse, EmployeeImport, EmployeeImportError, EmployeeImportResult } from '@/lib/types/database'
 import { approveTrainer, rejectTrainer } from '@/lib/actions/auth'
+import { buildQuizAssignedEmail, sendEmail } from '@/lib/email'
 
 // ─── Pending Trainer Sign-Ups (Admin only) ────────────────────────────
 
@@ -350,6 +351,26 @@ export async function assignQuizToEmployees(quizId: string, employeeIds: string[
   revalidatePath('/manager/quizzes', 'layout')
   revalidatePath('/manager/employees', 'layout')
 
+  if (successCount > 0) {
+    const [{ data: quiz }, { data: profiles }] = await Promise.all([
+      supabase.from('quizzes').select('title, topic, difficulty').eq('id', quizId).maybeSingle(),
+      supabase.from('profiles').select('id, full_name, email').in('id', employeeIds),
+    ])
+
+    await Promise.all((profiles || []).map((profile: any) =>
+      sendEmail({
+        to: profile.email,
+        subject: `Quiz Assigned: ${quiz?.title || 'SkillTest_AI Assessment'}`,
+        html: buildQuizAssignedEmail({
+          employeeName: profile.full_name,
+          quizTitle: quiz?.title || 'SkillTest_AI Assessment',
+          topic: quiz?.topic || 'General',
+          difficulty: quiz?.difficulty || 'medium',
+        }),
+      })
+    ))
+  }
+
   if (errors.length > 0) {
     return { error: `Assigned ${successCount}/${rows.length}. Errors: ${errors.join('; ')}` }
   }
@@ -415,4 +436,57 @@ export async function getQuizzesForAssignment() {
 
   if (error) return { error: error.message, data: [] }
   return { data: quizzes || [] }
+}
+
+export async function getCertificateRulesForAdmin() {
+  await requireAdmin()
+  const admin = createAdminClient()
+  const [{ data: quizzes }, { data: rules }] = await Promise.all([
+    admin
+      .from('quizzes')
+      .select('id, title, topic, difficulty, created_at')
+      .order('created_at', { ascending: false })
+      .limit(100),
+    admin
+      .from('certificate_rules')
+      .select('*')
+      .order('created_at', { ascending: false }),
+  ])
+
+  const ruleByQuiz = new Map((rules || []).map((rule: any) => [rule.quiz_id, rule]))
+  return {
+    data: (quizzes || []).map((quiz: any) => ({
+      ...quiz,
+      certificate_rule: ruleByQuiz.get(quiz.id) || null,
+    })),
+  }
+}
+
+export async function updateCertificateRule(formData: FormData) {
+  const { userId } = await requireAdmin()
+  const admin = createAdminClient()
+  const quizId = String(formData.get('quiz_id') || '')
+  const enabled = String(formData.get('enabled') || '') === 'on'
+  const minScore = Math.min(100, Math.max(0, Number(formData.get('min_score') || 70)))
+  const title = String(formData.get('title') || 'Certificate of Achievement').trim()
+  const message = String(formData.get('message') || '').trim()
+
+  if (!quizId) return { error: 'Quiz is required.' }
+  if (!title) return { error: 'Certificate title is required.' }
+
+  const { error } = await admin
+    .from('certificate_rules')
+    .upsert({
+      quiz_id: quizId,
+      enabled,
+      min_score: minScore,
+      title,
+      message: message || null,
+      created_by: userId,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'quiz_id' })
+
+  if (error) return { error: error.message }
+  revalidatePath('/manager/admin')
+  return { data: true }
 }

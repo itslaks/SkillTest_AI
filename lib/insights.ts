@@ -98,6 +98,13 @@ export function analyzeAttemptPattern(
     const difficulty = answer.questionDifficulty || baseDifficulty || 'medium'
     return difficulty === 'easy' && answer.timeSpent > 15
   }).length
+  const fastGuessCount = answers.filter((answer) => answer.timeSpent <= 4).length
+  const slowStruggleCount = answers.filter((answer) => !answer.isCorrect && answer.timeSpent >= 25).length
+  const timeVariance = answers.length
+    ? Math.round(
+        answers.reduce((sum, answer) => sum + Math.pow(answer.timeSpent - averageAnswerTime, 2), 0) / answers.length
+      )
+    : 0
 
   const fastWrongRun = answers.reduce(
     (state, answer) => {
@@ -120,6 +127,31 @@ export function analyzeAttemptPattern(
   const cognitiveLoadDetected = easyQuestionOverloadCount > 0
   const panicModeDetected = fastWrongRun >= 2
   const antiGamingDetected = perfectFastAttempts >= 3
+  const rhythmPenalty = clamp(Math.round(timeVariance / 18), 0, 18)
+  const focusScore = clamp(
+    100 - easyQuestionOverloadCount * 14 - fastGuessCount * 7 - slowStruggleCount * 10 - rhythmPenalty,
+    12,
+    100
+  )
+  const confidenceScore = clamp(
+    72 + answers.filter((answer) => answer.isCorrect).length * 5 - fastWrongRun * 16 - slowStruggleCount * 8 - easyQuestionOverloadCount * 8,
+    8,
+    100
+  )
+  const riskLevel: AttemptInsight['riskLevel'] =
+    panicModeDetected || focusScore < 45 || confidenceScore < 40
+      ? 'high'
+      : cognitiveLoadDetected || fastGuessCount >= 2 || slowStruggleCount >= 2
+        ? 'medium'
+        : 'low'
+  const behaviorTags = [
+    cognitiveLoadDetected ? 'cognitive-load' : null,
+    panicModeDetected ? 'panic-streak' : null,
+    antiGamingDetected ? 'challenge-needed' : null,
+    fastGuessCount >= 2 ? 'fast-guessing' : null,
+    slowStruggleCount >= 2 ? 'slow-struggle' : null,
+    focusScore >= 80 ? 'steady-focus' : null,
+  ].filter(Boolean) as string[]
 
   const suggestedNextDifficulty = antiGamingDetected
     ? shiftDifficulty(baseDifficulty, 1)
@@ -140,6 +172,13 @@ export function analyzeAttemptPattern(
   return {
     averageAnswerTime,
     easyQuestionOverloadCount,
+    fastGuessCount,
+    slowStruggleCount,
+    timeVariance,
+    focusScore,
+    confidenceScore,
+    riskLevel,
+    behaviorTags,
     cognitiveLoadDetected,
     panicModeDetected,
     panicStreak: fastWrongRun,

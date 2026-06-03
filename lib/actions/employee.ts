@@ -11,6 +11,7 @@ import {
   getTopicAttempts,
 } from '@/lib/insights'
 import type { SubmitQuizInput, LeaderboardEntry, QuizAnswer } from '@/lib/types/database'
+import { buildQuizCompletedEmail, sendEmail } from '@/lib/email'
 
 // ─── Start a quiz attempt ─────────────────────────────────────────────
 export async function startQuizAttempt(quizId: string) {
@@ -152,6 +153,31 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
     if (error) {
       console.error('Quiz submission update error:', error)
       return { error: error.message }
+    }
+
+    try {
+      const adminClient = createAdminClient()
+      const [{ data: profile }, { data: earnedBadges }, { data: certificate }] = await Promise.all([
+        adminClient.from('profiles').select('full_name, email').eq('id', user.id).maybeSingle(),
+        adminClient.from('user_badges').select('id').eq('user_id', user.id),
+        adminClient.from('certificates').select('id').eq('quiz_id', quiz_id).eq('user_id', user.id).maybeSingle(),
+      ])
+      if (profile?.email) {
+        await sendEmail({
+          to: profile.email,
+          subject: `Quiz Completed: ${quiz.title} - ${score}%`,
+          html: buildQuizCompletedEmail({
+            employeeName: profile.full_name,
+            quizTitle: quiz.title,
+            score,
+            points: pointsEarned,
+            badgesEarned: earnedBadges?.length || 0,
+            certificateIssued: Boolean(certificate),
+          }),
+        })
+      }
+    } catch (mailError) {
+      console.warn('Quiz completion email failed (non-fatal):', mailError)
     }
 
     console.log(`Quiz submission successful for user ${user.id}, quiz ${quiz_id}`)

@@ -160,6 +160,7 @@ export default async function ManagerEmployeesPage() {
           email: e.email,
           employee_id: e.employee_id,
           department: e.department,
+          domain: e.domain,
         }))}
         assignments={allAssignments}
       />
@@ -206,7 +207,7 @@ export default async function ManagerEmployeesPage() {
                                 <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-sm font-bold shrink-0">
                                   {emp.full_name?.charAt(0) || emp.email?.charAt(0) || '?'}
                                 </div>
-                                <span className="font-semibold">{emp.full_name || 'Unnamed'}</span>
+                                <a href={`/profiles/${emp.id}`} className="font-semibold hover:underline">{emp.full_name || 'Unnamed'}</a>
                               </div>
                             </td>
                             <td className="p-3 text-muted-foreground text-sm">{emp.email}</td>

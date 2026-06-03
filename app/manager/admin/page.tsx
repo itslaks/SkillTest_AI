@@ -1,9 +1,9 @@
-import { getAdminAuditLogs, getAdminUsers, updateUserRole, getPendingTrainerSignups, approveTrainerSignup, rejectTrainerSignup } from '@/lib/actions/manager'
+import { getAdminAuditLogs, getAdminUsers, updateUserRole, getPendingTrainerSignups, approveTrainerSignup, rejectTrainerSignup, getCertificateRulesForAdmin, updateCertificateRule } from '@/lib/actions/manager'
 import { getTrainingGovernanceSettings, updateTrainingGovernanceSettings } from '@/lib/actions/training'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Clock, ShieldCheck, Trophy, Users, CheckCircle2, XCircle, UserCheck, AlertTriangle } from 'lucide-react'
+import { Clock, ShieldCheck, Trophy, Users, CheckCircle2, XCircle, UserCheck, AlertTriangle, Medal } from 'lucide-react'
 
 async function updateRoleAction(formData: FormData) {
   'use server'
@@ -25,12 +25,18 @@ async function rejectAction(formData: FormData) {
   await rejectTrainerSignup(formData)
 }
 
+async function certificateRuleAction(formData: FormData) {
+  'use server'
+  await updateCertificateRule(formData)
+}
+
 export default async function AdminConsolePage() {
-  const [{ data: users }, { data: auditLogs }, governance, { data: pendingTrainers }] = await Promise.all([
+  const [{ data: users }, { data: auditLogs }, governance, { data: pendingTrainers }, { data: certificateQuizzes }] = await Promise.all([
     getAdminUsers(),
     getAdminAuditLogs(),
     getTrainingGovernanceSettings(),
     getPendingTrainerSignups(),
+    getCertificateRulesForAdmin(),
   ])
 
   return (
@@ -196,6 +202,49 @@ export default async function AdminConsolePage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-white shadow-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Medal className="h-5 w-5 text-amber-600" />
+            Certificate Automation
+          </CardTitle>
+          <CardDescription>
+            Admin-only control: enable certificates for quizzes and set the minimum score required for auto-issue.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {(certificateQuizzes || []).length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-amber-200 bg-white p-6 text-center text-sm text-amber-700">No quizzes available for certificate rules.</p>
+          ) : (certificateQuizzes || []).slice(0, 20).map((quiz: any) => (
+            <form key={quiz.id} action={certificateRuleAction} className="grid gap-3 rounded-2xl border border-amber-100 bg-white p-4 lg:grid-cols-[1fr_90px_1.1fr_auto] lg:items-end">
+              <input type="hidden" name="quiz_id" value={quiz.id} />
+              <label className="flex items-start gap-3">
+                <input
+                  name="enabled"
+                  type="checkbox"
+                  defaultChecked={quiz.certificate_rule?.enabled || false}
+                  className="mt-1 h-4 w-4 rounded border-amber-300"
+                />
+                <span>
+                  <span className="block font-semibold text-zinc-950">{quiz.title}</span>
+                  <span className="text-xs text-zinc-500">{quiz.topic} - {quiz.difficulty}</span>
+                </span>
+              </label>
+              <label className="grid gap-1 text-xs font-medium text-zinc-600">
+                Min Score
+                <input name="min_score" type="number" min="0" max="100" defaultValue={quiz.certificate_rule?.min_score || 70} className="h-10 rounded-xl border border-amber-200 px-3" />
+              </label>
+              <label className="grid gap-1 text-xs font-medium text-zinc-600">
+                Certificate Title
+                <input name="title" defaultValue={quiz.certificate_rule?.title || `Certificate of Achievement - ${quiz.topic}`} className="h-10 rounded-xl border border-amber-200 px-3" />
+                <input name="message" defaultValue={quiz.certificate_rule?.message || 'Awarded for successful assessment performance.'} className="h-10 rounded-xl border border-amber-100 px-3" />
+              </label>
+              <Button type="submit" className="rounded-full bg-amber-600 text-white hover:bg-amber-700">Save</Button>
+            </form>
+          ))}
+        </CardContent>
+      </Card>
 
       {/* ── AUDIT LOG ── */}
       <Card className="border-zinc-200 shadow-sm">

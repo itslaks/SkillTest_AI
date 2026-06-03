@@ -202,6 +202,7 @@ export default async function QuizDetailPage({ params, searchParams }: { params:
             email: e.email,
             employee_id: e.employee_id,
             department: e.department,
+            domain: e.domain,
           }))}
           assignments={assignmentData || []}
           autoOpen={autoOpenAssign}

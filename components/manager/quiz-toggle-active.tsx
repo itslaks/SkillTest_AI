@@ -1,11 +1,10 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { toggleQuizActive } from '@/lib/actions/quiz'
-import { CheckCircle2, AlertTriangle } from 'lucide-react'
+import { CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react'
 
 interface QuizToggleActiveProps {
   quizId: string
@@ -21,24 +20,13 @@ export function QuizToggleActive({ quizId, isActive }: QuizToggleActiveProps) {
     startTransition(async () => {
       const result = await toggleQuizActive(quizId, newValue)
       if (result.error) {
-        setChecked(!newValue) // Revert on error
+        setChecked(!newValue)
       }
     })
   }
 
   return (
-    <div className="flex items-center gap-3">
-      <div className="flex items-center gap-2">
-        <Switch
-          id={`active-${quizId}`}
-          checked={checked}
-          onCheckedChange={handleToggle}
-          disabled={isPending}
-        />
-        <Label htmlFor={`active-${quizId}`} className="text-sm font-medium">
-          {checked ? 'Active' : 'Draft'}
-        </Label>
-      </div>
+    <div className="flex flex-wrap items-center gap-3">
       <Badge 
         variant={checked ? "default" : "secondary"} 
         className={`text-xs flex items-center gap-1 ${
@@ -59,6 +47,17 @@ export function QuizToggleActive({ quizId, isActive }: QuizToggleActiveProps) {
           </>
         )}
       </Badge>
+      <Button
+        type="button"
+        size="sm"
+        variant={checked ? 'outline' : 'default'}
+        className={checked ? 'h-8 rounded-full border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50' : 'h-8 rounded-full bg-black text-white hover:bg-zinc-800'}
+        disabled={isPending}
+        onClick={() => handleToggle(!checked)}
+      >
+        {isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+        {checked ? 'Move to draft' : 'Publish'}
+      </Button>
     </div>
   )
 }

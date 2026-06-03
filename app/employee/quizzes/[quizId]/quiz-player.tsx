@@ -223,7 +223,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     if (currentIndex + 1 >= totalQuestions) {
       finishedRef.current = true
       setFinished(true)
-      doSubmit([...answers])
+      doSubmit([...answersRef.current])
       return
     }
 
