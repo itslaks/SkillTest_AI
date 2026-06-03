@@ -3,6 +3,7 @@ import { getTrainingGovernanceSettings, updateTrainingGovernanceSettings } from 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { CertificatePreview } from '@/components/certificates/certificate-preview'
 import { Clock, ShieldCheck, Trophy, Users, CheckCircle2, XCircle, UserCheck, AlertTriangle, Medal } from 'lucide-react'
 
 async function updateRoleAction(formData: FormData) {
@@ -217,7 +218,7 @@ export default async function AdminConsolePage() {
           {(certificateQuizzes || []).length === 0 ? (
             <p className="rounded-2xl border border-dashed border-amber-200 bg-white p-6 text-center text-sm text-amber-700">No quizzes available for certificate rules.</p>
           ) : (certificateQuizzes || []).slice(0, 20).map((quiz: any) => (
-            <form key={quiz.id} action={certificateRuleAction} className="grid gap-4 rounded-2xl border border-amber-100 bg-white p-4 xl:grid-cols-[1.05fr_0.8fr_0.9fr_auto] xl:items-end">
+            <form key={quiz.id} action={certificateRuleAction} className="grid gap-4 rounded-2xl border border-amber-100 bg-white p-4 xl:grid-cols-[0.9fr_0.78fr_0.95fr_0.9fr_auto] xl:items-end">
               <input type="hidden" name="quiz_id" value={quiz.id} />
               <input type="hidden" name="existing_template_image_url" value={quiz.certificate_rule?.template_image_url || ''} />
               <label className="flex items-start gap-3">
@@ -267,6 +268,16 @@ export default async function AdminConsolePage() {
                   Template notes
                   <input name="template_notes" defaultValue={quiz.certificate_rule?.template_notes || 'Employee name, course name, score, and issue date are rendered automatically.'} className="h-10 rounded-xl border border-amber-100 px-3" />
                 </label>
+              </div>
+              <div className="grid gap-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Preview</p>
+                <CertificatePreview
+                  compact
+                  employeeName="Laksham S J"
+                  topic={quiz.topic || quiz.title}
+                  message={quiz.certificate_rule?.message || `has been awarded this certificate in recognition of outstanding performance in the quiz on ${quiz.topic || quiz.title}`}
+                  accent={quiz.certificate_rule?.template_accent_color || '#6f5ab8'}
+                />
               </div>
               <Button type="submit" className="rounded-full bg-amber-600 text-white hover:bg-amber-700">Save</Button>
             </form>

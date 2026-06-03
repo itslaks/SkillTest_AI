@@ -119,6 +119,7 @@ DECLARE
   v_badge RECORD;
   v_stats RECORD;
   v_should_award BOOLEAN;
+  v_awarded_count INTEGER := 0;
 BEGIN
   -- Only check when quiz is completed
   IF NEW.status != 'completed' THEN
@@ -129,8 +130,11 @@ BEGIN
   SELECT * INTO v_stats FROM public.user_stats WHERE user_id = NEW.user_id;
   
   -- Check each badge criteria
-  FOR v_badge IN SELECT * FROM public.badges LOOP
+  FOR v_badge IN SELECT * FROM public.badges ORDER BY points ASC LOOP
     v_should_award := FALSE;
+    IF v_awarded_count >= 3 THEN
+      EXIT;
+    END IF;
     
     -- Check if user already has this badge
     IF EXISTS (SELECT 1 FROM public.user_badges WHERE user_id = NEW.user_id AND badge_id = v_badge.id) THEN
@@ -139,15 +143,25 @@ BEGIN
     
     -- Check criteria based on type
     IF v_badge.criteria->>'type' = 'perfect_score' THEN
-      v_should_award := (NEW.score = 100);
+      v_should_award := (
+        NEW.score = 100
+        AND COALESCE(v_stats.tests_completed, 0) >= COALESCE((v_badge.criteria->>'count')::INTEGER, 1)
+      );
     ELSIF v_badge.criteria->>'type' = 'streak' THEN
       v_should_award := (v_stats.current_streak >= (v_badge.criteria->>'count')::INTEGER);
     ELSIF v_badge.criteria->>'type' = 'tests_completed' THEN
       v_should_award := (v_stats.tests_completed >= (v_badge.criteria->>'count')::INTEGER);
+    ELSIF v_badge.criteria->>'type' = 'score_threshold' THEN
+      v_should_award := (
+        NEW.score >= COALESCE((v_badge.criteria->>'score')::INTEGER, 90)
+        AND COALESCE(v_stats.tests_completed, 0) >= COALESCE((v_badge.criteria->>'count')::INTEGER, 3)
+      );
     ELSIF v_badge.criteria->>'type' = 'speed' THEN
       -- Speed demon: complete in less than 50% of time limit
       v_should_award := (
         NEW.time_taken_seconds IS NOT NULL AND
+        NEW.score >= COALESCE((v_badge.criteria->>'score')::INTEGER, 80) AND
+        COALESCE(v_stats.tests_completed, 0) >= COALESCE((v_badge.criteria->>'count')::INTEGER, 2) AND
         EXISTS (
           SELECT 1 FROM public.quizzes q 
           WHERE q.id = NEW.quiz_id 
@@ -168,6 +182,8 @@ BEGIN
       UPDATE public.user_stats
       SET total_points = total_points + v_badge.points
       WHERE user_id = NEW.user_id;
+
+      v_awarded_count := v_awarded_count + 1;
     END IF;
   END LOOP;
   

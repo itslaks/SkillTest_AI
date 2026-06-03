@@ -160,7 +160,8 @@ function LoginContent() {
                 <Input
                   id="email"
                   name="email"
-                  type="email"
+                  type="text"
+                  inputMode="email"
                   placeholder="yourname@company.com"
                   required
                   className="pl-11 h-11 rounded-xl border-border/70 bg-muted/30 focus-visible:ring-1 focus-visible:ring-primary/30"

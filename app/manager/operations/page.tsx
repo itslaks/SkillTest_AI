@@ -405,14 +405,14 @@ export default async function ManagerOperationsPage() {
         <div className="rounded-[1.75rem] border border-zinc-900 bg-zinc-950 p-5 text-white shadow-sm">
           <div className="flex items-center gap-2 text-sm font-semibold">
             <Gauge className="h-4 w-4 text-cyan-300" />
-            Demo talking point
+            Production operations hook
           </div>
           <p className="mt-3 text-sm leading-relaxed text-zinc-300">
             The platform does not just send reminders. It records each governance run, counts notifications, stores dispatch logs, and exposes the same evidence in reports.
           </p>
           <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">Production hook</p>
-            <p className="mt-2 text-sm text-zinc-300">Schedule the automation action from Vercel Cron, Supabase Edge Scheduler, or any job runner. The UI remains the operator override.</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">Live integration</p>
+            <p className="mt-2 text-sm text-zinc-300">The same governed sweep can run from Vercel Cron, Supabase Edge Scheduler, or an enterprise job runner while this UI remains the operator override.</p>
           </div>
         </div>
       </section>
@@ -1675,7 +1675,7 @@ function TrainerScorecardDeck({ items }: { items: Array<{ id: string; name: stri
           <div>
             <CardTitle>Trainer Impact Scorecards</CardTitle>
             <CardDescription className="text-zinc-400">
-              A demo-ready view of trainer impact across attendance discipline, assessment outcomes, and learner feedback.
+              A production view of trainer impact across attendance discipline, assessment outcomes, and learner feedback.
             </CardDescription>
           </div>
           <Badge variant="outline" className="w-fit border-cyan-300/40 bg-cyan-300/10 text-cyan-200">

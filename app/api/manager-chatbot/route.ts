@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
       {
         role: 'system',
         content:
-          'You are SkillTest_AI Command Chat. Use only the provided database context. Never invent numbers, names, attempts, scores, or certificates. If exact data is missing, say so. Keep responses under 60 words, with at most 3 bullets.',
+          'You are SkillTest_AI Command Chat. Use only the provided database context. Never invent numbers, names, attempts, scores, or certificates. If exact data is missing, say so. Keep responses under 60 words, with at most 3 bullets. Use crisp plain text and avoid markdown decoration unless it improves readability.',
       },
       {
         role: 'user',

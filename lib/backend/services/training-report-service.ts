@@ -18,7 +18,7 @@ export function buildTrainingOpsEvidenceWorkbook(data: TrainingOpsDataset) {
       Artifact: 'Contest Evidence Pack',
       Generated_At: new Date().toLocaleString(),
       Purpose: 'One workbook proving BRD coverage, operational execution, auditability, and reporting readiness.',
-      Primary_Demo_Route: '/manager/compliance',
+      Primary_Operations_Route: '/manager/compliance',
     },
   ])
 
@@ -164,12 +164,12 @@ export function buildTrainingOpsEvidenceWorkbook(data: TrainingOpsDataset) {
     'Run At': item.created_at ? new Date(item.created_at).toLocaleString() : 'N/A',
   })))
   addSheet(wb, 'BRD Coverage Matrix', buildBrdCoverageRows(data))
-  addSheet(wb, 'Contest Demo Runbook', [
+  addSheet(wb, 'Operations Runbook', [
     { Step: 1, Judge_Action: 'Open BRD Proof', Route: '/manager/compliance', Proof: 'Live requirement matrix, readiness score, demo data checklist, and links into working screens.' },
     { Step: 2, Judge_Action: 'Open Operations', Route: '/manager/operations', Proof: 'Create/edit batches, assign trainers, upload candidates, schedule sessions, mark attendance, upload scores, trigger feedback.' },
     { Step: 3, Judge_Action: 'Run Governance', Route: '/manager/operations#feedback', Proof: 'Attendance cut-off, absence streak, assessment reminder, and feedback reminder automation logs.' },
     { Step: 4, Judge_Action: 'Open Reports', Route: '/manager/reports', Proof: 'Excel/PDF reports for attendance, assessment, feedback, toppers, and consolidated candidate status filters.' },
-    { Step: 5, Judge_Action: 'Download Evidence Pack', Route: '/api/reports/training-ops/download', Proof: 'This workbook packages batch data, audit logs, reports, BRD coverage, and demo runbook in one file.' },
+    { Step: 5, Judge_Action: 'Download Evidence Pack', Route: '/api/reports/training-ops/download', Proof: 'This workbook packages batch data, audit logs, reports, BRD coverage, and operations runbook in one file.' },
   ])
   addSheet(wb, 'Judge Winning Signals', [
     { Signal: 'Exact BRD Fit', Evidence: 'Coverage matrix maps sections 5.1 to 6.4 to live data and screens.' },
@@ -218,19 +218,19 @@ function buildBrdCoverageRows(data: BrdCoverageDataset) {
   return [
     {
       BRD_Section: '5.1 Training Batch Management',
-      Status: data.batches.length ? 'Covered' : 'Needs demo data',
+      Status: data.batches.length ? 'Covered' : 'Needs production data',
       Evidence: `${data.batches.length} batches, ${data.members.length} candidate assignments, ${data.sessions.length} sessions.`,
       Exceeds_Baseline: 'Multi-trainer assignment and lifecycle audit are available in operations.',
     },
     {
       BRD_Section: '5.2 Attendance Tracker',
-      Status: data.attendance.length || data.uploads.length ? 'Covered' : 'Needs demo data',
+      Status: data.attendance.length || data.uploads.length ? 'Covered' : 'Needs production data',
       Evidence: `${data.attendance.length} attendance rows, ${data.uploads.length} attendance upload logs.`,
       Exceeds_Baseline: 'Manual entry, Excel upload, cut-off late reason, validation errors, and absence automation.',
     },
     {
       BRD_Section: '5.3 Assessment Score Tracker',
-      Status: data.assessmentSetups.length || data.projectEvaluations.length ? 'Covered' : 'Needs demo data',
+      Status: data.assessmentSetups.length || data.projectEvaluations.length ? 'Covered' : 'Needs production data',
       Evidence: `${data.assessmentSetups.length} assessment setups, ${data.projectEvaluations.length} project evaluations.`,
       Exceeds_Baseline: 'Question/evidence files, passing scores, and score import audit logs.',
     },
@@ -248,7 +248,7 @@ function buildBrdCoverageRows(data: BrdCoverageDataset) {
     },
     {
       BRD_Section: '5.6 Dashboards & Metrics',
-      Status: data.batches.length ? 'Covered' : 'Needs demo data',
+      Status: data.batches.length ? 'Covered' : 'Needs production data',
       Evidence: 'Operations, reports, analytics, and employee training dashboards are implemented.',
       Exceeds_Baseline: 'Batch comparison radar and trainer impact scorecards go beyond standard dashboards.',
     },
@@ -266,7 +266,7 @@ function buildBrdCoverageRows(data: BrdCoverageDataset) {
     },
     {
       BRD_Section: '6 Non-Functional Requirements',
-      Status: auditRows ? 'Covered' : 'Needs demo data',
+      Status: auditRows ? 'Covered' : 'Needs production data',
       Evidence: `${auditRows} audit/evidence rows in this evidence pack; RBAC guards and scoped access are implemented.`,
       Exceeds_Baseline: '20,000-row fixture scripts and chunked importers support scale proof.',
     },

@@ -968,6 +968,17 @@ export async function updateAttendanceStatus(formData: FormData): Promise<ApiRes
 
   if (!session) return { error: 'Session not found.' }
 
+  const { data: membership } = await admin
+    .from('batch_members')
+    .select('id')
+    .eq('batch_id', session.batch_id)
+    .eq('user_id', userTargetId)
+    .maybeSingle()
+
+  if (!membership) {
+    return { error: 'Learner is not enrolled in this session batch.' }
+  }
+
   if (role === 'trainer') {
     const { data: assignment } = await admin
       .from('training_batch_trainers')

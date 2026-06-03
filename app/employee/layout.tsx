@@ -44,8 +44,7 @@ export default async function EmployeeLayout({
     { name: 'Training', href: '/employee/training', icon: CalendarDays, color: 'text-white' },
     { name: 'Quizzes', href: '/employee/quizzes', icon: FileQuestion, color: 'text-white' },
     { name: 'Leaderboard', href: '/employee/leaderboard', icon: Trophy, color: 'text-white' },
-    { name: 'Badges', href: '/employee/badges', icon: Award, color: 'text-white' },
-    { name: 'Profiles', href: '/profiles', icon: Star, color: 'text-white' },
+    { name: 'Accomplishments', href: '/employee/badges', icon: Award, color: 'text-white' },
     { name: 'Profile', href: '/profile/settings', icon: Settings, color: 'text-white' },
   ]
 
@@ -133,7 +132,7 @@ export default async function EmployeeLayout({
           </div>
           <span className="text-white font-bold text-sm">SkillTest_AI</span>
         </Link>
-        <nav className="mt-3 grid grid-cols-7 gap-1">
+        <nav className="mt-3 grid grid-cols-6 gap-1">
           {navigation.map((item) => (
             <Link key={item.name} href={item.href} className="flex flex-col items-center gap-1 rounded-lg px-1 py-2 text-white/70 hover:text-white hover:bg-white/8 transition-all">
               <item.icon className={`h-4 w-4 ${item.color}`} />

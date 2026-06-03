@@ -1,4 +1,5 @@
 import { getAllBadges } from '@/lib/actions/employee'
+import Link from 'next/link'
 import {
   Award,
   BookOpen,
@@ -11,6 +12,7 @@ import {
   Target,
   TrendingUp,
   Trophy,
+  Download,
   Zap,
 } from 'lucide-react'
 
@@ -30,7 +32,7 @@ const iconMap: Record<string, any> = {
 }
 
 export default async function BadgesPage() {
-  const { data: badges } = await getAllBadges()
+  const { data: badges, certificates } = await getAllBadges()
 
   const earned = badges?.filter((badge: any) => badge.earned) || []
   const locked = badges?.filter((badge: any) => !badge.earned) || []
@@ -40,9 +42,9 @@ export default async function BadgesPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Badges</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Accomplishments</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Earn badges by completing quizzes, answering well, attending daily, and keeping momentum.
+            Earn badges through sustained performance and download certificates after qualifying assessments.
             {earned.length > 0 && ` You've earned ${earned.length} of ${badges?.length || 0}.`}
           </p>
         </div>
@@ -63,11 +65,50 @@ export default async function BadgesPage() {
         </div>
       )}
 
+      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+              <Medal className="h-5 w-5 text-amber-600" />
+              Certificates
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">View and download issued certificates for completed assessments.</p>
+          </div>
+          <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+            {certificates?.length || 0} issued
+          </span>
+        </div>
+        {certificates && certificates.length > 0 ? (
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {certificates.map((certificate: any) => (
+              <div key={certificate.id} className="rounded-xl border border-amber-100 bg-amber-50/70 p-4">
+                <p className="font-semibold text-zinc-950">{certificate.rule?.certificate_name || certificate.title}</p>
+                <p className="mt-1 text-sm text-zinc-600">
+                  {certificate.quiz?.title || certificate.quiz?.topic || 'Assessment'} - Score {certificate.score}%
+                </p>
+                <p className="mt-1 text-xs text-zinc-500">Issued {new Date(certificate.issued_at).toLocaleDateString()}</p>
+                <Link
+                  href={`/certificates/${certificate.id}`}
+                  className="mt-3 inline-flex items-center gap-2 rounded-full bg-black px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  View / Download
+                </Link>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-4 rounded-xl border border-dashed border-zinc-200 bg-zinc-50 p-6 text-center text-sm text-muted-foreground">
+            No certificates issued yet.
+          </div>
+        )}
+      </section>
+
       {earned.length > 0 && (
         <section>
           <h2 className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
             <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            Earned Badges
+            Badges
           </h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {earned.map((badge: any) => (
@@ -94,8 +135,8 @@ export default async function BadgesPage() {
       {earned.length === 0 && locked.length === 0 && (
         <div className="rounded-2xl border border-border/60 bg-white py-16 text-center shadow-sm">
           <Award className="mx-auto mb-4 h-14 w-14 text-muted-foreground/30" />
-          <h3 className="mb-1 font-semibold">No Badges Yet</h3>
-          <p className="text-sm text-muted-foreground">Start taking quizzes to earn your first badge.</p>
+          <h3 className="mb-1 font-semibold">No Accomplishments Yet</h3>
+          <p className="text-sm text-muted-foreground">Complete assessments to earn your first badge or certificate.</p>
         </div>
       )}
     </div>

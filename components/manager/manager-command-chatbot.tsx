@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useEffect, useRef, useState } from 'react'
+import { FormEvent, KeyboardEvent, ReactNode, useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -94,6 +94,13 @@ export function ManagerCommandChatbot() {
     void ask(message)
   }
 
+  function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault()
+      void ask(message)
+    }
+  }
+
   async function copyLastAnswer() {
     const last = [...messages].reverse().find((entry) => entry.role === 'assistant')
     if (!last) return
@@ -105,16 +112,16 @@ export function ManagerCommandChatbot() {
   return (
     <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-3">
       {open && (
-        <section className="w-[min(calc(100vw-1.25rem),620px)] overflow-hidden rounded-3xl border border-cyan-300/30 bg-zinc-950 text-white shadow-[0_30px_120px_rgba(6,182,212,0.38)]">
-          <div className="relative border-b border-white/10 bg-[radial-gradient(circle_at_15%_10%,rgba(34,211,238,0.26),transparent_30%),radial-gradient(circle_at_85%_5%,rgba(168,85,247,0.20),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.12),rgba(255,255,255,0.02))] p-5">
+        <section className="w-[min(calc(100vw-1.25rem),500px)] overflow-hidden rounded-2xl border border-white/10 bg-[#0b0d10] text-white shadow-[0_24px_80px_rgba(2,6,23,0.45)]">
+          <div className="relative border-b border-white/10 bg-zinc-950 p-4">
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="grid h-12 w-12 place-items-center rounded-2xl border border-cyan-200/40 bg-cyan-200/10 shadow-[0_0_40px_rgba(34,211,238,0.25)]">
+                <div className="grid h-10 w-10 place-items-center rounded-xl border border-cyan-200/30 bg-cyan-200/10">
                   <BrainCircuit className="h-6 w-6 text-cyan-100" />
                 </div>
                 <div>
-                  <p className="text-base font-semibold">SkillTest_AI Command Center</p>
-                  <p className="text-[10px] uppercase tracking-[0.32em] text-cyan-100/70">Performance + certificate intelligence</p>
+                  <p className="text-sm font-semibold">SkillTest_AI Command</p>
+                  <p className="text-[10px] uppercase tracking-[0.24em] text-cyan-100/65">Performance intelligence</p>
                 </div>
               </div>
               <div className="flex gap-1">
@@ -130,15 +137,15 @@ export function ManagerCommandChatbot() {
               </div>
             </div>
 
-            <div className="mt-4 grid gap-2 sm:grid-cols-3">
+            <div className="mt-3 grid gap-2 sm:grid-cols-3">
               <SignalCard label="Scope" value="DB aware" />
               <SignalCard label="Answers" value="Actionable" />
               <SignalCard label="Fallback" value="Groq ready" />
             </div>
           </div>
 
-          <div className="border-b border-white/10 bg-black/25 p-3">
-            <div className="flex gap-2 overflow-x-auto pb-1">
+          <div className="border-b border-white/10 bg-black/25 p-2.5">
+            <div className="chatbot-scrollbar flex gap-2 overflow-x-auto pb-1">
               {quickPrompts.map((prompt) => (
                 <button
                   key={prompt}
@@ -153,21 +160,21 @@ export function ManagerCommandChatbot() {
             </div>
           </div>
 
-          <div ref={scrollRef} className="max-h-[470px] space-y-3 overflow-y-auto p-4">
+          <div ref={scrollRef} className="chatbot-scrollbar max-h-[360px] space-y-3 overflow-y-auto p-3.5">
             {messages.map((entry, index) => (
               <div key={`${entry.role}-${index}`} className={entry.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
                 <div
                   className={`max-w-[86%] rounded-2xl border p-3 text-sm leading-relaxed ${
                     entry.role === 'user'
-                      ? 'border-white/10 bg-white text-zinc-950'
-                      : 'border-cyan-300/20 bg-cyan-300/10 text-cyan-50'
+                      ? 'rounded-br-md border-white/10 bg-white text-zinc-950'
+                      : 'rounded-bl-md border-white/10 bg-white/[0.06] text-zinc-100'
                   }`}
                 >
                   <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] opacity-70">
                     {entry.role === 'user' ? <MessageSquareText className="h-3 w-3" /> : <Bot className="h-3 w-3" />}
                     {entry.role === 'user' ? 'Your question' : 'Command answer'}
                   </div>
-                  <p className="whitespace-pre-wrap">{entry.content}</p>
+                  <FormattedMessage content={entry.content} />
                   {entry.provider && (
                     <span className="mt-3 inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-white/55">
                       <Sparkles className="h-3 w-3" />
@@ -192,10 +199,12 @@ export function ManagerCommandChatbot() {
                 ref={textareaRef}
                 value={message}
                 onChange={(event) => setMessage(event.target.value)}
+                onKeyDown={handleKeyDown}
                 placeholder="Ask about certificate eligibility, weak domains, quiz scores, employee progress..."
-                className="max-h-32 min-h-12 rounded-2xl border-white/10 bg-white/5 text-sm text-white placeholder:text-white/35 focus-visible:ring-cyan-300/40"
+                rows={1}
+                className="max-h-28 min-h-11 rounded-xl border-white/10 bg-white/5 text-sm text-white placeholder:text-white/35 focus-visible:ring-cyan-300/40"
               />
-              <Button type="submit" size="icon" className="h-12 w-12 rounded-2xl bg-cyan-200 text-zinc-950 hover:bg-cyan-100" disabled={loading || !message.trim()} aria-label="Send message">
+              <Button type="submit" size="icon" className="h-11 w-11 rounded-xl bg-cyan-200 text-zinc-950 hover:bg-cyan-100" disabled={loading || !message.trim()} aria-label="Send message">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               </Button>
             </div>
@@ -206,7 +215,7 @@ export function ManagerCommandChatbot() {
       <Button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="h-14 rounded-full border border-cyan-200/50 bg-zinc-950 px-5 text-white shadow-[0_18px_60px_rgba(6,182,212,0.42)] hover:bg-zinc-900"
+        className="h-12 rounded-full border border-cyan-200/40 bg-zinc-950 px-4 text-white shadow-[0_16px_44px_rgba(2,6,23,0.35)] hover:bg-zinc-900"
       >
         <ExternalLink className="mr-2 h-4 w-4 text-cyan-100" />
         AI Command
@@ -222,4 +231,35 @@ function SignalCard({ label, value }: { label: string; value: string }) {
       <p className="mt-1 text-xs font-semibold text-cyan-50">{value}</p>
     </div>
   )
+}
+
+function FormattedMessage({ content }: { content: string }) {
+  const lines = content.split('\n')
+  return (
+    <div className="space-y-1.5 text-sm leading-relaxed">
+      {lines.map((line, index) => {
+        const trimmed = line.trim()
+        if (!trimmed) return <div key={index} className="h-1" />
+        const bullet = trimmed.match(/^[-*]\s+(.+)$/)
+        if (bullet) {
+          return (
+            <div key={index} className="flex gap-2">
+              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-60" />
+              <p>{formatInline(bullet[1])}</p>
+            </div>
+          )
+        }
+        return <p key={index}>{formatInline(trimmed)}</p>
+      })}
+    </div>
+  )
+}
+
+function formatInline(value: string): ReactNode[] {
+  return value.split(/(\*\*[^*]+\*\*)/g).filter(Boolean).map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={index} className="font-semibold text-current">{part.slice(2, -2)}</strong>
+    }
+    return part
+  })
 }

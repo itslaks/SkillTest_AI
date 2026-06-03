@@ -25,15 +25,15 @@ export function IntelligenceDashboard({
   antiGamingWatch,
 }: IntelligenceDashboardProps) {
   return (
-    <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-      <Card className="border-zinc-800 bg-black text-white shadow-[0_30px_90px_rgba(0,0,0,0.45)]">
-        <CardHeader>
-          <CardTitle>Batch DNA Fingerprint</CardTitle>
+    <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
+      <Card className="overflow-hidden border-zinc-800 bg-black text-white shadow-[0_22px_70px_rgba(0,0,0,0.32)]">
+        <CardHeader className="p-4">
+          <CardTitle className="text-lg">Batch DNA Fingerprint</CardTitle>
           <CardDescription className="text-zinc-400">
             Collective strengths and blind spots across current quiz topics.
           </CardDescription>
         </CardHeader>
-        <CardContent className="h-[340px]">
+        <CardContent className="h-[245px] overflow-hidden p-3 pt-0">
           <ChartContainer config={chartConfig} className="h-full w-full text-white">
             <RadarChart data={batchProfile.slice(0, 6)}>
               <ChartTooltip content={<ChartTooltipContent />} />

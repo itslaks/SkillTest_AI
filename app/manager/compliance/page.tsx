@@ -248,7 +248,7 @@ export default async function CompliancePage() {
           <Card className="overflow-hidden border-zinc-900 bg-black text-white shadow-sm">
             <CardHeader>
               <CardTitle>What Makes It Stand Out</CardTitle>
-              <CardDescription className="text-zinc-400">The parts that go beyond the BRD and create the demo story.</CardDescription>
+              <CardDescription className="text-zinc-400">The parts that go beyond the BRD and create the production evidence story.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {differentiators.map((item, index) => (
@@ -264,7 +264,7 @@ export default async function CompliancePage() {
 
           <Card className="border-zinc-200 shadow-sm">
             <CardHeader>
-              <CardTitle>Demo Data Checklist</CardTitle>
+              <CardTitle>Production Data Checklist</CardTitle>
               <CardDescription>Complete these before judging to make every BRD proof tile glow with live evidence.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-zinc-600">
@@ -278,7 +278,7 @@ export default async function CompliancePage() {
           <Card className="border-cyan-200 bg-cyan-50/70 shadow-sm">
             <CardHeader>
               <CardTitle>One-Click Evidence Pack</CardTitle>
-              <CardDescription>The workbook includes BRD coverage, batch data, upload logs, notifications, automation, feedback, toppers, and a demo runbook.</CardDescription>
+              <CardDescription>The workbook includes BRD coverage, batch data, upload logs, notifications, automation, feedback, toppers, and an operations runbook.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3">
               <Button asChild className="rounded-full bg-black text-white hover:bg-zinc-800">

@@ -16,11 +16,21 @@ CREATE TABLE IF NOT EXISTS public.certificate_rules (
   enabled BOOLEAN NOT NULL DEFAULT FALSE,
   min_score INTEGER NOT NULL DEFAULT 70 CHECK (min_score BETWEEN 0 AND 100),
   title TEXT NOT NULL DEFAULT 'Certificate of Achievement',
+  certificate_name TEXT DEFAULT 'Course Completion Certificate',
   message TEXT,
+  template_image_url TEXT,
+  template_accent_color TEXT DEFAULT '#6f5ab8',
+  template_notes TEXT,
   created_by UUID REFERENCES public.profiles(id),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE public.certificate_rules
+  ADD COLUMN IF NOT EXISTS certificate_name TEXT DEFAULT 'Course Completion Certificate',
+  ADD COLUMN IF NOT EXISTS template_image_url TEXT,
+  ADD COLUMN IF NOT EXISTS template_accent_color TEXT DEFAULT '#6f5ab8',
+  ADD COLUMN IF NOT EXISTS template_notes TEXT;
 
 CREATE TABLE IF NOT EXISTS public.certificates (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -102,9 +112,9 @@ generated_badges AS (
         ELSE 'score_threshold'
       END,
       'level', l.level,
-      'score', LEAST(100, 60 + l.level),
-      'count', l.level,
-      'attendance', LEAST(100, 65 + l.level)
+      'score', LEAST(100, 78 + l.level),
+      'count', GREATEST(2, l.level * 3),
+      'attendance', LEAST(100, 82 + l.level)
     ) AS criteria,
     20 + (l.level * 5) AS points,
     c.category,

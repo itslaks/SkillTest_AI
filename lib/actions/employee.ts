@@ -476,12 +476,22 @@ export async function getAllBadges() {
     .select('badge_id')
     .eq('user_id', user?.id)
 
+  const adminClient = createAdminClient()
+  const { data: certificates } = user?.id
+    ? await adminClient
+        .from('certificates')
+        .select('id, title, score, issued_at, quiz:quiz_id(title, topic), rule:rule_id(certificate_name, min_score)')
+        .eq('user_id', user.id)
+        .order('issued_at', { ascending: false })
+    : { data: [] }
+
   const earnedIds = new Set(earnedBadges?.map((b: any) => b.badge_id) || [])
 
   return {
     data: (allBadges || []).map((b: any) => ({
       ...b,
       earned: earnedIds.has(b.id),
-    }))
+    })),
+    certificates: certificates || [],
   }
 }

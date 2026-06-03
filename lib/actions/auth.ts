@@ -14,6 +14,11 @@ import { getAuthRedirectUrl, getSiteUrl, isSupabaseConfigured, isSupabaseAdminCo
 import { revalidatePath } from 'next/cache'
 import { normalizeDomain } from '@/lib/domain-options'
 
+function safeRedirectPath(value: string | undefined | null) {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return null
+  return value
+}
+
 export async function signUp(formData: FormData) {
   // Validate and sanitize all inputs
   const parsed = parseFormData(signUpSchema, formData)
@@ -147,7 +152,7 @@ export async function signIn(formData: FormData) {
     defaultRedirect = '/employee'
   }
 
-  return { success: true, redirectTo: redirectTo || defaultRedirect }
+  return { success: true, redirectTo: safeRedirectPath(redirectTo) || defaultRedirect }
 }
 
 export async function signInWithMagicLink(formData: FormData) {
