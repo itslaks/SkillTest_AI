@@ -49,8 +49,16 @@ const optionalSafeUrl = z
   .string()
   .trim()
   .max(MAX_LEN)
-  .url('Invalid URL')
-  .refine((val) => /^https?:\/\//i.test(val), 'URL must start with http:// or https://')
+  .refine((val) => /^https?:\/\//i.test(val) || /^data:image\/(png|jpe?g|webp|svg\+xml);/i.test(val), 'URL must be http(s) or a safe image data URL')
+  .optional()
+  .nullable()
+  .or(z.literal('').transform(() => null))
+
+const optionalSafeImageUrl = z
+  .string()
+  .trim()
+  .max(1_100_000, 'Image is too large')
+  .refine((val) => /^https?:\/\//i.test(val) || /^data:image\/(png|jpe?g|webp|svg\+xml);/i.test(val), 'Image must be http(s) or a safe image data URL')
   .optional()
   .nullable()
   .or(z.literal('').transform(() => null))
@@ -65,9 +73,19 @@ export const signUpSchema = z
     fullName: sanitizedString(150),
     employeeId: sanitizedString(50).optional().nullable().or(z.literal('').transform(() => null)),
     role: z.enum(['employee', 'trainer']).default('employee'),
+    domain: sanitizedString(150),
     department: sanitizedString(150).optional().nullable().or(z.literal('').transform(() => null)),
   })
   .strict()
+  .superRefine((value, context) => {
+    if (value.role === 'employee' && !value.employeeId) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['employeeId'],
+        message: 'Employee ID is required for employee signup',
+      })
+    }
+  })
 
 export const signInSchema = z
   .object({
@@ -99,8 +117,9 @@ export const magicLinkSchema = z
 export const updateProfileSchema = z
   .object({
     fullName: sanitizedString(150),
+    domain: sanitizedString(150),
     department: sanitizedString(150).optional().nullable().or(z.literal('').transform(() => null)),
-    avatarUrl: optionalSafeUrl,
+    avatarUrl: optionalSafeImageUrl,
   })
   .strict()
 

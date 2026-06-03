@@ -63,6 +63,7 @@ The application is designed for **admins, managers, training coordinators, train
 | 🎓 AI Learner Coach | Personalized recommendations based on streaks, quiz history, readiness, and retention signals |
 | 📊 Assessment Analyzer | Upload assessment results and chat with AI about scores, weak areas, and remediation |
 | 🧑‍💼 Profile Dashboards | Search anyone by name, email, employee ID, domain, or role and view quiz, badge, certificate, attendance, and training history |
+| 🖼️ Profile Photos | Users can upload a small profile photo or choose from 15 built-in default face avatars |
 | 🧭 Smart Domain Assignment | Filter large employee lists by vertical/domain with color-coded chips before assigning quizzes |
 | 🏅 Certificates | Admin-only certificate automation for score thresholds and automatic issuing |
 | 🎖️ Badge Universe | 250+ styled badges across 12+ categories with color, rarity, and shape metadata |
@@ -277,9 +278,9 @@ Run the SQL scripts in `scripts/` in numeric order.
 
 | Scenario | What To Run |
 |---|---|
-| Fresh Supabase project | Run `001` through `030` |
-| Existing DB already at `029` | Run only `030_certificates_badge_expansion.sql` |
-| Current project state | Migration `029` has already been executed in Supabase; run `030` next |
+| Fresh Supabase project | Run `001` through `031` |
+| Existing DB already at `030` | Run `031_backfill_old_certificates.sql` after enabling certificate rules |
+| Current project state | Migration `030` has already been executed in Supabase; run `031` after choosing certificate rules |
 
 ### 🧾 Latest Migration
 
@@ -287,6 +288,7 @@ Run the SQL scripts in `scripts/` in numeric order.
 |---|---|
 | `029_sync_quiz_status_visibility.sql` | Synchronizes `quizzes.status` and `quizzes.is_active`, making quiz visibility consistent for employees |
 | `030_certificates_badge_expansion.sql` | Adds certificate automation tables, certificate issuing trigger, badge style columns, and 260 seeded badges |
+| `031_backfill_old_certificates.sql` | Issues missing certificates for old completed attempts that already meet enabled certificate rules |
 
 ### ⚠️ Important Database Notes
 
@@ -298,6 +300,7 @@ Run the SQL scripts in `scripts/` in numeric order.
 | Notifications | Migration `028` expands notification delivery statuses |
 | Training Governance | Migrations `020` through `028` add training operations, audit, feedback, and notification controls |
 | Certificates | Migration `030` creates `certificate_rules` and `certificates`; admin certificate controls require this migration |
+| Old Quiz Certificates | Enable certificate rules in `/manager/admin`, then run migration `031` to backfill old attempts |
 
 ---
 
@@ -346,6 +349,7 @@ ALLOW_DEMO_SEED_CREDENTIALS=1 node scripts/seed_admin.js
 | `/manager/admin` | Admin | Trainer approvals and user governance |
 | `/profiles` | Authenticated users | Search employee/trainer/admin profiles by name, email, employee ID, domain, or role |
 | `/profiles/[id]` | Authenticated users | Profile dashboard with quiz, badge, certificate, attendance, and training history |
+| `/profile/settings` | Authenticated users | Update display name, domain, department, and profile avatar |
 | `/manager/analytics` | Manager | Assessment analyzer and AI chat |
 | `/manager/employees` | Manager | Employee import, export, edit, delete, quiz assignment |
 | `/manager/leaderboard` | Manager | Quiz and cumulative leaderboard |
@@ -506,7 +510,7 @@ npx playwright install chromium
 
 | Item | Required |
 |---|---:|
-| Supabase migrations through `030` applied | ✅ |
+| Supabase migrations through `031` applied when old certificates need backfill | ✅ |
 | Real Supabase URL/anon/service keys configured | ✅ |
 | `CRON_SECRET` configured | Recommended |
 | AI provider key configured | Recommended |

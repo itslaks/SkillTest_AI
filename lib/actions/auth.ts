@@ -12,6 +12,7 @@ import {
 } from '@/lib/security/validation'
 import { getAuthRedirectUrl, getSiteUrl, isSupabaseConfigured, isSupabaseAdminConfigured } from '@/lib/security/env'
 import { revalidatePath } from 'next/cache'
+import { normalizeDomain } from '@/lib/domain-options'
 
 export async function signUp(formData: FormData) {
   // Validate and sanitize all inputs
@@ -21,6 +22,7 @@ export async function signUp(formData: FormData) {
   }
 
   const { email, password, fullName, employeeId, department, role } = parsed.data
+  const domain = normalizeDomain(parsed.data.domain)
   if (!isSupabaseConfigured() || !isSupabaseAdminConfigured()) {
     return { error: 'Supabase is not configured. Add real Supabase URL, anon key, and service role key in .env.local, then restart the dev server.' }
   }
@@ -40,6 +42,7 @@ export async function signUp(formData: FormData) {
         full_name: fullName,
         employee_id: employeeId,
         role,
+        domain,
         department,
         approval_status: approvalStatus,
       },
@@ -59,6 +62,7 @@ export async function signUp(formData: FormData) {
         role: role as UserRole,
         approval_status: approvalStatus,
         full_name: fullName,
+        domain,
         department: department || null,
         employee_id: employeeId || null,
         updated_at: new Date().toISOString(),
@@ -218,6 +222,7 @@ export async function updateProfile(formData: FormData) {
   }
 
   const { fullName, department, avatarUrl } = parsed.data
+  const domain = normalizeDomain(parsed.data.domain)
 
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -231,6 +236,7 @@ export async function updateProfile(formData: FormData) {
     .from('profiles')
     .update({
       full_name: fullName,
+      domain,
       department,
       avatar_url: avatarUrl,
       updated_at: new Date().toISOString(),
@@ -274,10 +280,12 @@ export async function syncProfileFromUserMetadata(userId: string, userMetadata: 
   if (!profile || profile.full_name) return;
   const fullName = userMetadata.full_name || null;
   if (!fullName) return;
-  await supabase
-    .from('profiles')
-    .update({ full_name: fullName, updated_at: new Date().toISOString() })
-    .eq('id', userId);
+  const update: Record<string, string> = {
+    full_name: fullName,
+    updated_at: new Date().toISOString(),
+  };
+  if (userMetadata.domain) update.domain = normalizeDomain(userMetadata.domain);
+  await supabase.from('profiles').update(update).eq('id', userId);
 }
 
 export async function sendPasswordReset(formData: FormData) {

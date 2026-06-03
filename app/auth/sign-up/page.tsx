@@ -5,8 +5,16 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { signUp } from '@/lib/actions/auth'
+import { DOMAIN_OPTIONS } from '@/lib/domain-options'
 import {
   Mail, Lock, User, Building, Sparkles, ArrowRight, CheckCircle2,
   ShieldCheck, Zap, GraduationCap, BookOpen, Clock, Star
@@ -214,6 +222,37 @@ export default function SignUpPage() {
                 <Input id="email" name="email" type="email" placeholder="yourname@company.com" required className="pl-11 h-11 rounded-xl border-border/70 bg-muted/30 focus-visible:ring-1 focus-visible:ring-primary/30" />
               </div>
               <p className="text-xs text-muted-foreground">Use your official work or corporate email</p>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label htmlFor="employeeId" className="text-sm font-semibold">
+                  Employee ID
+                  {!isTrainer && <span className="ml-1 text-red-500">*</span>}
+                </label>
+                <Input
+                  id="employeeId"
+                  name="employeeId"
+                  type="text"
+                  placeholder="e.g., EMP1024"
+                  required={!isTrainer}
+                  className="h-11 rounded-xl border-border/70 bg-muted/30 focus-visible:ring-1 focus-visible:ring-primary/30"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="domain" className="text-sm font-semibold">Domain / Vertical</label>
+                <Select name="domain" defaultValue="Data Engineering" required>
+                  <SelectTrigger id="domain" className="h-11 w-full rounded-xl border-border/70 bg-muted/30">
+                    <SelectValue placeholder="Select domain" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DOMAIN_OPTIONS.map((domain) => (
+                      <SelectItem key={domain} value={domain}>{domain}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="space-y-1.5">

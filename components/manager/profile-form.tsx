@@ -1,14 +1,24 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import Image from 'next/image'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { updateProfile } from '@/lib/actions/auth'
 import type { Profile } from '@/lib/types/database'
-import { Save, User, CheckCircle2 } from 'lucide-react'
+import { DEFAULT_AVATARS } from '@/lib/avatar-options'
+import { DOMAIN_OPTIONS } from '@/lib/domain-options'
+import { Save, User, CheckCircle2, Camera, Image as ImageIcon } from 'lucide-react'
 
 interface ProfileFormProps {
   profile: Profile
@@ -18,6 +28,29 @@ export function ProfileForm({ profile }: ProfileFormProps) {
   const [isPending, startTransition] = useTransition()
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url || DEFAULT_AVATARS[0])
+
+  function handleAvatarUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setError('Please choose an image file.')
+      return
+    }
+    if (file.size > 750 * 1024) {
+      setError('Profile photo must be below 750 KB.')
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setAvatarUrl(reader.result)
+        setError(null)
+      }
+    }
+    reader.readAsDataURL(file)
+  }
 
   function handleSubmit(formData: FormData) {
     setError(null)
@@ -44,6 +77,7 @@ export function ProfileForm({ profile }: ProfileFormProps) {
       </CardHeader>
       <CardContent>
         <form action={handleSubmit} className="space-y-4">
+          <input type="hidden" name="avatarUrl" value={avatarUrl} />
           {error && (
             <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">{error}</div>
           )}
@@ -53,12 +87,54 @@ export function ProfileForm({ profile }: ProfileFormProps) {
             </div>
           )}
 
+          <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+            <div className="flex flex-wrap items-center gap-4">
+              <Image
+                src={avatarUrl}
+                alt="Profile avatar preview"
+                width={80}
+                height={80}
+                unoptimized
+                className="h-20 w-20 rounded-2xl border border-white bg-white object-cover shadow-sm"
+              />
+              <div className="min-w-0 flex-1">
+                <Label htmlFor="avatar-upload" className="mb-2 flex items-center gap-2 font-semibold">
+                  <Camera className="h-4 w-4" />
+                  Profile photo
+                </Label>
+                <Input
+                  id="avatar-upload"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                  onChange={handleAvatarUpload}
+                  className="bg-white"
+                />
+                <p className="mt-2 text-xs text-muted-foreground">Upload a small photo, or choose one of the default faces below.</p>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-5 gap-2 sm:grid-cols-8">
+              {DEFAULT_AVATARS.map((avatar, index) => (
+                <button
+                  key={avatar}
+                  type="button"
+                  onClick={() => setAvatarUrl(avatar)}
+                  className={`rounded-xl border bg-white p-1 transition-all ${
+                    avatarUrl === avatar ? 'border-black ring-2 ring-black/10' : 'border-zinc-200 hover:border-zinc-400'
+                  }`}
+                  aria-label={`Choose default face ${index + 1}`}
+                >
+                  <Image src={avatar} alt="" width={40} height={40} unoptimized className="h-10 w-10 rounded-lg object-cover" />
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="full_name">Full Name</Label>
               <Input
                 id="full_name"
-                name="full_name"
+                name="fullName"
                 defaultValue={profile.full_name || ''}
                 placeholder="Your full name"
               />
@@ -76,6 +152,19 @@ export function ProfileForm({ profile }: ProfileFormProps) {
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
+              <Label htmlFor="domain">Domain / Vertical</Label>
+              <Select name="domain" defaultValue={profile.domain || 'General'} required>
+                <SelectTrigger id="domain" className="w-full">
+                  <SelectValue placeholder="Select domain" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DOMAIN_OPTIONS.map((domain) => (
+                    <SelectItem key={domain} value={domain}>{domain}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="department">Department</Label>
               <Input
                 id="department"
@@ -84,7 +173,7 @@ export function ProfileForm({ profile }: ProfileFormProps) {
                 placeholder="e.g., Engineering"
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 md:col-span-2">
               <Label>Role</Label>
               <Input
                 value={profile.role}
@@ -98,6 +187,10 @@ export function ProfileForm({ profile }: ProfileFormProps) {
             {isPending ? <Spinner className="mr-2" /> : <Save className="mr-2 h-4 w-4" />}
             Save Changes
           </Button>
+          <span className="ml-3 inline-flex items-center gap-1 text-xs text-muted-foreground">
+            <ImageIcon className="h-3.5 w-3.5" />
+            Avatar reflects on profile pages after refresh
+          </span>
         </form>
       </CardContent>
     </Card>
