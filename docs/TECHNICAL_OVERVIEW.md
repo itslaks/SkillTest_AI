@@ -7,16 +7,16 @@ SkillTest_AI: Mavericks Execution Platform is a Next.js training management and 
 | Area | Current Capability |
 | --- | --- |
 | Authentication | Supabase Auth with employee/trainer signup, trainer approval, and role redirects |
-| Profiles | Searchable profile dashboards with employee ID, domain, quiz history, badges, certificates, attendance, and avatar support |
+| Profiles | Searchable profile dashboards with employee ID, domain, quiz history, badges, certificates, attendance, avatar support, and a direct dashboard return action |
 | Domains | Employee signup and assignment workflows use domain/vertical values such as Data Engineering, Java, C Sharp, Dotnet, Mainframe, Python, Cloud, DevOps, Testing, BA, UI/UX, and General |
 | Quizzes | Create, import, generate, publish/draft, assign, attempt, score, and analyze quizzes |
 | Assignment | Domain/vertical search and color-coded filters for large employee groups |
 | Certificates | Admin-configured thresholds, uploaded certificate format images, personalized certificate/course names, auto-issue triggers, and old-attempt backfill |
-| Badges | 250+ styled badges across 12+ categories with rarity, colors, and shapes |
+| Badges | 250+ styled badges across 12+ categories with rarity, colors, shapes, and hardened award criteria |
 | Email | SMTP via Nodemailer first, Resend fallback, console fallback in development |
 | AI | OpenAI primary, Groq fallback, Gemini fallback, plus local deterministic stats where possible |
-| Chatbot | Manager/admin command chatbot answers true computed stats first, then AI summarizes only provided DB context |
-| Training Ops | Batches, trainers, sessions, attendance, assessment uploads, feedback, reports, and governance controls |
+| Chatbot | Manager/admin command chatbot answers true computed stats first, then AI summarizes only provided DB context with professional admin-facing wording |
+| Training Ops | Simplified batch setup, trainers, sessions, attendance, assessment uploads, feedback, reports, and governance controls |
 | Exports | Excel/PDF reports for employees, leaderboards, attendance, assessments, feedback, toppers, BRD evidence, and training ops |
 
 ## Tech Stack
@@ -68,7 +68,7 @@ SkillTest_AI: Mavericks Execution Platform is a Next.js training management and 
 | `/profiles/[id]` | Profile dashboard with score, attendance, badge, certificate data |
 | `/profile/settings` | Avatar upload/default avatar, display name, domain, department |
 | `/certificates/[id]` | Personalized certificate view with uploaded template and print/download |
-| `/api/manager-chatbot` | Short, factual manager/admin chatbot responses |
+| `/api/manager-chatbot` | Short, factual manager/admin chatbot responses without exposing internal provider/fallback labels in the UI |
 
 ## Chatbot Behavior
 
@@ -79,6 +79,7 @@ The command chatbot is intentionally conservative:
 - It uses AI only after deterministic handlers cannot answer the question.
 - AI prompts are instructed to use only supplied database context and keep responses under 60 words.
 - If exact data is not loaded or not found, it says so instead of inventing.
+- The UI hides internal scope, answer-mode, fallback, and provider labels so managers see polished admin insights only.
 
 Examples it should handle:
 
@@ -130,8 +131,9 @@ Run SQL scripts in `scripts/` in numeric order. Current latest migration is:
 | `029_sync_quiz_status_visibility.sql` | Aligns quiz `status` and `is_active` visibility |
 | `030_certificates_badge_expansion.sql` | Adds certificates, trigger, badge metadata, 260 badges |
 | `031_backfill_old_certificates.sql` | Adds certificate template columns and backfills old eligible certificates |
+| `032_harden_badge_awards.sql` | Tightens badge award rules so a single quiz completion does not unlock too many badges |
 
-If `030` is already executed, run `031` after saving certificate rules in `/manager/admin`. It is safe to run `031` again because it uses conflict update.
+If `030` is already executed, run `031` after saving certificate rules in `/manager/admin`, then run `032` to harden badge awards. It is safe to run `031` again because it uses conflict update.
 
 ## Verification
 

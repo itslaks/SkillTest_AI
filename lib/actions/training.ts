@@ -649,11 +649,12 @@ export async function createTrainingBatch(formData: FormData): Promise<ApiRespon
       support_status: 'on_track',
     }))
 
-    await admin.from('batch_members').upsert(memberRows, { onConflict: 'batch_id,user_id' })
+    const { error: memberError } = await admin.from('batch_members').upsert(memberRows, { onConflict: 'batch_id,user_id' })
+    if (memberError) return { error: `Batch created, but learner enrollment failed: ${memberError.message}` }
   }
 
   if (trainerIds.length > 0) {
-    await admin.from('training_batch_trainers').upsert(
+    const { error: trainerError } = await admin.from('training_batch_trainers').upsert(
       trainerIds.map((id, index) => ({
         batch_id: batch.id,
         trainer_id: id,
@@ -662,14 +663,15 @@ export async function createTrainingBatch(formData: FormData): Promise<ApiRespon
       })),
       { onConflict: 'batch_id,trainer_id' }
     )
+    if (trainerError) return { error: `Batch created, but trainer assignment failed: ${trainerError.message}` }
   }
 
   if (quizIds.length > 0) {
-    await admin
+    const { error: quizError } = await admin
       .from('quizzes')
       .update({ batch_id: batch.id })
       .in('id', quizIds)
-      .eq('created_by', userId)
+    if (quizError) return { error: `Batch created, but assessment linking failed: ${quizError.message}` }
   }
 
   await admin.from('training_notifications').insert({

@@ -12,7 +12,6 @@ import {
   MessageSquareText,
   RotateCcw,
   Send,
-  Sparkles,
   X,
 } from 'lucide-react'
 
@@ -39,8 +38,7 @@ export function ManagerCommandChatbot() {
     {
       role: 'assistant',
       content:
-        'Command Center online. Ask about employees, quizzes, domains, scores, attendance, badges, certificate eligibility, or enabled certificate thresholds.',
-      provider: 'skilltest_ai_local',
+        'Admin assistant ready. Ask for employee progress, quiz performance, attendance risk, certificates, or batch-level insights.',
     },
   ])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -71,7 +69,6 @@ export function ManagerCommandChatbot() {
         {
           role: 'assistant',
           content: payload.message || payload.error || 'I could not read that data yet.',
-          provider: payload.provider,
         },
       ])
     } catch {
@@ -79,8 +76,7 @@ export function ManagerCommandChatbot() {
         ...previous,
         {
           role: 'assistant',
-          content: 'The analytics assistant could not connect. Check AI keys or retry after refresh.',
-          provider: 'skilltest_ai_local',
+          content: 'I could not connect to the analytics service. Please refresh and try again.',
         },
       ])
     } finally {
@@ -136,12 +132,6 @@ export function ManagerCommandChatbot() {
                 </Button>
               </div>
             </div>
-
-            <div className="mt-3 grid gap-2 sm:grid-cols-3">
-              <SignalCard label="Scope" value="DB aware" />
-              <SignalCard label="Answers" value="Actionable" />
-              <SignalCard label="Fallback" value="Groq ready" />
-            </div>
           </div>
 
           <div className="border-b border-white/10 bg-black/25 p-2.5">
@@ -172,15 +162,9 @@ export function ManagerCommandChatbot() {
                 >
                   <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] opacity-70">
                     {entry.role === 'user' ? <MessageSquareText className="h-3 w-3" /> : <Bot className="h-3 w-3" />}
-                    {entry.role === 'user' ? 'Your question' : 'Command answer'}
+                    {entry.role === 'user' ? 'Your question' : 'Admin insight'}
                   </div>
                   <FormattedMessage content={entry.content} />
-                  {entry.provider && (
-                    <span className="mt-3 inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-white/55">
-                      <Sparkles className="h-3 w-3" />
-                      {entry.provider}
-                    </span>
-                  )}
                 </div>
               </div>
             ))}
@@ -220,15 +204,6 @@ export function ManagerCommandChatbot() {
         <ExternalLink className="mr-2 h-4 w-4 text-cyan-100" />
         AI Command
       </Button>
-    </div>
-  )
-}
-
-function SignalCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
-      <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-white/35">{label}</p>
-      <p className="mt-1 text-xs font-semibold text-cyan-50">{value}</p>
     </div>
   )
 }

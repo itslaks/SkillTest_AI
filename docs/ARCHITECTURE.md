@@ -54,5 +54,19 @@ The manager chatbot follows this order:
 2. Try deterministic handlers for exact stats such as employee quiz score, quiz average, weak areas, and certificate eligibility.
 3. If no deterministic handler matches, send compact context to AI.
 4. AI must answer only from supplied context and keep responses short.
+5. The client renders only polished admin-facing answers and hides internal scope, provider, answer-mode, and fallback labels.
 
 This avoids fake scores while keeping broad natural-language coverage.
+
+## Training Operations Architecture
+
+Batch creation is kept intentionally compact in the manager operations page:
+
+```text
+manager form -> createTrainingBatch() -> training_batches
+             -> batch_learners
+             -> batch_trainers
+             -> quizzes.batch_id
+```
+
+The form collects only the required setup fields, one lead trainer, selected learners, and optional linked assessments. The server action returns a specific error if learner enrollment, trainer assignment, or assessment linking fails, so admins do not lose failures behind a successful batch insert.

@@ -279,16 +279,7 @@ export default async function ManagerOperationsPage() {
     quizAttempts,
   }).slice(0, 6)
 
-  const latestAutomationRun = automationRuns[0]
   const automationRunTypes = ['attendance_cutoff', 'absence_streak', 'assessment_reminder', 'feedback_reminder'] as const
-  const automationHealth = {
-    configuredCutoff: governanceSettings.attendanceCutoffTime,
-    absenceWindow: governanceSettings.absenceAlertDays,
-    feedbackWindow: governanceSettings.feedbackWindowDays,
-    lastRun: latestAutomationRun ? new Date(latestAutomationRun.created_at).toLocaleString() : 'No run yet',
-    lastRunType: latestAutomationRun ? latestAutomationRun.run_type.replaceAll('_', ' ') : 'Awaiting first governance sweep',
-    notificationsCreated: automationRuns.reduce((sum: number, item: any) => sum + Number(item.notifications_created || 0), 0),
-  }
   const notificationById = new Map(notifications.map((item: any) => [item.id, item]))
   const dispatchHealth = {
     sent: notificationDispatchLogs.filter((item: any) => item.provider_status === 'sent').length,
@@ -377,52 +368,12 @@ export default async function ManagerOperationsPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <div className="maverick-rail-card rounded-[1.75rem] p-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-black px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-white">
-                <RadioTower className="h-3.5 w-3.5" />
-                Automation Credibility
-              </div>
-              <h2 className="mt-3 text-2xl font-semibold tracking-tight">Governance autopilot is configured, logged, and reviewable.</h2>
-              <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-600">
-                Judges can see the business rules, manual override controls, notification evidence, and audit trail in one place.
-              </p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[520px]">
-              <MiniMetric label="Cut-off" value={automationHealth.configuredCutoff} />
-              <MiniMetric label="Absence rule" value={`${automationHealth.absenceWindow} days`} />
-              <MiniMetric label="Feedback window" value={`${automationHealth.feedbackWindow} days`} />
-            </div>
-          </div>
-          <div className="mt-5 grid gap-3 md:grid-cols-3">
-            <AutomationSignal label="Last sweep" value={automationHealth.lastRun} detail={automationHealth.lastRunType} />
-            <AutomationSignal label="Alerts created" value={`${automationHealth.notificationsCreated}`} detail={`${automationRuns.length} logged governance run(s)`} />
-            <AutomationSignal label="Next expected sweep" value="Daily ops window" detail="Cron or job runner can call the same governed checks." />
-          </div>
-        </div>
-        <div className="rounded-[1.75rem] border border-zinc-900 bg-zinc-950 p-5 text-white shadow-sm">
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <Gauge className="h-4 w-4 text-cyan-300" />
-            Production operations hook
-          </div>
-          <p className="mt-3 text-sm leading-relaxed text-zinc-300">
-            The platform does not just send reminders. It records each governance run, counts notifications, stores dispatch logs, and exposes the same evidence in reports.
-          </p>
-          <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">Live integration</p>
-            <p className="mt-2 text-sm text-zinc-300">The same governed sweep can run from Vercel Cron, Supabase Edge Scheduler, or an enterprise job runner while this UI remains the operator override.</p>
-          </div>
-        </div>
-      </section>
-
       {canCoordinate ? (
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <Card className="border-zinc-200 shadow-sm spotlight-card">
           <CardHeader>
-            <CardTitle>Batch Lifecycle Management</CardTitle>
-            <CardDescription>Create batches, attach trainers, enroll learners, and link assessments in one action.</CardDescription>
+            <CardTitle>Create Training Batch</CardTitle>
+            <CardDescription>Keep setup simple: name the batch, choose a trainer, add learners, and optionally link assessments.</CardDescription>
           </CardHeader>
           <CardContent>
             <form action={createTrainingBatchAction} className="grid gap-4">
@@ -436,18 +387,7 @@ export default async function ManagerOperationsPage() {
                   <input name="domain" className="h-11 w-full min-w-0 rounded-xl border border-zinc-200 px-3" placeholder="Java, Data, Cloud..." />
                 </label>
               </div>
-              <label className="grid gap-2 text-sm">
-                <span className="font-medium">Description</span>
-                <textarea name="description" rows={3} className="w-full min-w-0 rounded-xl border border-zinc-200 px-3 py-3" placeholder="Goal, scope, batch objective, and delivery expectations." />
-              </label>
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <div className="grid gap-2 text-sm">
-                  <span className="font-medium">Initial status</span>
-                  <div className="flex h-11 w-full min-w-0 items-center rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-zinc-700">
-                    Planned
-                  </div>
-                  <p className="text-xs text-zinc-500">Move to running after schedule, trainers, and learners are ready.</p>
-                </div>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 <label className="grid gap-2 text-sm">
                   <span className="font-medium">Start date</span>
                   <input name="start_date" type="date" className="h-11 w-full min-w-0 rounded-xl border border-zinc-200 px-3" />
@@ -468,81 +408,38 @@ export default async function ManagerOperationsPage() {
                   </select>
                 </label>
               </div>
-              <label className="grid gap-2 text-sm">
-                <span className="font-medium">Trainer panel</span>
-                <select name="trainer_ids" multiple className="min-h-28 w-full min-w-0 rounded-xl border border-zinc-200 px-3 py-3">
-                  {trainers.filter((trainer: any) => trainer.role === 'trainer').map((trainer: any) => (
-                    <option key={trainer.id} value={trainer.id}>
-                      {trainer.full_name || trainer.email}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Customization</p>
-                <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-                  <label className="grid gap-2 text-sm">
-                    <span className="font-medium">Cadence</span>
-                    <select name="cadence" className="h-11 w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-3">
-                      <option value="">Flexible</option>
-                      <option value="Daily">Daily</option>
-                      <option value="Twice weekly">Twice weekly</option>
-                      <option value="Weekly">Weekly</option>
-                      <option value="Bootcamp">Bootcamp</option>
-                    </select>
-                  </label>
-                  <label className="grid gap-2 text-sm">
-                    <span className="font-medium">Capacity</span>
-                    <input name="capacity" type="number" min="1" className="h-11 w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-3" placeholder="30" />
-                  </label>
-                  <label className="grid gap-2 text-sm">
-                    <span className="font-medium">Priority</span>
-                    <select name="priority" className="h-11 w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-3">
-                      <option value="">Normal</option>
-                      <option value="High">High</option>
-                      <option value="Critical">Critical</option>
-                      <option value="Pilot">Pilot</option>
-                    </select>
-                  </label>
-                  <label className="grid gap-2 text-sm">
-                    <span className="font-medium">Support model</span>
-                    <select name="support_model" className="h-11 w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-3">
-                      <option value="">Standard</option>
-                      <option value="Mentor led">Mentor led</option>
-                      <option value="Office hours">Office hours</option>
-                      <option value="Manager coaching">Manager coaching</option>
-                    </select>
-                  </label>
-                  <label className="grid gap-2 text-sm">
-                    <span className="font-medium">Timezone</span>
-                    <input name="timezone" className="h-11 w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-3" placeholder="IST, UTC..." />
-                  </label>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-2 text-sm">
+                  <span className="font-medium">Learners</span>
+                  <div className="max-h-56 overflow-y-auto rounded-xl border border-zinc-200 bg-white p-3">
+                    {employees.map((employee: any) => (
+                      <label key={employee.id} className="flex items-start gap-2 rounded-lg px-2 py-1.5 hover:bg-zinc-50">
+                        <input type="checkbox" name="employee_ids" value={employee.id} className="mt-1 h-4 w-4 rounded border-zinc-300" />
+                        <span>
+                          <span className="block text-sm font-medium">{employee.full_name || employee.email}</span>
+                          <span className="block text-xs text-zinc-500">{employee.employee_id || employee.email}{employee.domain ? ` - ${employee.domain}` : ''}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="grid gap-2 text-sm">
+                  <span className="font-medium">Assessments</span>
+                  <div className="max-h-56 overflow-y-auto rounded-xl border border-zinc-200 bg-white p-3">
+                    {quizzes.map((quiz: any) => (
+                      <label key={quiz.id} className="flex items-start gap-2 rounded-lg px-2 py-1.5 hover:bg-zinc-50">
+                        <input type="checkbox" name="quiz_ids" value={quiz.id} className="mt-1 h-4 w-4 rounded border-zinc-300" />
+                        <span>
+                          <span className="block text-sm font-medium">{quiz.title}</span>
+                          <span className="block text-xs text-zinc-500">{quiz.topic} - {quiz.difficulty}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
               </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="grid gap-2 text-sm">
-                  <span className="font-medium">Enroll learners</span>
-                  <select name="employee_ids" multiple className="min-h-44 w-full min-w-0 rounded-xl border border-zinc-200 px-3 py-3">
-                    {employees.map((employee: any) => (
-                      <option key={employee.id} value={employee.id}>
-                        {employee.full_name || employee.email} {employee.domain ? `- ${employee.domain}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="grid gap-2 text-sm">
-                  <span className="font-medium">Link assessments</span>
-                  <select name="quiz_ids" multiple className="min-h-44 w-full min-w-0 rounded-xl border border-zinc-200 px-3 py-3">
-                    {quizzes.map((quiz: any) => (
-                      <option key={quiz.id} value={quiz.id}>
-                        {quiz.title} - {quiz.topic}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
-                <p>Create once, then manage schedule, attendance, reminders, feedback, and reports from the same operating view.</p>
+                <p>New batches start as planned. Add sessions and attendance after creation.</p>
                 <Button type="submit" className="rounded-full bg-black text-white hover:bg-zinc-800">Create batch</Button>
               </div>
             </form>
@@ -1375,16 +1272,6 @@ function MiniMetric({ label, value }: { label: string; value: string }) {
     <div className="min-w-0 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
       <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">{label}</p>
       <p className="mt-3 text-lg font-semibold leading-tight text-black">{value}</p>
-    </div>
-  )
-}
-
-function AutomationSignal({ label, value, detail }: { label: string; value: string; detail: string }) {
-  return (
-    <div className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-4">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">{label}</p>
-      <p className="mt-3 text-base font-semibold leading-tight text-zinc-950">{value}</p>
-      <p className="mt-1 text-sm leading-relaxed text-zinc-500">{detail}</p>
     </div>
   )
 }

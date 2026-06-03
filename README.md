@@ -68,11 +68,11 @@ The application is designed for **admins, managers, training coordinators, train
 | 🏅 Certificates | Admin-only certificate automation with flexible score thresholds, uploaded certificate formats, personalized employee/course names, and automatic issuing |
 | 🎖️ Badge Universe | 250+ styled badges across 12+ categories with color, rarity, and shape metadata |
 | ✉️ Email Automation | Assignment and completion emails through SMTP or Resend, including score, badge, and certificate updates |
-| 🤖 Manager Command Chatbot | Floating DB-aware chatbot for admins/trainers to ask about quiz, employee, badge, certificate, and attendance performance |
-| 🧑‍🏫 Training Operations | Batch creation, trainer assignment, sessions, attendance, assessments, feedback, reports |
+| 🤖 Manager Command Chatbot | Sleek DB-aware chatbot for admins/trainers with professional answers, Enter-to-send input, markdown cleanup, and no visible internal provider/status labels |
+| 🧑‍🏫 Training Operations | Simplified batch creation, trainer assignment, sessions, attendance, assessments, feedback, reports |
 | ✅ Attendance Governance | Cutoff enforcement, late reason capture, version history, bulk import |
 | 📥 Import Workflows | Employee imports, batch candidate imports, attendance imports, assessment score imports |
-| 🏆 Gamification | Points, streaks, badges, live leaderboards, cumulative reports |
+| 🏆 Accomplishments | Harder-earned badges, employee certificate access, downloadable certificates, live leaderboards, cumulative reports |
 | 📄 Reports | Excel and PDF exports for training operations, employees, attendance, assessments, feedback, toppers |
 | 🔐 RBAC | Admin, manager, training coordinator, trainer, and employee access boundaries |
 | 📬 Notifications | In-app and email notification workflows through SMTP or Resend |
@@ -294,9 +294,9 @@ Run the SQL scripts in `scripts/` in numeric order.
 
 | Scenario | What To Run |
 |---|---|
-| Fresh Supabase project | Run `001` through `031` |
-| Existing DB already at `030` | Run `031_backfill_old_certificates.sql` after enabling certificate rules |
-| Current project state | Migration `030` has already been executed in Supabase; run `031` after choosing certificate rules |
+| Fresh Supabase project | Run `001` through `032` |
+| Existing DB already at `030` | Run `031_backfill_old_certificates.sql` after enabling certificate rules, then run `032_harden_badge_awards.sql` |
+| Current project state | Migration `032` has already been executed in Supabase; no extra SQL is required for the latest UI/workflow polish |
 
 ### 🧾 Latest Migration
 
@@ -305,6 +305,7 @@ Run the SQL scripts in `scripts/` in numeric order.
 | `029_sync_quiz_status_visibility.sql` | Synchronizes `quizzes.status` and `quizzes.is_active`, making quiz visibility consistent for employees |
 | `030_certificates_badge_expansion.sql` | Adds certificate automation tables, certificate issuing trigger, badge style columns, and 260 seeded badges |
 | `031_backfill_old_certificates.sql` | Adds certificate template personalization fields and issues missing certificates for old completed attempts that already meet enabled certificate rules |
+| `032_harden_badge_awards.sql` | Makes badge awards more selective so one quiz completion does not unlock large batches of badges |
 
 ### ⚠️ Important Database Notes
 
@@ -317,6 +318,7 @@ Run the SQL scripts in `scripts/` in numeric order.
 | Training Governance | Migrations `020` through `028` add training operations, audit, feedback, and notification controls |
 | Certificates | Migration `030` creates `certificate_rules` and `certificates`; admin certificate controls require this migration |
 | Old Quiz Certificates | Enable certificate rules in `/manager/admin`, set threshold/template, then run migration `031` to backfill old attempts |
+| Badge Awards | Migration `032` should be applied after the badge expansion so employee badges are harder to unlock and reflect sustained achievement |
 
 ---
 
@@ -390,7 +392,7 @@ ALLOW_DEMO_SEED_CREDENTIALS=1 node scripts/seed_admin.js
 | `/employee/quizzes/[quizId]/results` | Quiz result |
 | `/employee/quizzes/[quizId]/leaderboard` | Quiz leaderboard |
 | `/employee/leaderboard` | Cumulative leaderboard |
-| `/employee/badges` | Badges and achievements |
+| `/employee/badges` | Accomplishments page with separate Badges and Certificates sections, including certificate download links |
 | `/demo/leaderboard` | Demo leaderboard |
 
 ---
@@ -468,7 +470,7 @@ All provider calls go through `lib/ai.ts`.
 
 ### 🤖 Manager Command Chatbot
 
-The floating command chatbot is built to avoid fake numbers.
+The floating command chatbot is built to avoid fake numbers while keeping the UI clean and manager-appropriate.
 
 | Query Type | Example | Response Source |
 |---|---|---|
@@ -478,7 +480,19 @@ The floating command chatbot is built to avoid fake numbers.
 | Certificate eligibility | `certificate eligible employees` | Enabled certificate rules + attempts + issued certificates |
 | Weak areas | `weakest topic` | Topic averages from completed attempts |
 
-If exact data is missing, it says so. Responses are intentionally short.
+If exact data is missing, it says so professionally. The UI hides internal scope, provider, answer-mode, and fallback labels from admins.
+
+### 🧑‍🏫 Batch Lifecycle Management
+
+Batch setup is intentionally simple in `/manager/operations`:
+
+| Step | Behavior |
+|---|---|
+| Batch details | Admins/managers provide batch name, domain, start date, and end date |
+| Trainer | One lead trainer can be assigned during creation |
+| Learners | Learners are selected from a compact checkbox list |
+| Assessments | Optional quizzes can be linked during creation |
+| Error handling | If learner, trainer, or assessment linking fails, the server action reports the exact failed step |
 
 ### 🧠 AI Safety And Cost Controls
 
@@ -542,7 +556,7 @@ npx playwright install chromium
 
 | Item | Required |
 |---|---:|
-| Supabase migrations through `031` applied when old certificates need backfill | ✅ |
+| Supabase migrations through `032` applied when badge hardening is needed | ✅ |
 | Real Supabase URL/anon/service keys configured | ✅ |
 | `CRON_SECRET` configured | Recommended |
 | AI provider key configured | Recommended |

@@ -218,16 +218,16 @@ function summarizeQuiz(quiz: any, attempts: any[], rules: any[]) {
 
 function summarizeCertificates(profiles: any[], attempts: any[], rules: any[], certificates: any[]) {
   const enabledRules = rules.filter((rule) => rule.enabled)
-  if (!enabledRules.length) return 'No certificate rules are enabled.'
+  if (!enabledRules.length) return 'No certificate rules are enabled. Enable a rule for the required quiz before certificates can be issued.'
   const certKeys = new Set(certificates.map((cert) => `${cert.quiz_id}:${cert.user_id}`))
   const profileById = new Map(profiles.map((profile) => [profile.id, profile]))
   const eligibleMissing = attempts.filter((attempt) => {
     const rule = enabledRules.find((item) => item.quiz_id === attempt.quiz_id)
     return rule && Number(attempt.score || 0) >= Number(rule.min_score || 0) && !certKeys.has(`${attempt.quiz_id}:${attempt.user_id}`)
   })
-  if (!eligibleMissing.length) return `Certificate rules enabled: ${enabledRules.length}. No missing eligible certificates found in loaded attempts.`
-  const names = eligibleMissing.slice(0, 5).map((attempt) => `${displayName(profileById.get(attempt.user_id))} (${attempt.score}%)`)
-  return `Missing eligible certificates: ${eligibleMissing.length}. Examples: ${names.join(', ')}. Run 031 after rules are saved.`
+  if (!eligibleMissing.length) return `Certificate rules are active for ${enabledRules.length} quiz(es). All eligible loaded attempts already have certificates.`
+  const names = eligibleMissing.slice(0, 5).map((attempt) => `${displayName(profileById.get(attempt.user_id))} scored ${attempt.score}%`)
+  return `${eligibleMissing.length} eligible certificate(s) need review. Priority candidates: ${names.join(', ')}.`
 }
 
 function summarizeWeakAreas(attempts: any[]) {
@@ -309,5 +309,5 @@ function localFallback(message: string, attempts: any[], profiles: any[]) {
       const profile = profileById.get(attempt.user_id)
       return `${index + 1}. ${profile?.full_name || profile?.email || 'Unknown'} scored ${attempt.score}% in ${attempt.quizzes?.title || 'quiz'}.`
     })
-  return `AI provider was unavailable, so I used local summary mode for: "${message}".\n\n${top.join('\n') || 'No completed attempts found.'}`
+  return `Current performance summary for "${message}":\n\n${top.join('\n') || 'No completed attempts found in the loaded records.'}`
 }

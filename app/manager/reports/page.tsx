@@ -175,37 +175,37 @@ export default async function ManagerReportsPage() {
           <p className="mt-3 max-w-3xl text-sm leading-relaxed text-zinc-400">Attendance, assessment, feedback, topper, automation, and consolidated batch reporting are grouped for audit-ready walkthroughs.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" asChild>
+          <Button variant="outline" className="border-white bg-white text-zinc-950 hover:bg-zinc-100 hover:text-zinc-950" asChild>
             <a href="/api/export/comprehensive-report">
               <FileSpreadsheet className="mr-2 h-4 w-4" />
               Full TMS Report (Excel)
             </a>
           </Button>
-          <Button variant="outline" asChild>
+          <Button variant="outline" className="border-white bg-white text-zinc-950 hover:bg-zinc-100 hover:text-zinc-950" asChild>
             <a href="/api/reports/training-ops/download">
               <FileSpreadsheet className="mr-2 h-4 w-4" />
               BRD Evidence Pack
             </a>
           </Button>
-          <Button variant="outline" asChild>
+          <Button variant="outline" className="border-white bg-white text-zinc-950 hover:bg-zinc-100 hover:text-zinc-950" asChild>
             <a href="/api/export/pdf?type=consolidated">
               <FileText className="mr-2 h-4 w-4" />
               Consolidated PDF
             </a>
           </Button>
-          <Button variant="outline" asChild>
+          <Button variant="outline" className="border-white bg-white text-zinc-950 hover:bg-zinc-100 hover:text-zinc-950" asChild>
             <a href="/api/export/pdf?type=assessment">
               <FileText className="mr-2 h-4 w-4" />
               Assessment PDF
             </a>
           </Button>
-          <Button variant="outline" asChild>
+          <Button variant="outline" className="border-white bg-white text-zinc-950 hover:bg-zinc-100 hover:text-zinc-950" asChild>
             <a href="/api/export/toppers">
               <Trophy className="mr-2 h-4 w-4" />
               All Toppers (Excel)
             </a>
           </Button>
-          <Button variant="outline" asChild>
+          <Button variant="outline" className="border-white bg-white text-zinc-950 hover:bg-zinc-100 hover:text-zinc-950" asChild>
             <a href="/api/export/pdf?type=toppers">
               <FileText className="mr-2 h-4 w-4" />
               Toppers PDF
