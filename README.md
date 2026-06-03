@@ -178,7 +178,7 @@ route.ts -> controller -> service -> repository -> database
 | Node.js | 20.9+ recommended |
 | npm | Included with Node |
 | Supabase | Project URL, anon key, service role key |
-| OpenAI or Gemini | Optional but required for AI features |
+| OpenAI, Groq, or Gemini | Optional but required for external AI features |
 | SMTP account or Resend | Optional but required for email delivery |
 | Git | Required for pushing changes |
 
@@ -269,6 +269,22 @@ SEED_ADMIN_PASSWORD=replace_me
 SEED_TRAINER_PASSWORD=replace_me
 ALLOW_DEMO_SEED_CREDENTIALS=0
 ```
+
+---
+
+### 📬 SMTP Setup
+
+For Gmail SMTP:
+
+| Step | Action |
+|---|---|
+| 1 | Enable 2-step verification in your Google account |
+| 2 | Create a Google App Password from Security -> App passwords |
+| 3 | Put that app password in `SMTP_PASS` |
+| 4 | Use `smtp.gmail.com`, port `587`, and `SMTP_SECURE=false` |
+| 5 | Add the same variables in Vercel and redeploy |
+
+Do not use your normal Gmail password.
 
 ---
 
@@ -448,6 +464,21 @@ All provider calls go through `lib/ai.ts`.
 | Manager insight | Compact operational prompt | 200 |
 | Employee recommendation | Learner stats and risk prompt | 150 |
 | Assessment chat | Compact assessment context and chat history | 600 |
+| Manager command chatbot | Computes exact DB stats first, then AI summarizes only supplied context | 180 |
+
+### 🤖 Manager Command Chatbot
+
+The floating command chatbot is built to avoid fake numbers.
+
+| Query Type | Example | Response Source |
+|---|---|---|
+| Employee quiz score + behavior | `ashtoush airflow score and analysis` | Exact completed attempt + `analyzeAttemptPattern()` |
+| Quiz average | `average score of rag quiz` | Completed attempts for matching quiz |
+| Employee summary | `ashtoush performance` | Employee completed attempts |
+| Certificate eligibility | `certificate eligible employees` | Enabled certificate rules + attempts + issued certificates |
+| Weak areas | `weakest topic` | Topic averages from completed attempts |
+
+If exact data is missing, it says so. Responses are intentionally short.
 
 ### 🧠 AI Safety And Cost Controls
 

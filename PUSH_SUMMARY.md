@@ -1,52 +1,40 @@
-# 🎉 Successfully Pushed: Question Approval System Removal
+# Current Push Summary
 
-## ✅ Changes Pushed to GitHub
+Repository: `https://github.com/itslaks/SkillTest_AI`
 
-**Commit Hash:** `7de67ee`  
-**Repository:** https://github.com/itslaks/SkillTest_AI  
-**Branch:** main
+Branch: `main`
 
-## 📋 Summary of Changes
+## Latest Feature Areas
 
-### Files Modified (14 files total):
-- ✅ **87 insertions, 165 deletions** (net reduction in code complexity)
-- ✅ Removed approval workflow entirely
-- ✅ Fixed employee quiz access issue
+| Area | Summary |
+| --- | --- |
+| Profiles | Searchable profile dashboards, employee IDs, domains, avatars |
+| Signup | Employee ID and domain/vertical captured during signup |
+| Assignment | Domain search and color-coded filters for quiz assignment |
+| Certificates | Admin thresholds, template upload, personalized certificate page, old attempt backfill |
+| Badges | 260+ styled badges seeded by migration `030` |
+| Email | SMTP/Resend assignment and completion notifications |
+| Chatbot | Short deterministic stats for employee quiz analysis, averages, weak areas, certificates |
+| AI | OpenAI primary, Groq fallback, Gemini fallback |
 
-### Key Changes:
-1. **Database Schema Updates**
-   - Removed `status` and `is_approved` columns from questions
-   - Updated RLS policies to allow all questions for active quizzes
+## Required Supabase State
 
-2. **Backend Fixes**
-   - Updated employee quiz retrieval to not filter by approval
-   - Removed approval functions from quiz actions
-   - Updated all question creation flows
+| Migration | Required For |
+| --- | --- |
+| `029_sync_quiz_status_visibility.sql` | Active quiz visibility |
+| `030_certificates_badge_expansion.sql` | Certificates and expanded badges |
+| `031_backfill_old_certificates.sql` | Certificate template fields and old-attempt certificates |
 
-3. **Frontend Cleanup**
-   - Removed pending questions UI from manager dashboard
-   - Deleted `PendingQuestionActions` component
-   - Updated quiz editor and importer components
+Run `031` after saving certificate rules in `/manager/admin`.
 
-4. **Database Migration**
-   - Created migration script to safely remove approval columns
-   - Added comprehensive SQL scripts for database updates
+## Verification
 
-## 🚀 Next Steps
+Recent checks used:
 
-1. **Apply Database Migration**
-   - Run the SQL script: `scripts/015_remove_question_approval_system.sql`
-   - Or use: `scripts/remove_approval_system.sql` (more comprehensive)
+```bash
+npm run lint
+npm run build
+npm run test:smoke
+```
 
-2. **Test the Fix**
-   - Create a new quiz with questions
-   - Assign it to an employee
-   - Verify employee can immediately access and take the quiz
-
-## 🎯 Expected Result
-- ✅ No more "no questions available" errors
-- ✅ Employees can take quizzes immediately after assignment
-- ✅ Simplified codebase without approval complexity
-- ✅ All questions are available once quiz is assigned
-
-The fix is now live in your repository and ready for deployment! 🚀
+On Windows, direct Node invocation may be used when `npm` is not on PATH.

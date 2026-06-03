@@ -1,140 +1,127 @@
-# 🚀 How to Run — SkillTest
+# How To Run SkillTest_AI
 
-Step-by-step instructions to get the platform running locally.
-
----
+This is the operational runbook for local setup, Supabase setup, SMTP setup, and deployment.
 
 ## Prerequisites
 
-| Tool       | Version  | Install                                    |
-| ---------- | -------- | ------------------------------------------ |
-| **Node.js** | ≥ 18.x  | https://nodejs.org                         |
-| **npm**     | ≥ 9.x   | Comes with Node.js                         |
-| **Git**     | any      | https://git-scm.com                        |
-| **Supabase account** | — | https://supabase.com (free tier works) |
+| Tool | Version / Notes |
+| --- | --- |
+| Node.js | 20.9+ recommended |
+| npm | Included with Node |
+| Git | Required for source control |
+| Supabase | Project URL, anon key, service role key |
+| Vercel | Recommended production host |
+| AI key | OpenAI preferred, Groq/Gemini fallback optional |
+| Email | SMTP or Resend optional, required for mail delivery |
 
----
-
-## 1 · Clone the repository
-
-```bash
-git clone <your-repo-url>
-cd app
-```
-
----
-
-## 2 · Install dependencies
+## Local Setup
 
 ```bash
-npm install --legacy-peer-deps
+npm install
+npm run dev
 ```
 
-> `--legacy-peer-deps` is required because some packages have peer-dependency conflicts with React 19.
+Open:
 
----
-
-## 3 · Set up Supabase
-
-1. Go to [supabase.com](https://supabase.com) → create a new project.
-2. In your project dashboard go to **Settings → API** and copy:
-   - `Project URL`
-   - `anon public` key
-   - `service_role` key (keep secret!)
-
----
-
-## 4 · Configure environment variables
-
-```bash
-# Copy the example file
-cp .env.example .env.local
+```text
+http://localhost:3000
 ```
 
-Open `.env.local` and fill in:
+If PowerShell cannot find npm:
+
+```powershell
+$env:PATH='C:\Program Files\nodejs;'+$env:PATH
+npm run dev
+```
+
+## Environment Variables
+
+Create `.env.local`:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 
-# Optional — for AI question generation
-# OPENAI_API_KEY=sk-...
-# GOOGLE_GEMINI_API_KEY=...
+OPENAI_API_KEY=your-openai-key
+GROQ_API_KEY=your-groq-key
+GROQ_MODEL=llama-3.3-70b-versatile
+GOOGLE_GEMINI_API_KEY=your-gemini-key
+
+EMAIL_FROM="SkillTest_AI <your-email@gmail.com>"
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-gmail-app-password
+SMTP_SECURE=false
+
+CRON_SECRET=replace_with_a_long_random_secret
 ```
 
----
+## SMTP Setup
 
-## 5 · Run the database migrations
+For Gmail:
 
-Go to your Supabase project → **SQL Editor** and execute these files **in order**:
+1. Enable 2-step verification in Google Account.
+2. Go to Google Account -> Security -> App passwords.
+3. Create an app password for mail.
+4. Use that app password as `SMTP_PASS`.
+5. Add the SMTP variables locally and in Vercel.
+6. Redeploy after changing Vercel env vars.
 
-```
-scripts/001_create_profiles.sql
-scripts/002_create_quizzes.sql
-scripts/003_create_questions.sql
-scripts/004_create_attempts.sql
-scripts/005_create_gamification.sql
-scripts/006_create_triggers.sql
-scripts/007_seed_badges.sql
-scripts/008_add_passing_score.sql
-scripts/009_create_quiz_assignments.sql
-```
+Do not use your normal Gmail password.
 
-> Each script is idempotent (`IF NOT EXISTS`), so re-running is safe.
+## Supabase Migrations
 
----
+Run SQL scripts in `scripts/` in numeric order for a fresh project.
 
-## 6 · Start the development server
+Current important latest scripts:
+
+| Script | Purpose |
+| --- | --- |
+| `029_sync_quiz_status_visibility.sql` | Syncs quiz active/status visibility |
+| `030_certificates_badge_expansion.sql` | Adds certificates and 260+ styled badges |
+| `031_backfill_old_certificates.sql` | Adds certificate template fields and backfills old eligible certificates |
+
+If you already ran `030`, configure certificate rules in `/manager/admin`, then run `031`.
+
+## First Admin / Trainer
+
+Use the seed script after environment variables are configured:
 
 ```bash
-npm run dev
+SEED_ADMIN_PASSWORD="strong-admin-password" SEED_TRAINER_PASSWORD="strong-trainer-password" node scripts/seed_admin.js
 ```
 
-The app will be available at **http://localhost:3000**.
+Trainer signups are pending until an admin approves them in `/manager/admin`.
 
----
+## Feature Checks
 
-## 7 · Build for production
+After setup, test:
+
+| Feature | Route |
+| --- | --- |
+| Signup with employee ID/domain | `/auth/sign-up` |
+| Admin console and certificate rules | `/manager/admin` |
+| Employee domain assignment | `/manager/employees` or `/manager/quizzes/[id]` |
+| Profile search | `/profiles` |
+| Avatar settings | `/profile/settings` |
+| Certificate view | `/certificates/[id]` |
+| Chatbot | Floating AI Command button in manager pages |
+
+## Production / Vercel
+
+1. Push to GitHub `main`.
+2. In Vercel, connect/import the GitHub repo.
+3. Add the same environment variables in Vercel Project Settings.
+4. Confirm Supabase auth redirect URLs include the Vercel domain.
+5. Redeploy from latest `main`.
+
+## Verification Commands
 
 ```bash
+npm run lint
 npm run build
-npm run start
+npm run test:smoke
 ```
-
----
-
-## 8 · Create your first accounts
-
-1. Open **http://localhost:3000/auth/sign-up**
-2. Register an **Employee** account (all sign-ups create employee accounts by default)
-3. Confirm the email via the Supabase dashboard → **Authentication → Users** (or check your inbox if email is configured)
-4. To create a **Manager** account, update the user's `role` column to `manager` in the `profiles` table via Supabase Table Editor or SQL:
-   ```sql
-   UPDATE profiles SET role = 'manager' WHERE email = 'manager@example.com';
-   ```
-5. Manager can now log in and assign quizzes to employees from the **Employees** page
-
----
-
-## Quick reference — NPM scripts
-
-| Command          | Description                       |
-| ---------------- | --------------------------------- |
-| `npm run dev`    | Start development server (Turbopack) |
-| `npm run build`  | Create production build            |
-| `npm run start`  | Serve the production build         |
-| `npm run lint`   | Run ESLint                         |
-
----
-
-## Troubleshooting
-
-| Problem | Solution |
-| ------- | -------- |
-| `Module not found: @supabase/supabase-js` | Run `npm install @supabase/supabase-js --legacy-peer-deps` |
-| `useSearchParams() should be wrapped in Suspense` | Already fixed — run `npm run build` again |
-| Build fails with env errors | Make sure `.env.local` exists with all required variables |
-| `EACCES` or `ExecutionPolicy` error on Windows | Run `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` in PowerShell |
-| Supabase RLS errors (`new row violates policy`) | Run all SQL scripts in order; check the user's role in the `profiles` table |
