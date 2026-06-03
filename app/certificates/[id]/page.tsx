@@ -1,44 +1,28 @@
-import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { CertificatePrintButton } from '@/components/certificates/certificate-print-button'
 import { CertificatePreview } from '@/components/certificates/certificate-preview'
+import { getCertificateDisplay, getCertificateForViewer } from '@/lib/certificate-access'
 import { ArrowLeft, CalendarDays, CheckCircle2, Fingerprint, Trophy } from 'lucide-react'
 
 export default async function CertificatePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const supabase = await createClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
-  if (error || !user) redirect('/auth/login')
+  const result = await getCertificateForViewer(id)
+  if (!result.ok && result.status === 401) redirect('/auth/login')
 
-  const admin = createAdminClient()
-  const { data: certificate } = await admin
-    .from('certificates')
-    .select(`
-      *,
-      profile:user_id(id, full_name, email, employee_id, domain, department),
-      quiz:quiz_id(id, title, topic, difficulty),
-      rule:rule_id(certificate_name, template_image_url, template_accent_color, template_notes, min_score)
-    `)
-    .eq('id', id)
-    .maybeSingle()
-
-  if (!certificate) {
+  if (!result.ok) {
     return (
       <div className="mx-auto max-w-3xl p-8">
         <Button variant="ghost" asChild><Link href="/profiles"><ArrowLeft className="mr-2 h-4 w-4" />Profiles</Link></Button>
-        <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-6 text-red-700">Certificate not found.</div>
+        <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-6 text-red-700">{result.message}</div>
       </div>
     )
   }
 
-  const accent = certificate.rule?.template_accent_color || '#6f5ab8'
-  const employeeName = certificate.profile?.full_name || certificate.profile?.email || 'Employee'
-  const courseName = certificate.rule?.certificate_name || certificate.title || `${certificate.quiz?.topic || 'Course'} Completion`
-  const topic = certificate.quiz?.topic || certificate.quiz?.title || courseName
-  const issueDate = new Date(certificate.issued_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+  const { certificate } = result
+  const { accent, employeeName, topic, issueDate } = getCertificateDisplay(certificate)
 
   return (
     <div className="min-h-screen bg-zinc-100 p-4 print:bg-white md:p-8">
@@ -46,7 +30,7 @@ export default async function CertificatePage({ params }: { params: Promise<{ id
         <Button variant="ghost" asChild>
           <Link href={`/profiles/${certificate.user_id}`}><ArrowLeft className="mr-2 h-4 w-4" />Back to profile</Link>
         </Button>
-        <CertificatePrintButton />
+        <CertificatePrintButton certificateId={certificate.id} />
       </div>
 
       <section className="mx-auto max-w-6xl print:rounded-none print:border-0 print:shadow-none">

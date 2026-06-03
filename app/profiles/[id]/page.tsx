@@ -31,7 +31,7 @@ export default async function ProfileDashboardPage({ params }: { params: Promise
     )
   }
 
-  const { profile, stats, attempts, badges, assignments, memberships, attendance, certificates } = result.data
+  const { profile, stats, attempts, badges, assignments, memberships, attendance, certificates, restricted } = result.data
   const domain = profile.domain || profile.department || 'General'
   const domainStyle = getDomainColor(domain)
   const completed = attempts.filter((attempt: any) => attempt.status === 'completed')
@@ -79,14 +79,39 @@ export default async function ProfileDashboardPage({ params }: { params: Promise
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <Metric label="Points" value={stats?.total_points || 0} />
-            <Metric label="Streak" value={stats?.current_streak || 0} />
-            <Metric label="Avg Score" value={`${stats?.average_score ?? averageScore}%`} />
-            <Metric label="Attendance" value={`${attendanceRate}%`} />
-          </div>
+          {restricted ? (
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+              <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Public Profile</p>
+              <p className="mt-3 text-sm leading-6 text-zinc-300">
+                Performance details are private and visible only to this employee and authorized training staff.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <Metric label="Points" value={stats?.total_points || 0} />
+              <Metric label="Streak" value={stats?.current_streak || 0} />
+              <Metric label="Avg Score" value={`${stats?.average_score ?? averageScore}%`} />
+              <Metric label="Attendance" value={`${attendanceRate}%`} />
+            </div>
+          )}
         </div>
       </section>
+
+      {restricted && (
+        <section className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-zinc-950">Profile details are private</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600">
+            You can search and identify people in the organization, but quiz scores, attendance, badges, certificates,
+            assignments, and training history are visible only to the profile owner and authorized training staff.
+          </p>
+          <Button asChild className="mt-4 rounded-full bg-black text-white hover:bg-zinc-800">
+            <Link href="/profiles">Back to people search</Link>
+          </Button>
+        </section>
+      )}
+
+      {!restricted && (
+        <>
 
       <div className="grid gap-5 md:grid-cols-4">
         <SummaryCard icon={BookOpenCheck} label="Completed Quizzes" value={completed.length} tone="bg-blue-50 text-blue-700 border-blue-100" />
@@ -175,6 +200,8 @@ export default async function ProfileDashboardPage({ params }: { params: Promise
           </div>
         </Panel>
       </div>
+        </>
+      )}
     </div>
   )
 }

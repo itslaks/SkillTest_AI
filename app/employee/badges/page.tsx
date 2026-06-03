@@ -13,6 +13,7 @@ import {
   TrendingUp,
   Trophy,
   Download,
+  Eye,
   Zap,
 } from 'lucide-react'
 
@@ -87,13 +88,23 @@ export default async function BadgesPage() {
                   {certificate.quiz?.title || certificate.quiz?.topic || 'Assessment'} - Score {certificate.score}%
                 </p>
                 <p className="mt-1 text-xs text-zinc-500">Issued {new Date(certificate.issued_at).toLocaleDateString()}</p>
-                <Link
-                  href={`/certificates/${certificate.id}`}
-                  className="mt-3 inline-flex items-center gap-2 rounded-full bg-black px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  View / Download
-                </Link>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link
+                    href={`/certificates/${certificate.id}`}
+                    className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-amber-100"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    View
+                  </Link>
+                  <a
+                    href={`/api/certificates/${certificate.id}/download`}
+                    download
+                    className="inline-flex items-center gap-2 rounded-full bg-black px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Download PDF
+                  </a>
+                </div>
               </div>
             ))}
           </div>

@@ -1,6 +1,7 @@
 'use server'
 
 import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { getCurrentUserRole, isTrainingStaff } from '@/lib/rbac'
 import { redirect } from 'next/navigation'
 
 export async function getVisibleProfiles(query = '') {
@@ -30,8 +31,36 @@ export async function getProfileDashboard(profileId: string) {
   const supabase = await createClient()
   const { data: { user }, error } = await supabase.auth.getUser()
   if (error || !user) redirect('/auth/login')
+  const viewer = await getCurrentUserRole()
+  if (!viewer) redirect('/auth/login')
 
   const admin = createAdminClient()
+  const canViewFullProfile = profileId === user.id || isTrainingStaff(viewer.role)
+
+  if (!canViewFullProfile) {
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('id, full_name, email, employee_id, department, domain, role, avatar_url')
+      .eq('id', profileId)
+      .maybeSingle()
+
+    if (!profile) return { error: 'Profile not found' }
+
+    return {
+      data: {
+        profile,
+        stats: null,
+        attempts: [],
+        badges: [],
+        assignments: [],
+        memberships: [],
+        attendance: [],
+        certificates: [],
+        restricted: true,
+      },
+    }
+  }
+
   const [
     profileRes,
     statsRes,
