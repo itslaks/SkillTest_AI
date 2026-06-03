@@ -10,6 +10,8 @@ export interface Profile {
   full_name: string | null
   avatar_url: string | null
   role: UserRole
+  approval_status: 'pending' | 'approved' | 'rejected'
+  rejection_reason: string | null
   department: string | null
   domain: string | null
   employee_id: string | null
@@ -43,7 +45,7 @@ export interface Question {
   quiz_id: string
   question_text: string
   options: { text: string; isCorrect: boolean }[]
-  correct_option_index: number
+  correct_option_index?: number
   difficulty: DifficultyLevel
   explanation: string | null
   is_ai_generated: boolean

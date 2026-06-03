@@ -33,7 +33,7 @@ export async function createQuiz(input: CreateQuizInput) {
     .insert({
       ...parsed.data,
       created_by: user.id,
-      is_active: false, // Start as draft until manager reviews and activates
+      is_active: parsed.data.status !== 'draft' && parsed.data.status !== 'archived',
     })
     .select()
     .single()
@@ -69,9 +69,17 @@ export async function updateQuiz(id: string, input: Partial<CreateQuizInput>) {
     return { error: 'Not authenticated' }
   }
 
+  const updatePayload = {
+    ...parsed.data,
+    ...(parsed.data.status
+      ? { is_active: parsed.data.status === 'active' }
+      : {}),
+    updated_at: new Date().toISOString(),
+  }
+
   const { data, error } = await supabase
     .from('quizzes')
-    .update({ ...parsed.data, updated_at: new Date().toISOString() })
+    .update(updatePayload)
     .eq('id', idResult.data)
     .eq('created_by', user.id)
     .select()
@@ -134,7 +142,11 @@ export async function toggleQuizActive(id: string, isActive: boolean) {
 
   const { error } = await supabase
     .from('quizzes')
-    .update({ is_active: isActive, updated_at: new Date().toISOString() })
+    .update({
+      is_active: isActive,
+      status: isActive ? 'active' : 'draft',
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', idResult.data)
     .eq('created_by', user.id)
 

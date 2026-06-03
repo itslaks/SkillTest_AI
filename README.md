@@ -1,277 +1,560 @@
-# SkillTest_AI: Mavericks Execution Platform
+# 🚀 SkillTest_AI: Mavericks Execution Platform
 
-**AI-powered Training Management System** - built for enterprise learning teams who need real operations, governance proof, and contest-ready evidence, not just dashboards.
+**SkillTest_AI** is an AI-powered Training Management System for enterprise learning teams that need more than quiz screens. It combines training batch execution, employee assessment, attendance governance, trainer workflows, AI coaching, gamification, reporting, and BRD-ready evidence packs in one production-style Next.js platform.
 
-SkillTest_AI: Mavericks Execution Platform combines intelligent quiz generation, end-to-end training operations, real-time attendance tracking, AI coaching insights, BRD proof, and automated reporting in a single platform designed for non-technical trainers, coordinators, and learners.
-
-## Technical Documentation
-
-For a crisp owner-level explanation of the language, framework, routes, API endpoints, environment variables, scripts, AI providers, and deployment flow, see [docs/TECHNICAL_OVERVIEW.md](docs/TECHNICAL_OVERVIEW.md).
+The application is designed for **admins, managers, training coordinators, trainers, and employees**. It supports the full journey from candidate onboarding to quiz assignment, training attendance, assessment upload, project evaluation, feedback collection, leaderboard scoring, and downloadable compliance reports.
 
 ---
 
-## What Makes SkillTest_AI Different
+## 📌 Table Of Contents
 
-| Capability | Details |
+| Section | What It Covers |
 |---|---|
-| **AI Quiz Generation** | Generate MCQs from a topic or uploaded content (PDF/DOCX) in a single API call. OpenAI (gpt-4o-mini) preferred, Gemini 1.5 Flash fallback. |
-| **AI Coaching Insights** | `/api/ai-insight` — managers get 2-sentence coaching tips on batch health, attendance, trainer performance, and quiz results. Capped at 200 tokens. |
-| **AI Learning Recommendations** | `/api/ai-recommend` — employees receive personalised next-step coaching based on their streak, pass rate, and retention risk. 150 tokens per call. |
-| **AI Assessment Chat** | Upload an assessment Excel → chat with AI to analyse scores, identify weak areas, and get remediation suggestions. |
-| **Training Operations** | Full batch lifecycle: create batch → assign candidates & trainers → schedule sessions → mark attendance → upload scores → evaluate projects → download reports. |
-| **Role-Based Access** | Admin / Manager / Training Coordinator / Trainer / Employee — each sees exactly what they need. |
-| **Attendance System** | Cut-off enforcement, late-reason audit log, bulk Excel import with row-level validation. |
-| **Assessment Import** | Score upload with duplicate detection, passing-score rules, and per-row error reporting. |
-| **PDF & Excel Exports** | One-click reports: attendance, assessment, feedback, trainer performance, consolidated TMS. |
-| **Feedback System** | Coordinator-controlled feedback windows → employee submission → AI sentiment analysis for managers. |
-| **Gamification** | Points, streaks, badges, and live leaderboard for learners. |
-| **Notifications** | Email (Resend) + in-app notifications for sessions, reminders, and alerts. |
-| **BRD Evidence Pack** | `/manager/compliance` maps BRD requirements to live screens and `/api/reports/training-ops/download` exports a one-click judge workbook. |
+| [Product Snapshot](#-product-snapshot) | What the app is and who uses it |
+| [Core Features](#-core-features) | End-to-end capabilities |
+| [Roles And Permissions](#-roles-and-permissions) | Admin, manager, trainer, employee access |
+| [Tech Stack](#-tech-stack) | Framework, database, AI, UI, exports |
+| [Architecture](#-architecture) | Folder structure and backend flow |
+| [Setup](#-setup) | Local install, env, Supabase setup |
+| [Database Migrations](#-database-migrations) | SQL execution order and latest migration |
+| [Key Pages](#-key-pages) | Frontend routes by role |
+| [API Reference](#-api-reference) | Main API endpoints |
+| [AI Features](#-ai-features) | AI generation, insights, recommendations |
+| [Reports And Exports](#-reports-and-exports) | Excel/PDF outputs |
+| [Testing](#-testing-and-verification) | Lint, build, smoke checks |
+| [Deployment](#-deployment) | Vercel and production notes |
+| [Troubleshooting](#-troubleshooting) | Common setup/runtime issues |
 
 ---
 
-## Tech Stack
+## 🧭 Product Snapshot
+
+| Item | Details |
+|---|---|
+| Product Name | SkillTest_AI: Mavericks Execution Platform |
+| Category | Training Management System + AI Assessment Platform |
+| Primary Users | Admins, managers, training coordinators, trainers, employees |
+| Main Value | Runs training operations and proves execution quality with reports, audit trails, and AI insights |
+| Deployment Target | Vercel-compatible Next.js app |
+| Database/Auth | Supabase PostgreSQL, Supabase Auth, Row-Level Security |
+| AI Providers | OpenAI first, Google Gemini fallback |
+
+### 🎯 Use Cases
+
+| Use Case | How SkillTest_AI Helps |
+|---|---|
+| Employee onboarding | Import employees, group by domain, assign quizzes and batches |
+| Skill assessment | Create quizzes manually, from Excel, from topics, or from uploaded content |
+| Training execution | Create batches, schedule sessions, assign trainers, track attendance |
+| Governance | Enforce attendance cutoffs, late reasons, upload audits, batch status evidence |
+| Trainer operations | Provide trainer-scoped workflows for attendance, scores, and evaluations |
+| Learner engagement | Gamified dashboard, points, streaks, badges, leaderboards |
+| Reporting | Download Excel/PDF reports for attendance, assessment, feedback, toppers, and BRD evidence |
+| AI coaching | Generate questions, manager insights, employee learning tips, and assessment chat |
+
+---
+
+## ✨ Core Features
+
+| Feature | Description |
+|---|---|
+| 🤖 AI Quiz Generation | Generate MCQs from a topic or extracted PDF/DOCX/TXT content |
+| 🧠 AI Manager Insights | Short coaching recommendations for batch health, attendance, trainer performance, and quiz outcomes |
+| 🎓 AI Learner Coach | Personalized recommendations based on streaks, quiz history, readiness, and retention signals |
+| 📊 Assessment Analyzer | Upload assessment results and chat with AI about scores, weak areas, and remediation |
+| 🧑‍🏫 Training Operations | Batch creation, trainer assignment, sessions, attendance, assessments, feedback, reports |
+| ✅ Attendance Governance | Cutoff enforcement, late reason capture, version history, bulk import |
+| 📥 Import Workflows | Employee imports, batch candidate imports, attendance imports, assessment score imports |
+| 🏆 Gamification | Points, streaks, badges, live leaderboards, cumulative reports |
+| 📄 Reports | Excel and PDF exports for training operations, employees, attendance, assessments, feedback, toppers |
+| 🔐 RBAC | Admin, manager, training coordinator, trainer, and employee access boundaries |
+| 📬 Notifications | In-app and email notification workflows through Resend |
+| 🧾 BRD Evidence Pack | `/manager/compliance` plus downloadable evidence workbook for judge/client review |
+
+---
+
+## 👥 Roles And Permissions
+
+| Role | Primary Access | Capabilities |
+|---|---|---|
+| 👑 Admin | Full platform | User governance, trainer approval, all employee visibility, settings, reports |
+| 🧑‍💼 Manager | Manager workspace | Quizzes, employees in scope, batches, reports, dashboards, AI analytics |
+| 🗂️ Training Coordinator | Training operations | Batch execution, attendance, score uploads, feedback windows, reports |
+| 🧑‍🏫 Trainer | Assigned training batches | Mark attendance, upload assessment scores, submit project evaluations |
+| 🧑‍🎓 Employee | Learner workspace | Take assigned quizzes, view training, submit feedback, track leaderboard/badges |
+
+### 🔐 Access Rules
+
+| Area | Access Model |
+|---|---|
+| Manager pages | `admin`, `manager`, `training_coordinator`, and `trainer` where appropriate |
+| Admin console | `admin` only |
+| Trainer actions | Scoped to assigned batches |
+| Employee quizzes | Only assigned and active quizzes |
+| Employee exports | Admin sees all; non-admin training staff are domain-scoped |
+| Reports | Manager/training staff with route-level checks and scoped queries |
+
+---
+
+## 🧰 Tech Stack
 
 | Layer | Technology |
 |---|---|
-| Framework | Next.js 14 App Router (React Server Components) |
-| Database & Auth | Supabase (PostgreSQL + Row-Level Security) |
-| AI | OpenAI GPT-4o-mini (primary) · Google Gemini 1.5 Flash (fallback) |
-| Styling | Tailwind CSS v4 + shadcn/ui |
-| Charts | Recharts (bar, pie/donut, radar) |
+| Framework | Next.js 16 App Router |
+| Runtime | Node.js 20.9+ recommended |
+| Language | TypeScript, TSX |
+| UI | React 19, Tailwind CSS 4, shadcn/Radix-style components |
+| Auth | Supabase Auth |
+| Database | Supabase PostgreSQL with Row-Level Security |
+| AI | OpenAI Chat Completions, Google Gemini fallback |
 | Email | Resend |
-| Excel | SheetJS (xlsx) |
-| PDF | jsPDF + jspdf-autotable |
-| Storage | Supabase Storage (training evidence) |
+| Excel | SheetJS `xlsx` |
+| PDF | `jspdf`, `jspdf-autotable` |
+| Charts | Recharts |
+| Browser Testing | Playwright |
 | Deployment | Vercel |
 
 ---
 
-## AI Integration Architecture
+## 🏗️ Architecture
 
-All AI calls go through `lib/ai.ts` — a single shared utility that:
+The codebase uses Next.js App Router with server components, server actions, and API route handlers. New backend work should follow the documented layered flow:
 
-- Picks **OpenAI** if `OPENAI_API_KEY` is set, **Gemini** otherwise
-- Enforces per-endpoint `max_tokens` caps to keep costs controlled
-- Provides `buildCompactAssessmentContext()` — pipe-delimited rows vs verbose JSON (~60% token reduction)
-- Provides `stripCodeFences()` for safe JSON parsing from AI responses
+```text
+route.ts -> controller -> service -> repository -> database
+```
 
-### AI Endpoints
+### 📁 Folder Map
 
-| Endpoint | Purpose | Max Tokens |
-|---|---|---|
-| `POST /api/ai-chat` | Manager assessment chat with history | 600 |
-| `POST /api/ai-insight` | Coaching insight (batch/attendance/trainer/quiz) | 200 |
-| `POST /api/ai-recommend` | Employee personalised learning recommendation | 150 |
-| `POST /api/generate-questions` | AI quiz generation from topic (single call) | 4000 |
-| `POST /api/generate-from-content` | AI quiz from uploaded content (single call) | 4000 |
+| Path | Purpose |
+|---|---|
+| `app/` | Pages, layouts, API route handlers |
+| `app/auth/` | Login, signup, password reset, callback |
+| `app/manager/` | Manager/admin/trainer screens |
+| `app/employee/` | Learner dashboard, quizzes, training, badges |
+| `app/api/` | API adapters for AI, exports, imports, reports |
+| `components/ui/` | Shared UI primitives |
+| `components/manager/` | Manager/training operation components |
+| `components/employee/` | Learner widgets |
+| `components/landing/` | Public landing page sections |
+| `lib/actions/` | Server actions for auth, quiz, manager, employee, training |
+| `lib/backend/controllers/` | API request orchestration |
+| `lib/backend/services/` | Business logic and report generation |
+| `lib/backend/repositories/` | Database query modules |
+| `lib/backend/entities/` | Backend domain types |
+| `lib/supabase/` | Supabase client factories |
+| `lib/security/` | Env validation, input validation, rate-limit utilities |
+| `scripts/` | Supabase migrations, seed scripts, fixtures, smoke checks |
+| `public/templates/` | CSV/XLSX import templates |
 
-**Token efficiency improvement:** Question generation was previously N separate API calls (one per difficulty). It is now a single batched call, reducing costs by up to 80% for a 5-difficulty quiz.
+### 🧩 Important Backend Modules
+
+| File | Responsibility |
+|---|---|
+| `lib/rbac.ts` | Central role checks and redirects |
+| `lib/training-access.ts` | Batch-level access checks |
+| `lib/ai.ts` | Shared OpenAI/Gemini utility |
+| `lib/topper.ts` | Topper score calculations |
+| `lib/leaderboard.ts` | Leaderboard aggregation |
+| `lib/email.ts` | Resend email helpers |
+| `lib/security/env.ts` | Runtime environment validation |
+| `lib/security/validation.ts` | Zod schemas for user input |
 
 ---
 
-## Roles & Capabilities
+## ⚙️ Setup
 
-### Admin
-- Full platform governance
-- Manage all users, batches, quizzes, settings
-- Trainer approval workflow
+### ✅ Prerequisites
 
-### Manager / Training Coordinator
-- Create and manage training batches
-- Assign candidates and trainers
-- Monitor attendance health, session schedule
-- AI-powered dashboard insights
-- Download PDF and Excel reports
-- AI assessment analyser with chat
+| Requirement | Version / Notes |
+|---|---|
+| Node.js | 20.9+ recommended |
+| npm | Included with Node |
+| Supabase | Project URL, anon key, service role key |
+| OpenAI or Gemini | Optional but required for AI features |
+| Resend | Optional but required for email delivery |
+| Git | Required for pushing changes |
 
-### Trainer
-- Guided daily workflow: mark attendance → upload scores → submit evaluations
-- Step-by-step trainer workspace (no technical knowledge required)
-- Scoped to assigned batches only
-
-### Employee / Learner
-- Personalised AI learning recommendation on dashboard
-- Quiz assignments with readiness signals
-- Training schedule, attendance history, reminders
-- Feedback submission, gamification (points, streak, badges)
-
----
-
-## Getting Started
-
-### Prerequisites
-
-```bash
-# Node.js 20+, npm or pnpm
-# Supabase project
-# OpenAI API key (or Google Gemini API key)
-# Resend account for email
-```
-
-### Environment Variables
-
-Create `.env.local`:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-OPENAI_API_KEY=your_openai_key          # Primary AI provider
-GOOGLE_GEMINI_API_KEY=your_gemini_key   # Fallback AI provider
-RESEND_API_KEY=your_resend_key
-```
-
-### Install & Run
+### 📦 Install
 
 ```bash
 npm install
+```
+
+### ▶️ Run Locally
+
+```bash
 npm run dev
 ```
 
-### Database Setup
+Open:
 
-Run scripts in order from `scripts/` (001 through 028) in your Supabase SQL editor.
+```text
+http://localhost:3000
+```
+
+### 🧪 Useful Commands
+
+| Command | Purpose |
+|---|---|
+| `npm run dev` | Start local development server |
+| `npm run build` | Production build and TypeScript check |
+| `npm run lint` | ESLint check |
+| `npm run start` | Start built production app |
+| `npm run test:smoke` | Playwright smoke test |
+| `npm run fixtures:contest` | Generate contest/demo CSV fixtures |
+| `npm run fixtures:tms` | Generate large TMS upload fixtures |
+| `npm run test:scale` | Generate and validate 20,000-row import fixtures |
 
 ---
 
-## Key Pages
+## 🔑 Environment Variables
+
+Create `.env.local` in the project root.
+
+| Variable | Required | Purpose |
+|---|---:|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon/public key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Server-side admin operations |
+| `NEXT_PUBLIC_APP_URL` | Recommended | Local/site URL for redirects |
+| `NEXT_PUBLIC_SITE_URL` | Optional | Alternate site URL |
+| `NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL` | Optional | Local auth callback override |
+| `OPENAI_API_KEY` | Optional | Primary AI provider |
+| `GOOGLE_GEMINI_API_KEY` | Optional | Fallback AI provider |
+| `RESEND_API_KEY` | Optional | Email sending |
+| `EMAIL_FROM` | Optional | Sender identity for Resend |
+| `CRON_SECRET` | Production | Protects governance cron endpoint |
+| `SEED_ADMIN_PASSWORD` | Seed only | Password for seeded admin user |
+| `SEED_TRAINER_PASSWORD` | Seed only | Password for seeded trainer user |
+| `ALLOW_DEMO_SEED_CREDENTIALS` | Local only | Set `1` only for throwaway demos |
+
+Example:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+OPENAI_API_KEY=your-openai-key
+GOOGLE_GEMINI_API_KEY=your-gemini-key
+
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+EMAIL_FROM="Maverick TMS <noreply@yourdomain.com>"
+
+CRON_SECRET=replace_with_a_long_random_secret
+SEED_ADMIN_PASSWORD=replace_me
+SEED_TRAINER_PASSWORD=replace_me
+ALLOW_DEMO_SEED_CREDENTIALS=0
+```
+
+---
+
+## 🗄️ Database Migrations
+
+Run the SQL scripts in `scripts/` in numeric order.
+
+| Scenario | What To Run |
+|---|---|
+| Fresh Supabase project | Run `001` through `029` |
+| Existing DB already at `028` | Run only `029_sync_quiz_status_visibility.sql` |
+| Current project state | Migration `029` has already been executed in Supabase |
+
+### 🧾 Latest Migration
+
+| Migration | Purpose |
+|---|---|
+| `029_sync_quiz_status_visibility.sql` | Synchronizes `quizzes.status` and `quizzes.is_active`, making quiz visibility consistent for employees |
+
+### ⚠️ Important Database Notes
+
+| Topic | Note |
+|---|---|
+| RLS | Tables use Row-Level Security; server code still performs explicit role/batch checks where service role is needed |
+| Quiz Visibility | Employees see assigned quizzes only when `is_active = true`; migration `029` aligns this with `status = 'active'` |
+| Trainer Approval | Migration `025` adds `approval_status` and `rejection_reason` |
+| Notifications | Migration `028` expands notification delivery statuses |
+| Training Governance | Migrations `020` through `028` add training operations, audit, feedback, and notification controls |
+
+---
+
+## 🧑‍💻 Seed Admin And Trainer Users
+
+Use the seed script only after Supabase env values are configured.
+
+```bash
+SEED_ADMIN_PASSWORD="strong-admin-password" SEED_TRAINER_PASSWORD="strong-trainer-password" node scripts/seed_admin.js
+```
+
+For local throwaway demos only:
+
+```bash
+ALLOW_DEMO_SEED_CREDENTIALS=1 node scripts/seed_admin.js
+```
+
+| Seed User | Email | Role |
+|---|---|---|
+| Admin | `admin@hexaware.com` | `admin` |
+| Trainer | `trainer@hexaware.com` | `trainer` |
+
+---
+
+## 🧭 Key Pages
+
+### 🌐 Public And Auth
+
+| URL | Purpose |
+|---|---|
+| `/` | Public landing page |
+| `/auth/login` | Login |
+| `/auth/sign-up` | Employee/trainer registration |
+| `/auth/sign-up-success` | Signup confirmation |
+| `/auth/pending-approval` | Trainer approval pending page |
+| `/auth/reset-password` | Request password reset |
+| `/auth/update-password` | Set new password |
+| `/auth/error` | Auth error screen |
+| `/auth/callback` | Supabase auth callback |
+
+### 🧑‍💼 Manager / Admin / Trainer
 
 | URL | Role | Purpose |
 |---|---|---|
-| `/manager` | Manager | Dashboard with AI batch health insight, TMS live status |
-| `/manager/operations` | Manager/Trainer | Full TMS — batches, sessions, attendance, scores |
-| `/manager/analytics` | Manager | AI assessment analyser + chat |
-| `/manager/reports` | Manager | Trainer performance + AI coaching tip + exports |
-| `/employee` | Learner | Dashboard with personalised AI recommendation |
-| `/employee/training` | Learner | Training schedule, attendance, feedback |
-| `/employee/quizzes` | Learner | Assigned assessments |
+| `/manager` | Manager/training staff | Command dashboard and live TMS summary |
+| `/manager/admin` | Admin | Trainer approvals and user governance |
+| `/manager/analytics` | Manager | Assessment analyzer and AI chat |
+| `/manager/employees` | Manager | Employee import, export, edit, delete, quiz assignment |
+| `/manager/leaderboard` | Manager | Quiz and cumulative leaderboard |
+| `/manager/operations` | Manager/trainer | Batches, sessions, attendance, scores, feedback |
+| `/manager/quizzes` | Manager | Quiz list and management |
+| `/manager/quizzes/new` | Manager | Create quiz manually, from upload, or AI |
+| `/manager/quizzes/[id]` | Manager | Quiz details |
+| `/manager/quizzes/[id]/edit` | Manager | Edit quiz/questions |
+| `/manager/reports` | Manager | Reports, trainer performance, exports |
+| `/manager/settings` | Manager | Profile/settings |
+| `/manager/compliance` | Manager | BRD proof matrix |
+
+### 🧑‍🎓 Employee
+
+| URL | Purpose |
+|---|---|
+| `/employee` | Learner dashboard and AI recommendation |
+| `/employee/training` | Training schedule, attendance, feedback |
+| `/employee/quizzes` | Assigned quizzes |
+| `/employee/quizzes/[quizId]` | Take quiz |
+| `/employee/quizzes/[quizId]/results` | Quiz result |
+| `/employee/quizzes/[quizId]/leaderboard` | Quiz leaderboard |
+| `/employee/leaderboard` | Cumulative leaderboard |
+| `/employee/badges` | Badges and achievements |
+| `/demo/leaderboard` | Demo leaderboard |
 
 ---
 
-## Project Structure
+## 🔌 API Reference
 
+### 🤖 AI
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `GET` | `/api/ai-status` | AI provider availability |
+| `POST` | `/api/ai-chat` | Chat with assessment dataset |
+| `POST` | `/api/ai-insight` | Manager dashboard coaching insight |
+| `POST` | `/api/ai-recommend` | Employee learning recommendation |
+| `POST` | `/api/generate-questions` | Generate topic-based MCQs |
+| `POST` | `/api/generate-from-content` | Generate content-based MCQs |
+| `POST` | `/api/extract-content` | Extract text from PDF/DOCX/TXT |
+
+### 📥 Imports And Templates
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `POST` | `/api/assessment-import` | Import assessment score rows |
+| `GET` | `/api/assessment-import` | Read imported assessment data/status |
+| `POST` | `/api/training/attendance-import` | Bulk attendance import |
+| `GET` | `/api/training/attendance-template` | Attendance template download |
+| `POST` | `/api/training/batch-candidate-import` | Batch candidate import |
+| `GET` | `/api/training/batch-candidate-template` | Batch candidate template |
+| `GET` | `/api/employees/template` | Employee import template |
+| `POST` | `/api/employees/add` | Add employees |
+| `PATCH` | `/api/employees/[id]` | Update employee |
+| `DELETE` | `/api/employees/[id]` | Delete employee |
+
+### 📤 Exports And Reports
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `GET` | `/api/employees/export` | Employee Excel export |
+| `GET` | `/api/reports/download` | General report download |
+| `GET` | `/api/reports/training-ops/download` | Training ops evidence workbook |
+| `GET` | `/api/reports/training-ops/pdf` | Training ops PDF |
+| `GET` | `/api/export/pdf` | PDF export by report type |
+| `GET` | `/api/export/consolidated` | Consolidated workbook |
+| `GET` | `/api/export/comprehensive-report` | Comprehensive workbook |
+| `GET` | `/api/export/batch-attendance` | Batch attendance workbook |
+| `GET` | `/api/export/batch-assessment` | Batch assessment workbook |
+| `GET` | `/api/export/batch-feedback` | Batch feedback workbook |
+| `GET` | `/api/export/toppers` | Topper report |
+| `GET` | `/api/leaderboard/[quizId]/download` | Quiz leaderboard download |
+| `GET` | `/api/leaderboard/cumulative/download` | Cumulative leaderboard download |
+
+### 🧾 Health, Files, Automation
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `GET` | `/api/health` | Environment health check |
+| `GET` | `/api/training/evidence` | Secure evidence file retrieval |
+| `GET` | `/api/cron/training-governance` | Scheduled governance automation |
+
+---
+
+## 🤖 AI Features
+
+All provider calls go through `lib/ai.ts`.
+
+| Feature | Provider Flow | Token Cap |
+|---|---|---:|
+| Topic quiz generation | OpenAI if configured, otherwise Gemini, otherwise template fallback | 4000 |
+| Content quiz generation | Extract content, generate JSON MCQs, fallback to content-based local questions | 4000 |
+| Manager insight | Compact operational prompt | 200 |
+| Employee recommendation | Learner stats and risk prompt | 150 |
+| Assessment chat | Compact assessment context and chat history | 600 |
+
+### 🧠 AI Safety And Cost Controls
+
+| Control | Implementation |
+|---|---|
+| Provider selection | OpenAI preferred, Gemini fallback |
+| JSON cleanup | `stripCodeFences()` removes markdown fences |
+| Assessment compression | `buildCompactAssessmentContext()` caps and compresses rows |
+| Difficulty preservation | AI difficulty is validated against allowed levels |
+| Fallback | Template/content fallback prevents hard failure when AI keys are missing |
+
+---
+
+## 📊 Reports And Exports
+
+| Report | Format | Audience |
+|---|---|---|
+| Employee report | Excel | Admin/manager |
+| Quiz leaderboard | Excel | Manager |
+| Cumulative leaderboard | Excel | Manager |
+| Batch attendance | Excel | Manager/trainer |
+| Batch assessment | Excel | Manager/trainer |
+| Batch feedback | Excel | Manager/coordinator |
+| Consolidated TMS | Excel | Manager/admin |
+| Comprehensive report | Excel | Manager/admin |
+| Training ops report | PDF | Manager/admin |
+| BRD evidence pack | Excel | Judges/client governance |
+| Topper report | Excel/PDF | Manager/admin |
+
+---
+
+## 🧪 Testing And Verification
+
+The current codebase passes:
+
+| Check | Command | Status |
+|---|---|---|
+| ESLint | `npm run lint` | ✅ Passing |
+| Production build | `npm run build` | ✅ Passing |
+| Browser smoke | `npm run test:smoke` | ✅ Passing |
+
+If Playwright browsers are missing:
+
+```bash
+npx playwright install chromium
 ```
-app/
-  api/
-    ai-chat/          # Assessment chat with history
-    ai-insight/       # Manager coaching insights (200 tokens)
-    ai-recommend/     # Employee learning recommendations (150 tokens)
-    generate-questions/   # Topic-based quiz generation (1 API call)
-    generate-from-content/ # Content-based quiz generation (1 API call)
-    training/         # Attendance import, session management
-    export/           # PDF & Excel report generation
-  manager/            # All manager/trainer pages
-  employee/           # All learner pages
-components/
-  manager/
-    ai-insight-card.tsx   # Reusable AI coaching widget
-    trainer-performance-panel.tsx
-    feedback-sentiment-chart.tsx
-  employee/
-    ai-learn-recommend.tsx  # Employee AI coaching widget
-lib/
-  ai.ts              # Shared AI utility (callAI, buildCompactAssessmentContext)
-  actions/           # Server actions (training, quiz, employee)
-  supabase/          # DB clients
-scripts/             # SQL migrations (001-028)
-```
 
 ---
 
-## AI Features Demonstration
+## 🚢 Deployment
 
-### 1. Manager Dashboard AI Insight
-When you load `/manager`, the dashboard automatically shows:
-- **AI Batch Health Insight** — analyses active batches, attendance rate, alerts, and gives one actionable 2-sentence recommendation
-- Real-time data from TMS + AI processing in <1 second
+### Vercel
 
-### 2. Employee Learning Coach
-When a learner loads `/employee`, they see:
-- **SkillTest AI — Your Coach** card with personalised recommendation based on their points, streak, completed quizzes, and retention risk
-- Example: "Your 7-day streak is strong—keep it going by tackling JavaScript Basics next. With 85% pass rate, you're ready for medium difficulty."
+1. Connect the GitHub repo to Vercel.
+2. Add all required environment variables.
+3. Ensure Supabase redirect URLs include the deployed domain.
+4. Configure the cron route with `CRON_SECRET` if using scheduled governance automation.
+5. Deploy from `main`.
 
-### 3. Trainer Performance AI Coaching
-On `/manager/reports`, after the trainer performance chart:
-- **AI Coaching Tip** analyses top/bottom performers and suggests concrete improvement actions
-- Example: "John Smith leads with 92% attendance and 88% avg scores. Focus on improving Maria's session clarity—her attendance is solid but assessment outcomes lag."
+### Production Checklist
 
-### 4. AI Assessment Chat
-On `/manager/analytics`:
-- Upload Excel assessment results
-- Ask: "Who are the top 5 performers?" or "Which employees need improvement?"
-- AI responds with data-driven insights + suggestions
-
-### 5. AI Quiz Generation
-On `/manager/quizzes`:
-- **Generate from Topic**: Enter "React Hooks" + select difficulty → AI creates 20 questions in 3 seconds
-- **Generate from Content**: Upload a PDF/DOCX training manual → AI extracts key concepts and generates targeted questions
-
-All AI responses are capped at specific token limits to keep OpenAI costs predictable.
+| Item | Required |
+|---|---:|
+| Supabase migrations through `029` applied | ✅ |
+| Real Supabase URL/anon/service keys configured | ✅ |
+| `CRON_SECRET` configured | Recommended |
+| AI provider key configured | Recommended |
+| Resend key configured | Recommended |
+| Demo seed credentials disabled | ✅ |
+| Admin/trainer seed passwords stored securely | ✅ |
 
 ---
 
-## Non-Technical User Experience
+## 🔐 Security Notes
 
-### For Trainers (zero technical knowledge required)
-1. Log in → see **Trainer Workspace** with 3-step daily guide:
-   - **Step 1**: Mark attendance (before 10 AM cut-off)
-   - **Step 2**: Upload assessment scores (Excel template provided)
-   - **Step 3**: Submit project evaluations
-2. All actions have plain-English labels, example placeholders, and error messages
-3. Late attendance submission prompts: "Why are you submitting after 10 AM? (required if uploading after the cut-off time)" — no jargon
-
-### For Learners (gamified, friendly)
-1. Dashboard shows: "Welcome back, [Name]" + AI personal coach recommendation
-2. Quiz cards say "Refresh due" instead of "Retention pressure"
-3. "You are doing well!" instead of "Anti-gaming pattern detected"
-4. All technical terms replaced with everyday language
+| Topic | Approach |
+|---|---|
+| Secrets | Read from environment variables only |
+| Client safety | Service role key is server-only |
+| Input validation | Zod schemas in `lib/security/validation.ts` |
+| Auth | Supabase Auth and server-side role checks |
+| RBAC | Centralized in `lib/rbac.ts` |
+| Batch access | Scoped in `lib/training-access.ts` |
+| Service role usage | Used only after server-side authorization checks |
+| Seed passwords | Env-driven; demo defaults require explicit opt-in |
 
 ---
 
-## Performance & Scalability
+## 🧯 Troubleshooting
 
-- **Database**: Supabase Postgres with Row-Level Security policies on all tables
-- **Auth**: Supabase Auth with role-based redirects
-- **Caching**: React Server Components cache quiz/batch data server-side
-- **AI calls**: Batched where possible; single quiz generation = 1 API call (not 5)
-- **Reports**: PDF/Excel generated server-side, streamed to client
-- **Real-time**: Leaderboard uses Supabase real-time subscriptions
-
----
-
-## Security & Compliance
-
-- All database access via RLS policies
-- Service role key used only in server-side code
-- Trainer access scoped to assigned batches only
-- Attendance cut-off enforcement with audit trail
-- Email notifications via Resend (GDPR-compliant)
-- No user data sent to AI beyond anonymized stats
+| Problem | Likely Cause | Fix |
+|---|---|---|
+| `Supabase is not configured` | Missing/placeholder env vars | Fill `.env.local` with real Supabase values |
+| Employees cannot see quiz | Quiz not active or not assigned | Confirm assignment and `status = active`; migration `029` syncs visibility |
+| AI generation unavailable | No AI provider key | Set `OPENAI_API_KEY` or `GOOGLE_GEMINI_API_KEY` |
+| Smoke test fails for browser | Playwright browser missing | Run `npx playwright install chromium` |
+| Trainer cannot upload | Trainer not assigned to batch | Assign trainer in training operations |
+| Cron returns 401 | Missing/wrong bearer token | Send `Authorization: Bearer <CRON_SECRET>` |
+| Seed script refuses to run | Password env vars missing | Set `SEED_ADMIN_PASSWORD` and `SEED_TRAINER_PASSWORD` |
 
 ---
 
-## Roadmap
+## 🗺️ Roadmap Ideas
 
-- [ ] Multi-language support (i18n)
-- [ ] Mobile app (React Native)
-- [ ] Video training integration
-- [ ] Advanced analytics (predictive failure risk)
-- [ ] Slack/Teams notifications
-- [ ] Custom branding per organization
+| Area | Potential Enhancement |
+|---|---|
+| Analytics | Predictive failure risk and cohort comparison |
+| Integrations | Slack, Microsoft Teams, calendar sync |
+| Learning | Recommended content paths by weak topic |
+| Branding | Organization-specific themes and logos |
+| Internationalization | Multi-language UI |
+| Mobile | React Native companion app |
+| Observability | Structured logging and export job tracing |
 
 ---
 
-## License
+## 📚 Additional Documentation
+
+| Document | Purpose |
+|---|---|
+| `docs/TECHNICAL_OVERVIEW.md` | Owner-level route, stack, API, deployment overview |
+| `docs/ARCHITECTURE.md` | Backend layering rules |
+| `ENHANCED_WORKFLOW.md` | Workflow explanation |
+| `EXECUTE.md` | Execution/demo guidance |
+| `PRESENTATION_SCRIPT.md` | Presentation narrative |
+| `DELETE_FUNCTIONALITY_SUMMARY.md` | Delete feature notes |
+
+---
+
+## 📄 License
 
 Private. All rights reserved.
 
 ---
 
-## Support
+## 💬 Support
 
-For issues or questions, contact: [Your contact email]
+For setup, deployment, or product questions, contact the project owner/maintainer.
 
----
-
-**Built with ❤️ for training teams who deserve better tools.**
+**Built for training teams that need execution, evidence, and insight in one place. 💙**

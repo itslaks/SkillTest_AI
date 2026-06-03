@@ -226,18 +226,28 @@ function generateTempPassword(): string {
 
 // ─── Get all employees (for manager view) ─────────────────────────────
 export async function getEmployees() {
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return { error: 'Not authenticated', data: [] }
+  const { userId, role } = await requireManager()
 
-  // Use admin client to bypass RLS and get all employees with stats
   const adminClient = createAdminClient()
+  const { data: currentProfile } = await adminClient
+    .from('profiles')
+    .select('domain')
+    .eq('id', userId)
+    .maybeSingle()
 
-  const { data: employees, error } = await adminClient
+  let query = adminClient
     .from('profiles')
     .select('*, user_stats(*)')
     .eq('role', 'employee')
     .order('full_name', { ascending: true })
+
+  if (role !== 'admin') {
+    query = currentProfile?.domain
+      ? query.eq('domain', currentProfile.domain)
+      : query.eq('id', userId)
+  }
+
+  const { data: employees, error } = await query
 
   if (error) return { error: error.message, data: [] }
   return { data: employees || [] }
@@ -245,18 +255,28 @@ export async function getEmployees() {
 
 // ─── Get employees grouped by domain ──────────────────────────────────
 export async function getEmployeesByDomain() {
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return { error: 'Not authenticated', data: {} }
+  const { userId, role } = await requireManager()
 
-  // Use admin client to bypass RLS
   const adminClient = createAdminClient()
+  const { data: currentProfile } = await adminClient
+    .from('profiles')
+    .select('domain')
+    .eq('id', userId)
+    .maybeSingle()
 
-  const { data: employees, error } = await adminClient
+  let query = adminClient
     .from('profiles')
     .select('*')
     .eq('role', 'employee')
     .order('domain', { ascending: true })
+
+  if (role !== 'admin') {
+    query = currentProfile?.domain
+      ? query.eq('domain', currentProfile.domain)
+      : query.eq('id', userId)
+  }
+
+  const { data: employees, error } = await query
 
   if (error) return { error: error.message, data: {} }
 

@@ -44,11 +44,12 @@ export async function POST(request: NextRequest) {
     const seenFingerprints = new Set<string>()
     const validationErrors: any[] = []
     const cleanRecords = records.filter((record: any, index: number) => {
-      const candidateEmail = String(record.Candidate_Email_Address || record.candidate_email || '').trim().toLowerCase()
-      const candidateId = String(record.Candidate_ID || record.candidate_id || '').trim().toLowerCase()
-      const percentage = Number(record.Percentage ?? record.percentage ?? 0)
-      const candidateScore = Number(record.Candidate_Score ?? record.candidate_score ?? 0)
-      const fingerprint = `${batchId || quizId || 'global'}:${assessmentSetupId || record.Test_Id || record.test_id || 'assessment'}:${candidateEmail || candidateId}`
+      const candidateEmail = rowString(record, 'Candidate_Email_Address', 'candidate_email', 'Candidate_Email').toLowerCase()
+      const candidateId = rowString(record, 'Candidate_ID', 'candidate_id').toLowerCase()
+      const percentage = rowNumber(record, 0, 'Percentage', 'percentage')
+      const candidateScore = rowNumber(record, 0, 'Candidate_Score', 'candidate_score')
+      const testId = rowString(record, 'Test_Id', 'test_id')
+      const fingerprint = `${batchId || quizId || 'global'}:${assessmentSetupId || testId || 'assessment'}:${candidateEmail || candidateId}`
 
       if (!candidateEmail && !candidateId) {
         validationErrors.push({ row: index + 1, error: 'Missing candidate email or candidate ID.' })
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
     })
 
     const candidateEmails = cleanRecords
-      .map((record: any) => String(record.Candidate_Email_Address || record.candidate_email || '').trim().toLowerCase())
+      .map((record: any) => rowString(record, 'Candidate_Email_Address', 'candidate_email', 'Candidate_Email').toLowerCase())
       .filter(Boolean)
     const { data: profiles } = candidateEmails.length
       ? await supabase.from('profiles').select('id, email').in('email', candidateEmails)
@@ -93,7 +94,7 @@ export async function POST(request: NextRequest) {
       : { data: [] }
     const existingFingerprints = new Set((existingRows || []).map((row: any) => row.upload_fingerprint))
     const candidateCheckedRecords = cleanRecords.filter((record: any, index: number) => {
-      const email = String(record.Candidate_Email_Address || record.candidate_email || '').trim().toLowerCase()
+      const email = rowString(record, 'Candidate_Email_Address', 'candidate_email', 'Candidate_Email').toLowerCase()
       if (email && !existingEmails.has(email)) {
         validationErrors.push({ row: index + 1, error: 'Candidate does not exist in candidate master.', email })
         return false
@@ -136,36 +137,36 @@ export async function POST(request: NextRequest) {
       assessment_setup_id: assessmentSetupId || null,
       uploaded_by: userId,
       upload_fingerprint: record.__uploadFingerprint || null,
-      candidate_id: record.Candidate_ID || record.candidate_id,
-      candidate_name: record.Candidate_Full_Name || record.candidate_name || 'Unknown',
-      candidate_email: record.Candidate_Email_Address || record.candidate_email || '',
-      test_id: record.Test_Id || record.test_id,
-      test_name: record.Test_Name || record.test_name,
-      test_status: record.Test_Status || record.test_status,
-      test_link_name: record.Test_Link_Name || record.test_link_name,
-      test_score: parseInt(record.Test_Score) || 0,
-      candidate_score: parseInt(record.Candidate_Score) || 0,
-      negative_points: parseInt(record.Test_Negative_Points) || 0,
-      percentage: parseFloat(record.Percentage) || 0,
-      performance_category: record.Performance_Category || record.performance_category,
-      percentile: parseInt(record.Percentile) || 0,
-      total_questions: parseInt(record.Total_Questions) || 0,
-      answered: parseInt(record.Answered) || record.GIT_Assessment_Answered || 0,
-      not_answered: parseInt(record.Not_Answered) || record.GIT_Assessment_Not_Answered || 0,
-      correct: parseInt(record.Correct) || record.GIT_Assessment_Correct || 0,
-      wrong: parseInt(record.Wrong) || record.GIT_Assessment_Wrong || 0,
-      test_duration_minutes: parseInt(record['Test_Duration(minutes)']) || 0,
-      time_taken_minutes: parseFloat(record['Time_Taken(minutes)']) || 0,
-      avg_test_time_minutes: parseFloat(record['Avg_Test_Time(Minutes)']) || 0,
-      completion_time_flag: record.Completion_Time_Flag || record.completion_time_flag,
-      proctoring_flag: record.Proctoring_Flag || record.proctoring_flag,
-      window_violation: parseInt(record.Window_Violation) || 0,
-      time_violation_seconds: parseInt(record['Time_Violation(seconds)']) || 0,
-      invited_by_email: record.Invited_By_Email_Address || record.invited_by_email,
-      appeared_on: record.Appeared_On ? parseDate(record.Appeared_On) : null,
-      candidate_feedback: record.Candidate_Feedback || record.candidate_feedback,
-      applicant_id: record.Applicant_ID || record.applicant_id,
-      test_navigation_type: record['Test Navigation Type'] || record.test_navigation_type,
+      candidate_id: rowString(record, 'Candidate_ID', 'candidate_id') || null,
+      candidate_name: rowString(record, 'Candidate_Full_Name', 'candidate_name', 'Candidate_Name') || 'Unknown',
+      candidate_email: rowString(record, 'Candidate_Email_Address', 'candidate_email', 'Candidate_Email'),
+      test_id: rowString(record, 'Test_Id', 'test_id') || null,
+      test_name: rowString(record, 'Test_Name', 'test_name') || null,
+      test_status: rowString(record, 'Test_Status', 'test_status') || null,
+      test_link_name: rowString(record, 'Test_Link_Name', 'test_link_name') || null,
+      test_score: rowNumber(record, 0, 'Test_Score', 'test_score'),
+      candidate_score: rowNumber(record, 0, 'Candidate_Score', 'candidate_score'),
+      negative_points: rowNumber(record, 0, 'Test_Negative_Points', 'negative_points'),
+      percentage: rowNumber(record, 0, 'Percentage', 'percentage'),
+      performance_category: rowString(record, 'Performance_Category', 'performance_category') || null,
+      percentile: rowNumber(record, 0, 'Percentile', 'percentile'),
+      total_questions: rowNumber(record, 0, 'Total_Questions', 'total_questions'),
+      answered: rowNumber(record, 0, 'Answered', 'answered', 'GIT_Assessment_Answered'),
+      not_answered: rowNumber(record, 0, 'Not_Answered', 'not_answered', 'GIT_Assessment_Not_Answered'),
+      correct: rowNumber(record, 0, 'Correct', 'correct', 'GIT_Assessment_Correct'),
+      wrong: rowNumber(record, 0, 'Wrong', 'wrong', 'GIT_Assessment_Wrong'),
+      test_duration_minutes: rowNumber(record, 0, 'Test_Duration(minutes)', 'test_duration_minutes'),
+      time_taken_minutes: rowNumber(record, 0, 'Time_Taken(minutes)', 'time_taken_minutes'),
+      avg_test_time_minutes: rowNumber(record, 0, 'Avg_Test_Time(Minutes)', 'avg_test_time_minutes'),
+      completion_time_flag: rowString(record, 'Completion_Time_Flag', 'completion_time_flag') || null,
+      proctoring_flag: rowString(record, 'Proctoring_Flag', 'proctoring_flag') || null,
+      window_violation: rowNumber(record, 0, 'Window_Violation', 'window_violation'),
+      time_violation_seconds: rowNumber(record, 0, 'Time_Violation(seconds)', 'time_violation_seconds'),
+      invited_by_email: rowString(record, 'Invited_By_Email_Address', 'invited_by_email') || null,
+      appeared_on: rowString(record, 'Appeared_On', 'appeared_on') ? parseDate(rowString(record, 'Appeared_On', 'appeared_on')) : null,
+      candidate_feedback: rowString(record, 'Candidate_Feedback', 'candidate_feedback') || null,
+      applicant_id: rowString(record, 'Applicant_ID', 'applicant_id') || null,
+      test_navigation_type: rowString(record, 'Test Navigation Type', 'test_navigation_type') || null,
       section_data: extractSectionData(record),
     }))
 
@@ -249,6 +250,30 @@ export async function POST(request: NextRequest) {
     console.error('Assessment import error:', error)
     return NextResponse.json({ error: error.message || 'Import failed' }, { status: 500 })
   }
+}
+
+function rowValue(record: Record<string, any>, ...keys: string[]) {
+  for (const key of keys) {
+    if (record[key] !== undefined && record[key] !== null && record[key] !== '') return record[key]
+  }
+
+  const normalizedKeys = new Set(keys.map(normalizeKey))
+  const match = Object.keys(record).find((key) => normalizedKeys.has(normalizeKey(key)))
+  return match ? record[match] : undefined
+}
+
+function rowString(record: Record<string, any>, ...keys: string[]) {
+  const value = rowValue(record, ...keys)
+  return value === undefined || value === null ? '' : String(value).trim()
+}
+
+function rowNumber(record: Record<string, any>, fallback: number, ...keys: string[]) {
+  const value = Number(rowValue(record, ...keys))
+  return Number.isFinite(value) ? value : fallback
+}
+
+function normalizeKey(key: string) {
+  return key.toLowerCase().replace(/[^a-z0-9]/g, '')
 }
 
 function parseDate(dateStr: string): string | null {

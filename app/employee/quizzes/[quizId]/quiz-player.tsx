@@ -54,6 +54,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [started, setStarted] = useState(false)
+  const [startError, setStartError] = useState<string | null>(null)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [questionOrder, setQuestionOrder] = useState<string[]>(
     (quiz.questions || []).map((question: any) => question.id)
@@ -138,8 +139,13 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   }, [started, finished, quiz.time_limit_minutes, handleAutoSubmit])
 
   function handleStart() {
+    setStartError(null)
     startTransition(async () => {
-      await startQuizAttempt(quiz.id)
+      const result = await startQuizAttempt(quiz.id)
+      if (result.error) {
+        setStartError(result.error)
+        return
+      }
       setStarted(true)
       setQuestionStartTime(Date.now())
     })
@@ -294,6 +300,9 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
               >
                 {isPending ? 'Starting session...' : 'Launch adaptive quiz'}
               </Button>
+              {startError && (
+                <p className="text-sm font-medium text-red-300">{startError}</p>
+              )}
             </div>
 
             <div className="relative flex flex-col justify-between gap-6 rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03))] p-6">

@@ -5,6 +5,7 @@ import type { DifficultyLevel } from '@/lib/types/database'
 import { callAI, stripCodeFences } from '@/lib/ai'
 
 const ALL_DIFFICULTIES: DifficultyLevel[] = ['easy', 'medium', 'hard', 'advanced', 'hardcore']
+const DIFFICULTY_SET = new Set<DifficultyLevel>(ALL_DIFFICULTIES)
 
 type QuestionOption = { text: string; isCorrect: boolean }
 
@@ -180,8 +181,13 @@ function normalizeQuestions(rawQuestions: any[], difficulty: DifficultyLevel) {
       question_text: q.question_text,
       options: q.options,
       explanation: q.explanation || null,
-      difficulty,
+      difficulty: normalizeDifficulty(q.difficulty, difficulty),
     }))
+}
+
+function normalizeDifficulty(value: unknown, fallback: DifficultyLevel): DifficultyLevel {
+  const normalized = String(value || '').toLowerCase().trim() as DifficultyLevel
+  return DIFFICULTY_SET.has(normalized) ? normalized : fallback
 }
 
 function buildContentFallbackQuestions(topic: string, content: string, difficulty: DifficultyLevel, count: number) {

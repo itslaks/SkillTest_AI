@@ -30,10 +30,22 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   auth: { autoRefreshToken: false, persistSession: false }
 })
 
+const allowDemoCredentials = process.env.ALLOW_DEMO_SEED_CREDENTIALS === '1'
+const adminPassword = process.env.SEED_ADMIN_PASSWORD || (allowDemoCredentials ? 'Zxcv,0987' : '')
+const trainerPassword = process.env.SEED_TRAINER_PASSWORD || (allowDemoCredentials ? 'Asdf,1234' : '')
+
+if (!adminPassword || !trainerPassword) {
+  console.error(
+    'Seed passwords are required. Set SEED_ADMIN_PASSWORD and SEED_TRAINER_PASSWORD, ' +
+    'or set ALLOW_DEMO_SEED_CREDENTIALS=1 for local-only demo credentials.'
+  )
+  process.exit(1)
+}
+
 const ACCOUNTS = [
   {
     email: 'admin@hexaware.com',
-    password: 'Zxcv,0987',
+    password: adminPassword,
     full_name: 'Hexaware Admin',
     role: 'admin',
     approval_status: 'approved',
@@ -41,7 +53,7 @@ const ACCOUNTS = [
   },
   {
     email: 'trainer@hexaware.com',
-    password: 'Asdf,1234',
+    password: trainerPassword,
     full_name: 'Sample Trainer',
     role: 'trainer',
     approval_status: 'approved',
@@ -106,8 +118,8 @@ async function main() {
     await seedAccount(account)
   }
   console.log('\n✅ All done! Credentials:')
-  console.log('   Admin   → admin@hexaware.com   / Zxcv,0987')
-  console.log('   Trainer → trainer@hexaware.com / Asdf,1234')
+  console.log('   Admin   → admin@hexaware.com   / configured SEED_ADMIN_PASSWORD')
+  console.log('   Trainer → trainer@hexaware.com / configured SEED_TRAINER_PASSWORD')
 }
 
 main()
