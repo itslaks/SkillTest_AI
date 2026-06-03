@@ -3,6 +3,8 @@ import { requireTrainingStaffForApi } from '@/lib/rbac'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getAccessibleTrainingBatchIds } from '@/lib/training-access'
 import { callAI } from '@/lib/ai'
+import { analyzeAttemptPattern } from '@/lib/insights'
+import type { DifficultyLevel, QuizAnswer } from '@/lib/types/database'
 
 export async function POST(request: NextRequest) {
   const auth = await requireTrainingStaffForApi()
@@ -58,7 +60,7 @@ export async function POST(request: NextRequest) {
       .limit(500),
   ])
 
-  const context = buildChatbotContext({
+  const data = {
     quizzes: quizzes || [],
     attempts: attempts || [],
     profiles: profiles || [],
@@ -66,20 +68,27 @@ export async function POST(request: NextRequest) {
     certificates: certificates || [],
     certificateRules: certificateRules || [],
     attendance: attendance || [],
-  })
+  }
+
+  const deterministicAnswer = buildDeterministicAnswer(message, data)
+  if (deterministicAnswer) {
+    return NextResponse.json({ message: deterministicAnswer, provider: 'skilltest_ai_stats' })
+  }
+
+  const context = buildChatbotContext(data)
 
   try {
     const { text, provider } = await callAI([
       {
         role: 'system',
         content:
-          'You are SkillTest_AI Command Chat, a precise training analytics assistant. Answer only from the provided database context. If data is missing, say what is missing. Keep answers concise, numeric, and actionable.',
+          'You are SkillTest_AI Command Chat. Use only the provided database context. Never invent numbers, names, attempts, scores, or certificates. If exact data is missing, say so. Keep responses under 60 words, with at most 3 bullets.',
       },
       {
         role: 'user',
         content: `DATABASE CONTEXT:\n${context}\n\nQUESTION:\n${message}`,
       },
-    ], { maxTokens: 550, temperature: 0.2 })
+    ], { maxTokens: 180, temperature: 0.1 })
 
     return NextResponse.json({ message: text, provider })
   } catch (error: any) {
@@ -95,6 +104,7 @@ function buildChatbotContext(data: Record<string, any[]>) {
   const profileById = new Map(data.profiles.map((profile) => [profile.id, profile]))
   const rows = data.attempts.slice(0, 120).map((attempt) => {
     const profile = profileById.get(attempt.user_id)
+    const behavior = analyzeAttemptPattern((attempt.answers || []) as QuizAnswer[], attempt.quizzes?.difficulty as DifficultyLevel)
     return [
       profile?.full_name || profile?.email || 'Unknown',
       profile?.employee_id || 'no-id',
@@ -104,6 +114,8 @@ function buildChatbotContext(data: Record<string, any[]>) {
       `${attempt.score}%`,
       `${attempt.correct_answers}/${attempt.total_questions}`,
       `${attempt.points_earned || 0}pts`,
+      `focus=${behavior.focusScore}`,
+      `risk=${behavior.riskLevel}`,
     ].join('|')
   })
 
@@ -123,7 +135,7 @@ function buildChatbotContext(data: Record<string, any[]>) {
   )
 
   return [
-    'ATTEMPTS name|empId|domain|quiz|topic|score|correct|points',
+    'ATTEMPTS name|empId|domain|quiz|topic|score|correct|points|focus|risk',
     rows.join('\n') || 'none',
     'QUIZZES title|topic|difficulty|passing',
     quizSummary.join('\n') || 'none',
@@ -134,6 +146,157 @@ function buildChatbotContext(data: Record<string, any[]>) {
     'CERTIFICATE_RULES quiz|topic|enabled|minScore|certificateName',
     certRuleSummary.join('\n') || 'none',
   ].join('\n')
+}
+
+function buildDeterministicAnswer(message: string, data: Record<string, any[]>) {
+  const lower = normalize(message)
+  const profile = findProfile(lower, data.profiles)
+  const quiz = findQuiz(lower, data.quizzes, data.attempts)
+
+  if ((lower.includes('average') || lower.includes('avg')) && lower.includes('score')) {
+    const quizAverage = quiz ? summarizeQuiz(quiz, data.attempts, data.certificateRules) : null
+    if (quizAverage) return quizAverage
+  }
+
+  if (profile && quiz) {
+    return summarizeEmployeeQuiz(profile, quiz, data.attempts)
+  }
+
+  if (profile && (lower.includes('score') || lower.includes('analysis') || lower.includes('performance'))) {
+    return summarizeEmployee(profile, data.attempts)
+  }
+
+  if (quiz && (lower.includes('score') || lower.includes('analysis') || lower.includes('performance') || lower.includes('pass'))) {
+    return summarizeQuiz(quiz, data.attempts, data.certificateRules)
+  }
+
+  if (lower.includes('certificate')) {
+    return summarizeCertificates(data.profiles, data.attempts, data.certificateRules, data.certificates)
+  }
+
+  if (lower.includes('weak') || lower.includes('lowest') || lower.includes('risk')) {
+    return summarizeWeakAreas(data.attempts)
+  }
+
+  return null
+}
+
+function summarizeEmployeeQuiz(profile: any, quiz: any, attempts: any[]) {
+  const matches = attempts
+    .filter((attempt) => attempt.user_id === profile.id && attempt.quiz_id === quiz.id)
+    .sort(byLatest)
+  const attempt = matches[0]
+  if (!attempt) {
+    return `No completed attempt found for ${displayName(profile)} in ${quiz.title}.`
+  }
+  const behavior = analyzeAttemptPattern((attempt.answers || []) as QuizAnswer[], attempt.quizzes?.difficulty as DifficultyLevel)
+  return [
+    `${displayName(profile)} scored ${attempt.score}% in ${quiz.title}.`,
+    `Correct: ${attempt.correct_answers}/${attempt.total_questions}; avg answer time: ${behavior.averageAnswerTime}s.`,
+    `Behavior: ${behavior.riskLevel} risk, focus ${behavior.focusScore}%, confidence ${behavior.confidenceScore}%. ${behavior.masterySignal}`,
+  ].join('\n')
+}
+
+function summarizeEmployee(profile: any, attempts: any[]) {
+  const rows = attempts.filter((attempt) => attempt.user_id === profile.id)
+  if (!rows.length) return `No completed quiz attempts found for ${displayName(profile)}.`
+  const avg = average(rows.map((attempt) => Number(attempt.score || 0)))
+  const latest = rows.slice().sort(byLatest)[0]
+  return `${displayName(profile)} average score is ${avg}% across ${rows.length} completed quiz(es). Latest: ${latest.quizzes?.title || 'quiz'} ${latest.score}%.`
+}
+
+function summarizeQuiz(quiz: any, attempts: any[], rules: any[]) {
+  const rows = attempts.filter((attempt) => attempt.quiz_id === quiz.id)
+  if (!rows.length) return `No completed attempts found for ${quiz.title}.`
+  const avg = average(rows.map((attempt) => Number(attempt.score || 0)))
+  const passLine = Number(quiz.passing_score || 60)
+  const passRate = Math.round((rows.filter((attempt) => Number(attempt.score || 0) >= passLine).length / rows.length) * 100)
+  const certRule = rules.find((rule) => rule.quiz_id === quiz.id)
+  const certText = certRule?.enabled ? ` Certificate threshold: ${certRule.min_score}%.` : ''
+  return `${quiz.title} average score is ${avg}% from ${rows.length} completed attempt(s). Pass rate: ${passRate}% at ${passLine}%.${certText}`
+}
+
+function summarizeCertificates(profiles: any[], attempts: any[], rules: any[], certificates: any[]) {
+  const enabledRules = rules.filter((rule) => rule.enabled)
+  if (!enabledRules.length) return 'No certificate rules are enabled.'
+  const certKeys = new Set(certificates.map((cert) => `${cert.quiz_id}:${cert.user_id}`))
+  const profileById = new Map(profiles.map((profile) => [profile.id, profile]))
+  const eligibleMissing = attempts.filter((attempt) => {
+    const rule = enabledRules.find((item) => item.quiz_id === attempt.quiz_id)
+    return rule && Number(attempt.score || 0) >= Number(rule.min_score || 0) && !certKeys.has(`${attempt.quiz_id}:${attempt.user_id}`)
+  })
+  if (!eligibleMissing.length) return `Certificate rules enabled: ${enabledRules.length}. No missing eligible certificates found in loaded attempts.`
+  const names = eligibleMissing.slice(0, 5).map((attempt) => `${displayName(profileById.get(attempt.user_id))} (${attempt.score}%)`)
+  return `Missing eligible certificates: ${eligibleMissing.length}. Examples: ${names.join(', ')}. Run 031 after rules are saved.`
+}
+
+function summarizeWeakAreas(attempts: any[]) {
+  const byTopic = new Map<string, number[]>()
+  for (const attempt of attempts) {
+    const topic = attempt.quizzes?.topic || attempt.quizzes?.title || 'General'
+    byTopic.set(topic, [...(byTopic.get(topic) || []), Number(attempt.score || 0)])
+  }
+  const weakest = [...byTopic.entries()]
+    .map(([topic, scores]) => ({ topic, avg: average(scores), count: scores.length }))
+    .sort((a, b) => a.avg - b.avg)[0]
+  if (!weakest) return 'No completed attempts found to identify weak areas.'
+  return `Weakest loaded topic: ${weakest.topic}, average ${weakest.avg}% across ${weakest.count} attempt(s).`
+}
+
+function findProfile(query: string, profiles: any[]) {
+  const tokens = significantTokens(query)
+  return profiles.find((profile) => {
+    const haystack = normalize([profile.full_name, profile.email, profile.employee_id].filter(Boolean).join(' '))
+    return tokens.some((token) => token.length >= 3 && haystack.includes(token))
+  })
+}
+
+function findQuiz(query: string, quizzes: any[], attempts: any[]) {
+  const quizPool = quizzes.length
+    ? quizzes
+    : uniqueBy(attempts.map((attempt) => ({
+        id: attempt.quiz_id,
+        title: attempt.quizzes?.title,
+        topic: attempt.quizzes?.topic,
+        difficulty: attempt.quizzes?.difficulty,
+      })), 'id')
+  const tokens = significantTokens(query)
+  return quizPool.find((quiz) => {
+    const haystack = normalize([quiz.title, quiz.topic].filter(Boolean).join(' '))
+    return tokens.some((token) => token.length >= 3 && haystack.includes(token))
+  })
+}
+
+function significantTokens(value: string) {
+  const stop = new Set(['score', 'analysis', 'average', 'avg', 'quiz', 'test', 'of', 'in', 'for', 'the', 'and', 'performance', 'show', 'tell', 'me'])
+  return normalize(value).split(/\s+/).filter((token) => token && !stop.has(token))
+}
+
+function normalize(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9@._ -]/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+function displayName(profile: any) {
+  return profile?.full_name || profile?.email || 'Unknown employee'
+}
+
+function average(values: number[]) {
+  if (!values.length) return 0
+  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)
+}
+
+function byLatest(left: any, right: any) {
+  return new Date(right.completed_at || 0).getTime() - new Date(left.completed_at || 0).getTime()
+}
+
+function uniqueBy(items: any[], key: string) {
+  const seen = new Set()
+  return items.filter((item) => {
+    const value = item[key]
+    if (!value || seen.has(value)) return false
+    seen.add(value)
+    return true
+  })
 }
 
 function localFallback(message: string, attempts: any[], profiles: any[]) {
