@@ -74,9 +74,12 @@ export function AddEmployeeDialog({ onEmployeeAdded }: AddEmployeeDialogProps) {
         const result = await response.json()
 
         if (response.ok) {
+          const warnings = Array.isArray(result.errors) ? result.errors : []
           toast({
-            title: 'Employee Added',
-            description: `${formData.full_name} has been added successfully.`
+            title: warnings.length ? 'Employee Added With Warning' : 'Employee Added',
+            description: warnings.length
+              ? warnings[0]
+              : `${formData.full_name} has been added successfully and received a password setup email.`
           })
           setFormData({
             email: '',

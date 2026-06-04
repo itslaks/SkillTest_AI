@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import type { ApiResponse, EmployeeImport, EmployeeImportError, EmployeeImportResult } from '@/lib/types/database'
 import { approveTrainer, rejectTrainer } from '@/lib/actions/auth'
 import { buildQuizAssignedEmail, sendEmail } from '@/lib/email'
+import { createEmployeeWithSetupEmail, sendEmployeeSetupEmail } from '@/lib/employee-onboarding'
 
 // ─── Pending Trainer Sign-Ups (Admin only) ────────────────────────────
 
@@ -153,44 +154,34 @@ export async function importEmployees(employees: EmployeeImport[]): Promise<ApiR
         errors.push({ row: i + 1, email, error: error.message })
         continue
       }
+      const setupResult = await sendEmployeeSetupEmail(supabase, email, fullName)
+      if (!setupResult.success) {
+        errors.push({
+          row: i + 1,
+          email,
+          error: `Profile updated, but setup email failed: ${setupResult.error}`,
+        })
+      }
       successful++
     } else {
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email,
-        password: generateTempPassword(),
-        email_confirm: true,
-        user_metadata: {
-          role: 'employee',
-          full_name: fullName,
-        },
-      })
-
-      if (authError || !authData.user) {
-        failed++
-        errors.push({ row: i + 1, email, error: authError?.message || 'Could not create user' })
-        continue
-      }
-
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: authData.user.id,
+      try {
+        const { warning } = await createEmployeeWithSetupEmail(supabase, {
           email,
-          full_name: fullName,
-          employee_id: emp.employee_id || null,
+          fullName,
+          employeeId: emp.employee_id || null,
           department: emp.domain || 'General',
           domain: emp.domain || 'General',
-          role: 'employee',
         })
 
-      if (profileError) {
-        await supabase.auth.admin.deleteUser(authData.user.id)
+        if (warning) {
+          errors.push({ row: i + 1, email, error: `Employee created, but setup email failed: ${warning}` })
+        }
+        successful++
+      } catch (error: any) {
         failed++
-        errors.push({ row: i + 1, email, error: profileError.message })
+        errors.push({ row: i + 1, email, error: error.message })
         continue
       }
-
-      successful++
     }
   }
 
@@ -214,15 +205,6 @@ export async function importEmployees(employees: EmployeeImport[]): Promise<ApiR
       errors,
     }
   }
-}
-
-function generateTempPassword(): string {
-  const chars = 'ABCDEFGHJKLMNOPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
-  let password = ''
-  for (let i = 0; i < 12; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return `${password}!`
 }
 
 // ─── Get all employees (for manager view) ─────────────────────────────

@@ -132,8 +132,9 @@ Run SQL scripts in `scripts/` in numeric order. Current latest migration is:
 | `030_certificates_badge_expansion.sql` | Adds certificates, trigger, badge metadata, 260 badges |
 | `031_backfill_old_certificates.sql` | Adds certificate template columns and backfills old eligible certificates |
 | `032_harden_badge_awards.sql` | Tightens badge award rules so a single quiz completion does not unlock too many badges |
+| `033_harden_quiz_certificate_rls.sql` | Scopes direct reads of quiz attempts and certificates to learners and authorized training staff |
 
-If `030` is already executed, run `031` after saving certificate rules in `/manager/admin`, then run `032` to harden badge awards. It is safe to run `031` again because it uses conflict update.
+If `030` is already executed, run `031` after saving certificate rules in `/manager/admin`, then run `032` to harden badge awards, then run `033` to harden quiz-attempt and certificate RLS. It is safe to run `031` again because it uses conflict update.
 
 ## Verification
 

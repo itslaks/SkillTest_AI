@@ -294,9 +294,9 @@ Run the SQL scripts in `scripts/` in numeric order.
 
 | Scenario | What To Run |
 |---|---|
-| Fresh Supabase project | Run `001` through `032` |
-| Existing DB already at `030` | Run `031_backfill_old_certificates.sql` after enabling certificate rules, then run `032_harden_badge_awards.sql` |
-| Current project state | Migration `032` has already been executed in Supabase; no extra SQL is required for the latest UI/workflow polish |
+| Fresh Supabase project | Run `001` through `033` |
+| Existing DB already at `030` | Run `031_backfill_old_certificates.sql`, `032_harden_badge_awards.sql`, then `033_harden_quiz_certificate_rls.sql` |
+| Current project state | Migration `033` is the latest schema hardening step and should be applied after `032` |
 
 ### 🧾 Latest Migration
 
@@ -306,6 +306,7 @@ Run the SQL scripts in `scripts/` in numeric order.
 | `030_certificates_badge_expansion.sql` | Adds certificate automation tables, certificate issuing trigger, badge style columns, and 260 seeded badges |
 | `031_backfill_old_certificates.sql` | Adds certificate template personalization fields and issues missing certificates for old completed attempts that already meet enabled certificate rules |
 | `032_harden_badge_awards.sql` | Makes badge awards more selective so one quiz completion does not unlock large batches of badges |
+| `033_harden_quiz_certificate_rls.sql` | Restricts direct Supabase reads for quiz attempts and certificates while preserving learner and scoped training-staff access |
 
 ### ⚠️ Important Database Notes
 
@@ -319,6 +320,7 @@ Run the SQL scripts in `scripts/` in numeric order.
 | Certificates | Migration `030` creates `certificate_rules` and `certificates`; admin certificate controls require this migration |
 | Old Quiz Certificates | Enable certificate rules in `/manager/admin`, set threshold/template, then run migration `031` to backfill old attempts |
 | Badge Awards | Migration `032` should be applied after the badge expansion so employee badges are harder to unlock and reflect sustained achievement |
+| Attempt And Certificate Privacy | Migration `033` should be applied after `032` to prevent broad direct reads of answer JSON, certificate identity, and score data |
 
 ---
 
@@ -556,7 +558,7 @@ npx playwright install chromium
 
 | Item | Required |
 |---|---:|
-| Supabase migrations through `032` applied when badge hardening is needed | ✅ |
+| Supabase migrations through `033` applied | Required |
 | Real Supabase URL/anon/service keys configured | ✅ |
 | `CRON_SECRET` configured | Recommended |
 | AI provider key configured | Recommended |

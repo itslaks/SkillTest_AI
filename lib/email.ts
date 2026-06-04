@@ -17,6 +17,15 @@ export interface SendEmailOptions {
   from?: string
 }
 
+function escapeHtml(value: string | null | undefined) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 export async function sendEmail(options: SendEmailOptions): Promise<{ success: boolean; error?: string }> {
   const from = options.from ?? (process.env.EMAIL_FROM ?? PRODUCT_EMAIL_FROM)
 
@@ -235,6 +244,29 @@ export function buildQuizAssignedEmail(opts: {
         <tr><td style="padding:10px;background:#f3f4f6;font-weight:700;">Due</td><td style="padding:10px;background:#fafafa;">${opts.dueDate || 'As scheduled by your trainer'}</td></tr>
       </table>
       <a href="${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/employee/quizzes" style="display:inline-block;background:#000;color:#fff;padding:12px 20px;border-radius:999px;text-decoration:none;font-weight:700;">Open Quiz</a>
+    </div>
+  </div>`
+}
+
+export function buildEmployeeWelcomeEmail(opts: {
+  employeeName?: string | null
+  setupLink: string
+}) {
+  const employeeName = escapeHtml(opts.employeeName || 'Learner')
+  const setupLink = escapeHtml(opts.setupLink)
+
+  return `
+  <div style="font-family:system-ui,sans-serif;max-width:620px;margin:0 auto;padding:24px;background:#f8fafc;">
+    <div style="background:#050505;color:#fff;padding:24px;border-radius:18px 18px 0 0;">
+      <p style="margin:0;color:#22c55e;font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;">SkillTest_AI Account</p>
+      <h1 style="margin:10px 0 0;font-size:24px;">Set up your learning account</h1>
+    </div>
+    <div style="background:#fff;border:1px solid #e5e7eb;border-top:0;padding:24px;border-radius:0 0 18px 18px;">
+      <p>Hi ${employeeName},</p>
+      <p>Your SkillTest_AI learner account has been created. Set your password to access assigned quizzes, training sessions, leaderboards, badges, and certificates.</p>
+      <a href="${setupLink}" style="display:inline-block;background:#000;color:#fff;padding:12px 20px;border-radius:999px;text-decoration:none;font-weight:700;margin:12px 0;">Set Password</a>
+      <p style="color:#64748b;font-size:13px;">If the button does not work, open this link in your browser:</p>
+      <p style="word-break:break-all;color:#334155;font-size:13px;">${setupLink}</p>
     </div>
   </div>`
 }

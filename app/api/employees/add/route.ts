@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { requireManager } from '@/lib/rbac'
+import { requireManagerForApi } from '@/lib/rbac'
+import { createEmployeeWithSetupEmail } from '@/lib/employee-onboarding'
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify manager authentication
-    await requireManager()
+    const auth = await requireManagerForApi()
+    if (auth instanceof NextResponse) return auth
     
     const employees = await request.json()
     
@@ -41,42 +42,16 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        // Create auth user first
-        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        const { profile, warning } = await createEmployeeWithSetupEmail(supabase, {
           email,
-          password: generateTempPassword(),
-          email_confirm: true,
-          user_metadata: {
-            role: 'employee',
-            full_name
-          }
+          fullName: full_name,
+          employeeId: employee_id || null,
+          department: department || null,
+          domain: domain || 'General',
         })
 
-        if (authError) {
-          errors.push(`Auth error for ${email}: ${authError.message}`)
-          continue
-        }
-
-        // Create profile
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: authData.user.id,
-            email: email,
-            full_name: full_name,
-            employee_id: employee_id || null,
-            department: department || null,
-            domain: domain || 'General',
-            role: 'employee'
-          })
-          .select()
-          .single()
-
-        if (profileError) {
-          // Clean up auth user if profile creation fails
-          await supabase.auth.admin.deleteUser(authData.user.id)
-          errors.push(`Profile error for ${email}: ${profileError.message}`)
-          continue
+        if (warning) {
+          errors.push(`Employee ${email} was added, but setup email failed: ${warning}`)
         }
 
         results.push(profile)
@@ -106,13 +81,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-}
-
-function generateTempPassword(): string {
-  const chars = 'ABCDEFGHJKLMNOPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
-  let password = ''
-  for (let i = 0; i < 12; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return password + '!'
 }
