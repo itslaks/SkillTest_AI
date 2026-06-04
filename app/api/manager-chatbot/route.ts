@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getAccessibleTrainingBatchIds } from '@/lib/training-access'
 import { callAI } from '@/lib/ai'
 import { analyzeAttemptPattern } from '@/lib/insights'
+import { buildAdminGuideSearchIndex, findAdminGuideAnswer } from '@/lib/manager-docs'
 import type { DifficultyLevel, QuizAnswer } from '@/lib/types/database'
 
 export async function POST(request: NextRequest) {
@@ -13,6 +14,11 @@ export async function POST(request: NextRequest) {
   const { message } = await request.json()
   if (!message || typeof message !== 'string') {
     return NextResponse.json({ error: 'Message is required.' }, { status: 400 })
+  }
+
+  const docsAnswer = findAdminGuideAnswer(message)
+  if (docsAnswer) {
+    return NextResponse.json({ message: docsAnswer, provider: 'skilltest_ai_docs' })
   }
 
   const admin = createAdminClient()
@@ -76,17 +82,18 @@ export async function POST(request: NextRequest) {
   }
 
   const context = buildChatbotContext(data)
+  const docsContext = buildAdminGuideSearchIndex()
 
   try {
     const { text, provider } = await callAI([
       {
         role: 'system',
         content:
-          'You are SkillTest_AI Command Chat. Use only the provided database context. Never invent numbers, names, attempts, scores, or certificates. If exact data is missing, say so. Keep responses under 60 words, with at most 3 bullets. Use crisp plain text and avoid markdown decoration unless it improves readability.',
+          'You are SkillTest_AI Command Chat. Use only the provided database context and admin guide context. Never invent numbers, names, attempts, scores, or certificates. If exact data is missing, say so. For how-to questions, answer from the admin guide. Keep responses under 80 words, with at most 4 bullets. Use crisp plain text and avoid markdown decoration unless it improves readability.',
       },
       {
         role: 'user',
-        content: `DATABASE CONTEXT:\n${context}\n\nQUESTION:\n${message}`,
+        content: `DATABASE CONTEXT:\n${context}\n\nADMIN GUIDE CONTEXT:\n${docsContext}\n\nQUESTION:\n${message}`,
       },
     ], { maxTokens: 180, temperature: 0.1 })
 

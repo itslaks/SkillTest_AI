@@ -23,6 +23,7 @@ import { BatchComparisonChart } from '@/components/manager/batch-comparison-char
 import { BatchMemberStatusDropdown } from '@/components/manager/batch-member-status-dropdown'
 import { OpsAutoRefresh } from '@/components/manager/ops-auto-refresh'
 import { FeedbackSentimentChart } from '@/components/manager/feedback-sentiment-chart'
+import { adminGuideQuickStart } from '@/lib/manager-docs'
 import { createAdminClient } from '@/lib/supabase/server'
 import {
   BellRing,
@@ -350,6 +351,8 @@ export default async function ManagerOperationsPage({
       <CommandProofStrip metrics={proofMetrics} />
 
       <QuickOpsStrip canCoordinate={canCoordinate} />
+
+      <GuidedOpsPath />
 
       {(operationMessage?.ops_status || operationMessage?.ops_error) ? (
         <div className={`rounded-2xl border p-4 text-sm font-medium ${
@@ -1338,6 +1341,32 @@ function QuickOpsStrip({ canCoordinate }: { canCoordinate: boolean }) {
   )
 }
 
+function GuidedOpsPath() {
+  return (
+    <section className="rounded-[1.5rem] border border-zinc-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-zinc-950">Recommended admin workflow</p>
+          <p className="mt-1 text-sm text-zinc-500">Follow this order when Training Ops feels confusing.</p>
+        </div>
+        <Button asChild variant="outline" className="w-fit rounded-full">
+          <Link href="/manager/docs">Open full A to Z guide</Link>
+        </Button>
+      </div>
+      <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+        {adminGuideQuickStart.slice(0, 8).map((step, index) => (
+          <div key={step} className="flex gap-3 rounded-2xl border border-zinc-100 bg-zinc-50 p-3">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-950 text-[11px] font-bold text-white">
+              {index + 1}
+            </div>
+            <p className="text-sm leading-5 text-zinc-700">{step}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 function MiniMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
@@ -1387,7 +1416,7 @@ function ScheduleTimeline({ items }: { items: Array<{ id: string; type: string; 
   }, new Map<string, typeof nextItems>())
 
   return (
-    <Card className="border-zinc-200 shadow-sm spotlight-card">
+    <Card id="schedule-planner" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
       <CardHeader>
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
@@ -1528,7 +1557,7 @@ function AssessmentDocumentLibrary({
   ]
 
   return (
-    <Card className="border-zinc-200 shadow-sm spotlight-card">
+    <Card id="document-library" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
       <CardHeader>
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>

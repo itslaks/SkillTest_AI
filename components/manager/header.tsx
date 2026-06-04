@@ -45,8 +45,10 @@ export function ManagerHeader({ profile, notifications = [] }: ManagerHeaderProp
           </Link>
         </Button>
 
-        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/60">
-          <HelpCircle className="h-4.5 w-4.5" />
+        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/60" asChild>
+          <Link href="/manager/docs" title="Admin guide">
+            <HelpCircle className="h-4.5 w-4.5" />
+          </Link>
         </Button>
 
         {(profile?.role === 'admin' || profile?.role === 'trainer') && (
