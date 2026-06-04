@@ -144,7 +144,7 @@ export async function importEmployees(employees: EmployeeImport[]): Promise<ApiR
       .from('profiles')
       .select('id')
       .eq('email', email)
-      .single()
+      .maybeSingle()
 
     if (existingProfile) {
       const { error } = await supabase
@@ -182,7 +182,7 @@ export async function importEmployees(employees: EmployeeImport[]): Promise<ApiR
         })
 
         if (warning) {
-          errors.push({ row: i + 1, email, error: `Employee created, but setup email failed: ${warning}` })
+          errors.push({ row: i + 1, email, error: warning })
         }
         successful++
       } catch (error: any) {
@@ -204,7 +204,18 @@ export async function importEmployees(employees: EmployeeImport[]): Promise<ApiR
     error_log: errors.length > 0 ? errors : null,
   })
 
+  await supabase.from('training_notifications').insert({
+    title: 'Employee import processed',
+    message: `${successful} of ${employees.length} employee row(s) were processed. ${failed} failed.${errors.length > failed ? ` ${errors.length - failed} setup email warning(s) need review.` : ''}`,
+    audience: 'trainers',
+    channel: 'in_app',
+    delivery_status: failed === 0 ? 'sent' : 'logged',
+    sent_at: failed === 0 ? new Date().toISOString() : null,
+    created_by: userId,
+  })
+
   revalidatePath('/manager/employees', 'layout')
+  revalidatePath('/manager/notifications')
   return {
     data: {
       total: employees.length,

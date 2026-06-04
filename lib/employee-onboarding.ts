@@ -161,7 +161,7 @@ async function updateExistingEmployeeProfile(
   const setupResult = await sendEmployeeSetupEmail(supabase, input.email, input.fullName)
   return {
     profile: updatedProfile as Profile,
-    warning: setupResult.success ? 'Employee already existed; profile details were updated and setup email was resent.' : `Employee already existed and profile was updated, but setup email failed: ${setupResult.error}`,
+    warning: setupResult.success ? undefined : `Employee profile was updated, but setup email failed: ${setupResult.error}`,
   }
 }
 

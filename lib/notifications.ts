@@ -35,6 +35,14 @@ export async function getStaffNotifications(
     baseNotificationQuery(admin).eq('recipient_user_id', userId).limit(limit),
   ]
 
+  if (role === 'trainer') {
+    queries.push(baseNotificationQuery(admin).eq('audience', 'trainers').limit(limit))
+  }
+
+  if (role === 'training_coordinator' || role === 'manager') {
+    queries.push(baseNotificationQuery(admin).eq('audience', 'coordinators').limit(limit))
+  }
+
   if (batchIds.length > 0) {
     queries.push(baseNotificationQuery(admin).in('batch_id', batchIds).limit(limit))
   }

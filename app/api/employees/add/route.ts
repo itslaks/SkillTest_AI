@@ -55,6 +55,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    await supabase.from('training_notifications').insert({
+      title: results.length === 1 ? 'Employee profile processed' : 'Employee profiles processed',
+      message: `${results.length} employee profile(s) were created or updated.${errors.length ? ` ${errors.length} setup issue(s) need review.` : ''}`,
+      audience: 'trainers',
+      channel: 'in_app',
+      delivery_status: errors.length ? 'logged' : 'sent',
+      sent_at: errors.length ? null : new Date().toISOString(),
+      created_by: auth.userId,
+    })
+
     return NextResponse.json({
       success: true,
       added: results.length,

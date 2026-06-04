@@ -173,10 +173,12 @@ export function EmployeeImporter() {
               {result.failed > 0 && ` ${result.failed} failed.`}
             </p>
             {result.errors.length > 0 && (
-              <div className="mt-3 p-3 bg-red-500/5 rounded-lg border border-red-500/10 text-sm">
-                <p className="font-bold text-red-600 mb-2">Errors:</p>
+              <div className={`mt-3 rounded-lg border p-3 text-sm ${result.failed > 0 ? 'border-red-500/10 bg-red-500/5' : 'border-amber-500/20 bg-amber-500/10'}`}>
+                <p className={`mb-2 font-bold ${result.failed > 0 ? 'text-red-600' : 'text-amber-700'}`}>
+                  {result.failed > 0 ? 'Rows needing correction:' : 'Setup email warnings:'}
+                </p>
                 {result.errors.slice(0, 5).map((err, i) => (
-                  <p key={i} className="text-xs text-red-500 font-mono">Row {err.row}: {err.email} - {err.error}</p>
+                  <p key={i} className={`font-mono text-xs ${result.failed > 0 ? 'text-red-500' : 'text-amber-700'}`}>Row {err.row}: {err.email} - {err.error}</p>
                 ))}
               </div>
             )}
