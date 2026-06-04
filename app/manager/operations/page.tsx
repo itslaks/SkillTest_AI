@@ -29,6 +29,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import {
   BellRing,
   CalendarDays,
+  ChevronDown,
   ClipboardCheck,
   Trash2,
   FileText,
@@ -41,6 +42,7 @@ import {
   ShieldAlert,
   Users,
 } from 'lucide-react'
+import type { ReactNode } from 'react'
 
 async function createTrainingBatchAction(formData: FormData) {
   'use server'
@@ -430,13 +432,14 @@ export default async function ManagerOperationsPage({
       </section>
 
       {canCoordinate ? (
-      <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr_0.8fr]">
-        <Card id="create-batch" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
-          <CardHeader>
-            <CardTitle>Create Training Batch</CardTitle>
-            <CardDescription>Keep setup simple: name the batch, choose a trainer, add learners, and optionally link assessments.</CardDescription>
-          </CardHeader>
-          <CardContent>
+      <div className="grid gap-4 xl:grid-cols-3">
+        <DropPanel
+          id="create-batch"
+          title="Create Training Batch"
+          description="Name it, choose trainers, add learners, and link assessments."
+          badge="Setup"
+        >
+          <CardContent className="pt-5">
             <form action={createTrainingBatchAction} className="grid gap-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="grid gap-2 text-sm">
@@ -505,13 +508,14 @@ export default async function ManagerOperationsPage({
               </div>
             </form>
           </CardContent>
-        </Card>
+        </DropPanel>
 
-        <Card id="schedule-session" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
-          <CardHeader>
-            <CardTitle>Session Planner & Notifications</CardTitle>
-            <CardDescription>Schedule trainer-led sessions and trigger communication without leaving this screen.</CardDescription>
-          </CardHeader>
+        <DropPanel
+          id="schedule-session"
+          title="Session Planner"
+          description="Schedule a session or send a quick batch notification."
+          badge={`${sessions.length} sessions`}
+        >
           <CardContent className="space-y-6">
             <form action={createTrainingSessionAction} className="grid gap-4">
               <label className="grid gap-2 text-sm">
@@ -640,13 +644,14 @@ export default async function ManagerOperationsPage({
               <Button type="submit" variant="outline" className="rounded-full">Create notification</Button>
             </form>
           </CardContent>
-        </Card>
+        </DropPanel>
 
-        <Card id="manage-training" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
-          <CardHeader>
-            <CardTitle>Manage Training</CardTitle>
-            <CardDescription>Delete wrong batches, clear old training data, and restart cleanly without touching employee profiles.</CardDescription>
-          </CardHeader>
+        <DropPanel
+          id="manage-training"
+          title="Manage Training"
+          description="Delete wrong batches or clear training data without touching employees."
+          badge={`${batches.length} batches`}
+        >
           <CardContent className="space-y-5">
             <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
               <div className="flex items-center gap-2 text-sm font-semibold">
@@ -699,7 +704,7 @@ export default async function ManagerOperationsPage({
               </div>
             )}
           </CardContent>
-        </Card>
+        </DropPanel>
       </div>
       ) : (
         <Card className="border-cyan-200 bg-cyan-50 shadow-sm">
@@ -733,12 +738,13 @@ export default async function ManagerOperationsPage({
 
       <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
         {canCoordinate ? (
-        <Card id="assessment-setup" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
-          <CardHeader>
-            <CardTitle>Assessment Governance</CardTitle>
-            <CardDescription>Define assessment type, date, template, question file, and score rules before trainers upload results.</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <DropPanel
+          id="assessment-setup"
+          title="Assessment Governance"
+          description="Define type, date, template, question file, and score rules."
+          badge={`${assessmentSetups.length} setups`}
+        >
+          <CardContent className="pt-5">
             <form action={createTrainingAssessmentSetupAction} className="grid gap-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="grid gap-2 text-sm">
@@ -794,15 +800,16 @@ export default async function ManagerOperationsPage({
               <Button type="submit" className="w-fit rounded-full bg-black text-white hover:bg-zinc-800">Create assessment setup</Button>
             </form>
           </CardContent>
-        </Card>
+        </DropPanel>
         ) : null}
 
-        <Card id="project-evaluation" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
-          <CardHeader>
-            <CardTitle>Project Evaluation Evidence</CardTitle>
-            <CardDescription>Trainer-uploaded project scores and evidence filenames are tracked as a first-class TMS artifact.</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <DropPanel
+          id="project-evaluation"
+          title="Project Evaluation"
+          description="Score projects and attach evidence filenames or files."
+          badge={`${projectEvaluations.length} records`}
+        >
+          <CardContent className="pt-5">
             <form action={createProjectEvaluationAction} className="grid gap-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="grid gap-2 text-sm">
@@ -847,15 +854,16 @@ export default async function ManagerOperationsPage({
               <Button type="submit" className="w-fit rounded-full bg-black text-white hover:bg-zinc-800">Save project evaluation</Button>
             </form>
           </CardContent>
-        </Card>
+        </DropPanel>
       </div>
 
       {canCoordinate ? (
-      <Card id="automation" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
-        <CardHeader>
-          <CardTitle>Automation Runbook</CardTitle>
-          <CardDescription>Each governed check has a business rule, an operator override, and an audit record after execution.</CardDescription>
-        </CardHeader>
+      <DropPanel
+        id="automation"
+        title="Automation Runbook"
+        description="Run attendance, absence, assessment, and feedback checks on demand."
+        badge={`${automationRuns.length} runs`}
+      >
         <CardContent className="grid gap-4 md:grid-cols-2">
           {automationRunTypes.map((runType) => {
             const latestForType = automationRuns.find((item: any) => item.run_type === runType)
@@ -891,15 +899,17 @@ export default async function ManagerOperationsPage({
             </form>
           )})}
         </CardContent>
-      </Card>
+      </DropPanel>
       ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <Card id="batch-board" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
-          <CardHeader>
-            <CardTitle>Live Batch Board</CardTitle>
-            <CardDescription>Operational visibility across lifecycle, trainer ownership, enrolled learners, and linked assessments.</CardDescription>
-          </CardHeader>
+        <DropPanel
+          id="batch-board"
+          title="Live Batch Board"
+          description="Review lifecycle, trainers, learners, and linked assessments."
+          badge={`${batches.length} batches`}
+          defaultOpen
+        >
           <CardContent className="space-y-4">
             {batches.length === 0 ? (
               <EmptyState text="No training batches yet. Create the first batch above to unlock session planning, attendance, and communication workflows." />
@@ -1020,13 +1030,14 @@ export default async function ManagerOperationsPage({
               })
             )}
           </CardContent>
-        </Card>
+        </DropPanel>
 
-        <Card id="feedback" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
-          <CardHeader>
-            <CardTitle>Feedback & Reminder Pulse</CardTitle>
-            <CardDescription>Recent learner sentiment and communication activity tied to training execution.</CardDescription>
-          </CardHeader>
+        <DropPanel
+          id="feedback"
+          title="Feedback Pulse"
+          description="Review sentiment, dispatch evidence, and open feedback windows."
+          badge={`${feedback.length} feedback`}
+        >
           <CardContent className="space-y-4">
             <FeedbackAnalyticsPanel
               analytics={feedbackAnalytics}
@@ -1140,14 +1151,16 @@ export default async function ManagerOperationsPage({
               </div>
             </form>
           </CardContent>
-        </Card>
+        </DropPanel>
       </div>
 
-      <Card id="attendance" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
-        <CardHeader>
-          <CardTitle>Attendance Tracker</CardTitle>
-          <CardDescription>Session-level attendance now has physical controls in the UI and persists through the backend.</CardDescription>
-        </CardHeader>
+      <DropPanel
+        id="attendance"
+        title="Attendance Tracker"
+        description="Upload or mark attendance for every visible session."
+        badge={`${summary.attendanceRate}% health`}
+        defaultOpen
+      >
         <CardContent className="space-y-6">
           <AttendanceImporter
             sessions={sessions.map((session: any) => ({
@@ -1225,13 +1238,14 @@ export default async function ManagerOperationsPage({
             })
           )}
         </CardContent>
-      </Card>
+      </DropPanel>
 
-      <Card id="assessment" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
-        <CardHeader>
-          <CardTitle>Assessment Score Upload</CardTitle>
-          <CardDescription>Trainers can upload sprint review, API/coding, and project-linked assessment scores for assigned batches.</CardDescription>
-        </CardHeader>
+      <DropPanel
+        id="assessment"
+        title="Assessment Score Upload"
+        description="Upload sprint, coding, and project-linked assessment scores."
+        badge={`${assessmentUploads.length} uploads`}
+      >
         <CardContent>
           <AssessmentScoreImporter
             batches={batches.map((batch: any) => ({ id: batch.id, title: batch.title }))}
@@ -1243,7 +1257,7 @@ export default async function ManagerOperationsPage({
             }))}
           />
         </CardContent>
-      </Card>
+      </DropPanel>
 
       <ScheduleTimeline items={scheduleTimeline} />
 
@@ -1386,6 +1400,42 @@ function CommandProofStrip({ metrics }: { metrics: { brdReadiness: number; evide
         )
       })}
     </section>
+  )
+}
+
+function DropPanel({
+  id,
+  title,
+  description,
+  badge,
+  defaultOpen = false,
+  children,
+}: {
+  id: string
+  title: string
+  description: string
+  badge?: string
+  defaultOpen?: boolean
+  children: ReactNode
+}) {
+  return (
+    <details id={id} open={defaultOpen} className="group scroll-mt-32 overflow-hidden rounded-[1.35rem] border border-zinc-200 bg-white shadow-sm transition open:shadow-md">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 marker:hidden">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-base font-semibold text-zinc-950">{title}</h2>
+            {badge ? <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">{badge}</span> : null}
+          </div>
+          <p className="mt-1 text-sm leading-5 text-zinc-500">{description}</p>
+        </div>
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-zinc-50 text-zinc-600 transition group-open:rotate-180">
+          <ChevronDown className="h-4 w-4" />
+        </div>
+      </summary>
+      <div className="border-t border-zinc-100 bg-white">
+        {children}
+      </div>
+    </details>
   )
 }
 
