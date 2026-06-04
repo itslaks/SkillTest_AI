@@ -713,6 +713,110 @@ export async function createTrainingBatch(formData: FormData): Promise<ApiRespon
   return { data: { id: batch.id } }
 }
 
+export async function deleteTrainingBatch(formData: FormData): Promise<ApiResponse<boolean>> {
+  const { userId, role } = await requireManager()
+  const admin = createAdminClient()
+
+  const batchId = asRequiredString(formData.get('batch_id'))
+  const confirmation = asRequiredString(formData.get('confirmation'))
+
+  if (!batchId) return { error: 'Training batch is required.' }
+  if (confirmation !== 'DELETE') return { error: 'Type DELETE to confirm removing this training batch.' }
+
+  const { data: batch } = await admin
+    .from('training_batches')
+    .select('id, title, created_by, coordinator_id')
+    .eq('id', batchId)
+    .maybeSingle()
+
+  if (!batch) return { error: 'Training batch was not found.' }
+  if (role !== 'admin' && batch.created_by !== userId && batch.coordinator_id !== userId) {
+    return { error: 'You do not have permission to delete this training batch.' }
+  }
+
+  const { error: quizError } = await admin
+    .from('quizzes')
+    .update({ batch_id: null })
+    .eq('batch_id', batchId)
+  if (quizError) return { error: `Could not unlink assessments before deleting batch: ${quizError.message}` }
+
+  const { error } = await admin
+    .from('training_batches')
+    .delete()
+    .eq('id', batchId)
+
+  if (error) return { error: error.message }
+
+  await admin.from('training_notifications').insert({
+    title: `Training batch deleted: ${batch.title}`,
+    message: 'A training batch and its linked sessions, attendance, members, feedback, and training records were removed.',
+    audience: 'coordinators',
+    channel: 'in_app',
+    delivery_status: 'sent',
+    sent_at: new Date().toISOString(),
+    created_by: userId,
+  })
+
+  revalidatePath('/manager')
+  revalidatePath('/manager/operations')
+  revalidatePath('/manager/reports')
+  revalidatePath('/employee/training')
+  return { data: true }
+}
+
+export async function clearAllTrainingData(formData: FormData): Promise<ApiResponse<boolean>> {
+  const { userId, role } = await requireManager()
+  const admin = createAdminClient()
+  const confirmation = asRequiredString(formData.get('confirmation'))
+
+  if (role !== 'admin') return { error: 'Only admins can remove all existing training data.' }
+  if (confirmation !== 'DELETE TRAINING') return { error: 'Type DELETE TRAINING to confirm removing all training data.' }
+
+  async function cleanup(label: string, query: PromiseLike<{ error: any }>) {
+    const { error } = await query
+    if (error) return `Training cleanup stopped at ${label}: ${error.message}`
+    return null
+  }
+
+  const cleanupError =
+    await cleanup('quiz links', admin.from('quizzes').update({ batch_id: null }).not('batch_id', 'is', null) as any)
+    || await cleanup('assessment results', admin.from('assessment_results').delete().not('batch_id', 'is', null) as any)
+    || await cleanup('notification dispatch logs', admin.from('training_notification_dispatch_log').delete().not('id', 'is', null) as any)
+    || await cleanup('attendance versions', admin.from('session_attendance_versions').delete().not('id', 'is', null) as any)
+    || await cleanup('attendance uploads', admin.from('training_attendance_uploads').delete().not('id', 'is', null) as any)
+    || await cleanup('assessment uploads', admin.from('training_assessment_uploads').delete().not('id', 'is', null) as any)
+    || await cleanup('automation runs', admin.from('training_automation_runs').delete().not('id', 'is', null) as any)
+    || await cleanup('project evaluations', admin.from('training_project_evaluations').delete().not('id', 'is', null) as any)
+    || await cleanup('feedback', admin.from('training_feedback').delete().not('id', 'is', null) as any)
+    || await cleanup('feedback windows', admin.from('training_feedback_windows').delete().not('id', 'is', null) as any)
+    || await cleanup('notifications', admin.from('training_notifications').delete().not('id', 'is', null) as any)
+    || await cleanup('assessment setups', admin.from('training_assessment_setups').delete().not('id', 'is', null) as any)
+    || await cleanup('attendance', admin.from('session_attendance').delete().not('id', 'is', null) as any)
+    || await cleanup('sessions', admin.from('training_sessions').delete().not('id', 'is', null) as any)
+    || await cleanup('trainer assignments', admin.from('training_batch_trainers').delete().not('id', 'is', null) as any)
+    || await cleanup('batch members', admin.from('batch_members').delete().not('id', 'is', null) as any)
+    || await cleanup('batch audit', admin.from('training_batch_change_audit').delete().not('id', 'is', null) as any)
+    || await cleanup('batches', admin.from('training_batches').delete().not('id', 'is', null) as any)
+
+  if (cleanupError) return { error: cleanupError }
+
+  await admin.from('training_notifications').insert({
+    title: 'All training data removed',
+    message: 'An admin cleared all existing training batches, sessions, attendance, feedback, assessment setup, automation, and notification records.',
+    audience: 'coordinators',
+    channel: 'in_app',
+    delivery_status: 'sent',
+    sent_at: new Date().toISOString(),
+    created_by: userId,
+  })
+
+  revalidatePath('/manager')
+  revalidatePath('/manager/operations')
+  revalidatePath('/manager/reports')
+  revalidatePath('/employee/training')
+  return { data: true }
+}
+
 export async function updateBatchMemberStatus(formData: FormData): Promise<ApiResponse<boolean>> {
   const { userId } = await requireManager()
   const admin = createAdminClient()

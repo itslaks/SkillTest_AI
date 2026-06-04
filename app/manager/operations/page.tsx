@@ -1,10 +1,12 @@
 import {
   createProjectEvaluation,
+  clearAllTrainingData,
   createTrainingAssessmentSetup,
   createTrainingBatch,
   createFeedbackWindow,
   createTrainingNotification,
   createTrainingSession,
+  deleteTrainingBatch,
   getTrainingOpsManagerData,
   runTrainingAutomation,
   updateTrainingBatchDetails,
@@ -28,6 +30,7 @@ import {
   BellRing,
   CalendarDays,
   ClipboardCheck,
+  Trash2,
   FileText,
   FileCheck2,
   FileSpreadsheet,
@@ -43,6 +46,18 @@ async function createTrainingBatchAction(formData: FormData) {
   'use server'
   const result = await createTrainingBatch(formData)
   redirectWithOpsResult(result, 'Batch created.', 'create-batch')
+}
+
+async function deleteTrainingBatchAction(formData: FormData) {
+  'use server'
+  const result = await deleteTrainingBatch(formData)
+  redirectWithOpsResult(result, 'Training batch deleted.', 'manage-training')
+}
+
+async function clearAllTrainingDataAction(formData: FormData) {
+  'use server'
+  const result = await clearAllTrainingData(formData)
+  redirectWithOpsResult(result, 'All existing training data removed.', 'manage-training')
 }
 
 async function createTrainingSessionAction(formData: FormData) {
@@ -415,7 +430,7 @@ export default async function ManagerOperationsPage({
       </section>
 
       {canCoordinate ? (
-      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+      <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr_0.8fr]">
         <Card id="create-batch" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
           <CardHeader>
             <CardTitle>Create Training Batch</CardTitle>
@@ -624,6 +639,65 @@ export default async function ManagerOperationsPage({
               </label>
               <Button type="submit" variant="outline" className="rounded-full">Create notification</Button>
             </form>
+          </CardContent>
+        </Card>
+
+        <Card id="manage-training" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
+          <CardHeader>
+            <CardTitle>Manage Training</CardTitle>
+            <CardDescription>Delete wrong batches, clear old training data, and restart cleanly without touching employee profiles.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Trash2 className="h-4 w-4" />
+                Delete one batch
+              </div>
+              <p className="mt-1 text-xs leading-5 text-zinc-500">
+                Removes that batch with its sessions, attendance, members, feedback, trainer links, and training audit records.
+              </p>
+              <div className="mt-4 max-h-80 space-y-3 overflow-y-auto pr-1">
+                {batches.length === 0 ? (
+                  <p className="rounded-xl border border-dashed border-zinc-300 bg-white p-3 text-sm text-zinc-500">No training batches exist.</p>
+                ) : batches.map((batch: any) => (
+                  <form key={batch.id} action={deleteTrainingBatchAction} className="rounded-xl border border-zinc-200 bg-white p-3">
+                    <input type="hidden" name="batch_id" value={batch.id} />
+                    <p className="text-sm font-semibold text-zinc-950">{batch.title}</p>
+                    <p className="mt-1 text-xs text-zinc-500">{batch.status.replace('_', ' ')} - {(membersByBatch.get(batch.id) || []).length} learner(s), {sessions.filter((session: any) => session.batch_id === batch.id).length} session(s)</p>
+                    <label className="mt-3 grid gap-1 text-xs font-medium text-zinc-600">
+                      Type DELETE
+                      <input name="confirmation" className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" placeholder="DELETE" />
+                    </label>
+                    <Button type="submit" variant="outline" size="sm" className="mt-3 rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">
+                      Delete batch
+                    </Button>
+                  </form>
+                ))}
+              </div>
+            </div>
+
+            {role === 'admin' ? (
+              <form action={clearAllTrainingDataAction} className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-rose-900">
+                  <ShieldAlert className="h-4 w-4" />
+                  Remove all existing training
+                </div>
+                <p className="mt-1 text-xs leading-5 text-rose-800">
+                  Clears all training batches, sessions, attendance, candidate batch links, training feedback, assessment setup, project evaluations, automation logs, and notifications. Employees and quizzes stay available.
+                </p>
+                <label className="mt-3 grid gap-1 text-xs font-medium text-rose-900">
+                  Type DELETE TRAINING
+                  <input name="confirmation" className="h-10 rounded-lg border border-rose-200 bg-white px-2 text-sm" placeholder="DELETE TRAINING" />
+                </label>
+                <Button type="submit" className="mt-3 rounded-full bg-rose-700 text-white hover:bg-rose-800">
+                  Remove all training
+                </Button>
+              </form>
+            ) : (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                Only admins can remove all existing training data. Coordinators can delete batches they own.
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
