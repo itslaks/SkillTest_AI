@@ -1072,7 +1072,9 @@ export async function updateAttendanceStatus(formData: FormData): Promise<ApiRes
     changed_by: userId,
     source: 'manual',
   })
-  if (versionError) return { error: `Attendance updated, but change history failed: ${versionError.message}` }
+  if (versionError) {
+    console.warn('Attendance updated, but change history failed:', versionError.message)
+  }
 
   revalidatePath('/manager/operations')
   revalidatePath('/employee/training')

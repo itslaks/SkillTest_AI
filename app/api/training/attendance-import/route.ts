@@ -4,6 +4,19 @@ import { sendEmail, buildUploadConfirmationEmail } from '@/lib/email'
 import { NextRequest, NextResponse } from 'next/server'
 
 const VALID_STATUSES = new Set(['present', 'absent', 'late', 'excused'])
+const STATUS_ALIASES: Record<string, string> = {
+  p: 'present',
+  present: 'present',
+  attended: 'present',
+  a: 'absent',
+  absent: 'absent',
+  no: 'absent',
+  l: 'late',
+  late: 'late',
+  e: 'excused',
+  excused: 'excused',
+  leave: 'excused',
+}
 
 export async function POST(request: NextRequest) {
   const auth = await requireTrainingStaffForApi()
@@ -25,7 +38,7 @@ export async function POST(request: NextRequest) {
   const admin = createAdminClient()
   const { data: session, error: sessionError } = await admin
     .from('training_sessions')
-    .select('id, title, batch_id, session_date, batch:batch_id(title)')
+    .select('id, title, batch_id, trainer_id, session_date, batch:batch_id(title, trainer_id)')
     .eq('id', sessionId)
     .maybeSingle()
 
@@ -40,7 +53,8 @@ export async function POST(request: NextRequest) {
       .eq('batch_id', session.batch_id)
       .eq('trainer_id', userId)
       .maybeSingle()
-    if (!assignment) {
+    const isAssigned = session.trainer_id === userId || (session.batch as any)?.trainer_id === userId || Boolean(assignment)
+    if (!isAssigned) {
       return NextResponse.json({ error: 'Trainer access is limited to assigned batches.' }, { status: 403 })
     }
   }
@@ -67,10 +81,10 @@ export async function POST(request: NextRequest) {
   }
 
   const emails = records
-    .map((row: any) => normalize(row.Email || row.email || row.Candidate_Email || row.Candidate_Email_Address))
+    .map((row: any) => normalize(rowString(row, 'Email', 'Candidate Email', 'Candidate_Email', 'Candidate_Email_Address')))
     .filter(Boolean)
   const employeeIds = records
-    .map((row: any) => normalize(row.Employee_ID || row.employee_id || row.Candidate_ID))
+    .map((row: any) => normalize(rowString(row, 'Employee_ID', 'Employee ID', 'employee_id', 'Candidate_ID', 'Candidate ID')))
     .filter(Boolean)
 
   const profileFilters = [
@@ -90,7 +104,7 @@ export async function POST(request: NextRequest) {
   const duplicateKeys = new Set<string>()
   const seenKeys = new Set<string>()
   records.forEach((record: any) => {
-    const key = normalize(record.Email || record.email || record.Candidate_Email || record.Candidate_Email_Address || record.Employee_ID || record.employee_id || record.Candidate_ID)
+    const key = normalize(rowString(record, 'Email', 'Candidate Email', 'Candidate_Email', 'Candidate_Email_Address', 'Employee_ID', 'Employee ID', 'employee_id', 'Candidate_ID', 'Candidate ID'))
     if (!key) return
     if (seenKeys.has(key)) duplicateKeys.add(key)
     seenKeys.add(key)
@@ -107,17 +121,29 @@ export async function POST(request: NextRequest) {
   }
 
   const errors: any[] = []
+  const warnings: any[] = []
   const rows: any[] = []
 
   records.forEach((record: any, index: number) => {
-    const email = normalize(record.Email || record.email || record.Candidate_Email || record.Candidate_Email_Address)
-    const employeeId = normalize(record.Employee_ID || record.employee_id || record.Candidate_ID)
-    const status = normalize(record.Status || record.status || 'present')
+    const email = normalize(rowString(record, 'Email', 'Candidate Email', 'Candidate_Email', 'Candidate_Email_Address'))
+    const employeeId = normalize(rowString(record, 'Employee_ID', 'Employee ID', 'employee_id', 'Candidate_ID', 'Candidate ID'))
+    const rawStatus = rowString(record, 'Status', 'Attendance Status', 'attendance_status')
+    const status = normalizeAttendanceStatus(rawStatus)
     const rowKey = normalize(email || employeeId)
     const profile = byEmail.get(email) || byEmployeeId.get(employeeId)
 
+    if (!rowKey) {
+      errors.push({ row: index + 1, error: 'Email or Employee ID is required.', email, employeeId })
+      return
+    }
+
     if (rowKey && duplicateKeys.has(rowKey)) {
       errors.push({ row: index + 1, error: 'Duplicate candidate row in upload.', email, employeeId })
+      return
+    }
+
+    if (!rawStatus) {
+      errors.push({ row: index + 1, error: 'Attendance status is required.', email, employeeId })
       return
     }
 
@@ -183,7 +209,7 @@ export async function POST(request: NextRequest) {
     for (let i = 0; i < versionRows.length; i += 500) {
       const { error: versionError } = await admin.from('session_attendance_versions').insert(versionRows.slice(i, i + 500))
       if (versionError) {
-        return NextResponse.json({ error: `Attendance was saved, but version logging failed: ${versionError.message}` }, { status: 500 })
+        warnings.push({ area: 'history', message: `Attendance was saved, but version logging failed: ${versionError.message}` })
       }
     }
   }
@@ -203,7 +229,7 @@ export async function POST(request: NextRequest) {
     chunk_total: Number.isFinite(Number(chunkTotal)) ? Number(chunkTotal) : null,
   })
   if (uploadLogError) {
-    return NextResponse.json({ error: `Attendance was saved, but upload logging failed: ${uploadLogError.message}` }, { status: 500 })
+    warnings.push({ area: 'upload_log', message: `Attendance was saved, but upload logging failed: ${uploadLogError.message}` })
   }
 
   const { data: notification, error: notificationError } = await admin.from('training_notifications').insert({
@@ -217,7 +243,7 @@ export async function POST(request: NextRequest) {
     created_by: userId,
   }).select('id').single()
   if (notificationError) {
-    return NextResponse.json({ error: `Attendance upload completed, but notification logging failed: ${notificationError.message}` }, { status: 500 })
+    warnings.push({ area: 'notification', message: `Attendance upload completed, but notification logging failed: ${notificationError.message}` })
   }
 
   // Send real email confirmation to uploader
@@ -260,10 +286,34 @@ export async function POST(request: NextRequest) {
     successfulRecords: rows.length,
     failedRecords: errors.length,
     errors,
+    warnings,
     uploadedAfterCutoff,
   })
 }
 
 function normalize(value: unknown) {
   return value === null || value === undefined ? '' : String(value).trim().toLowerCase()
+}
+
+function normalizeAttendanceStatus(value: unknown) {
+  return STATUS_ALIASES[normalize(value)] || normalize(value)
+}
+
+function rowValue(record: Record<string, any>, ...keys: string[]) {
+  for (const key of keys) {
+    if (record[key] !== undefined && record[key] !== null && record[key] !== '') return record[key]
+  }
+
+  const normalizedKeys = new Set(keys.map(normalizeKey))
+  const match = Object.keys(record).find((key) => normalizedKeys.has(normalizeKey(key)))
+  return match ? record[match] : undefined
+}
+
+function rowString(record: Record<string, any>, ...keys: string[]) {
+  const value = rowValue(record, ...keys)
+  return value === undefined || value === null ? '' : String(value).trim()
+}
+
+function normalizeKey(key: string) {
+  return key.toLowerCase().replace(/[^a-z0-9]/g, '')
 }

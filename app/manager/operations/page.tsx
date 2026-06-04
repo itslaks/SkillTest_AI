@@ -1086,7 +1086,7 @@ export default async function ManagerOperationsPage({
           {sessions.length === 0 ? (
             <EmptyState text="No sessions scheduled yet. Attendance controls appear here after a session is created." />
           ) : (
-            sessions.slice(0, 6).map((session: any) => {
+            sessions.map((session: any) => {
               const existingRecords = attendanceBySession.get(session.id) || []
               const existingByUser = new Map(existingRecords.map((record: any) => [record.user_id, record]))
               const roster = membersByBatch.get(session.batch_id) || []

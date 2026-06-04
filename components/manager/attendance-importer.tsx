@@ -22,6 +22,7 @@ type UploadResult = {
   successfulRecords: number
   failedRecords: number
   errors?: Array<{ row: number; error: string; email?: string; employeeId?: string }>
+  warnings?: Array<{ area?: string; message: string }>
   uploadedAfterCutoff?: boolean
 }
 
@@ -92,6 +93,10 @@ export function AttendanceImporter({ sessions }: AttendanceImporterProps) {
         aggregate.failedRecords += payload.failedRecords || 0
         aggregate.uploadedAfterCutoff = aggregate.uploadedAfterCutoff || Boolean(payload.uploadedAfterCutoff)
         aggregate.errors?.push(...((payload.errors || []).map((item: any) => ({ ...item, row: item.row + (index * CHUNK_SIZE) }))))
+        aggregate.warnings = [
+          ...(aggregate.warnings || []),
+          ...((payload.warnings || []).map((item: any) => ({ area: item.area, message: item.message || String(item) }))),
+        ]
         setProgress({
           current: index + 1,
           total: chunks.length,
@@ -195,6 +200,14 @@ export function AttendanceImporter({ sessions }: AttendanceImporterProps) {
             ) : null}
           </div>
           <p className="mt-1">{result.successfulRecords}/{result.totalRecords} rows updated. {result.failedRecords} row(s) need review.{result.uploadedAfterCutoff ? ' Late upload reason captured in the audit log.' : ''}</p>
+          {result.warnings?.length ? (
+            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+              <p className="font-semibold">Attendance was marked, but these background logs need review:</p>
+              {result.warnings.slice(0, 3).map((warning, index) => (
+                <p key={`${warning.area || 'warning'}-${index}`} className="mt-1">{warning.message}</p>
+              ))}
+            </div>
+          ) : null}
           {result.errors?.length ? (
             <div className="mt-3 overflow-hidden rounded-xl border border-rose-200 bg-white text-xs text-rose-800">
               <div className="grid grid-cols-[4.5rem_1fr_1fr_1.4fr] gap-2 border-b border-rose-100 bg-rose-50 px-3 py-2 font-semibold">
