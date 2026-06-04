@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
   }
 
   const distribution = calculateStrictDistribution(difficulty, count)
-  const hasAI = !!(process.env.OPENAI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY)
+  const hasAI = !!(process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY || process.env.GOOGLE_GEMINI_API_KEY)
 
   const rawQuestions = hasAI ? await generateFromContentAI(content, distribution, topic) : []
   const questions = ensureContentQuestionCount(rawQuestions, topic || 'Provided content', content, difficulty, count)
@@ -68,7 +68,13 @@ export async function POST(request: NextRequest) {
     data, 
     distribution,
     generated: questions.length,
-    method: hasAI ? 'Provider AI' : 'SkillTest_AI local content intelligence',
+    method: process.env.OPENAI_API_KEY
+      ? 'OpenAI'
+      : process.env.GROQ_API_KEY
+        ? 'Groq'
+        : process.env.GOOGLE_GEMINI_API_KEY
+          ? 'Gemini'
+          : 'SkillTest_AI local content intelligence',
   })
 }
 

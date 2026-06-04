@@ -182,7 +182,6 @@ export const submitQuizSchema = z
     answers: z.array(z.object({
       questionId: z.string().uuid(),
       selectedOption: z.number().int().min(0),
-      isCorrect: z.boolean(),
       timeSpent: z.number().int().min(0),
       questionDifficulty: difficultyLevelSchema.optional(),
       cognitiveLoadFlag: z.boolean().optional(),

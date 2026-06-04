@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
   // Calculate distribution
   const distribution = calculateDistribution(difficulty, count)
 
-  const hasAI = !!(process.env.OPENAI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY)
+  const hasAI = !!(process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY || process.env.GOOGLE_GEMINI_API_KEY)
 
   // Single AI call for all difficulty groups, or template fallback
   const questions = hasAI
@@ -71,7 +71,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  const generationMethod = process.env.OPENAI_API_KEY ? 'OpenAI' : process.env.GOOGLE_GEMINI_API_KEY ? 'Gemini' : 'Template-based'
+  const generationMethod = process.env.OPENAI_API_KEY
+    ? 'OpenAI'
+    : process.env.GROQ_API_KEY
+      ? 'Groq'
+      : process.env.GOOGLE_GEMINI_API_KEY
+        ? 'Gemini'
+        : 'Template-based'
   
   return NextResponse.json({ 
     data, 

@@ -444,7 +444,7 @@ export interface ParsedQuestion {
 
 export interface SubmitQuizInput {
   quiz_id: string
-  answers: QuizAnswer[]
+  answers: SubmittedQuizAnswer[]
   time_taken_seconds: number
 }
 
@@ -458,6 +458,16 @@ export interface QuizAnswer {
   questionId: string
   selectedOption: number
   isCorrect: boolean
+  timeSpent: number
+  questionDifficulty?: DifficultyLevel
+  cognitiveLoadFlag?: boolean
+  panicSignal?: boolean
+  adaptiveDifficulty?: DifficultyLevel
+}
+
+export interface SubmittedQuizAnswer {
+  questionId: string
+  selectedOption: number
   timeSpent: number
   questionDifficulty?: DifficultyLevel
   cognitiveLoadFlag?: boolean
