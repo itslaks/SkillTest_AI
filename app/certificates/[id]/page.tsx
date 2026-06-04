@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { CertificatePrintButton } from '@/components/certificates/certificate-print-button'
 import { CertificatePreview } from '@/components/certificates/certificate-preview'
+import { SafeBackButton } from '@/components/navigation/safe-back-button'
 import { getCertificateDisplay, getCertificateForViewer } from '@/lib/certificate-access'
 import { ArrowLeft, CalendarDays, CheckCircle2, Fingerprint, Trophy } from 'lucide-react'
 
@@ -27,9 +28,9 @@ export default async function CertificatePage({ params }: { params: Promise<{ id
   return (
     <div className="min-h-screen bg-zinc-100 p-4 print:bg-white md:p-8">
       <div className="mx-auto mb-5 flex max-w-6xl flex-wrap items-center justify-between gap-3 print:hidden">
-        <Button variant="ghost" asChild>
-          <Link href={`/profiles/${certificate.user_id}`}><ArrowLeft className="mr-2 h-4 w-4" />Back to profile</Link>
-        </Button>
+        <SafeBackButton fallbackHref={`/profiles/${certificate.user_id}`}>
+          <ArrowLeft className="mr-2 h-4 w-4" />Back to profile
+        </SafeBackButton>
         <CertificatePrintButton certificateId={certificate.id} />
       </div>
 

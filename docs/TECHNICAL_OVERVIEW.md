@@ -12,7 +12,7 @@ SkillTest_AI: Mavericks Execution Platform is a Next.js training management and 
 | Quizzes | Create, import, generate, publish/draft, assign, attempt, score, and analyze quizzes |
 | Assignment | Domain/vertical search and color-coded filters for large employee groups |
 | Certificates | Admin-configured thresholds, uploaded certificate format images, personalized certificate/course names, auto-issue triggers, and old-attempt backfill |
-| Badges | 250+ styled badges across 12+ categories with rarity, colors, shapes, and hardened award criteria |
+| Badges | Practical milestone catalog with quality, speed, streak, consistency, readiness, and domain award criteria |
 | Email | SMTP via Nodemailer first, Resend fallback, console fallback in development |
 | AI | OpenAI primary, Groq fallback, Gemini fallback, plus local deterministic stats where possible |
 | Chatbot | Manager/admin command chatbot answers true computed stats first, then AI summarizes only provided DB context with professional admin-facing wording |
@@ -133,8 +133,9 @@ Run SQL scripts in `scripts/` in numeric order. Current latest migration is:
 | `031_backfill_old_certificates.sql` | Adds certificate template columns and backfills old eligible certificates |
 | `032_harden_badge_awards.sql` | Tightens badge award rules so a single quiz completion does not unlock too many badges |
 | `033_harden_quiz_certificate_rls.sql` | Scopes direct reads of quiz attempts and certificates to learners and authorized training staff |
+| `034_reset_meaningful_badges.sql` | Clears earned badge awards and replaces the old catalog with a smaller useful milestone set |
 
-If `030` is already executed, run `031` after saving certificate rules in `/manager/admin`, then run `032` to harden badge awards, then run `033` to harden quiz-attempt and certificate RLS. It is safe to run `031` again because it uses conflict update.
+If `030` is already executed, run `031` after saving certificate rules in `/manager/admin`, then run `032` to harden badge awards, `033` to harden quiz-attempt and certificate RLS, and `034` to reset badges from scratch. It is safe to run `031` again because it uses conflict update.
 
 ## Verification
 

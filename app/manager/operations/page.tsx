@@ -299,10 +299,10 @@ export default async function ManagerOperationsPage() {
       <section className="rounded-[2rem] border border-zinc-900 bg-black p-6 text-white shadow-[0_40px_120px_rgba(0,0,0,0.55)] md:p-8 dashboard-grid-bg maverick-command-band">
         <div className="grid gap-6 xl:grid-cols-[0.82fr_1.18fr]">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-[10px] uppercase tracking-[0.35em] text-zinc-400">
+            <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-[10px] uppercase tracking-[0.18em] text-zinc-400 sm:tracking-[0.28em]">
               Training Execution Platform
             </div>
-            <h1 className="mt-4 text-3xl font-semibold tracking-tight md:text-5xl">Operations control room for batches, trainers, attendance, and reminders</h1>
+            <h1 className="mt-4 max-w-4xl text-3xl font-semibold tracking-tight md:text-5xl">Operations control room for training delivery</h1>
             <p className="mt-4 max-w-3xl text-sm leading-relaxed text-zinc-400">
               Your daily control room for batch health, attendance discipline, trainer ownership, reminders, feedback, and exports.
             </p>
@@ -325,6 +325,8 @@ export default async function ManagerOperationsPage() {
       </section>
 
       <CommandProofStrip metrics={proofMetrics} />
+
+      <QuickOpsStrip canCoordinate={canCoordinate} />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <ActionTile
@@ -370,7 +372,7 @@ export default async function ManagerOperationsPage() {
 
       {canCoordinate ? (
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <Card className="border-zinc-200 shadow-sm spotlight-card">
+        <Card id="create-batch" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
           <CardHeader>
             <CardTitle>Create Training Batch</CardTitle>
             <CardDescription>Keep setup simple: name the batch, choose a trainer, add learners, and optionally link assessments.</CardDescription>
@@ -446,7 +448,7 @@ export default async function ManagerOperationsPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-zinc-200 shadow-sm spotlight-card">
+        <Card id="schedule-session" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
           <CardHeader>
             <CardTitle>Session Planner & Notifications</CardTitle>
             <CardDescription>Schedule trainer-led sessions and trigger communication without leaving this screen.</CardDescription>
@@ -613,7 +615,7 @@ export default async function ManagerOperationsPage() {
 
       <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
         {canCoordinate ? (
-        <Card className="border-zinc-200 shadow-sm spotlight-card">
+        <Card id="assessment-setup" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
           <CardHeader>
             <CardTitle>Assessment Governance</CardTitle>
             <CardDescription>Define assessment type, date, template, question file, and score rules before trainers upload results.</CardDescription>
@@ -677,7 +679,7 @@ export default async function ManagerOperationsPage() {
         </Card>
         ) : null}
 
-        <Card className="border-zinc-200 shadow-sm spotlight-card">
+        <Card id="project-evaluation" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
           <CardHeader>
             <CardTitle>Project Evaluation Evidence</CardTitle>
             <CardDescription>Trainer-uploaded project scores and evidence filenames are tracked as a first-class TMS artifact.</CardDescription>
@@ -731,7 +733,7 @@ export default async function ManagerOperationsPage() {
       </div>
 
       {canCoordinate ? (
-      <Card id="feedback" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
+      <Card id="automation" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
         <CardHeader>
           <CardTitle>Automation Runbook</CardTitle>
           <CardDescription>Each governed check has a business rule, an operator override, and an audit record after execution.</CardDescription>
@@ -789,7 +791,7 @@ export default async function ManagerOperationsPage() {
       <TrainerScorecardDeck items={trainerScorecards} />
 
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <Card className="border-zinc-200 shadow-sm spotlight-card">
+        <Card id="feedback" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
           <CardHeader>
             <CardTitle>Live Batch Board</CardTitle>
             <CardDescription>Operational visibility across lifecycle, trainer ownership, enrolled learners, and linked assessments.</CardDescription>
@@ -1263,6 +1265,42 @@ function CommandProofStrip({ metrics }: { metrics: { brdReadiness: number; evide
           </Link>
         )
       })}
+    </section>
+  )
+}
+
+function QuickOpsStrip({ canCoordinate }: { canCoordinate: boolean }) {
+  const actions = [
+    { label: 'Create batch', detail: 'Set trainer, learners, dates', href: '#create-batch', icon: Users, adminOnly: true },
+    { label: 'Schedule session', detail: 'Trainer, agenda, attendance', href: '#schedule-session', icon: CalendarDays, adminOnly: true },
+    { label: 'Feedback', detail: 'Open windows and sentiment', href: '#feedback', icon: MessageSquareQuote, adminOnly: false },
+    { label: 'Attendance', detail: 'Upload or edit status', href: '#attendance', icon: ClipboardCheck, adminOnly: false },
+    { label: 'Assessment', detail: 'Upload scores and evidence', href: '#assessment', icon: FileSpreadsheet, adminOnly: false },
+    { label: 'Reports', detail: 'Excel and PDF exports', href: '/manager/reports', icon: FileText, adminOnly: false },
+  ].filter((item) => canCoordinate || !item.adminOnly)
+
+  return (
+    <section className="rounded-[1.5rem] border border-zinc-200 bg-white p-3 shadow-sm">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        {actions.map((action) => {
+          const Icon = action.icon
+          return (
+            <Link
+              key={action.label}
+              href={action.href}
+              className="group flex min-w-0 items-center gap-3 rounded-2xl border border-zinc-100 bg-zinc-50 px-3 py-3 text-left transition hover:border-zinc-300 hover:bg-white"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-zinc-950 text-white transition group-hover:bg-cyan-600">
+                <Icon className="h-4 w-4" />
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold text-zinc-950">{action.label}</span>
+                <span className="block truncate text-xs text-zinc-500">{action.detail}</span>
+              </span>
+            </Link>
+          )
+        })}
+      </div>
     </section>
   )
 }

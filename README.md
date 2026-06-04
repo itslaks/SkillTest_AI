@@ -294,9 +294,9 @@ Run the SQL scripts in `scripts/` in numeric order.
 
 | Scenario | What To Run |
 |---|---|
-| Fresh Supabase project | Run `001` through `033` |
-| Existing DB already at `030` | Run `031_backfill_old_certificates.sql`, `032_harden_badge_awards.sql`, then `033_harden_quiz_certificate_rls.sql` |
-| Current project state | Migration `033` is the latest schema hardening step and should be applied after `032` |
+| Fresh Supabase project | Run `001` through `034` |
+| Existing DB already at `030` | Run `031_backfill_old_certificates.sql`, `032_harden_badge_awards.sql`, `033_harden_quiz_certificate_rls.sql`, then `034_reset_meaningful_badges.sql` |
+| Current project state | Migration `034` is the latest badge reset step and should be applied after `033` |
 
 ### 🧾 Latest Migration
 
@@ -307,6 +307,7 @@ Run the SQL scripts in `scripts/` in numeric order.
 | `031_backfill_old_certificates.sql` | Adds certificate template personalization fields and issues missing certificates for old completed attempts that already meet enabled certificate rules |
 | `032_harden_badge_awards.sql` | Makes badge awards more selective so one quiz completion does not unlock large batches of badges |
 | `033_harden_quiz_certificate_rls.sql` | Restricts direct Supabase reads for quiz attempts and certificates while preserving learner and scoped training-staff access |
+| `034_reset_meaningful_badges.sql` | Clears existing employee badge awards and replaces the catalog with a smaller useful milestone set while preserving quiz and training history |
 
 ### ⚠️ Important Database Notes
 
@@ -321,6 +322,7 @@ Run the SQL scripts in `scripts/` in numeric order.
 | Old Quiz Certificates | Enable certificate rules in `/manager/admin`, set threshold/template, then run migration `031` to backfill old attempts |
 | Badge Awards | Migration `032` should be applied after the badge expansion so employee badges are harder to unlock and reflect sustained achievement |
 | Attempt And Certificate Privacy | Migration `033` should be applied after `032` to prevent broad direct reads of answer JSON, certificate identity, and score data |
+| Badge Reset | Migration `034` starts employee badges from scratch with a smaller useful catalog; it does not delete quiz attempts or training records |
 
 ---
 
@@ -558,7 +560,7 @@ npx playwright install chromium
 
 | Item | Required |
 |---|---:|
-| Supabase migrations through `033` applied | Required |
+| Supabase migrations through `034` applied | Required |
 | Real Supabase URL/anon/service keys configured | ✅ |
 | `CRON_SECRET` configured | Recommended |
 | AI provider key configured | Recommended |

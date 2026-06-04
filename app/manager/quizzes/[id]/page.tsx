@@ -14,6 +14,7 @@ import { QuizToggleActive } from '@/components/manager/quiz-toggle-active'
 import { QuizAssignmentManager } from '@/components/manager/quiz-assignment-manager'
 import { AssessmentAnalyzer } from '@/components/manager/assessment-analyzer'
 import { QuickDeleteButton } from '@/components/manager/quick-delete-button'
+import { SafeBackButton } from '@/components/navigation/safe-back-button'
 
 const difficultyColors: Record<string, string> = {
   easy: 'bg-green-100 text-green-700',
@@ -68,9 +69,9 @@ export default async function QuizDetailPage({ params, searchParams }: { params:
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/manager/quizzes"><ArrowLeft className="h-4 w-4" /></Link>
-        </Button>
+        <SafeBackButton fallbackHref="/manager/quizzes" size="icon" className="shrink-0">
+          <ArrowLeft className="h-4 w-4" />
+        </SafeBackButton>
         <div className="flex-1">
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{quiz.title}</h1>
           <p className="text-muted-foreground">{quiz.description || quiz.topic}</p>

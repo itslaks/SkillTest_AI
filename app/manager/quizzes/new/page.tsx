@@ -15,11 +15,11 @@ import {
   Shuffle, Eye, Hash, BookOpen, Zap, ChevronRight,
   Info, XCircle, Settings2, FileUp,
 } from 'lucide-react'
-import Link from 'next/link'
 import type { DifficultyLevel, ParsedQuestion } from '@/lib/types/database'
 import { cn } from '@/lib/utils'
 import * as XLSX from 'xlsx'
 import { AISetupInstructions } from '@/components/manager/ai-setup-instructions'
+import { SafeBackButton } from '@/components/navigation/safe-back-button'
 
 const ALL_DIFFICULTIES: DifficultyLevel[] = ['easy', 'medium', 'hard', 'advanced', 'hardcore']
 
@@ -231,9 +231,9 @@ export default function NewQuizPage() {
     <div className="max-w-3xl mx-auto">
       {/* Top bar */}
       <div className="flex items-center gap-4 mb-8">
-        <Button variant="ghost" size="icon" asChild className="rounded-xl">
-          <Link href="/manager/quizzes"><ArrowLeft className="h-4 w-4" /></Link>
-        </Button>
+        <SafeBackButton fallbackHref="/manager/quizzes" size="icon" className="rounded-xl">
+          <ArrowLeft className="h-4 w-4" />
+        </SafeBackButton>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Create New Quiz</h1>
           <p className="text-sm text-muted-foreground">Set up your employee assessment in 3 easy steps</p>

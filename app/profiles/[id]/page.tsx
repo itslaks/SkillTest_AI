@@ -4,6 +4,7 @@ import Image from 'next/image'
 import { getDomainColor } from '@/lib/domain-colors'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { SafeBackButton } from '@/components/navigation/safe-back-button'
 import Link from 'next/link'
 import {
   ArrowLeft,
@@ -43,9 +44,9 @@ export default async function ProfileDashboardPage({ params }: { params: Promise
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-8">
-      <Button variant="ghost" asChild>
-        <Link href="/profiles"><ArrowLeft className="mr-2 h-4 w-4" />Back to profiles</Link>
-      </Button>
+      <SafeBackButton fallbackHref="/profiles">
+        <ArrowLeft className="mr-2 h-4 w-4" />Back to profiles
+      </SafeBackButton>
 
       <section className="overflow-hidden rounded-3xl border border-zinc-900 bg-black text-white shadow-[0_40px_140px_rgba(0,0,0,0.45)]">
         <div className={`h-2 bg-gradient-to-r ${domainStyle.gradient}`} />

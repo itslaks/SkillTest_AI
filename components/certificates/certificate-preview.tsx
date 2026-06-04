@@ -75,13 +75,8 @@ export function CertificatePreview({
           <p className={`mt-3 font-semibold text-zinc-950 ${compact ? 'text-xs' : 'text-base'}`}>{topic}</p>
         </div>
 
-        <footer className="grid grid-cols-3 items-end gap-4 text-left">
+        <footer className="grid grid-cols-2 items-end gap-4 border-t border-zinc-200 pt-4 text-left">
           <Meta label="Issue Date" value={issueDate || 'On completion'} compact={compact} />
-          <div className="text-center">
-            <div className="mx-auto h-px w-32 bg-zinc-400" />
-            <p className={`mt-2 font-semibold text-zinc-950 ${compact ? 'text-[10px]' : 'text-xs'}`}>Authorized Signature</p>
-            <p className={`text-zinc-500 ${compact ? 'text-[9px]' : 'text-[11px]'}`}>{presenter}</p>
-          </div>
           <div className="text-right">
             <Meta label="Score" value={scoreLabel} compact={compact} align="right" />
             {employeeId && <p className={`mt-1 text-zinc-500 ${compact ? 'text-[9px]' : 'text-[11px]'}`}>Employee ID: {employeeId}</p>}
