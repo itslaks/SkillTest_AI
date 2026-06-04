@@ -10,7 +10,14 @@ export async function POST(request: NextRequest) {
   if (auth instanceof NextResponse) return auth
   const { userId } = auth
 
-  const { batchId, records, fileName, chunkIndex, chunkTotal } = await request.json()
+  let payload: any
+  try {
+    payload = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid upload payload. Please retry with the template file.' }, { status: 400 })
+  }
+
+  const { batchId, records, fileName, chunkIndex, chunkTotal } = payload
   if (!batchId || !Array.isArray(records) || records.length === 0) {
     return NextResponse.json({ error: 'Batch and candidate rows are required.' }, { status: 400 })
   }
@@ -20,7 +27,7 @@ export async function POST(request: NextRequest) {
     .from('training_batches')
     .select('id, title')
     .eq('id', batchId)
-    .single()
+    .maybeSingle()
 
   if (batchError || !batch) {
     return NextResponse.json({ error: batchError?.message || 'Batch not found.' }, { status: 404 })
@@ -96,7 +103,7 @@ export async function POST(request: NextRequest) {
     }
 
     const previousByUser = new Map((previousRows || []).map((row: any) => [row.user_id, row]))
-    await admin.from('training_batch_change_audit').insert({
+    const { error: auditError } = await admin.from('training_batch_change_audit').insert({
       batch_id: batchId,
       change_type: 'batch_candidate_excel_import',
       previous_value: { existing_members_updated: previousRows?.length || 0 },
@@ -111,9 +118,12 @@ export async function POST(request: NextRequest) {
       },
       changed_by: userId,
     })
+    if (auditError) {
+      return NextResponse.json({ error: `Candidate rows were saved, but audit logging failed: ${auditError.message}` }, { status: 500 })
+    }
   }
 
-  await admin.from('training_notifications').insert({
+  const { error: notificationError } = await admin.from('training_notifications').insert({
     batch_id: batchId,
     title: `Candidate upload processed: ${batch.title}`,
     message: `${rows.length} candidate(s) assigned from ${fileName || 'candidate upload'}. ${errors.length} row(s) need review.`,
@@ -123,6 +133,9 @@ export async function POST(request: NextRequest) {
     sent_at: new Date().toISOString(),
     created_by: userId,
   })
+  if (notificationError) {
+    return NextResponse.json({ error: `Candidate upload completed, but notification logging failed: ${notificationError.message}` }, { status: 500 })
+  }
 
   return NextResponse.json({
     success: true,

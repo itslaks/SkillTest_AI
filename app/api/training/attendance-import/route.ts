@@ -10,7 +10,14 @@ export async function POST(request: NextRequest) {
   if (auth instanceof NextResponse) return auth
   const { userId, role } = auth
 
-  const { sessionId, records, fileName, chunkIndex, chunkTotal, lateReason } = await request.json()
+  let payload: any
+  try {
+    payload = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid attendance upload payload. Please retry with the attendance template.' }, { status: 400 })
+  }
+
+  const { sessionId, records, fileName, chunkIndex, chunkTotal, lateReason } = payload
   if (!sessionId || !Array.isArray(records) || records.length === 0) {
     return NextResponse.json({ error: 'Session and attendance rows are required.' }, { status: 400 })
   }
@@ -20,7 +27,7 @@ export async function POST(request: NextRequest) {
     .from('training_sessions')
     .select('id, title, batch_id, session_date, batch:batch_id(title)')
     .eq('id', sessionId)
-    .single()
+    .maybeSingle()
 
   if (sessionError || !session) {
     return NextResponse.json({ error: sessionError?.message || 'Session not found.' }, { status: 404 })
@@ -174,11 +181,14 @@ export async function POST(request: NextRequest) {
       }
     })
     for (let i = 0; i < versionRows.length; i += 500) {
-      await admin.from('session_attendance_versions').insert(versionRows.slice(i, i + 500))
+      const { error: versionError } = await admin.from('session_attendance_versions').insert(versionRows.slice(i, i + 500))
+      if (versionError) {
+        return NextResponse.json({ error: `Attendance was saved, but version logging failed: ${versionError.message}` }, { status: 500 })
+      }
     }
   }
 
-  await admin.from('training_attendance_uploads').insert({
+  const { error: uploadLogError } = await admin.from('training_attendance_uploads').insert({
     session_id: sessionId,
     batch_id: session.batch_id,
     uploaded_by: userId,
@@ -192,8 +202,11 @@ export async function POST(request: NextRequest) {
     chunk_index: Number.isFinite(Number(chunkIndex)) ? Number(chunkIndex) : null,
     chunk_total: Number.isFinite(Number(chunkTotal)) ? Number(chunkTotal) : null,
   })
+  if (uploadLogError) {
+    return NextResponse.json({ error: `Attendance was saved, but upload logging failed: ${uploadLogError.message}` }, { status: 500 })
+  }
 
-  const { data: notification } = await admin.from('training_notifications').insert({
+  const { data: notification, error: notificationError } = await admin.from('training_notifications').insert({
     batch_id: session.batch_id,
     session_id: sessionId,
     title: `Attendance uploaded: ${session.title}`,
@@ -203,9 +216,12 @@ export async function POST(request: NextRequest) {
     delivery_status: 'queued',
     created_by: userId,
   }).select('id').single()
+  if (notificationError) {
+    return NextResponse.json({ error: `Attendance upload completed, but notification logging failed: ${notificationError.message}` }, { status: 500 })
+  }
 
   // Send real email confirmation to uploader
-  const { data: uploaderProfile } = await admin.from('profiles').select('full_name, email').eq('id', userId).single()
+  const { data: uploaderProfile } = await admin.from('profiles').select('full_name, email').eq('id', userId).maybeSingle()
   if (uploaderProfile?.email) {
     const html = buildUploadConfirmationEmail({
       uploaderName: uploaderProfile.full_name || uploaderProfile.email,

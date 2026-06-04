@@ -674,7 +674,7 @@ export async function createTrainingBatch(formData: FormData): Promise<ApiRespon
     if (quizError) return { error: `Batch created, but assessment linking failed: ${quizError.message}` }
   }
 
-  await admin.from('training_notifications').insert({
+  const { error: notificationError } = await admin.from('training_notifications').insert({
     batch_id: batch.id,
     title: `Batch created: ${title}`,
     message: `A new training batch has been created with ${employeeIds.length} learner(s) and ${quizIds.length} linked assessment(s).`,
@@ -684,8 +684,9 @@ export async function createTrainingBatch(formData: FormData): Promise<ApiRespon
     sent_at: new Date().toISOString(),
     created_by: userId,
   })
+  if (notificationError) return { error: `Batch created, but notification logging failed: ${notificationError.message}` }
 
-  await admin.from('training_batch_change_audit').insert({
+  const { error: auditError } = await admin.from('training_batch_change_audit').insert({
     batch_id: batch.id,
     change_type: 'batch_created',
     previous_value: null,
@@ -701,6 +702,7 @@ export async function createTrainingBatch(formData: FormData): Promise<ApiRespon
     },
     changed_by: userId,
   })
+  if (auditError) return { error: `Batch created, but audit logging failed: ${auditError.message}` }
 
   revalidatePath('/manager')
   revalidatePath('/manager/operations')
@@ -727,7 +729,11 @@ export async function updateBatchMemberStatus(formData: FormData): Promise<ApiRe
     .from('batch_members')
     .select('*')
     .eq('id', memberId)
-    .single()
+    .maybeSingle()
+
+  if (!previous) {
+    return { error: 'Batch member was not found.' }
+  }
 
   const { error } = await admin
     .from('batch_members')
@@ -739,7 +745,7 @@ export async function updateBatchMemberStatus(formData: FormData): Promise<ApiRe
 
   if (error) return { error: error.message }
 
-  await admin.from('training_batch_change_audit').insert({
+  const { error: auditError } = await admin.from('training_batch_change_audit').insert({
     batch_id: previous?.batch_id || null,
     change_type: 'batch_member_status_update',
     previous_value: previous || null,
@@ -750,6 +756,7 @@ export async function updateBatchMemberStatus(formData: FormData): Promise<ApiRe
     },
     changed_by: userId,
   })
+  if (auditError) return { error: `Member status updated, but audit logging failed: ${auditError.message}` }
 
   revalidatePath('/manager')
   revalidatePath('/manager/operations')
@@ -773,9 +780,13 @@ export async function updateTrainingBatchStatus(formData: FormData): Promise<Api
     .from('training_batches')
     .select('id, title, status')
     .eq('id', batchId)
-    .single()
+    .maybeSingle()
 
-  if (currentBatch && !canTransitionBatchStatus(currentBatch.status, status)) {
+  if (!currentBatch) {
+    return { error: 'Training batch was not found.' }
+  }
+
+  if (!canTransitionBatchStatus(currentBatch.status, status)) {
     return { error: `Invalid lifecycle transition: ${normalizeBatchStatus(currentBatch.status)} cannot move directly to ${status}.` }
   }
 
@@ -798,7 +809,7 @@ export async function updateTrainingBatchStatus(formData: FormData): Promise<Api
     return { error: 'You do not have permission to update this batch.' }
   }
 
-  await admin.from('training_notifications').insert({
+  const { error: notificationError } = await admin.from('training_notifications').insert({
     batch_id: batchId,
     title: `Batch status changed: ${currentBatch?.title || 'Training batch'}`,
     message: `Lifecycle moved from ${(currentBatch?.status || 'planned').replace('_', ' ')} to ${status}.`,
@@ -808,6 +819,7 @@ export async function updateTrainingBatchStatus(formData: FormData): Promise<Api
     sent_at: new Date().toISOString(),
     created_by: userId,
   })
+  if (notificationError) return { error: `Batch status updated, but notification logging failed: ${notificationError.message}` }
 
   revalidatePath('/manager')
   revalidatePath('/manager/operations')
@@ -837,9 +849,13 @@ export async function updateTrainingBatchDetails(formData: FormData): Promise<Ap
     .from('training_batches')
     .select('*')
     .eq('id', batchId)
-    .single()
+    .maybeSingle()
 
-  if (previous && !canTransitionBatchStatus(previous.status, status)) {
+  if (!previous) {
+    return { error: 'Training batch was not found.' }
+  }
+
+  if (!canTransitionBatchStatus(previous.status, status)) {
     return { error: `Invalid lifecycle transition: ${normalizeBatchStatus(previous.status)} cannot move directly to ${status}.` }
   }
 
@@ -867,9 +883,10 @@ export async function updateTrainingBatchDetails(formData: FormData): Promise<Ap
   if (error) return { error: error.message }
   if (!updatedRows?.length) return { error: 'You do not have permission to update this batch.' }
 
+  const { error: trainerDeleteError } = await admin.from('training_batch_trainers').delete().eq('batch_id', batchId)
+  if (trainerDeleteError) return { error: `Batch updated, but existing trainer assignments could not be cleared: ${trainerDeleteError.message}` }
   if (trainerIds.length > 0) {
-    await admin.from('training_batch_trainers').delete().eq('batch_id', batchId)
-    await admin.from('training_batch_trainers').insert(
+    const { error: trainerError } = await admin.from('training_batch_trainers').insert(
       trainerIds.map((trainerId, index) => ({
         batch_id: batchId,
         trainer_id: trainerId,
@@ -877,15 +894,17 @@ export async function updateTrainingBatchDetails(formData: FormData): Promise<Ap
         assigned_by: userId,
       }))
     )
+    if (trainerError) return { error: `Batch updated, but trainer assignment failed: ${trainerError.message}` }
   }
 
-  await admin.from('training_batch_change_audit').insert({
+  const { error: auditError } = await admin.from('training_batch_change_audit').insert({
     batch_id: batchId,
     change_type: 'batch_details_update',
     previous_value: previous || null,
     new_value: { title, description, domain, status, startDate, endDate, trainerIds },
     changed_by: userId,
   })
+  if (auditError) return { error: `Batch updated, but audit logging failed: ${auditError.message}` }
 
   revalidatePath('/manager/operations')
   revalidatePath('/employee/training')
@@ -942,10 +961,11 @@ export async function createTrainingSession(formData: FormData): Promise<ApiResp
       updated_by: userId,
     }))
 
-    await admin.from('session_attendance').upsert(attendanceRows, { onConflict: 'session_id,user_id' })
+    const { error: attendanceError } = await admin.from('session_attendance').upsert(attendanceRows, { onConflict: 'session_id,user_id' })
+    if (attendanceError) return { error: `Session created, but attendance setup failed: ${attendanceError.message}` }
   }
 
-  await admin.from('training_notifications').insert({
+  const { error: notificationError } = await admin.from('training_notifications').insert({
     batch_id: batchId,
     session_id: session.id,
     title: `New session scheduled: ${title}`,
@@ -956,6 +976,7 @@ export async function createTrainingSession(formData: FormData): Promise<ApiResp
     sent_at: new Date().toISOString(),
     created_by: userId,
   })
+  if (notificationError) return { error: `Session created, but notification logging failed: ${notificationError.message}` }
 
   revalidatePath('/manager')
   revalidatePath('/manager/operations')
@@ -982,7 +1003,7 @@ export async function updateAttendanceStatus(formData: FormData): Promise<ApiRes
     .from('training_sessions')
     .select('id, batch_id, trainer_id, batch:batch_id(created_by, coordinator_id, trainer_id)')
     .eq('id', sessionId)
-    .single()
+    .maybeSingle()
 
   if (!session) return { error: 'Session not found.' }
 
@@ -1038,9 +1059,9 @@ export async function updateAttendanceStatus(formData: FormData): Promise<ApiRes
     .select('id')
     .eq('session_id', sessionId)
     .eq('user_id', userTargetId)
-    .single()
+    .maybeSingle()
 
-  await admin.from('session_attendance_versions').insert({
+  const { error: versionError } = await admin.from('session_attendance_versions').insert({
     attendance_id: current?.id || previous?.id || null,
     session_id: sessionId,
     user_id: userTargetId,
@@ -1051,6 +1072,7 @@ export async function updateAttendanceStatus(formData: FormData): Promise<ApiRes
     changed_by: userId,
     source: 'manual',
   })
+  if (versionError) return { error: `Attendance updated, but change history failed: ${versionError.message}` }
 
   revalidatePath('/manager/operations')
   revalidatePath('/employee/training')
@@ -1142,7 +1164,7 @@ export async function createTrainingAssessmentSetup(formData: FormData): Promise
 
   if (error) return { error: error.message }
 
-  await admin.from('training_notifications').insert({
+  const { error: notificationError } = await admin.from('training_notifications').insert({
     batch_id: batchId,
     title: `Assessment scheduled: ${title}`,
     message: scheduledAt ? `Assessment is scheduled for ${new Date(scheduledAt).toLocaleString()}.` : 'Assessment setup has been created.',
@@ -1152,6 +1174,7 @@ export async function createTrainingAssessmentSetup(formData: FormData): Promise
     scheduled_for: scheduledAt,
     created_by: userId,
   })
+  if (notificationError) return { error: `Assessment setup created, but notification logging failed: ${notificationError.message}` }
 
   revalidatePath('/manager/operations')
   return { data: true }
@@ -1183,7 +1206,7 @@ export async function createProjectEvaluation(formData: FormData): Promise<ApiRe
       .from('training_batches')
       .select('trainer_id')
       .eq('id', batchId)
-      .single()
+      .maybeSingle()
     if (!assignment && batch?.trainer_id !== userId) return { error: 'Trainer access is limited to assigned batches.' }
   }
 
@@ -1539,7 +1562,7 @@ export async function createFeedbackWindow(formData: FormData): Promise<ApiRespo
     return { error: error?.message || 'Unable to open feedback window.' }
   }
 
-  const { data: notification } = await admin
+  const { data: notification, error: notificationError } = await admin
     .from('training_notifications')
     .insert({
       batch_id: batchId,
@@ -1553,6 +1576,7 @@ export async function createFeedbackWindow(formData: FormData): Promise<ApiRespo
     })
     .select('id')
     .single()
+  if (notificationError) return { error: `Feedback window opened, but notification logging failed: ${notificationError.message}` }
 
   const { data: members } = await admin
     .from('batch_members')
@@ -1560,7 +1584,7 @@ export async function createFeedbackWindow(formData: FormData): Promise<ApiRespo
     .eq('batch_id', batchId)
 
   // Send real feedback request emails to all batch members
-  const { data: batchInfo } = await admin.from('training_batches').select('title').eq('id', batchId).single()
+  const { data: batchInfo } = await admin.from('training_batches').select('title').eq('id', batchId).maybeSingle()
   let sendAttempts = 0
   let sendFailures = 0
   for (const member of members || []) {
