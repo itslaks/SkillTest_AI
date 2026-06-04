@@ -23,7 +23,6 @@ import { BatchComparisonChart } from '@/components/manager/batch-comparison-char
 import { BatchMemberStatusDropdown } from '@/components/manager/batch-member-status-dropdown'
 import { OpsAutoRefresh } from '@/components/manager/ops-auto-refresh'
 import { FeedbackSentimentChart } from '@/components/manager/feedback-sentiment-chart'
-import { adminGuideQuickStart } from '@/lib/manager-docs'
 import { createAdminClient } from '@/lib/supabase/server'
 import {
   BellRing,
@@ -90,8 +89,12 @@ async function createProjectEvaluationAction(formData: FormData) {
 
 async function runTrainingAutomationAction(formData: FormData) {
   'use server'
-  const result = await runTrainingAutomation(formData)
-  redirectWithOpsResult(result, 'Automation run completed.', 'automation')
+  try {
+    const result = await runTrainingAutomation(formData)
+    redirectWithOpsResult(result, 'Automation run completed.', 'automation')
+  } catch (error: any) {
+    redirectWithOpsResult({ error: error?.message || 'Automation run failed.' }, 'Automation run completed.', 'automation')
+  }
 }
 
 function redirectWithOpsResult(result: { error?: string } | unknown, success: string, anchor: string) {
@@ -358,12 +361,6 @@ export default async function ManagerOperationsPage({
         assessmentClearance={overallAssessmentClearance}
         negativeFeedback={summary.negativeFeedbackCount}
       />
-
-      <CommandProofStrip metrics={proofMetrics} />
-
-      <QuickOpsStrip canCoordinate={canCoordinate} />
-
-      <GuidedOpsPath />
 
       {(operationMessage?.ops_status || operationMessage?.ops_error) ? (
         <div className={`rounded-2xl border p-4 text-sm font-medium ${
@@ -823,22 +820,8 @@ export default async function ManagerOperationsPage({
       </Card>
       ) : null}
 
-      <ScheduleTimeline items={scheduleTimeline} />
-
-      <AssessmentDocumentLibrary
-        assessments={assessmentSetups}
-        projectEvaluations={projectEvaluations}
-        batches={batches.map((batch: any) => ({ id: batch.id, title: batch.title }))}
-      />
-
-      {batchComparisonData.length > 0 && (
-        <BatchComparisonChart data={batchComparisonData} />
-      )}
-
-      <TrainerScorecardDeck items={trainerScorecards} />
-
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <Card id="feedback" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
+        <Card id="batch-board" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
           <CardHeader>
             <CardTitle>Live Batch Board</CardTitle>
             <CardDescription>Operational visibility across lifecycle, trainer ownership, enrolled learners, and linked assessments.</CardDescription>
@@ -965,7 +948,7 @@ export default async function ManagerOperationsPage({
           </CardContent>
         </Card>
 
-        <Card id="batch-board" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
+        <Card id="feedback" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
           <CardHeader>
             <CardTitle>Feedback & Reminder Pulse</CardTitle>
             <CardDescription>Recent learner sentiment and communication activity tied to training execution.</CardDescription>
@@ -1188,6 +1171,22 @@ export default async function ManagerOperationsPage({
         </CardContent>
       </Card>
 
+      <ScheduleTimeline items={scheduleTimeline} />
+
+      <AssessmentDocumentLibrary
+        assessments={assessmentSetups}
+        projectEvaluations={projectEvaluations}
+        batches={batches.map((batch: any) => ({ id: batch.id, title: batch.title }))}
+      />
+
+      {batchComparisonData.length > 0 && (
+        <BatchComparisonChart data={batchComparisonData} />
+      )}
+
+      <TrainerScorecardDeck items={trainerScorecards} />
+
+      <CommandProofStrip metrics={proofMetrics} />
+
       <div className="grid gap-6 xl:grid-cols-4">
         <AuditPanel
           title="Batch Change Audit"
@@ -1316,42 +1315,6 @@ function CommandProofStrip({ metrics }: { metrics: { brdReadiness: number; evide
   )
 }
 
-function QuickOpsStrip({ canCoordinate }: { canCoordinate: boolean }) {
-  const actions = [
-    { label: 'Create batch', detail: 'Set trainer, learners, dates', href: '#create-batch', icon: Users, adminOnly: true },
-    { label: 'Schedule session', detail: 'Trainer, agenda, attendance', href: '#schedule-session', icon: CalendarDays, adminOnly: true },
-    { label: 'Feedback', detail: 'Open windows and sentiment', href: '#feedback', icon: MessageSquareQuote, adminOnly: false },
-    { label: 'Attendance', detail: 'Upload or edit status', href: '#attendance', icon: ClipboardCheck, adminOnly: false },
-    { label: 'Assessment', detail: 'Upload scores and evidence', href: '#assessment', icon: FileSpreadsheet, adminOnly: false },
-    { label: 'Reports', detail: 'Excel and PDF exports', href: '/manager/reports', icon: FileText, adminOnly: false },
-  ].filter((item) => canCoordinate || !item.adminOnly)
-
-  return (
-    <section className="rounded-[1.5rem] border border-zinc-200 bg-white p-3 shadow-sm">
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        {actions.map((action) => {
-          const Icon = action.icon
-          return (
-            <Link
-              key={action.label}
-              href={action.href}
-              className="group flex min-w-0 items-center gap-3 rounded-2xl border border-zinc-100 bg-zinc-50 px-3 py-3 text-left transition hover:border-zinc-300 hover:bg-white"
-            >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-zinc-950 text-white transition group-hover:bg-cyan-600">
-                <Icon className="h-4 w-4" />
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold text-zinc-950">{action.label}</span>
-                <span className="block truncate text-xs text-zinc-500">{action.detail}</span>
-              </span>
-            </Link>
-          )
-        })}
-      </div>
-    </section>
-  )
-}
-
 function PriorityOpsWorkbench({
   canCoordinate,
   attendanceDue,
@@ -1372,6 +1335,22 @@ function PriorityOpsWorkbench({
   negativeFeedback: number
 }) {
   const tasks = [
+    {
+      title: 'Add employees',
+      detail: 'Create learners with Employee ID and Domain',
+      href: '/manager/employees',
+      icon: Users,
+      tone: 'border-emerald-200 bg-emerald-50 text-emerald-950',
+      enabled: canCoordinate,
+    },
+    {
+      title: 'Assign quiz',
+      detail: 'Create or assign assessment before batch execution',
+      href: '/manager/quizzes',
+      icon: FileText,
+      tone: 'border-violet-200 bg-violet-50 text-violet-950',
+      enabled: canCoordinate,
+    },
     {
       title: 'Fix attendance first',
       detail: attendanceDue > 0 ? `${attendanceDue} session(s) need attention` : 'No overdue attendance right now',
@@ -1465,32 +1444,6 @@ function PriorityOpsWorkbench({
             </Link>
           )
         })}
-      </div>
-    </section>
-  )
-}
-
-function GuidedOpsPath() {
-  return (
-    <section className="rounded-[1.5rem] border border-zinc-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-sm font-semibold text-zinc-950">Recommended admin workflow</p>
-          <p className="mt-1 text-sm text-zinc-500">Follow this order when Training Ops feels confusing.</p>
-        </div>
-        <Button asChild variant="outline" className="w-fit rounded-full">
-          <Link href="/manager/docs">Open full A to Z guide</Link>
-        </Button>
-      </div>
-      <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-        {adminGuideQuickStart.slice(0, 8).map((step, index) => (
-          <div key={step} className="flex gap-3 rounded-2xl border border-zinc-100 bg-zinc-50 p-3">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-950 text-[11px] font-bold text-white">
-              {index + 1}
-            </div>
-            <p className="text-sm leading-5 text-zinc-700">{step}</p>
-          </div>
-        ))}
       </div>
     </section>
   )
