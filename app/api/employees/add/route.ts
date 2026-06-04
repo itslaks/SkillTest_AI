@@ -30,18 +30,6 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        // Check if employee already exists
-        const { data: existing } = await supabase
-          .from('profiles')
-          .select('id, email')
-          .eq('email', email)
-          .single()
-
-        if (existing) {
-          errors.push(`Employee with email ${email} already exists`)
-          continue
-        }
-
         const { profile, warning } = await createEmployeeWithSetupEmail(supabase, {
           email,
           fullName: full_name,
@@ -51,7 +39,7 @@ export async function POST(request: NextRequest) {
         })
 
         if (warning) {
-          errors.push(`Employee ${email} was added, but setup email failed: ${warning}`)
+          errors.push(`Employee ${email}: ${warning}`)
         }
 
         results.push(profile)

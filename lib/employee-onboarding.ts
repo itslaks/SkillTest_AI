@@ -31,6 +31,22 @@ export async function createEmployeeWithSetupEmail(
     throw new Error('Employee ID and domain are required')
   }
 
+  const { data: existingProfile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('email', email)
+    .maybeSingle()
+
+  if (existingProfile) {
+    return updateExistingEmployeeProfile(supabase, existingProfile as Profile, {
+      email,
+      fullName,
+      employeeId,
+      department: input.department || domain,
+      domain,
+    })
+  }
+
   const { data: authData, error: authError } = await supabase.auth.admin.createUser({
     email,
     password: tempPassword,
@@ -42,6 +58,25 @@ export async function createEmployeeWithSetupEmail(
   })
 
   if (authError || !authData.user) {
+    if (isDuplicateAuthUserError(authError?.message)) {
+      const { data: profileAfterAuthConflict } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('email', email)
+        .maybeSingle()
+
+      if (profileAfterAuthConflict) {
+        return updateExistingEmployeeProfile(supabase, profileAfterAuthConflict as Profile, {
+          email,
+          fullName,
+          employeeId,
+          department: input.department || domain,
+          domain,
+        })
+      }
+
+      throw new Error(`Auth account already exists for ${email}, but no employee profile was found. Ask an admin to link or remove that auth user, then retry.`)
+    }
     throw new Error(authError?.message || 'Could not create user')
   }
 
@@ -60,6 +95,24 @@ export async function createEmployeeWithSetupEmail(
     .single()
 
   if (profileError) {
+    if (profileError.code === '23505') {
+      const { data: profileById } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authData.user.id)
+        .maybeSingle()
+
+      if (profileById) {
+        return updateExistingEmployeeProfile(supabase, profileById as Profile, {
+          email,
+          fullName,
+          employeeId,
+          department: input.department || domain,
+          domain,
+        })
+      }
+    }
+
     await supabase.auth.admin.deleteUser(authData.user.id)
     throw new Error(profileError.message)
   }
@@ -69,6 +122,55 @@ export async function createEmployeeWithSetupEmail(
     profile: profile as Profile,
     warning: setupResult.success ? undefined : setupResult.error,
   }
+}
+
+async function updateExistingEmployeeProfile(
+  supabase: AdminClient,
+  profile: Profile,
+  input: {
+    email: string
+    fullName: string
+    employeeId: string
+    department: string | null
+    domain: string
+  },
+): Promise<EmployeeOnboardingResult> {
+  if (profile.role !== 'employee') {
+    throw new Error(`A ${profile.role} profile already exists for ${input.email}. Use the user management screen to edit this account instead of adding it as an employee.`)
+  }
+
+  const { data: updatedProfile, error } = await supabase
+    .from('profiles')
+    .update({
+      email: input.email,
+      full_name: input.fullName,
+      employee_id: input.employeeId,
+      department: input.department,
+      domain: input.domain,
+      role: 'employee',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', profile.id)
+    .select()
+    .single()
+
+  if (error || !updatedProfile) {
+    throw new Error(error?.message || 'Could not update existing employee profile')
+  }
+
+  const setupResult = await sendEmployeeSetupEmail(supabase, input.email, input.fullName)
+  return {
+    profile: updatedProfile as Profile,
+    warning: setupResult.success ? 'Employee already existed; profile details were updated and setup email was resent.' : `Employee already existed and profile was updated, but setup email failed: ${setupResult.error}`,
+  }
+}
+
+function isDuplicateAuthUserError(message?: string | null) {
+  if (!message) return false
+  const normalized = message.toLowerCase()
+  return normalized.includes('already registered')
+    || normalized.includes('already exists')
+    || normalized.includes('duplicate')
 }
 
 export async function sendEmployeeSetupEmail(

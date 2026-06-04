@@ -11,6 +11,7 @@ import {
   updateAttendanceStatus,
 } from '@/lib/actions/training'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -40,47 +41,64 @@ import {
 
 async function createTrainingBatchAction(formData: FormData) {
   'use server'
-  await createTrainingBatch(formData)
+  const result = await createTrainingBatch(formData)
+  redirectWithOpsResult(result, 'Batch created.', 'create-batch')
 }
 
 async function createTrainingSessionAction(formData: FormData) {
   'use server'
-  await createTrainingSession(formData)
+  const result = await createTrainingSession(formData)
+  redirectWithOpsResult(result, 'Session scheduled.', 'schedule-session')
 }
 
 async function createTrainingNotificationAction(formData: FormData) {
   'use server'
-  await createTrainingNotification(formData)
+  const result = await createTrainingNotification(formData)
+  redirectWithOpsResult(result, 'Notification created.', 'schedule-session')
 }
 
 async function createFeedbackWindowAction(formData: FormData) {
   'use server'
-  await createFeedbackWindow(formData)
+  const result = await createFeedbackWindow(formData)
+  redirectWithOpsResult(result, 'Feedback window opened.', 'feedback')
 }
 
 async function updateAttendanceStatusAction(formData: FormData) {
   'use server'
-  await updateAttendanceStatus(formData)
+  const result = await updateAttendanceStatus(formData)
+  redirectWithOpsResult(result, 'Attendance updated.', 'attendance')
 }
 
 async function updateTrainingBatchDetailsAction(formData: FormData) {
   'use server'
-  await updateTrainingBatchDetails(formData)
+  const result = await updateTrainingBatchDetails(formData)
+  redirectWithOpsResult(result, 'Batch edits saved.', 'batch-board')
 }
 
 async function createTrainingAssessmentSetupAction(formData: FormData) {
   'use server'
-  await createTrainingAssessmentSetup(formData)
+  const result = await createTrainingAssessmentSetup(formData)
+  redirectWithOpsResult(result, 'Assessment setup created.', 'assessment-setup')
 }
 
 async function createProjectEvaluationAction(formData: FormData) {
   'use server'
-  await createProjectEvaluation(formData)
+  const result = await createProjectEvaluation(formData)
+  redirectWithOpsResult(result, 'Project evaluation saved.', 'project-evaluation')
 }
 
 async function runTrainingAutomationAction(formData: FormData) {
   'use server'
-  await runTrainingAutomation(formData)
+  const result = await runTrainingAutomation(formData)
+  redirectWithOpsResult(result, 'Automation run completed.', 'automation')
+}
+
+function redirectWithOpsResult(result: { error?: string } | unknown, success: string, anchor: string) {
+  const maybeError = result && typeof result === 'object' && 'error' in result ? String((result as { error?: string }).error || '') : ''
+  const params = new URLSearchParams()
+  if (maybeError) params.set('ops_error', maybeError)
+  else params.set('ops_status', success)
+  redirect(`/manager/operations?${params.toString()}#${anchor}`)
 }
 
 function toneForBatchStatus(status: string) {
@@ -112,7 +130,12 @@ function toneForAttendance(status: string) {
   }
 }
 
-export default async function ManagerOperationsPage() {
+export default async function ManagerOperationsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ ops_status?: string; ops_error?: string }>
+}) {
+  const operationMessage = await searchParams
   const {
     role,
     summary,
@@ -327,6 +350,16 @@ export default async function ManagerOperationsPage() {
       <CommandProofStrip metrics={proofMetrics} />
 
       <QuickOpsStrip canCoordinate={canCoordinate} />
+
+      {(operationMessage?.ops_status || operationMessage?.ops_error) ? (
+        <div className={`rounded-2xl border p-4 text-sm font-medium ${
+          operationMessage.ops_error
+            ? 'border-rose-200 bg-rose-50 text-rose-800'
+            : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+        }`}>
+          {operationMessage.ops_error || operationMessage.ops_status}
+        </div>
+      ) : null}
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <ActionTile
@@ -918,7 +951,7 @@ export default async function ManagerOperationsPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-zinc-200 shadow-sm spotlight-card">
+        <Card id="batch-board" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
           <CardHeader>
             <CardTitle>Feedback & Reminder Pulse</CardTitle>
             <CardDescription>Recent learner sentiment and communication activity tied to training execution.</CardDescription>

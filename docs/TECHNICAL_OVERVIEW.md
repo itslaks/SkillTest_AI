@@ -134,8 +134,9 @@ Run SQL scripts in `scripts/` in numeric order. Current latest migration is:
 | `032_harden_badge_awards.sql` | Tightens badge award rules so a single quiz completion does not unlock too many badges |
 | `033_harden_quiz_certificate_rls.sql` | Scopes direct reads of quiz attempts and certificates to learners and authorized training staff |
 | `034_reset_meaningful_badges.sql` | Clears earned badge awards and replaces the old catalog with a smaller useful milestone set |
+| `035_repair_training_ops_current_schema.sql` | Reasserts current Training Ops schema compatibility for sessions, attendance, notifications, feedback, assessments, and project edits |
 
-If `030` is already executed, run `031` after saving certificate rules in `/manager/admin`, then run `032` to harden badge awards, `033` to harden quiz-attempt and certificate RLS, and `034` to reset badges from scratch. It is safe to run `031` again because it uses conflict update.
+If `030` is already executed, run `031` after saving certificate rules in `/manager/admin`, then run `032` to harden badge awards, `033` to harden quiz-attempt and certificate RLS, `034` to reset badges from scratch, and `035` to repair Training Ops schema compatibility. It is safe to run `031` again because it uses conflict update.
 
 ## Verification
 

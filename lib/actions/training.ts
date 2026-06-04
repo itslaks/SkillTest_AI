@@ -759,7 +759,7 @@ export async function updateBatchMemberStatus(formData: FormData): Promise<ApiRe
 }
 
 export async function updateTrainingBatchStatus(formData: FormData): Promise<ApiResponse<boolean>> {
-  const { userId } = await requireManager()
+  const { userId, role } = await requireManager()
   const admin = createAdminClient()
 
   const batchId = asRequiredString(formData.get('batch_id'))
@@ -779,14 +779,23 @@ export async function updateTrainingBatchStatus(formData: FormData): Promise<Api
     return { error: `Invalid lifecycle transition: ${normalizeBatchStatus(currentBatch.status)} cannot move directly to ${status}.` }
   }
 
-  const { error } = await admin
+  let updateQuery = admin
     .from('training_batches')
     .update({ status, updated_at: new Date().toISOString() })
     .eq('id', batchId)
-    .or(`created_by.eq.${userId},coordinator_id.eq.${userId}`)
+    .select('id')
+
+  if (role !== 'admin') {
+    updateQuery = updateQuery.or(`created_by.eq.${userId},coordinator_id.eq.${userId}`)
+  }
+
+  const { data: updatedRows, error } = await updateQuery
 
   if (error) {
     return { error: error.message }
+  }
+  if (!updatedRows?.length) {
+    return { error: 'You do not have permission to update this batch.' }
   }
 
   await admin.from('training_notifications').insert({
@@ -808,7 +817,7 @@ export async function updateTrainingBatchStatus(formData: FormData): Promise<Api
 }
 
 export async function updateTrainingBatchDetails(formData: FormData): Promise<ApiResponse<boolean>> {
-  const { userId } = await requireManager()
+  const { userId, role } = await requireManager()
   const admin = createAdminClient()
 
   const batchId = asRequiredString(formData.get('batch_id'))
@@ -834,7 +843,7 @@ export async function updateTrainingBatchDetails(formData: FormData): Promise<Ap
     return { error: `Invalid lifecycle transition: ${normalizeBatchStatus(previous.status)} cannot move directly to ${status}.` }
   }
 
-  const { error } = await admin
+  let updateQuery = admin
     .from('training_batches')
     .update({
       title,
@@ -847,9 +856,16 @@ export async function updateTrainingBatchDetails(formData: FormData): Promise<Ap
       updated_at: new Date().toISOString(),
     })
     .eq('id', batchId)
-    .or(`created_by.eq.${userId},coordinator_id.eq.${userId}`)
+    .select('id')
+
+  if (role !== 'admin') {
+    updateQuery = updateQuery.or(`created_by.eq.${userId},coordinator_id.eq.${userId}`)
+  }
+
+  const { data: updatedRows, error } = await updateQuery
 
   if (error) return { error: error.message }
+  if (!updatedRows?.length) return { error: 'You do not have permission to update this batch.' }
 
   if (trainerIds.length > 0) {
     await admin.from('training_batch_trainers').delete().eq('batch_id', batchId)
@@ -1188,7 +1204,7 @@ export async function createProjectEvaluation(formData: FormData): Promise<ApiRe
     evidence_file_name: evidenceFileName,
     remarks,
     updated_at: new Date().toISOString(),
-  })
+  }, { onConflict: 'batch_id,user_id,project_title' })
 
   if (error) return { error: error.message }
 
