@@ -23,7 +23,13 @@ export async function createEmployeeWithSetupEmail(
 ): Promise<EmployeeOnboardingResult> {
   const email = input.email.trim().toLowerCase()
   const fullName = input.fullName.trim()
+  const employeeId = input.employeeId?.trim()
+  const domain = input.domain?.trim()
   const tempPassword = generateTempPassword()
+
+  if (!employeeId || !domain) {
+    throw new Error('Employee ID and domain are required')
+  }
 
   const { data: authData, error: authError } = await supabase.auth.admin.createUser({
     email,
@@ -45,9 +51,9 @@ export async function createEmployeeWithSetupEmail(
       id: authData.user.id,
       email,
       full_name: fullName,
-      employee_id: input.employeeId || null,
-      department: input.department || input.domain || 'General',
-      domain: input.domain || 'General',
+      employee_id: employeeId,
+      department: input.department || domain,
+      domain,
       role: 'employee',
     })
     .select()

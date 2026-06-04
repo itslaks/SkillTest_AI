@@ -3,6 +3,7 @@ import { requireTrainingStaff } from '@/lib/rbac'
 import { ManagerSidebar } from '@/components/manager/sidebar'
 import { ManagerHeader } from '@/components/manager/header'
 import { ManagerCommandChatbot } from '@/components/manager/manager-command-chatbot'
+import { getStaffNotifications } from '@/lib/notifications'
 import Link from 'next/link'
 import {
   CalendarDays,
@@ -26,12 +27,15 @@ export default async function ManagerLayout({
     .select('*')
     .eq('id', userId)
     .single()
+  const notifications = profile
+    ? await getStaffNotifications(supabase, userId, profile.role, 6)
+    : []
 
   return (
     <div className="min-h-screen bg-background text-foreground maverick-ops-shell">
       <ManagerSidebar profile={profile} />
       <div className="relative z-10 transition-[margin-left] duration-200 ease-out lg:ml-[var(--manager-sidebar-width,16rem)]">
-        <ManagerHeader profile={profile} />
+        <ManagerHeader profile={profile} notifications={notifications} />
         {/* Command strip — terminal-style quick actions */}
         <div className="border-b border-zinc-900/10 bg-zinc-950 px-4 py-2 md:px-6">
           <div className="mx-auto flex max-w-[1600px] items-center gap-3 overflow-x-auto">

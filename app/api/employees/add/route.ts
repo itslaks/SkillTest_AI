@@ -24,8 +24,8 @@ export async function POST(request: NextRequest) {
     for (const emp of employees) {
       const { email, full_name, employee_id, department, domain } = emp
 
-      if (!email || !full_name) {
-        errors.push(`Missing required fields for ${email || 'unknown employee'}`)
+      if (!email || !full_name || !employee_id || !domain) {
+        errors.push(`Missing required fields for ${email || 'unknown employee'}: email, full name, employee ID, and domain are required`)
         continue
       }
 
@@ -45,9 +45,9 @@ export async function POST(request: NextRequest) {
         const { profile, warning } = await createEmployeeWithSetupEmail(supabase, {
           email,
           fullName: full_name,
-          employeeId: employee_id || null,
+          employeeId: employee_id,
           department: department || null,
-          domain: domain || 'General',
+          domain,
         })
 
         if (warning) {

@@ -37,7 +37,12 @@ export default async function CertificatePage({ params }: { params: Promise<{ id
         <CertificatePreview
           employeeName={employeeName}
           topic={topic}
+          certificateTitle={certificate.rule?.certificate_name || certificate.title || 'Certificate of Achievement'}
           message={certificate.message}
+          issueDate={issueDate}
+          score={certificate.score}
+          employeeId={certificate.profile?.employee_id || null}
+          templateImageUrl={certificate.rule?.template_image_url || null}
           accent={accent}
         />
       </section>

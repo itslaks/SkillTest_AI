@@ -275,7 +275,12 @@ export default async function AdminConsolePage() {
                   compact
                   employeeName="Laksham S J"
                   topic={quiz.topic || quiz.title}
+                  certificateTitle={quiz.certificate_rule?.certificate_name || `${quiz.topic || quiz.title} Completion`}
                   message={quiz.certificate_rule?.message || `has been awarded this certificate in recognition of outstanding performance in the quiz on ${quiz.topic || quiz.title}`}
+                  issueDate={new Date().toLocaleDateString('en-IN')}
+                  score={quiz.certificate_rule?.min_score || 90}
+                  employeeId="EMP1024"
+                  templateImageUrl={quiz.certificate_rule?.template_image_url || null}
                   accent={quiz.certificate_rule?.template_accent_color || '#6f5ab8'}
                 />
               </div>

@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { signOut } from '@/lib/actions/auth'
+import { ProfileCompletionDialog } from '@/components/employee/profile-completion-dialog'
 import {
   LayoutDashboard,
   FileQuestion,
@@ -148,6 +149,7 @@ export default async function EmployeeLayout({
           {children}
         </main>
       </div>
+      {profile && <ProfileCompletionDialog profile={profile} />}
     </div>
   )
 }

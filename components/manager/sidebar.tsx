@@ -20,6 +20,7 @@ import {
   Crown,
   BookOpen,
   FileCheck2,
+  Bell,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { signOut } from '@/lib/actions/auth'
@@ -47,6 +48,7 @@ const navigation = [
       { name: 'Analytics & AI', href: '/manager/analytics', icon: Brain, color: 'text-pink-400', bg: 'bg-pink-400/10', activeBg: 'bg-pink-500', description: 'AI-powered insights' },
       { name: 'Reports', href: '/manager/reports', icon: BarChart3, color: 'text-orange-400', bg: 'bg-orange-400/10', activeBg: 'bg-orange-500', description: 'Download reports' },
       { name: 'BRD Proof', href: '/manager/compliance', icon: FileCheck2, color: 'text-cyan-300', bg: 'bg-cyan-300/10', activeBg: 'bg-cyan-400', description: 'Requirement coverage' },
+      { name: 'Notifications', href: '/manager/notifications', icon: Bell, color: 'text-rose-300', bg: 'bg-rose-300/10', activeBg: 'bg-rose-400', description: 'Action log' },
       { name: 'Admin Console', href: '/manager/admin', icon: ShieldCheck, color: 'text-yellow-400', bg: 'bg-yellow-400/10', activeBg: 'bg-yellow-500', description: 'Roles & controls' },
     ]
   },
@@ -145,10 +147,11 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
               {group.items.filter((item) => {
                 // Trainer only sees Dashboard and Training Ops
                 if (profile?.role === 'trainer') {
-                  return ['/manager', '/manager/operations', '/manager/quizzes', '/manager/employees'].includes(item.href)
+                  return ['/manager', '/manager/operations', '/manager/quizzes', '/manager/employees', '/manager/notifications'].includes(item.href)
                 }
                 // Admin Console only for admins
                 if (item.href === '/manager/admin') return profile?.role === 'admin'
+                if (item.href === '/manager/notifications') return profile?.role === 'admin'
                 return true
               }).map((item) => {
                 const isActive = pathname === item.href ||

@@ -112,10 +112,18 @@ export async function importEmployees(employees: EmployeeImport[]): Promise<ApiR
     const emp = employees[i]
     const email = emp.email?.trim().toLowerCase()
     const fullName = emp.full_name?.trim()
+    const employeeId = emp.employee_id?.trim()
+    const domain = emp.domain?.trim()
 
     if (!email || !fullName) {
       failed++
       errors.push({ row: i + 1, email: email || 'N/A', error: 'Missing email or name' })
+      continue
+    }
+
+    if (!employeeId || !domain) {
+      failed++
+      errors.push({ row: i + 1, email, error: 'Employee ID and domain are required' })
       continue
     }
 
@@ -143,9 +151,9 @@ export async function importEmployees(employees: EmployeeImport[]): Promise<ApiR
         .from('profiles')
         .update({
           full_name: fullName,
-          domain: emp.domain || 'General',
-          department: emp.domain || 'General',
-          employee_id: emp.employee_id || null,
+          domain,
+          department: domain,
+          employee_id: employeeId,
           updated_at: new Date().toISOString(),
         })
         .eq('id', existingProfile.id)
@@ -168,9 +176,9 @@ export async function importEmployees(employees: EmployeeImport[]): Promise<ApiR
         const { warning } = await createEmployeeWithSetupEmail(supabase, {
           email,
           fullName,
-          employeeId: emp.employee_id || null,
-          department: emp.domain || 'General',
-          domain: emp.domain || 'General',
+          employeeId,
+          department: domain,
+          domain,
         })
 
         if (warning) {
@@ -340,16 +348,28 @@ export async function assignQuizToEmployees(quizId: string, employeeIds: string[
     ])
 
     await Promise.all((profiles || []).map((profile: any) =>
-      sendEmail({
-        to: profile.email,
-        subject: `Quiz Assigned: ${quiz?.title || 'SkillTest_AI Assessment'}`,
-        html: buildQuizAssignedEmail({
-          employeeName: profile.full_name,
-          quizTitle: quiz?.title || 'SkillTest_AI Assessment',
-          topic: quiz?.topic || 'General',
-          difficulty: quiz?.difficulty || 'medium',
+      Promise.all([
+        sendEmail({
+          to: profile.email,
+          subject: `Quiz Assigned: ${quiz?.title || 'SkillTest_AI Assessment'}`,
+          html: buildQuizAssignedEmail({
+            employeeName: profile.full_name,
+            quizTitle: quiz?.title || 'SkillTest_AI Assessment',
+            topic: quiz?.topic || 'General',
+            difficulty: quiz?.difficulty || 'medium',
+          }),
         }),
-      })
+        supabase.from('training_notifications').insert({
+          recipient_user_id: profile.id,
+          title: `Quiz assigned: ${quiz?.title || 'SkillTest_AI Assessment'}`,
+          message: `${profile.full_name || profile.email} was assigned ${quiz?.title || 'a SkillTest_AI assessment'}.`,
+          audience: 'individual',
+          channel: 'in_app',
+          delivery_status: 'sent',
+          sent_at: new Date().toISOString(),
+          created_by: userId,
+        }),
+      ])
     ))
   }
 

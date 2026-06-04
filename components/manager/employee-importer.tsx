@@ -62,7 +62,7 @@ export function EmployeeImporter() {
           s_no: getCell(row, EMPLOYEE_COLUMNS.serial),
           email: getCell(row, EMPLOYEE_COLUMNS.email).toLowerCase(),
           full_name: getCell(row, EMPLOYEE_COLUMNS.name),
-          domain: getCell(row, EMPLOYEE_COLUMNS.domain) || 'General',
+          domain: getCell(row, EMPLOYEE_COLUMNS.domain),
           employee_id: getCell(row, EMPLOYEE_COLUMNS.employeeId) || undefined,
         }))
         const seenEmails = new Set<string>()
@@ -73,6 +73,10 @@ export function EmployeeImporter() {
           const rowNumber = row.s_no || String(index + 1)
           if (!row.email || !row.full_name) {
             rowErrors.push(`Row ${rowNumber}: missing email or name`)
+            return
+          }
+          if (!row.employee_id || !row.domain) {
+            rowErrors.push(`Row ${rowNumber}: missing employee ID or domain`)
             return
           }
           if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) {
@@ -147,8 +151,7 @@ export function EmployeeImporter() {
           Import Employees
         </CardTitle>
         <CardDescription className="text-base mt-2">
-          Upload Excel or CSV with <strong>Email</strong> and <strong>name</strong>.
-          Optional columns: <strong>domain</strong>, <strong>department</strong>, <strong>employee_id</strong>.
+          Upload Excel or CSV with <strong>Email</strong>, <strong>name</strong>, <strong>employee_id</strong>, and <strong>domain</strong>.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -271,4 +274,3 @@ export function EmployeeImporter() {
     </Card>
   )
 }
-

@@ -165,6 +165,16 @@ export function ProfileForm({ profile }: ProfileFormProps) {
               </Select>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="employee_id">Employee ID{profile.role === 'employee' ? ' *' : ''}</Label>
+              <Input
+                id="employee_id"
+                name="employeeId"
+                defaultValue={profile.employee_id || ''}
+                placeholder="e.g., EMP1024"
+                required={profile.role === 'employee'}
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="department">Department</Label>
               <Input
                 id="department"
@@ -173,7 +183,7 @@ export function ProfileForm({ profile }: ProfileFormProps) {
                 placeholder="e.g., Engineering"
               />
             </div>
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-2">
               <Label>Role</Label>
               <Input
                 value={profile.role}

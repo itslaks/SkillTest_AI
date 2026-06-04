@@ -117,6 +117,7 @@ export const magicLinkSchema = z
 export const updateProfileSchema = z
   .object({
     fullName: sanitizedString(150),
+    employeeId: sanitizedString(50).optional().nullable().or(z.literal('').transform(() => null)),
     domain: sanitizedString(150),
     department: sanitizedString(150).optional().nullable().or(z.literal('').transform(() => null)),
     avatarUrl: optionalSafeImageUrl,
