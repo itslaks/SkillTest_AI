@@ -348,6 +348,17 @@ export default async function ManagerOperationsPage({
         </div>
       </section>
 
+      <PriorityOpsWorkbench
+        canCoordinate={canCoordinate}
+        attendanceDue={summary.attendanceDueToday}
+        absenceAlerts={summary.absenceAlerts}
+        activeBatches={summary.activeBatches}
+        upcomingSessions={summary.upcomingSessions}
+        remainingCandidates={summary.remainingCandidates}
+        assessmentClearance={overallAssessmentClearance}
+        negativeFeedback={summary.negativeFeedbackCount}
+      />
+
       <CommandProofStrip metrics={proofMetrics} />
 
       <QuickOpsStrip canCoordinate={canCoordinate} />
@@ -1333,6 +1344,124 @@ function QuickOpsStrip({ canCoordinate }: { canCoordinate: boolean }) {
                 <span className="block truncate text-sm font-semibold text-zinc-950">{action.label}</span>
                 <span className="block truncate text-xs text-zinc-500">{action.detail}</span>
               </span>
+            </Link>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+function PriorityOpsWorkbench({
+  canCoordinate,
+  attendanceDue,
+  absenceAlerts,
+  activeBatches,
+  upcomingSessions,
+  remainingCandidates,
+  assessmentClearance,
+  negativeFeedback,
+}: {
+  canCoordinate: boolean
+  attendanceDue: number
+  absenceAlerts: number
+  activeBatches: number
+  upcomingSessions: number
+  remainingCandidates: number
+  assessmentClearance: number
+  negativeFeedback: number
+}) {
+  const tasks = [
+    {
+      title: 'Fix attendance first',
+      detail: attendanceDue > 0 ? `${attendanceDue} session(s) need attention` : 'No overdue attendance right now',
+      href: '#attendance',
+      icon: ClipboardCheck,
+      tone: attendanceDue > 0 ? 'border-rose-200 bg-rose-50 text-rose-950' : 'border-emerald-200 bg-emerald-50 text-emerald-950',
+      enabled: true,
+    },
+    {
+      title: 'Review live batches',
+      detail: `${activeBatches} active batch(es), ${remainingCandidates} learner(s) in training`,
+      href: '#batch-board',
+      icon: Users,
+      tone: 'border-zinc-200 bg-white text-zinc-950',
+      enabled: true,
+    },
+    {
+      title: 'Create or edit batch',
+      detail: canCoordinate ? 'Add learners, trainer, dates, and quizzes' : 'Coordinator access required',
+      href: canCoordinate ? '#create-batch' : '/manager/docs#create-training-batch',
+      icon: CalendarDays,
+      tone: 'border-cyan-200 bg-cyan-50 text-cyan-950',
+      enabled: true,
+    },
+    {
+      title: 'Plan sessions',
+      detail: `${upcomingSessions} upcoming session(s)`,
+      href: canCoordinate ? '#schedule-session' : '#schedule-planner',
+      icon: CalendarDays,
+      tone: 'border-blue-200 bg-blue-50 text-blue-950',
+      enabled: true,
+    },
+    {
+      title: 'Assessments and projects',
+      detail: `Clearance signal ${assessmentClearance}%`,
+      href: canCoordinate ? '#assessment-setup' : '#assessment',
+      icon: FileSpreadsheet,
+      tone: 'border-amber-200 bg-amber-50 text-amber-950',
+      enabled: true,
+    },
+    {
+      title: 'Feedback and reminders',
+      detail: negativeFeedback > 0 ? `${negativeFeedback} negative feedback item(s)` : 'Open windows and reminders',
+      href: '#feedback',
+      icon: MessageSquareQuote,
+      tone: negativeFeedback > 0 ? 'border-rose-200 bg-rose-50 text-rose-950' : 'border-violet-200 bg-violet-50 text-violet-950',
+      enabled: true,
+    },
+    {
+      title: 'Run automation',
+      detail: `${absenceAlerts} absence risk(s) visible`,
+      href: canCoordinate ? '#automation' : '/manager/docs#automation-runbook',
+      icon: RadioTower,
+      tone: 'border-zinc-200 bg-zinc-50 text-zinc-950',
+      enabled: true,
+    },
+    {
+      title: 'Read the guide',
+      detail: 'A to Z non-technical instructions',
+      href: '/manager/docs',
+      icon: FileText,
+      tone: 'border-emerald-200 bg-emerald-50 text-emerald-950',
+      enabled: true,
+    },
+  ]
+
+  return (
+    <section className="rounded-[1.5rem] border border-zinc-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">Manager workbench</p>
+          <h2 className="mt-2 text-xl font-semibold tracking-tight text-zinc-950">Do these in priority order</h2>
+        </div>
+        <p className="max-w-xl text-sm leading-6 text-zinc-500">
+          The dense tools are still below, but this strip puts the highest-value actions first so a non-technical admin knows where to click.
+        </p>
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {tasks.filter((task) => task.enabled).map((task, index) => {
+          const Icon = task.icon
+          return (
+            <Link key={task.title} href={task.href} className={`group rounded-2xl border p-4 transition hover:-translate-y-0.5 hover:shadow-md ${task.tone}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/80 shadow-sm">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <span className="rounded-full bg-white/80 px-2 py-1 text-[10px] font-bold">Step {index + 1}</span>
+              </div>
+              <p className="mt-4 text-sm font-semibold">{task.title}</p>
+              <p className="mt-1 text-xs leading-5 opacity-75">{task.detail}</p>
             </Link>
           )
         })}
