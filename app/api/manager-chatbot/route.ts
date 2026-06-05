@@ -5,6 +5,7 @@ import { getAccessibleTrainingBatchIds } from '@/lib/training-access'
 import { callAI } from '@/lib/ai'
 import { analyzeAttemptPattern } from '@/lib/insights'
 import { buildAdminGuideSearchIndex, findAdminGuideAnswer } from '@/lib/manager-docs'
+import { createEmployeeWithSetupEmail } from '@/lib/employee-onboarding'
 import type { DifficultyLevel, QuizAnswer } from '@/lib/types/database'
 
 export async function POST(request: NextRequest) {
@@ -14,6 +15,19 @@ export async function POST(request: NextRequest) {
   const { message } = await request.json()
   if (!message || typeof message !== 'string') {
     return NextResponse.json({ error: 'Message is required.' }, { status: 400 })
+  }
+
+  if (isCommand(message)) {
+    if (auth.role !== 'admin') {
+      return NextResponse.json({ error: 'AI Command mutations require admin access.' }, { status: 403 })
+    }
+    const admin = createAdminClient()
+    const result = await executeAdminCommand(admin, auth.userId, message)
+    return NextResponse.json({
+      message: result.error ? `Command failed: ${result.error}` : result.message,
+      provider: 'skilltest_ai_command',
+      command: result,
+    }, { status: result.error ? 400 : 200 })
   }
 
   const docsAnswer = findAdminGuideAnswer(message)
@@ -105,6 +119,359 @@ export async function POST(request: NextRequest) {
       error: error.message,
     })
   }
+}
+
+function isCommand(message: string) {
+  return /^run\s+/i.test(message.trim()) || /^execute\s+/i.test(message.trim())
+}
+
+type CommandResult = { message?: string; error?: string; data?: any }
+
+async function executeAdminCommand(admin: ReturnType<typeof createAdminClient>, actorId: string, raw: string): Promise<CommandResult> {
+  const commandText = raw.trim().replace(/^(run|execute)\s+/i, '')
+  const { action, args } = parseCommand(commandText)
+
+  try {
+    switch (action) {
+      case 'create employee':
+        return createEmployeeCommand(admin, args)
+      case 'delete employee':
+        return deleteProfileCommand(admin, args, 'employee')
+      case 'create quiz':
+        return createQuizCommand(admin, actorId, args)
+      case 'delete quiz':
+        return deleteQuizCommand(admin, args)
+      case 'activate quiz':
+        return toggleQuizCommand(admin, args, true)
+      case 'deactivate quiz':
+        return toggleQuizCommand(admin, args, false)
+      case 'create batch':
+        return createBatchCommand(admin, actorId, args)
+      case 'delete batch':
+      case 'remove batch':
+        return deleteBatchCommand(admin, args)
+      case 'assign trainer':
+      case 'add trainer':
+        return assignTrainerCommand(admin, actorId, args)
+      case 'approve trainer':
+        return updateTrainerApprovalCommand(admin, args, 'approved')
+      case 'reject trainer':
+        return updateTrainerApprovalCommand(admin, args, 'rejected')
+      case 'create session':
+      case 'create roadmap':
+        return createSessionCommand(admin, actorId, args)
+      case 'update session':
+      case 'update roadmap':
+        return updateSessionCommand(admin, args)
+      case 'delete session':
+      case 'delete roadmap':
+        return deleteSessionCommand(admin, args)
+      case 'mark attendance':
+        return markAttendanceCommand(admin, actorId, args)
+      case 'delete training':
+      case 'clear training':
+        return clearTrainingCommand(admin, args)
+      case 'clear scheduled':
+      case 'delete scheduled':
+        return clearScheduledCommand(admin, args)
+      default:
+        return { error: `Unknown command "${action}". Open AI Command > Admin Ops for supported examples.` }
+    }
+  } catch (error: any) {
+    return { error: error?.message || 'Command execution failed.' }
+  }
+}
+
+function parseCommand(text: string) {
+  const knownActions = [
+    'create employee', 'delete employee', 'create quiz', 'delete quiz', 'activate quiz', 'deactivate quiz',
+    'create batch', 'delete batch', 'remove batch', 'assign trainer', 'add trainer', 'approve trainer', 'reject trainer',
+    'create session', 'update session', 'delete session', 'create roadmap', 'update roadmap', 'delete roadmap',
+    'mark attendance', 'delete training', 'clear training', 'clear scheduled', 'delete scheduled',
+  ]
+  const lower = text.toLowerCase()
+  const action = knownActions.find((item) => lower === item || lower.startsWith(`${item} `)) || lower.split(/\s+/).slice(0, 2).join(' ')
+  const rest = text.slice(action.length).trim()
+  const args: Record<string, string> = {}
+  const pattern = /([a-zA-Z_][\w-]*)=(?:"([^"]*)"|'([^']*)'|([^"'\s][^\s]*))/g
+  let match: RegExpExecArray | null
+  while ((match = pattern.exec(rest))) {
+    args[normalizeArgKey(match[1])] = (match[2] ?? match[3] ?? match[4] ?? '').trim()
+  }
+  return { action, args }
+}
+
+function normalizeArgKey(key: string) {
+  return key.toLowerCase().replace(/-/g, '_')
+}
+
+async function createEmployeeCommand(admin: ReturnType<typeof createAdminClient>, args: Record<string, string>) {
+  const email = args.email
+  const fullName = args.name || args.full_name
+  const employeeId = args.employee_id || args.emp_id
+  const domain = args.domain
+  if (!email || !fullName || !employeeId || !domain) return { error: 'Use: run create employee email=... name="..." employee_id=... domain=...' }
+  const { profile, warning } = await createEmployeeWithSetupEmail(admin, {
+    email,
+    fullName,
+    employeeId,
+    department: args.department || null,
+    domain,
+  })
+  return { message: `Employee ${profile.full_name || email} created or updated.${warning ? ` Warning: ${warning}` : ''}`, data: profile }
+}
+
+async function deleteProfileCommand(admin: ReturnType<typeof createAdminClient>, args: Record<string, string>, role: string) {
+  const profile = await findProfileByArgs(admin, args)
+  if (!profile) return { error: `No ${role} matched email/id/name.` }
+  if (profile.role !== role) return { error: `Matched profile is ${profile.role}, not ${role}.` }
+  const { error } = await admin.from('profiles').delete().eq('id', profile.id)
+  if (error) return { error: error.message }
+  return { message: `${role} ${profile.full_name || profile.email} deleted.` }
+}
+
+async function createQuizCommand(admin: ReturnType<typeof createAdminClient>, actorId: string, args: Record<string, string>) {
+  const title = args.title
+  const topic = args.topic || args.domain
+  if (!title || !topic) return { error: 'Use: run create quiz title="..." topic="..." difficulty=medium question_count=10 passing_score=70' }
+  const payload = {
+    title,
+    topic,
+    description: args.description || null,
+    difficulty: args.difficulty || 'medium',
+    question_count: Number(args.question_count || args.questions || 10),
+    time_limit_minutes: Number(args.time_limit || args.time_limit_minutes || 30),
+    passing_score: Number(args.passing_score || 70),
+    status: args.status || 'active',
+    is_active: (args.status || 'active') !== 'draft' && (args.status || 'active') !== 'archived',
+    created_by: actorId,
+    batch_id: args.batch_id || null,
+  }
+  const { data, error } = await admin.from('quizzes').insert(payload).select('id, title').single()
+  if (error) return { error: error.message }
+  return { message: `Quiz "${data.title}" created. Add questions from Quiz Manager or AI generation.`, data }
+}
+
+async function deleteQuizCommand(admin: ReturnType<typeof createAdminClient>, args: Record<string, string>) {
+  const quiz = await findQuizByArgs(admin, args)
+  if (!quiz) return { error: 'No quiz matched id/title.' }
+  await admin.from('questions').delete().eq('quiz_id', quiz.id)
+  await admin.from('quiz_attempts').delete().eq('quiz_id', quiz.id)
+  const { error } = await admin.from('quizzes').delete().eq('id', quiz.id)
+  if (error) return { error: error.message }
+  return { message: `Quiz "${quiz.title}" deleted.` }
+}
+
+async function toggleQuizCommand(admin: ReturnType<typeof createAdminClient>, args: Record<string, string>, active: boolean) {
+  const quiz = await findQuizByArgs(admin, args)
+  if (!quiz) return { error: 'No quiz matched id/title.' }
+  const { error } = await admin.from('quizzes').update({ is_active: active, status: active ? 'active' : 'draft', updated_at: new Date().toISOString() }).eq('id', quiz.id)
+  if (error) return { error: error.message }
+  return { message: `Quiz "${quiz.title}" ${active ? 'activated' : 'deactivated'}.` }
+}
+
+async function createBatchCommand(admin: ReturnType<typeof createAdminClient>, actorId: string, args: Record<string, string>) {
+  if (!args.title) return { error: 'Use: run create batch title="..." domain=... trainer_email=... employee_emails=a@x.com,b@x.com' }
+  const trainer = args.trainer_email ? await findProfileByArgs(admin, { email: args.trainer_email }) : null
+  const { data: batch, error } = await admin.from('training_batches').insert({
+    title: args.title,
+    domain: args.domain || null,
+    description: args.description || null,
+    status: args.status || 'planned',
+    trainer_id: trainer?.id || null,
+    coordinator_id: actorId,
+    created_by: actorId,
+    start_date: args.start_date || null,
+    end_date: args.end_date || null,
+  }).select('id, title').single()
+  if (error || !batch) return { error: error?.message || 'Batch creation failed.' }
+
+  if (trainer?.id) {
+    await admin.from('training_batch_trainers').upsert({ batch_id: batch.id, trainer_id: trainer.id, role_label: 'Lead Trainer', assigned_by: actorId }, { onConflict: 'batch_id,trainer_id' })
+  }
+  const employeeEmails = splitList(args.employee_emails || args.employees)
+  if (employeeEmails.length) {
+    const { data: employees } = await admin.from('profiles').select('id, email').in('email', employeeEmails)
+    if (employees?.length) {
+      await admin.from('batch_members').upsert(employees.map((employee: any) => ({ batch_id: batch.id, user_id: employee.id, enrollment_status: 'active' })), { onConflict: 'batch_id,user_id' })
+    }
+  }
+  return { message: `Batch "${batch.title}" created${trainer ? ` with trainer ${trainer.email}` : ''}.`, data: batch }
+}
+
+async function deleteBatchCommand(admin: ReturnType<typeof createAdminClient>, args: Record<string, string>) {
+  const batch = await findBatchByArgs(admin, args)
+  if (!batch) return { error: 'No batch matched id/title.' }
+  await deleteBatchCascade(admin, batch.id)
+  return { message: `Batch "${batch.title}" deleted.` }
+}
+
+async function assignTrainerCommand(admin: ReturnType<typeof createAdminClient>, actorId: string, args: Record<string, string>) {
+  const batch = await findBatchByArgs(admin, args)
+  const trainer = await findProfileByArgs(admin, { email: args.trainer_email || args.email, name: args.trainer || args.name })
+  if (!batch || !trainer) return { error: 'Use: run assign trainer batch="..." trainer_email=trainer@example.com' }
+  if (trainer.role !== 'trainer') return { error: 'Matched user is not a trainer.' }
+  await admin.from('training_batches').update({ trainer_id: trainer.id, updated_at: new Date().toISOString() }).eq('id', batch.id)
+  const { error } = await admin.from('training_batch_trainers').upsert({ batch_id: batch.id, trainer_id: trainer.id, role_label: args.role_label || 'Trainer', assigned_by: actorId }, { onConflict: 'batch_id,trainer_id' })
+  if (error) return { error: error.message }
+  return { message: `${trainer.full_name || trainer.email} assigned to ${batch.title}.` }
+}
+
+async function updateTrainerApprovalCommand(admin: ReturnType<typeof createAdminClient>, args: Record<string, string>, status: 'approved' | 'rejected') {
+  const trainer = await findProfileByArgs(admin, args)
+  if (!trainer) return { error: 'No trainer matched email/id/name.' }
+  if (trainer.role !== 'trainer') return { error: 'Matched user is not a trainer.' }
+  const { error } = await admin.from('profiles').update({ approval_status: status, updated_at: new Date().toISOString() }).eq('id', trainer.id)
+  if (error) return { error: error.message }
+  return { message: `Trainer ${trainer.full_name || trainer.email} ${status}.` }
+}
+
+async function createSessionCommand(admin: ReturnType<typeof createAdminClient>, actorId: string, args: Record<string, string>) {
+  const batch = await findBatchByArgs(admin, args)
+  if (!batch || !args.title || !args.date) return { error: 'Use: run create session batch="..." title="..." date=2026-06-10T10:00 trainer_email=...' }
+  const trainer = args.trainer_email ? await findProfileByArgs(admin, { email: args.trainer_email }) : null
+  const { data, error } = await admin.from('training_sessions').insert({
+    batch_id: batch.id,
+    title: args.title,
+    agenda: args.agenda || null,
+    session_date: args.date,
+    mode: args.mode || 'virtual',
+    status: args.status || 'scheduled',
+    trainer_id: trainer?.id || null,
+    attendance_required: args.attendance_required !== 'false',
+    created_by: actorId,
+  }).select('id, title').single()
+  if (error) return { error: error.message }
+  return { message: `Session "${data.title}" created for ${batch.title}.`, data }
+}
+
+async function updateSessionCommand(admin: ReturnType<typeof createAdminClient>, args: Record<string, string>) {
+  const session = await findSessionByArgs(admin, args)
+  if (!session) return { error: 'No session matched id/title.' }
+  const update: Record<string, any> = { updated_at: new Date().toISOString() }
+  if (args.title) update.title = args.title
+  if (args.date) update.session_date = args.date
+  if (args.status) update.status = args.status
+  if (args.mode) update.mode = args.mode
+  if (args.agenda) update.agenda = args.agenda
+  const { error } = await admin.from('training_sessions').update(update).eq('id', session.id)
+  if (error) return { error: error.message }
+  return { message: `Session "${session.title}" updated.` }
+}
+
+async function deleteSessionCommand(admin: ReturnType<typeof createAdminClient>, args: Record<string, string>) {
+  const session = await findSessionByArgs(admin, args)
+  if (!session) return { error: 'No session matched id/title.' }
+  await deleteSessionCascade(admin, session.id)
+  return { message: `Session "${session.title}" deleted.` }
+}
+
+async function markAttendanceCommand(admin: ReturnType<typeof createAdminClient>, actorId: string, args: Record<string, string>) {
+  const session = await findSessionByArgs(admin, args)
+  const employee = await findProfileByArgs(admin, { email: args.email, employee_id: args.employee_id, name: args.name })
+  const status = args.status || 'present'
+  if (!session || !employee || !['present', 'late', 'excused', 'absent'].includes(status)) {
+    return { error: 'Use: run mark attendance session="..." email=employee@example.com status=present' }
+  }
+  const { error } = await admin.from('session_attendance').upsert({
+    session_id: session.id,
+    user_id: employee.id,
+    status,
+    updated_by: actorId,
+    check_in_time: status === 'present' || status === 'late' ? new Date().toISOString() : null,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'session_id,user_id' })
+  if (error) return { error: error.message }
+  return { message: `${employee.full_name || employee.email} marked ${status} for ${session.title}.` }
+}
+
+async function clearScheduledCommand(admin: ReturnType<typeof createAdminClient>, args: Record<string, string>) {
+  if ((args.confirmation || '').replace(/_/g, ' ') !== 'DELETE SCHEDULED') return { error: 'Add confirmation="DELETE SCHEDULED".' }
+  const batch = args.batch || args.title || args.batch_id ? await findBatchByArgs(admin, args) : null
+  let query = admin.from('training_sessions').select('id').eq('status', 'scheduled')
+  if (batch) query = query.eq('batch_id', batch.id)
+  const { data } = await query
+  for (const session of data || []) await deleteSessionCascade(admin, session.id)
+  return { message: `${data?.length || 0} scheduled session(s) deleted.` }
+}
+
+async function clearTrainingCommand(admin: ReturnType<typeof createAdminClient>, args: Record<string, string>) {
+  if ((args.confirmation || '').replace(/_/g, ' ') !== 'DELETE TRAINING') return { error: 'Add confirmation="DELETE TRAINING".' }
+  const { data: batches } = await admin.from('training_batches').select('id')
+  for (const batch of batches || []) await deleteBatchCascade(admin, batch.id)
+  return { message: `${batches?.length || 0} training batch(es) deleted.` }
+}
+
+async function findProfileByArgs(admin: ReturnType<typeof createAdminClient>, args: Record<string, string>) {
+  let query = admin.from('profiles').select('*').limit(1)
+  if (args.id || args.user_id) query = query.eq('id', args.id || args.user_id)
+  else if (args.email) query = query.ilike('email', args.email)
+  else if (args.employee_id || args.emp_id) query = query.eq('employee_id', args.employee_id || args.emp_id)
+  else if (args.name) query = query.ilike('full_name', `%${args.name}%`)
+  else return null
+  const { data } = await query
+  return data?.[0] || null
+}
+
+async function findQuizByArgs(admin: ReturnType<typeof createAdminClient>, args: Record<string, string>) {
+  let query = admin.from('quizzes').select('*').limit(1)
+  if (args.id || args.quiz_id) query = query.eq('id', args.id || args.quiz_id)
+  else if (args.title || args.quiz) query = query.ilike('title', `%${args.title || args.quiz}%`)
+  else return null
+  const { data } = await query
+  return data?.[0] || null
+}
+
+async function findBatchByArgs(admin: ReturnType<typeof createAdminClient>, args: Record<string, string>) {
+  let query = admin.from('training_batches').select('*').limit(1)
+  if (args.batch_id || args.id) query = query.eq('id', args.batch_id || args.id)
+  else if (args.batch || args.title) query = query.ilike('title', `%${args.batch || args.title}%`)
+  else return null
+  const { data } = await query
+  return data?.[0] || null
+}
+
+async function findSessionByArgs(admin: ReturnType<typeof createAdminClient>, args: Record<string, string>) {
+  let query = admin.from('training_sessions').select('*').limit(1)
+  if (args.session_id || args.id) query = query.eq('id', args.session_id || args.id)
+  else if (args.session || args.title) query = query.ilike('title', `%${args.session || args.title}%`)
+  else return null
+  const { data } = await query
+  return data?.[0] || null
+}
+
+async function deleteSessionCascade(admin: ReturnType<typeof createAdminClient>, sessionId: string) {
+  await admin.from('session_attendance_versions').delete().eq('session_id', sessionId)
+  await admin.from('training_attendance_uploads').delete().eq('session_id', sessionId)
+  await admin.from('session_attendance').delete().eq('session_id', sessionId)
+  await admin.from('training_feedback_windows').update({ session_id: null }).eq('session_id', sessionId)
+  await admin.from('training_feedback').delete().eq('session_id', sessionId)
+  await admin.from('training_notifications').delete().eq('session_id', sessionId)
+  const { error } = await admin.from('training_sessions').delete().eq('id', sessionId)
+  if (error) throw new Error(error.message)
+}
+
+async function deleteBatchCascade(admin: ReturnType<typeof createAdminClient>, batchId: string) {
+  const { data: sessions } = await admin.from('training_sessions').select('id').eq('batch_id', batchId)
+  for (const session of sessions || []) await deleteSessionCascade(admin, session.id)
+  await admin.from('quizzes').update({ batch_id: null }).eq('batch_id', batchId)
+  await admin.from('assessment_results').delete().eq('batch_id', batchId)
+  await admin.from('training_assessment_uploads').delete().eq('batch_id', batchId)
+  await admin.from('training_automation_runs').delete().eq('batch_id', batchId)
+  await admin.from('training_project_evaluations').delete().eq('batch_id', batchId)
+  await admin.from('training_feedback').delete().eq('batch_id', batchId)
+  await admin.from('training_feedback_windows').delete().eq('batch_id', batchId)
+  await admin.from('training_notifications').delete().eq('batch_id', batchId)
+  await admin.from('training_assessment_setups').delete().eq('batch_id', batchId)
+  await admin.from('training_batch_trainers').delete().eq('batch_id', batchId)
+  await admin.from('batch_members').delete().eq('batch_id', batchId)
+  await admin.from('training_batch_change_audit').delete().eq('batch_id', batchId)
+  const { error } = await admin.from('training_batches').delete().eq('id', batchId)
+  if (error) throw new Error(error.message)
+}
+
+function splitList(value: string | undefined) {
+  return (value || '').split(',').map((item) => item.trim()).filter(Boolean)
 }
 
 function buildChatbotContext(data: Record<string, any[]>) {

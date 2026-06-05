@@ -7,6 +7,7 @@ import {
   Bot,
   BrainCircuit,
   Clipboard,
+  DatabaseZap,
   ExternalLink,
   Loader2,
   MessageSquareText,
@@ -29,16 +30,84 @@ const quickPrompts = [
   'Which certificate rules are enabled and what are their thresholds?',
 ]
 
+const commandTemplates = [
+  {
+    label: 'Create employee',
+    command: 'run create employee email=person@company.com name="Person Name" employee_id=EMP001 domain=Java department=Engineering',
+  },
+  {
+    label: 'Delete employee',
+    command: 'run delete employee email=person@company.com',
+  },
+  {
+    label: 'Create quiz',
+    command: 'run create quiz title="Java Basics" topic=Java difficulty=medium question_count=10 passing_score=70',
+  },
+  {
+    label: 'Delete quiz',
+    command: 'run delete quiz title="Java Basics"',
+  },
+  {
+    label: 'Create batch',
+    command: 'run create batch title="Week 1 Java" domain=Java trainer_email=trainer@company.com employee_emails=a@company.com,b@company.com',
+  },
+  {
+    label: 'Delete batch',
+    command: 'run delete batch title="Week 1 Java"',
+  },
+  {
+    label: 'Assign trainer',
+    command: 'run assign trainer batch="Week 1 Java" trainer_email=trainer@company.com',
+  },
+  {
+    label: 'Approve trainer',
+    command: 'run approve trainer email=trainer@company.com',
+  },
+  {
+    label: 'Create roadmap/session',
+    command: 'run create session batch="Week 1 Java" title="Day 1 Orientation" date=2026-06-10T10:00 trainer_email=trainer@company.com',
+  },
+  {
+    label: 'Update roadmap/session',
+    command: 'run update session title="Day 1 Orientation" status=completed',
+  },
+  {
+    label: 'Delete roadmap/session',
+    command: 'run delete session title="Day 1 Orientation"',
+  },
+  {
+    label: 'Mark attendance',
+    command: 'run mark attendance session="Day 1 Orientation" email=person@company.com status=present',
+  },
+  {
+    label: 'Clear scheduled',
+    command: 'run clear scheduled confirmation="DELETE SCHEDULED"',
+  },
+  {
+    label: 'Delete training',
+    command: 'run delete training confirmation="DELETE TRAINING"',
+  },
+]
+
+const fullPanels = [
+  { label: 'Employees', href: '/manager/employees' },
+  { label: 'Quizzes', href: '/manager/quizzes' },
+  { label: 'Training Ops', href: '/manager/operations' },
+  { label: 'Admin', href: '/manager/admin' },
+  { label: 'Reports', href: '/manager/reports' },
+]
+
 export function ManagerCommandChatbot() {
   const [open, setOpen] = useState(false)
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [opsPanel, setOpsPanel] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
       content:
-        'Admin assistant ready. Ask for employee progress, quiz performance, attendance risk, certificates, or batch-level insights.',
+        'Admin assistant ready. Ask for insights, or open Admin Ops and send a run command to create, update, delete, approve, assign, or mark attendance.',
     },
   ])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -135,6 +204,49 @@ export function ManagerCommandChatbot() {
           </div>
 
           <div className="border-b border-white/10 bg-black/25 p-2.5">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setOpsPanel((value) => !value)}
+                className="inline-flex items-center gap-2 rounded-full border border-cyan-200/20 bg-cyan-200/10 px-3 py-1.5 text-[11px] font-bold text-cyan-50 transition hover:bg-cyan-200/15"
+              >
+                <DatabaseZap className="h-3.5 w-3.5" />
+                Admin Ops
+              </button>
+              <div className="flex gap-1">
+                {fullPanels.slice(0, 3).map((panel) => (
+                  <a key={panel.href} href={panel.href} className="rounded-full border border-white/10 px-2.5 py-1 text-[10px] font-semibold text-white/70 hover:bg-white/10">
+                    {panel.label}
+                  </a>
+                ))}
+              </div>
+            </div>
+            {opsPanel ? (
+              <div className="mb-2 rounded-xl border border-cyan-200/15 bg-cyan-200/[0.06] p-2">
+                <div className="chatbot-scrollbar grid max-h-40 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+                  {commandTemplates.map((item) => (
+                    <button
+                      key={item.label}
+                      type="button"
+                      onClick={() => {
+                        setMessage(item.command)
+                        textareaRef.current?.focus()
+                      }}
+                      className="rounded-lg border border-white/10 bg-black/25 px-2.5 py-2 text-left text-[11px] font-semibold text-white/85 transition hover:border-cyan-200/40 hover:bg-cyan-200/10"
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {fullPanels.map((panel) => (
+                    <a key={panel.href} href={panel.href} className="rounded-full border border-white/10 px-2.5 py-1 text-[10px] font-semibold text-cyan-100/75 hover:bg-white/10">
+                      Full {panel.label}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <div className="chatbot-scrollbar flex gap-2 overflow-x-auto pb-1">
               {quickPrompts.map((prompt) => (
                 <button
@@ -184,7 +296,7 @@ export function ManagerCommandChatbot() {
                 value={message}
                 onChange={(event) => setMessage(event.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask about certificate eligibility, weak domains, quiz scores, employee progress..."
+                placeholder='Ask for insights, or use: run create batch title="Week 1" domain=Java'
                 rows={1}
                 className="max-h-28 min-h-11 rounded-xl border-white/10 bg-white/5 text-sm text-white placeholder:text-white/35 focus-visible:ring-cyan-300/40"
               />
