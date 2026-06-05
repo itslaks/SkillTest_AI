@@ -9,6 +9,7 @@ import { importEmployees } from '@/lib/actions/manager'
 import type { EmployeeImport, EmployeeImportResult } from '@/lib/types/database'
 import { Upload, Users, CheckCircle2, XCircle, FileSpreadsheet } from 'lucide-react'
 import * as XLSX from 'xlsx'
+import { parseJsonFile, parseSpreadsheetFile, parseKeyValueText, parseTextToRows, extractTextFromFile, getCell } from '@/lib/file-utils'
 
 type SpreadsheetRow = Record<string, string | number | boolean | null | undefined>
 type EmployeeImportPreview = EmployeeImport & { s_no: string }
@@ -39,72 +40,88 @@ export function EmployeeImporter() {
   const [error, setError] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
 
-  function processFile(file: File) {
+  async function processFile(file: File) {
     if (!file) return
 
     setError(null)
     setResult(null)
+    setPreview(null)
 
-    const reader = new FileReader()
-    reader.onload = (evt) => {
-      try {
-        const data = new Uint8Array(evt.target?.result as ArrayBuffer)
-        const workbook = XLSX.read(data, { type: 'array' })
-        const sheet = workbook.Sheets[workbook.SheetNames[0]]
-        const json = XLSX.utils.sheet_to_json<SpreadsheetRow>(sheet)
+    try {
+      const fileName = file.name.toLowerCase()
+      let rows: SpreadsheetRow[] = []
 
-        if (json.length === 0) {
-          setError('Excel file is empty')
-          return
+      const isSpreadsheet = fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || fileName.endsWith('.csv')
+      const isJson = fileName.endsWith('.json')
+      const isDocument = fileName.endsWith('.pdf') || fileName.endsWith('.docx') || fileName.endsWith('.txt') || fileName.endsWith('.doc')
+
+      if (isSpreadsheet) {
+        rows = await parseSpreadsheetFile(file)
+      } else if (isJson) {
+        rows = await parseJsonFile(file)
+      } else if (isDocument) {
+        const extracted = await extractTextFromFile(file)
+        rows = parseTextToRows(extracted)
+        if (rows.length === 0) {
+          rows = parseKeyValueText(extracted)
         }
-
-        const normalized: EmployeeImportPreview[] = json.map((row) => ({
-          s_no: getCell(row, EMPLOYEE_COLUMNS.serial),
-          email: getCell(row, EMPLOYEE_COLUMNS.email).toLowerCase(),
-          full_name: getCell(row, EMPLOYEE_COLUMNS.name),
-          domain: getCell(row, EMPLOYEE_COLUMNS.domain),
-          employee_id: getCell(row, EMPLOYEE_COLUMNS.employeeId) || undefined,
-        }))
-        const seenEmails = new Set<string>()
-        const validRows: EmployeeImportPreview[] = []
-        const rowErrors: string[] = []
-
-        normalized.forEach((row, index) => {
-          const rowNumber = row.s_no || String(index + 1)
-          if (!row.email || !row.full_name) {
-            rowErrors.push(`Row ${rowNumber}: missing email or name`)
-            return
-          }
-          if (!row.employee_id || !row.domain) {
-            rowErrors.push(`Row ${rowNumber}: missing employee ID or domain`)
-            return
-          }
-          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) {
-            rowErrors.push(`Row ${rowNumber}: invalid email`)
-            return
-          }
-          if (seenEmails.has(row.email)) {
-            rowErrors.push(`Row ${rowNumber}: duplicate email`)
-            return
-          }
-          seenEmails.add(row.email)
-          validRows.push(row)
-        })
-
-        if (validRows.length === 0) {
-          setError(`No valid employees found. Accepted columns: Email, name/full_name, domain/department, employee_id. ${rowErrors.slice(0, 3).join('; ')}`)
-          return
-        }
-
-        setPreview(validRows)
-        if (rowErrors.length > 0) {
-          setError(`${rowErrors.length} row(s) skipped: ${rowErrors.slice(0, 3).join('; ')}`)
-        }
-      } catch {
-        setError('Failed to parse file. Use Excel or CSV with Email and name columns.')
+      } else {
+        setError('Unsupported file type. Use XLSX, XLS, CSV, JSON, PDF, DOCX, TXT, or DOC.')
+        return
       }
+
+      if (rows.length === 0) {
+        setError('No rows could be extracted from the file. Ensure it contains structured employee data or try a different format.')
+        return
+      }
+
+      const normalized: EmployeeImportPreview[] = rows.map((row, index) => ({
+        s_no: getCell(row, EMPLOYEE_COLUMNS.serial),
+        email: getCell(row, EMPLOYEE_COLUMNS.email).toLowerCase(),
+        full_name: getCell(row, EMPLOYEE_COLUMNS.name),
+        domain: getCell(row, EMPLOYEE_COLUMNS.domain),
+        employee_id: getCell(row, EMPLOYEE_COLUMNS.employeeId) || undefined,
+      }))
+
+      const seenEmails = new Set<string>()
+      const validRows: EmployeeImportPreview[] = []
+      const rowErrors: string[] = []
+
+      normalized.forEach((row, index) => {
+        const rowNumber = row.s_no || String(index + 1)
+        if (!row.email || !row.full_name) {
+          rowErrors.push(`Row ${rowNumber}: missing email or name`)
+          return
+        }
+        if (!row.employee_id || !row.domain) {
+          rowErrors.push(`Row ${rowNumber}: missing employee ID or domain`)
+          return
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) {
+          rowErrors.push(`Row ${rowNumber}: invalid email`)
+          return
+        }
+        if (seenEmails.has(row.email)) {
+          rowErrors.push(`Row ${rowNumber}: duplicate email`)
+          return
+        }
+        seenEmails.add(row.email)
+        validRows.push(row)
+      })
+
+      if (validRows.length === 0) {
+        setError(`No valid employees found. Accepted columns: Email, name/full_name, domain/department, employee_id. ${rowErrors.slice(0, 3).join('; ')}`)
+        return
+      }
+
+      setPreview(validRows)
+      if (rowErrors.length > 0) {
+        setError(`${rowErrors.length} row(s) skipped: ${rowErrors.slice(0, 3).join('; ')}`)
+      }
+    } catch (err: any) {
+      console.error('Employee import parse failed:', err)
+      setError(err?.message || 'Failed to parse file. Use XLSX, CSV, JSON, PDF, DOCX, or TXT with employee records.')
     }
-    reader.readAsArrayBuffer(file)
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -202,10 +219,10 @@ export function EmployeeImporter() {
             </div>
             <div>
               <p className="text-xl font-display font-medium mb-1">
-                {isDragging ? "Drop it here!" : "Drag & drop your Excel file"}
+                {isDragging ? "Drop it here!" : "Drag & drop your file"}
               </p>
               <p className="text-muted-foreground mt-2">
-                or click to browse your computer
+                Accepts XLSX, XLS, CSV, JSON, PDF, DOCX, DOC, or TXT
               </p>
             </div>
             <label className="mt-4">
@@ -214,7 +231,7 @@ export function EmployeeImporter() {
               </span>
               <input
                 type="file"
-                accept=".xlsx,.xls,.csv"
+                accept=".xlsx,.xls,.csv,.json,.pdf,.docx,.txt,.doc"
                 onChange={handleFileChange}
                 className="hidden"
               />

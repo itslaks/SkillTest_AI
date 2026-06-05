@@ -15,60 +15,58 @@ export async function POST(request: NextRequest) {
     let extractedText = ''
 
     if (pastedText && pastedText.trim()) {
-      // Direct text input
       extractedText = pastedText.trim()
     } else if (file) {
       const buffer = Buffer.from(await file.arrayBuffer())
       const fileName = file.name.toLowerCase()
 
       if (fileName.endsWith('.docx')) {
-        // Extract text from DOCX
         const result = await mammoth.extractRawText({ buffer })
         extractedText = result.value
       } else if (fileName.endsWith('.pdf')) {
-        // Extract text from PDF using pdf-parse
         const pdfParseModule = await import('pdf-parse')
-        // @ts-ignore - handle both ESM and CJS exports
         const parser = pdfParseModule.default ?? pdfParseModule
         const pdfData = await parser(buffer)
         extractedText = pdfData.text
       } else if (fileName.endsWith('.txt')) {
-        // Plain text file
         extractedText = buffer.toString('utf-8')
       } else if (fileName.endsWith('.json')) {
         extractedText = jsonBufferToText(buffer)
       } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || fileName.endsWith('.csv')) {
         extractedText = spreadsheetBufferToText(buffer)
+      } else if (fileName.endsWith('.doc')) {
+        return NextResponse.json({
+          error: 'DOC files are not supported yet. Please use DOCX, PDF, TXT, XLSX, XLS, CSV, or JSON.'
+        }, { status: 400 })
       } else {
-        return NextResponse.json({ 
-          error: 'Unsupported file type. Please upload PDF, DOCX, TXT, XLSX, XLS, CSV, or JSON files.' 
+        return NextResponse.json({
+          error: 'Unsupported file type. Please upload PDF, DOCX, TXT, XLSX, XLS, CSV, or JSON files.'
         }, { status: 400 })
       }
     } else {
-      return NextResponse.json({ 
-        error: 'No content provided. Please upload a file or paste text.' 
+      return NextResponse.json({
+        error: 'No content provided. Please upload a file or paste text.'
       }, { status: 400 })
     }
 
     extractedText = cleanExtractedText(extractedText)
 
     if (!extractedText || extractedText.length < 50) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Extracted content is too short. Please provide more content (at least 50 characters).' 
       }, { status: 400 })
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       text: extractedText,
-      wordCount: extractedText.split(/\s+/).length,
+      wordCount: extractedText.split(/\s+/).filter(Boolean).length,
       charCount: extractedText.length,
       lineCount: extractedText.split('\n').filter(Boolean).length,
     })
-
   } catch (error: any) {
     console.error('Content extraction error:', error)
-    return NextResponse.json({ 
-      error: `Failed to extract content: ${error.message}` 
+    return NextResponse.json({
+      error: `Failed to extract content: ${error.message}`
     }, { status: 500 })
   }
 }

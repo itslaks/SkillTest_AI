@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/hooks/use-toast'
-import { createQuiz, bulkCreateQuestions } from '@/lib/actions/quiz'
+import { createQuiz, bulkCreateQuestions, deleteQuiz } from '@/lib/actions/quiz'
 import {
   ArrowLeft, Sparkles, Wand2, Upload, FileSpreadsheet, Download,
   CheckCircle2, Clock, Target, AlarmClock,
@@ -191,87 +191,101 @@ export default function NewQuizPage() {
       const quizId = result.data?.id
 
       if (quizId) {
-        // Upload questions from file
-        if ((questionSource === 'upload' || questionSource === 'both') && parsedQuestions.length > 0) {
-          const questionInputs = parsedQuestions.map(q => ({
-            quiz_id: quizId,
-            question_text: q.question_text,
-            options: [
-              { text: q.option_a, isCorrect: q.correct_answer?.toLowerCase() === 'a' },
-              { text: q.option_b, isCorrect: q.correct_answer?.toLowerCase() === 'b' },
-              { text: q.option_c, isCorrect: q.correct_answer?.toLowerCase() === 'c' },
-              { text: q.option_d, isCorrect: q.correct_answer?.toLowerCase() === 'd' },
-            ],
-            difficulty: (q.difficulty || difficulty) as DifficultyLevel,
-            explanation: q.explanation || undefined,
-          }))
-          await bulkCreateQuestions(questionInputs)
+        const cleanupQuiz = async (reason: string) => {
+          await deleteQuiz(quizId)
+          setError(`Quiz creation rolled back: ${reason}`)
         }
 
-        if ((questionSource === 'upload' || questionSource === 'both') && extractedUploadContent) {
-          if (aiAvailable === false) {
-            setError('Document upload needs AI question generation. Please configure your API keys in the .env.local file.')
-            return
-          }
-
-          const response = await fetch('/api/generate-from-content', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+        try {
+          if ((questionSource === 'upload' || questionSource === 'both') && parsedQuestions.length > 0) {
+            const questionInputs = parsedQuestions.map(q => ({
               quiz_id: quizId,
-              content: extractedUploadContent,
-              difficulty,
-              count: questionCount,
-              topic,
-            }),
-          })
+              question_text: q.question_text,
+              options: [
+                { text: q.option_a, isCorrect: q.correct_answer?.toLowerCase() === 'a' },
+                { text: q.option_b, isCorrect: q.correct_answer?.toLowerCase() === 'b' },
+                { text: q.option_c, isCorrect: q.correct_answer?.toLowerCase() === 'c' },
+                { text: q.option_d, isCorrect: q.correct_answer?.toLowerCase() === 'd' },
+              ],
+              difficulty: (q.difficulty || difficulty) as DifficultyLevel,
+              explanation: q.explanation || undefined,
+            }))
 
-          const result = await response.json()
-          if (!response.ok) {
-            setError(result.error || 'Failed to generate questions from uploaded document')
-            return
+            const questionResult = await bulkCreateQuestions(questionInputs)
+            if (questionResult.error) {
+              await cleanupQuiz(questionResult.error)
+              return
+            }
           }
 
-          toast({
-            title: 'Document Questions Generated',
-            description: `Created ${result.generated} questions from ${uploadedFile?.name || 'the uploaded document'}.`,
-          })
-        }
+          if ((questionSource === 'upload' || questionSource === 'both') && extractedUploadContent) {
+            if (aiAvailable === false) {
+              await cleanupQuiz('Document upload requires AI question generation, but AI is not configured.')
+              return
+            }
 
-        // AI generation
-        if (questionSource === 'ai' || questionSource === 'both') {
-          if (aiAvailable === false) {
-            setError('AI question generation is not available. Please configure your API keys in the .env.local file.')
-            return
-          }
-          
-          setIsGenerating(true)
-          try {
-            const response = await fetch('/api/generate-questions', {
+            const response = await fetch('/api/generate-from-content', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ quiz_id: quizId, topic, difficulty, count: questionCount }),
+              body: JSON.stringify({
+                quiz_id: quizId,
+                content: extractedUploadContent,
+                difficulty,
+                count: questionCount,
+                topic,
+              }),
             })
-            
+
             const result = await response.json()
-            
             if (!response.ok) {
-              throw new Error(result.error || 'Failed to generate questions')
+              await cleanupQuiz(result.error || 'Failed to generate questions from uploaded document')
+              return
             }
-            
-            console.log('Questions generated successfully:', result)
+
             toast({
-              title: 'Questions Generated! 🎉',
-              description: result.success || `Successfully generated ${result.generated} questions using ${result.method}`,
+              title: 'Document Questions Generated',
+              description: `Created ${result.generated} questions from ${uploadedFile?.name || 'the uploaded document'}.`,
             })
-          } catch (error) {
-            console.error('AI question generation failed:', error)
-            setError(error instanceof Error ? error.message : 'Failed to generate AI questions')
           }
-          setIsGenerating(false)
+
+          if (questionSource === 'ai' || questionSource === 'both') {
+            if (aiAvailable === false) {
+              await cleanupQuiz('AI question generation is not available. Please configure your API keys in .env.local.')
+              return
+            }
+
+            setIsGenerating(true)
+            try {
+              const response = await fetch('/api/generate-questions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ quiz_id: quizId, topic, difficulty, count: questionCount }),
+              })
+
+              const result = await response.json()
+              if (!response.ok) {
+                throw new Error(result.error || 'Failed to generate questions')
+              }
+
+              toast({
+                title: 'Questions Generated! 🎉',
+                description: result.success || `Successfully generated ${result.generated} questions using ${result.method}`,
+              })
+            } catch (error) {
+              console.error('AI question generation failed:', error)
+              await cleanupQuiz(error instanceof Error ? error.message : 'Failed to generate AI questions')
+              return
+            } finally {
+              setIsGenerating(false)
+            }
+          }
+        } catch (error: any) {
+          console.error('Quiz creation failed after initial save:', error)
+          await cleanupQuiz(error?.message || 'Unexpected failure while creating quiz questions')
+          return
         }
       }
-      // Redirect to quiz detail page for review
+
       router.push(`/manager/quizzes/${quizId}?assign=1`)
     })
   }
