@@ -143,24 +143,24 @@ export function AICommandConsole() {
   }
 
   return (
-    <div className="space-y-5">
-      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+    <div className="space-y-4">
+      <section className="rounded-xl border border-zinc-200 bg-white px-5 py-4 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-zinc-950 text-cyan-200">
-              <DatabaseZap className="h-6 w-6" />
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-zinc-950 text-cyan-200">
+              <DatabaseZap className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-zinc-500">Admin execution cockpit</p>
-              <h1 className="text-2xl font-bold tracking-tight text-zinc-950">AI Command</h1>
-              <p className="mt-1 text-sm text-zinc-500">Use the popup for quick access, or this page for full admin workflows and command history.</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-zinc-500">Admin execution cockpit</p>
+              <h1 className="text-xl font-bold tracking-tight text-zinc-950">AI Command</h1>
+              <p className="mt-0.5 text-sm text-zinc-500">Full command workspace for app-wide admin operations.</p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {moduleLinks.map((link) => {
               const Icon = link.icon
               return (
-                <a key={link.href} href={link.href} className="inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100">
+                <a key={link.href} href={link.href} className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100">
                   <Icon className="h-3.5 w-3.5" />
                   {link.label}
                 </a>
@@ -170,10 +170,10 @@ export function AICommandConsole() {
         </div>
       </section>
 
-      <div className="grid min-h-[calc(100vh-17rem)] grid-cols-1 gap-5 xl:grid-cols-[300px_minmax(0,1fr)_320px]">
-        <aside className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+      <div className="grid min-h-[calc(100vh-16rem)] grid-cols-1 gap-4 xl:grid-cols-[280px_minmax(0,1fr)_300px]">
+        <aside className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">Command lanes</p>
-          <div className="mt-4 grid gap-2">
+          <div className="mt-3 grid gap-2">
             {commandPacks.map((pack) => {
               const Icon = pack.icon
               const selected = pack.title === activePack
@@ -182,7 +182,7 @@ export function AICommandConsole() {
                   key={pack.title}
                   type="button"
                   onClick={() => setActivePack(pack.title)}
-                  className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ${
+                  className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition ${
                     selected ? 'border-zinc-950 bg-zinc-950 text-white' : 'border-zinc-200 bg-zinc-50 text-zinc-600 hover:bg-zinc-100'
                   }`}
                 >
@@ -193,7 +193,7 @@ export function AICommandConsole() {
             })}
           </div>
 
-          <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+          <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
             <div className="flex items-center gap-2 text-sm font-semibold text-emerald-800">
               <CheckCircle2 className="h-4 w-4" />
               Realtime execution
@@ -204,23 +204,23 @@ export function AICommandConsole() {
           </div>
         </aside>
 
-        <main className="flex min-h-[640px] flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-          <div className="border-b border-zinc-200 bg-zinc-50 p-5">
+        <main className="flex min-h-[640px] flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+          <div className="border-b border-zinc-200 bg-zinc-50 px-5 py-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-zinc-500">Selected lane</p>
-                <h2 className="mt-1 text-2xl font-semibold text-zinc-950">{active.title} operations</h2>
+                <h2 className="mt-1 text-xl font-semibold text-zinc-950">{active.title} operations</h2>
               </div>
-              <div className="rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-semibold text-cyan-800">
+              <div className="rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-semibold text-cyan-800">
                 Live data commands
               </div>
             </div>
           </div>
 
-          <div ref={scrollRef} className="chatbot-scrollbar flex-1 space-y-4 overflow-y-auto p-5">
+          <div ref={scrollRef} className="chatbot-scrollbar flex-1 space-y-3 overflow-y-auto bg-white p-5">
             {messages.map((message, index) => (
               <div key={`${message.role}-${index}`} className={message.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
-                <div className={`max-w-[86%] rounded-3xl border p-4 text-sm leading-relaxed ${
+                <div className={`max-w-[86%] rounded-2xl border px-4 py-3 text-sm leading-relaxed ${
                   message.role === 'user'
                     ? 'rounded-br-md border-zinc-900 bg-zinc-950 text-white'
                     : message.ok === false
@@ -236,14 +236,14 @@ export function AICommandConsole() {
               </div>
             ))}
             {loading && (
-              <div className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs text-cyan-800">
+              <div className="inline-flex items-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs text-cyan-800">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 Executing command against live data
               </div>
             )}
           </div>
 
-          <form onSubmit={submit} className="border-t border-zinc-200 bg-zinc-50 p-5">
+          <form onSubmit={submit} className="border-t border-zinc-200 bg-zinc-50 p-4">
             <div className="flex items-end gap-3">
               <Textarea
                 ref={inputRef}
@@ -252,9 +252,9 @@ export function AICommandConsole() {
                 onKeyDown={keydown}
                 rows={2}
                 placeholder='Say: create employee email=... name="..." employee_id=... domain=...'
-                className="max-h-40 min-h-16 rounded-2xl border-zinc-200 bg-white text-zinc-950 placeholder:text-zinc-400 focus-visible:ring-cyan-300/40"
+                className="max-h-40 min-h-14 rounded-xl border-zinc-200 bg-white text-zinc-950 placeholder:text-zinc-400 focus-visible:ring-cyan-300/40"
               />
-              <Button type="submit" disabled={loading || !input.trim()} className="h-16 rounded-2xl bg-zinc-950 px-5 text-white hover:bg-zinc-800">
+              <Button type="submit" disabled={loading || !input.trim()} className="h-14 rounded-xl bg-zinc-950 px-5 text-white hover:bg-zinc-800">
                 {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
               </Button>
             </div>
@@ -262,7 +262,7 @@ export function AICommandConsole() {
         </main>
 
         <aside className="space-y-4">
-          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+          <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
             <div className="flex items-center gap-2 text-sm font-semibold text-zinc-950">
               <TerminalSquare className="h-4 w-4 text-amber-600" />
               Command examples
@@ -273,7 +273,7 @@ export function AICommandConsole() {
                   key={prompt}
                   type="button"
                   onClick={() => setInput(prompt)}
-                  className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-3 text-left text-xs leading-relaxed text-zinc-600 transition hover:border-cyan-200 hover:bg-cyan-50 hover:text-zinc-950"
+                  className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-left text-xs leading-relaxed text-zinc-600 transition hover:border-cyan-200 hover:bg-cyan-50 hover:text-zinc-950"
                 >
                   {prompt}
                 </button>
@@ -281,7 +281,7 @@ export function AICommandConsole() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
             <div className="flex items-center gap-2 text-sm font-semibold text-amber-900">
               <Sparkles className="h-4 w-4" />
               Natural language
