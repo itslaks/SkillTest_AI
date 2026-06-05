@@ -17,6 +17,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { bulkCreateQuestions } from '@/lib/actions/quiz'
 import type { DifficultyLevel, CreateQuestionInput } from '@/lib/types/database'
+import { parseUniversalRowsFile, UNIVERSAL_UPLOAD_ACCEPT, normalizeHeader } from '@/lib/file-utils'
 import * as XLSX from 'xlsx'
 
 const DIFFICULTIES: DifficultyLevel[] = ['easy', 'medium', 'hard', 'advanced', 'hardcore']
@@ -78,22 +79,6 @@ export function QuizImporter({
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (file) {
-      const validTypes = [
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'application/vnd.ms-excel',
-        'text/csv',
-        'application/json',
-      ]
-      
-      if (!validTypes.includes(file.type) && 
-          !file.name.endsWith('.xlsx') && 
-          !file.name.endsWith('.xls') &&
-          !file.name.endsWith('.csv') &&
-          !file.name.endsWith('.json')) {
-        setError('Please upload an Excel (.xlsx, .xls), CSV, or JSON file')
-        return
-      }
-      
       setSelectedFile(file)
       setParsedQuestions([])
       setError(null)
@@ -102,25 +87,9 @@ export function QuizImporter({
     }
   }
 
-  async function spreadsheetRows(file: File) {
-    const data = await file.arrayBuffer()
-    const workbook = XLSX.read(data)
-    const sheetName = workbook.SheetNames[0]
-    const worksheet = workbook.Sheets[sheetName]
-    return XLSX.utils.sheet_to_json(worksheet) as any[]
-  }
-
-  function normalizeJsonRows(parsed: any) {
-    if (Array.isArray(parsed)) return parsed
-    if (Array.isArray(parsed?.questions)) return parsed.questions
-    throw new Error('JSON must be an array of questions or an object with a questions array')
-  }
-
   async function parseFile(file: File) {
     try {
-      const jsonData = file.name.toLowerCase().endsWith('.json')
-        ? normalizeJsonRows(JSON.parse(await file.text()))
-        : await spreadsheetRows(file)
+      const jsonData = await parseUniversalRowsFile(file) as any[]
       
       if (jsonData.length === 0) {
         setError('The file appears to be empty')
@@ -130,14 +99,14 @@ export function QuizImporter({
       // Map to expected format - handle various column name formats
       const questions: ParsedQuestion[] = jsonData.map((row: any) => {
         const q: ParsedQuestion = {
-          question_text: row['question_text'] || row['Question'] || row['question'] || row['Q'] || '',
-          option_a: row['option_a'] || row['Option A'] || row['A'] || row['a'] || '',
-          option_b: row['option_b'] || row['Option B'] || row['B'] || row['b'] || '',
-          option_c: row['option_c'] || row['Option C'] || row['C'] || row['c'] || '',
-          option_d: row['option_d'] || row['Option D'] || row['D'] || row['d'] || '',
-          correct_answer: (row['correct_answer'] || row['Correct Answer'] || row['Answer'] || row['correct'] || 'A').toString().toUpperCase(),
-          difficulty: normalizeDifficulty(row['difficulty'] || row['Difficulty'] || quizDifficulty, quizDifficulty),
-          explanation: row['explanation'] || row['Explanation'] || '',
+          question_text: rowCell(row, ['question_text', 'Question', 'question', 'Q', 'prompt']),
+          option_a: rowCell(row, ['option_a', 'Option A', 'A', 'choice_a', 'answer_a']),
+          option_b: rowCell(row, ['option_b', 'Option B', 'B', 'choice_b', 'answer_b']),
+          option_c: rowCell(row, ['option_c', 'Option C', 'C', 'choice_c', 'answer_c']),
+          option_d: rowCell(row, ['option_d', 'Option D', 'D', 'choice_d', 'answer_d']),
+          correct_answer: (rowCell(row, ['correct_answer', 'Correct Answer', 'Answer', 'correct', 'key']) || 'A').toUpperCase(),
+          difficulty: normalizeDifficulty(rowCell(row, ['difficulty', 'Difficulty', 'level']) || quizDifficulty, quizDifficulty),
+          explanation: rowCell(row, ['explanation', 'Explanation', 'reason', 'rationale']),
         }
         return q
       }).filter((q: ParsedQuestion) => q.question_text && q.option_a && q.option_b)
@@ -255,7 +224,7 @@ export function QuizImporter({
           Import Questions from File
         </CardTitle>
         <CardDescription>
-          Upload Excel, CSV, or JSON questions. Download the template to see the required format.
+          Upload CSV, XLSX, DOCX, PDF, XML, or JSON questions. Download the template to see the required format.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -295,7 +264,7 @@ export function QuizImporter({
           <input
             ref={fileInputRef}
             type="file"
-            accept=".xlsx,.xls,.csv,.json"
+            accept={UNIVERSAL_UPLOAD_ACCEPT}
             onChange={handleFileSelect}
             className="hidden"
           />
@@ -304,7 +273,7 @@ export function QuizImporter({
             {selectedFile ? selectedFile.name : 'Click to upload or drag and drop'}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            Excel (.xlsx, .xls), CSV, or JSON files
+            CSV, XLSX, DOCX, PDF, XML, or JSON files
           </p>
         </div>
 
@@ -369,4 +338,11 @@ export function QuizImporter({
       </CardContent>
     </Card>
   )
+}
+
+function rowCell(row: Record<string, any>, aliases: string[]) {
+  const normalizedAliases = new Set(aliases.map(normalizeHeader))
+  const key = Object.keys(row).find((candidate) => normalizedAliases.has(normalizeHeader(candidate)))
+  const value = key ? row[key] : undefined
+  return value === null || value === undefined ? '' : String(value).trim()
 }

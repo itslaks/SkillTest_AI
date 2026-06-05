@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import type { DifficultyLevel, ParsedQuestion } from '@/lib/types/database'
 import { cn } from '@/lib/utils'
-import * as XLSX from 'xlsx'
+import { parseUniversalRowsFile, UNIVERSAL_UPLOAD_ACCEPT, normalizeHeader } from '@/lib/file-utils'
 import { AISetupInstructions } from '@/components/manager/ai-setup-instructions'
 import { SafeBackButton } from '@/components/navigation/safe-back-button'
 
@@ -123,7 +123,7 @@ export default function NewQuizPage() {
     try {
       const fileName = file.name.toLowerCase()
 
-      if (fileName.endsWith('.pdf') || fileName.endsWith('.docx') || fileName.endsWith('.txt')) {
+      if (fileName.endsWith('.pdf') || fileName.endsWith('.docx')) {
         const formData = new FormData()
         formData.append('file', file)
         const response = await fetch('/api/extract-content', { method: 'POST', body: formData })
@@ -137,23 +137,17 @@ export default function NewQuizPage() {
         return
       }
 
-      let rows: any[]
-      if (fileName.endsWith('.json')) {
-        rows = normalizeJsonRows(JSON.parse(await file.text()))
-      } else {
-        const workbook = XLSX.read(await file.arrayBuffer())
-        rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]) as any[]
-      }
+      const rows = await parseUniversalRowsFile(file) as any[]
 
       const questions = rows.map((r: any) => ({
-        question_text: r['question_text'] || r['Question'] || r['question'] || r['prompt'] || '',
-        option_a: r['option_a'] || r['Option A'] || r['A'] || '',
-        option_b: r['option_b'] || r['Option B'] || r['B'] || '',
-        option_c: r['option_c'] || r['Option C'] || r['C'] || '',
-        option_d: r['option_d'] || r['Option D'] || r['D'] || '',
-        correct_answer: r['correct_answer'] || r['Correct Answer'] || r['Answer'] || r['answer'] || 'a',
-        difficulty: r['difficulty'] || r['Difficulty'] || difficulty,
-        explanation: r['explanation'] || r['Explanation'] || '',
+        question_text: rowCell(r, ['question_text', 'Question', 'question', 'prompt']),
+        option_a: rowCell(r, ['option_a', 'Option A', 'A', 'choice_a', 'answer_a']),
+        option_b: rowCell(r, ['option_b', 'Option B', 'B', 'choice_b', 'answer_b']),
+        option_c: rowCell(r, ['option_c', 'Option C', 'C', 'choice_c', 'answer_c']),
+        option_d: rowCell(r, ['option_d', 'Option D', 'D', 'choice_d', 'answer_d']),
+        correct_answer: rowCell(r, ['correct_answer', 'Correct Answer', 'Answer', 'answer', 'key']) || 'a',
+        difficulty: normalizeDifficulty(rowCell(r, ['difficulty', 'Difficulty', 'level']), difficulty),
+        explanation: rowCell(r, ['explanation', 'Explanation', 'reason', 'rationale']),
       })).filter((q: any) => q.question_text)
       if (questions.length === 0) throw new Error('No valid questions found. Check column headers.')
       setParsedQuestions(questions)
@@ -161,12 +155,6 @@ export default function NewQuizPage() {
       setUploadError(err.message || 'Failed to parse file')
       setUploadedFile(null)
     }
-  }
-
-  function normalizeJsonRows(parsed: any) {
-    if (Array.isArray(parsed)) return parsed
-    if (Array.isArray(parsed?.questions)) return parsed.questions
-    throw new Error('JSON must be an array of questions or an object with a questions array')
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -621,7 +609,7 @@ export default function NewQuizPage() {
                 {/* Upload zone */}
                 {(questionSource === 'upload' || questionSource === 'both') && (
                   <div className="space-y-3">
-                    <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls,.json,.pdf,.docx,.txt" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f) }} />
+                    <input ref={fileInputRef} type="file" accept={UNIVERSAL_UPLOAD_ACCEPT} className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f) }} />
 
                     {/* Template download */}
                     <div className="flex items-center justify-between p-3 rounded-xl bg-blue-50 border border-blue-100">
@@ -657,7 +645,7 @@ export default function NewQuizPage() {
                       ) : (
                         <div className="space-y-2">
                           <Upload className="h-10 w-10 text-muted-foreground/50 mx-auto" />
-                          <p className="font-medium text-sm">Drop Excel, CSV, JSON, PDF, DOCX, or TXT here</p>
+                          <p className="font-medium text-sm">Drop CSV, XLSX, DOCX, PDF, XML, or JSON here</p>
                           <p className="text-xs text-muted-foreground">Structured files import directly; documents are converted into questions with AI.</p>
                         </div>
                       )}
@@ -733,4 +721,16 @@ export default function NewQuizPage() {
       </form>
     </div>
   )
+}
+
+function rowCell(row: Record<string, any>, aliases: string[]) {
+  const normalizedAliases = new Set(aliases.map(normalizeHeader))
+  const key = Object.keys(row).find((candidate) => normalizedAliases.has(normalizeHeader(candidate)))
+  const value = key ? row[key] : undefined
+  return value === null || value === undefined ? '' : String(value).trim()
+}
+
+function normalizeDifficulty(value: string, fallback: DifficultyLevel): DifficultyLevel {
+  const normalized = value.toLowerCase() as DifficultyLevel
+  return ALL_DIFFICULTIES.includes(normalized) ? normalized : fallback
 }

@@ -8,8 +8,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { importEmployees } from '@/lib/actions/manager'
 import type { EmployeeImport, EmployeeImportResult } from '@/lib/types/database'
 import { Upload, Users, CheckCircle2, XCircle, FileSpreadsheet } from 'lucide-react'
-import * as XLSX from 'xlsx'
-import { parseJsonFile, parseSpreadsheetFile, parseKeyValueText, parseTextToRows, extractTextFromFile, getCell } from '@/lib/file-utils'
+import { parseUniversalRowsFile, UNIVERSAL_UPLOAD_ACCEPT } from '@/lib/file-utils'
 
 type SpreadsheetRow = Record<string, string | number | boolean | null | undefined>
 type EmployeeImportPreview = EmployeeImport & { s_no: string }
@@ -48,34 +47,14 @@ export function EmployeeImporter() {
     setPreview(null)
 
     try {
-      const fileName = file.name.toLowerCase()
-      let rows: SpreadsheetRow[] = []
-
-      const isSpreadsheet = fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || fileName.endsWith('.csv')
-      const isJson = fileName.endsWith('.json')
-      const isDocument = fileName.endsWith('.pdf') || fileName.endsWith('.docx') || fileName.endsWith('.txt') || fileName.endsWith('.doc')
-
-      if (isSpreadsheet) {
-        rows = await parseSpreadsheetFile(file)
-      } else if (isJson) {
-        rows = await parseJsonFile(file)
-      } else if (isDocument) {
-        const extracted = await extractTextFromFile(file)
-        rows = parseTextToRows(extracted)
-        if (rows.length === 0) {
-          rows = parseKeyValueText(extracted)
-        }
-      } else {
-        setError('Unsupported file type. Use XLSX, XLS, CSV, JSON, PDF, DOCX, TXT, or DOC.')
-        return
-      }
+      const rows = await parseUniversalRowsFile(file) as SpreadsheetRow[]
 
       if (rows.length === 0) {
         setError('No rows could be extracted from the file. Ensure it contains structured employee data or try a different format.')
         return
       }
 
-      const normalized: EmployeeImportPreview[] = rows.map((row, index) => ({
+      const normalized: EmployeeImportPreview[] = rows.map((row) => ({
         s_no: getCell(row, EMPLOYEE_COLUMNS.serial),
         email: getCell(row, EMPLOYEE_COLUMNS.email).toLowerCase(),
         full_name: getCell(row, EMPLOYEE_COLUMNS.name),
@@ -120,7 +99,7 @@ export function EmployeeImporter() {
       }
     } catch (err: any) {
       console.error('Employee import parse failed:', err)
-      setError(err?.message || 'Failed to parse file. Use XLSX, CSV, JSON, PDF, DOCX, or TXT with employee records.')
+      setError(err?.message || 'Failed to parse file. Use CSV, XLSX, DOCX, PDF, XML, or JSON with employee records.')
     }
   }
 
@@ -222,7 +201,7 @@ export function EmployeeImporter() {
                 {isDragging ? "Drop it here!" : "Drag & drop your file"}
               </p>
               <p className="text-muted-foreground mt-2">
-                Accepts XLSX, XLS, CSV, JSON, PDF, DOCX, DOC, or TXT
+                Accepts CSV, XLSX, DOCX, PDF, XML, or JSON
               </p>
             </div>
             <label className="mt-4">
@@ -231,7 +210,7 @@ export function EmployeeImporter() {
               </span>
               <input
                 type="file"
-                accept=".xlsx,.xls,.csv,.json,.pdf,.docx,.txt,.doc"
+                accept={UNIVERSAL_UPLOAD_ACCEPT}
                 onChange={handleFileChange}
                 className="hidden"
               />

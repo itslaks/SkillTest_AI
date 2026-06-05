@@ -2,11 +2,11 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Search, UserRound, Fingerprint } from 'lucide-react'
 import { getDomainColor } from '@/lib/domain-colors'
+import { AvatarView } from '@/components/avatar/avatar-view'
 
 type ProfileRow = {
   id: string
@@ -59,20 +59,17 @@ export function ProfileSearch({ profiles }: { profiles: ProfileRow[] }) {
               className="group rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-lg"
             >
               <div className="flex items-start gap-4">
-                {profile.avatar_url ? (
-                  <Image
+                <AvatarView
                     src={profile.avatar_url}
                     alt={profile.full_name || profile.email}
-                    width={48}
-                    height={48}
-                    unoptimized
+                    size={48}
                     className="h-12 w-12 shrink-0 rounded-2xl border border-zinc-200 bg-white object-cover shadow-md"
+                    fallback={(
+                      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${domainStyle.gradient} text-sm font-bold text-white shadow-md`}>
+                        {profile.full_name?.charAt(0) || profile.email.charAt(0)}
+                      </div>
+                    )}
                   />
-                ) : (
-                  <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${domainStyle.gradient} text-sm font-bold text-white shadow-md`}>
-                    {profile.full_name?.charAt(0) || profile.email.charAt(0)}
-                  </div>
-                )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <h2 className="truncate font-semibold text-zinc-950 group-hover:underline">

@@ -25,22 +25,24 @@ export async function POST(request: NextRequest) {
         extractedText = result.value
       } else if (fileName.endsWith('.pdf')) {
         const pdfParseModule = await import('pdf-parse')
-        const parser = pdfParseModule.default ?? pdfParseModule
+        const parser = (pdfParseModule as any).default ?? pdfParseModule
         const pdfData = await parser(buffer)
         extractedText = pdfData.text
       } else if (fileName.endsWith('.txt')) {
         extractedText = buffer.toString('utf-8')
       } else if (fileName.endsWith('.json')) {
         extractedText = jsonBufferToText(buffer)
+      } else if (fileName.endsWith('.xml')) {
+        extractedText = xmlBufferToText(buffer)
       } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || fileName.endsWith('.csv')) {
         extractedText = spreadsheetBufferToText(buffer)
       } else if (fileName.endsWith('.doc')) {
         return NextResponse.json({
-          error: 'DOC files are not supported yet. Please use DOCX, PDF, TXT, XLSX, XLS, CSV, or JSON.'
+          error: 'DOC files are not supported yet. Please use DOCX, PDF, XLSX, XLS, CSV, XML, or JSON.'
         }, { status: 400 })
       } else {
         return NextResponse.json({
-          error: 'Unsupported file type. Please upload PDF, DOCX, TXT, XLSX, XLS, CSV, or JSON files.'
+          error: 'Unsupported file type. Please upload PDF, DOCX, XLSX, XLS, CSV, XML, or JSON files.'
         }, { status: 400 })
       }
     } else {
@@ -53,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     if (!extractedText || extractedText.length < 50) {
       return NextResponse.json({
-        error: 'Extracted content is too short. Please provide more content (at least 50 characters).' 
+        error: 'Extracted content is too short. If this is a scanned PDF or image-only document, export it with selectable text or run OCR before upload.'
       }, { status: 400 })
     }
 
@@ -100,6 +102,23 @@ function spreadsheetBufferToText(buffer: Buffer) {
 function jsonBufferToText(buffer: Buffer) {
   const parsed = JSON.parse(buffer.toString('utf-8'))
   return jsonToText(parsed)
+}
+
+function xmlBufferToText(buffer: Buffer) {
+  return buffer
+    .toString('utf-8')
+    .replace(/<\?xml[^>]*>/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+    .replace(/<\/(question|employee|candidate|attendance|score|row|record|item)>/gi, '\n\n')
+    .replace(/<([^/\s>]+)[^>]*>/g, '$1: ')
+    .replace(/<\/[^>]+>/g, '\n')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
 }
 
 function jsonToText(value: unknown, label = 'JSON'): string {

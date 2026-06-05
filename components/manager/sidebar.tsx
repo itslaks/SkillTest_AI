@@ -25,6 +25,8 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { signOut } from '@/lib/actions/auth'
 import { useEffect, useState } from 'react'
+import { Avatar3D } from '@/components/avatar/avatar-3d'
+import { getAvatar3DId } from '@/lib/avatar-options'
 
 interface ManagerSidebarProps {
   profile: Profile | null
@@ -74,6 +76,7 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
   const roleBadge = getRoleBadge(profile?.role)
   const RoleBadgeIcon = roleBadge.icon
+  const avatarId = getAvatar3DId((profile as any)?.avatar_url)
 
   useEffect(() => {
     document.documentElement.style.setProperty('--manager-sidebar-width', collapsed ? '68px' : '16rem')
@@ -214,12 +217,16 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
 
         {/* User */}
         <div className={cn('flex items-center gap-3 p-2 rounded-xl cursor-default', collapsed && 'justify-center')}>
-          <Avatar className="h-8 w-8 shrink-0 ring-1 ring-white/20">
-            <AvatarImage src={(profile as any)?.avatar_url || undefined} />
-            <AvatarFallback className={cn('text-white text-xs font-bold bg-gradient-to-br', sidebarAccent)}>
-              {profile?.full_name?.charAt(0) || profile?.email?.charAt(0) || 'M'}
-            </AvatarFallback>
-          </Avatar>
+          {avatarId ? (
+            <Avatar3D avatarId={avatarId} size={32} className="shrink-0 ring-1 ring-white/20" />
+          ) : (
+            <Avatar className="h-8 w-8 shrink-0 ring-1 ring-white/20">
+              <AvatarImage src={(profile as any)?.avatar_url || undefined} />
+              <AvatarFallback className={cn('text-white text-xs font-bold bg-gradient-to-br', sidebarAccent)}>
+                {profile?.full_name?.charAt(0) || profile?.email?.charAt(0) || 'M'}
+              </AvatarFallback>
+            </Avatar>
+          )}
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <p className="text-[13px] font-semibold text-white/90 truncate">{profile?.full_name || 'Staff'}</p>

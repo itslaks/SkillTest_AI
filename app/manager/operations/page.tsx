@@ -952,7 +952,7 @@ export default async function ManagerOperationsPage({
               </div>
               <label className="grid gap-2 text-sm">
                 <span className="font-medium">Upload question file</span>
-                <input name="question_file" type="file" accept=".xlsx,.xls,.csv,.pdf,.doc,.docx" className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-3 py-3 text-sm" />
+                <input name="question_file" type="file" accept=".csv,.xlsx,.xls,.json,.xml,.pdf,.docx" className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-3 py-3 text-sm" />
               </label>
               <OpsSubmitButton pendingLabel="Creating..." className="w-fit rounded-full bg-black text-white hover:bg-zinc-800">Create assessment setup</OpsSubmitButton>
             </form>
@@ -1060,7 +1060,7 @@ export default async function ManagerOperationsPage({
               </div>
               <label className="grid gap-2 text-sm">
                 <span className="font-medium">Upload evidence file</span>
-                <input name="evidence_file" type="file" accept=".xlsx,.xls,.csv,.pdf,.doc,.docx,.png,.jpg,.jpeg,.zip" className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-3 py-3 text-sm" />
+                <input name="evidence_file" type="file" accept=".csv,.xlsx,.xls,.json,.xml,.pdf,.docx,.png,.jpg,.jpeg,.zip" className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-3 py-3 text-sm" />
               </label>
               <label className="grid gap-2 text-sm">
                 <span className="font-medium">Remarks</span>

@@ -31,13 +31,18 @@ export function CertificatePreview({
     <div className={`relative mx-auto aspect-[1.414/1] w-full overflow-hidden rounded-xl border border-zinc-300 bg-[#fbfaf7] shadow-sm ${compact ? 'max-w-xl' : 'max-w-6xl'}`}>
       {templateImageUrl && (
         <div
-          className="absolute inset-0 bg-cover bg-center opacity-20"
+          className="absolute inset-0 bg-cover bg-center opacity-25"
           style={{ backgroundImage: `url("${templateImageUrl}")` }}
         />
       )}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.9),rgba(255,255,255,0.58),rgba(255,255,255,0.2))]" />
       <div className="absolute inset-4 border border-zinc-300" />
       <div className="absolute inset-7 border" style={{ borderColor: accent }} />
       <div className="absolute left-0 top-0 h-1.5 w-full" style={{ backgroundColor: accent }} />
+      <Corner position="left-7 top-7" accent={accent} />
+      <Corner position="right-7 top-7 rotate-90" accent={accent} />
+      <Corner position="bottom-7 right-7 rotate-180" accent={accent} />
+      <Corner position="bottom-7 left-7 -rotate-90" accent={accent} />
 
       <div className={`relative flex h-full flex-col px-[8%] py-[5.5%] text-center ${compact ? 'gap-3' : 'gap-5'}`}>
         <header className="flex items-start justify-between gap-4 text-left">
@@ -45,8 +50,10 @@ export function CertificatePreview({
             <p className={`font-semibold uppercase tracking-[0.28em] text-zinc-500 ${compact ? 'text-[9px]' : 'text-xs'}`}>{presenter}</p>
             <p className={`mt-1 font-medium text-zinc-500 ${compact ? 'text-[10px]' : 'text-sm'}`}>SkillTest_AI Verified Credential</p>
           </div>
-          <div className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white/75 px-3 py-1.5 text-left shadow-sm">
-            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: accent }} />
+          <div className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white/80 px-3 py-1.5 text-left shadow-sm backdrop-blur">
+            <span className="grid h-7 w-7 place-items-center rounded-full text-white shadow-sm" style={{ backgroundColor: accent }}>
+              <span className={`${compact ? 'text-[10px]' : 'text-xs'} font-black`}>ST</span>
+            </span>
             <span className={`font-semibold uppercase tracking-[0.16em] text-zinc-600 ${compact ? 'text-[8px]' : 'text-[10px]'}`}>Verified</span>
           </div>
         </header>
@@ -73,6 +80,10 @@ export function CertificatePreview({
             {message || `has successfully completed ${topic} and demonstrated the required proficiency for this credential.`}
           </p>
           <p className={`mt-3 font-semibold text-zinc-950 ${compact ? 'text-xs' : 'text-base'}`}>{topic}</p>
+          <div className="mx-auto mt-4 flex w-fit items-center gap-2 rounded-full border border-zinc-200 bg-white/75 px-4 py-1.5 shadow-sm">
+            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: accent }} />
+            <span className={`font-semibold uppercase tracking-[0.18em] text-zinc-500 ${compact ? 'text-[8px]' : 'text-[10px]'}`}>Skill credential</span>
+          </div>
         </div>
 
         <footer className="grid grid-cols-2 items-end gap-4 border-t border-zinc-200 pt-4 text-left">
@@ -83,6 +94,17 @@ export function CertificatePreview({
           </div>
         </footer>
       </div>
+    </div>
+  )
+}
+
+function Corner({ position, accent }: { position: string; accent: string }) {
+  return (
+    <div className={`absolute h-12 w-12 ${position}`} aria-hidden>
+      <span className="absolute left-0 top-0 h-px w-12" style={{ backgroundColor: accent }} />
+      <span className="absolute left-0 top-0 h-12 w-px" style={{ backgroundColor: accent }} />
+      <span className="absolute left-2 top-2 h-px w-8 bg-zinc-300" />
+      <span className="absolute left-2 top-2 h-8 w-px bg-zinc-300" />
     </div>
   )
 }

@@ -12,8 +12,8 @@ import {
   BarChart3, Users, Trophy, TrendingUp, Sparkles, RefreshCw,
   ChevronRight, Zap, Target, Clock,
 } from 'lucide-react'
-import * as XLSX from 'xlsx'
 import { cn } from '@/lib/utils'
+import { parseUniversalRowsFile, UNIVERSAL_UPLOAD_ACCEPT } from '@/lib/file-utils'
 
 interface AssessmentRecord {
   Candidate_ID?: string
@@ -110,19 +110,8 @@ export function AssessmentAnalyzer({ quizId, quizTitle }: AssessmentAnalyzerProp
     }
   }
 
-  const readFile = (file: File): Promise<AssessmentRecord[]> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        try {
-          const workbook = XLSX.read(e.target?.result, { type: 'binary' })
-          const sheet = workbook.Sheets[workbook.SheetNames[0]]
-          resolve(XLSX.utils.sheet_to_json(sheet) as AssessmentRecord[])
-        } catch (error) { reject(error) }
-      }
-      reader.onerror = () => reject(new Error('Failed to read file'))
-      reader.readAsBinaryString(file)
-    })
+  const readFile = async (file: File): Promise<AssessmentRecord[]> => {
+    return parseUniversalRowsFile(file) as Promise<AssessmentRecord[]>
   }
 
   const handleSendMessage = async (text?: string) => {
@@ -255,14 +244,14 @@ export function AssessmentAnalyzer({ quizId, quizTitle }: AssessmentAnalyzerProp
               onDrop={(e) => {
                 e.preventDefault()
                 setIsDragging(false)
-                const dropped = Array.from(e.dataTransfer.files).filter(f => /\.(csv|xlsx|xls)$/i.test(f.name))
+                const dropped = Array.from(e.dataTransfer.files).filter(f => /\.(csv|xlsx|xls|json|xml|pdf|docx)$/i.test(f.name))
                 if (dropped.length) handleFileSelect(dropped)
               }}
             >
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".csv,.xlsx,.xls"
+                accept={UNIVERSAL_UPLOAD_ACCEPT}
                 multiple
                 className="hidden"
                 onChange={(e) => handleFileSelect(Array.from(e.target.files || []))}
@@ -274,7 +263,7 @@ export function AssessmentAnalyzer({ quizId, quizTitle }: AssessmentAnalyzerProp
                     <Upload className="h-7 w-7 text-muted-foreground group-hover:text-primary transition-colors" />
                   </div>
                   <h3 className="text-[15px] font-semibold mb-1.5">Drop your files here</h3>
-                  <p className="text-sm text-muted-foreground mb-3">or click to browse — supports CSV, Excel (.xlsx, .xls)</p>
+                  <p className="text-sm text-muted-foreground mb-3">or click to browse - supports CSV, XLSX, DOCX, PDF, XML, and JSON</p>
                   <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground/70">
                     <span className="flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> Multiple files</span>
                     <span className="flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> Auto-detect columns</span>

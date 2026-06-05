@@ -58,7 +58,7 @@ const optionalSafeImageUrl = z
   .string()
   .trim()
   .max(1_100_000, 'Image is too large')
-  .refine((val) => /^https?:\/\//i.test(val) || /^data:image\/(png|jpe?g|webp|svg\+xml);/i.test(val), 'Image must be http(s) or a safe image data URL')
+  .refine((val) => /^https?:\/\//i.test(val) || /^data:image\/(png|jpe?g|webp|svg\+xml);/i.test(val) || /^avatar3d:[a-z0-9_-]+$/i.test(val), 'Image must be http(s), a safe image data URL, or a 3D avatar preset')
   .optional()
   .nullable()
   .or(z.literal('').transform(() => null))

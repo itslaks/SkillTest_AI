@@ -58,25 +58,40 @@ The application is designed for **admins, managers, training coordinators, train
 
 | Feature | Description |
 |---|---|
-| 🤖 AI Quiz Generation | Generate MCQs from a topic or extracted PDF/DOCX/TXT content |
+| 🤖 AI Quiz Generation | Generate MCQs from a topic or extracted CSV/XLSX/DOCX/PDF/XML/JSON content |
 | 🧠 AI Manager Insights | Short coaching recommendations for batch health, attendance, trainer performance, and quiz outcomes |
 | 🎓 AI Learner Coach | Personalized recommendations based on streaks, quiz history, readiness, and retention signals |
 | 📊 Assessment Analyzer | Upload assessment results and chat with AI about scores, weak areas, and remediation |
 | 🧑‍💼 Profile Dashboards | Search anyone by name, email, employee ID, domain, or role and view quiz, badge, certificate, attendance, and training history |
-| 🖼️ Profile Photos | Users can upload a small profile photo or choose from 15 built-in default face avatars |
+| 🖼️ Profile Photos | Users can upload a small profile photo or choose from 15 built-in Three.js 3D emoji-style avatar presets |
 | 🧭 Smart Domain Assignment | Filter large employee lists by vertical/domain with color-coded chips before assigning quizzes |
-| 🏅 Certificates | Admin-only certificate automation with flexible score thresholds, uploaded certificate formats, personalized employee/course names, and automatic issuing |
+| 🏅 Certificates | Admin-only certificate automation with flexible score thresholds, uploaded image templates, personalized employee/course names, stronger visual preview, and automatic issuing |
 | 🎖️ Badge Universe | 250+ styled badges across 12+ categories with color, rarity, and shape metadata |
 | ✉️ Email Automation | Assignment and completion emails through SMTP or Resend, including score, badge, and certificate updates |
 | 🤖 Manager Command Chatbot | Sleek DB-aware chatbot for admins/trainers with professional answers, Enter-to-send input, markdown cleanup, and no visible internal provider/status labels |
 | 🧑‍🏫 Training Operations | Simplified batch creation, trainer assignment, sessions, attendance, assessments, feedback, reports |
 | ✅ Attendance Governance | Cutoff enforcement, late reason capture, version history, bulk import |
-| 📥 Import Workflows | Employee imports, batch candidate imports, attendance imports, assessment score imports |
+| 📥 Import Workflows | Employee imports, quiz-question imports, batch candidate imports, attendance imports, assessment score imports, and analyzer uploads support CSV, XLSX/XLS, DOCX, PDF, XML, and JSON where upload parsing is used |
 | 🏆 Accomplishments | Harder-earned badges, employee certificate access, downloadable certificates, live leaderboards, cumulative reports |
 | 📄 Reports | Excel and PDF exports for training operations, employees, attendance, assessments, feedback, toppers |
 | 🔐 RBAC | Admin, manager, training coordinator, trainer, and employee access boundaries |
 | 📬 Notifications | In-app and email notification workflows through SMTP or Resend |
 | 🧾 BRD Evidence Pack | `/manager/compliance` plus downloadable evidence workbook for judge/client review |
+
+---
+
+## 📥 Upload And Extraction Support
+
+| Upload Area | Supported Formats | Notes |
+|---|---|---|
+| Quiz question import | CSV, XLSX/XLS, XML, JSON, DOCX, PDF | Structured files import directly; DOCX/PDF content is extracted for AI question generation or parsed when it contains table-like text |
+| Employee import | CSV, XLSX/XLS, XML, JSON, DOCX, PDF | Reads email, name, domain/vertical, and employee ID from flexible headers |
+| Attendance upload | CSV, XLSX/XLS, XML, JSON, DOCX, PDF | Supports email or employee ID plus attendance status |
+| Batch candidate upload | CSV, XLSX/XLS, XML, JSON, DOCX, PDF | Maps employee/candidate rows into training batches |
+| Assessment score upload/analyzer | CSV, XLSX/XLS, XML, JSON, DOCX, PDF | Validates score ranges, candidates, duplicates, and batch membership |
+| AI content extraction | CSV, XLSX/XLS, XML, JSON, DOCX, PDF | `/api/extract-content` converts supported files into clean text for AI |
+
+> OCR note: PDF and DOCX extraction works best when the document has selectable text. Image-only scanned PDFs should be OCR-processed before upload, or the app will return a clear “too short / scanned PDF” message instead of guessing.
 
 ---
 
@@ -416,7 +431,7 @@ ALLOW_DEMO_SEED_CREDENTIALS=1 node scripts/seed_admin.js
 | `POST` | `/api/ai-recommend` | Employee learning recommendation |
 | `POST` | `/api/generate-questions` | Generate topic-based MCQs |
 | `POST` | `/api/generate-from-content` | Generate content-based MCQs |
-| `POST` | `/api/extract-content` | Extract text from PDF/DOCX/TXT |
+| `POST` | `/api/extract-content` | Extract text from CSV, XLSX/XLS, DOCX, PDF, XML, or JSON |
 
 ### 📥 Imports And Templates
 

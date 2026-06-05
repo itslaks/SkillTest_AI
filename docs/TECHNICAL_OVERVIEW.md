@@ -7,7 +7,7 @@ SkillTest_AI: Mavericks Execution Platform is a Next.js training management and 
 | Area | Current Capability |
 | --- | --- |
 | Authentication | Supabase Auth with employee/trainer signup, trainer approval, and role redirects |
-| Profiles | Searchable profile dashboards with employee ID, domain, quiz history, badges, certificates, attendance, avatar support, and a direct dashboard return action |
+| Profiles | Searchable profile dashboards with employee ID, domain, quiz history, badges, certificates, attendance, uploaded photos, and 15 Three.js 3D avatar presets |
 | Domains | Employee signup and assignment workflows use domain/vertical values such as Data Engineering, Java, C Sharp, Dotnet, Mainframe, Python, Cloud, DevOps, Testing, BA, UI/UX, and General |
 | Quizzes | Create, import, generate, publish/draft, assign, attempt, score, and analyze quizzes |
 | Assignment | Domain/vertical search and color-coded filters for large employee groups |
@@ -53,7 +53,8 @@ SkillTest_AI: Mavericks Execution Platform is a Next.js training management and 
 | `lib/email.ts` | SMTP/Resend mail sending and templates |
 | `lib/insights.ts` | Readiness, retention, behavioral analysis, trainer impact |
 | `lib/domain-options.ts` | Shared domain/vertical list |
-| `lib/avatar-options.ts` | 15 built-in default avatar faces |
+| `lib/avatar-options.ts` | 15 built-in Three.js 3D avatar preset IDs |
+| `components/avatar/` | Three.js avatar renderer, preset picker, and avatar view wrapper |
 | `scripts/` | Supabase migrations, seed scripts, fixtures, smoke test |
 
 ## Important Routes
@@ -96,7 +97,7 @@ Examples it should handle:
 | --- | --- |
 | Migration `030` | Creates `certificate_rules`, `certificates`, trigger, badge style columns, and badge seed data |
 | Migration `031` | Adds template/personalization columns and backfills old eligible attempts |
-| Admin settings | `/manager/admin` lets admins enable certificates, set any threshold such as 90%, set title/name/message/color, and upload a template image |
+| Admin settings | `/manager/admin` lets admins enable certificates, set any threshold such as 90%, set title/name/message/color, upload a template image, and preview a polished credential frame |
 | Auto issue | New completed attempts create/update certificates when score meets enabled rule |
 | Backfill | Run `031` after saving rules to issue missing certificates for old attempts |
 | Certificate page | `/certificates/[id]` renders uploaded background with employee/course/score/date details |

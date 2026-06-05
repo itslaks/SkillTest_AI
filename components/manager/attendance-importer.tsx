@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Upload, FileSpreadsheet, CheckCircle2, XCircle, Download } from 'lucide-react'
-import * as XLSX from 'xlsx'
+import { parseUniversalRowsFile, UNIVERSAL_UPLOAD_ACCEPT } from '@/lib/file-utils'
 
 type SessionOption = {
   id: string
@@ -39,27 +39,21 @@ export function AttendanceImporter({ sessions }: AttendanceImporterProps) {
   const [loading, setLoading] = useState(false)
   const [progress, setProgress] = useState<UploadProgress>(null)
 
-  function readFile(file: File) {
+  async function readFile(file: File) {
     setError('')
     setResult(null)
     setProgress(null)
     setFileName(file.name)
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      try {
-        const workbook = XLSX.read(event.target?.result, { type: 'array' })
-        const sheet = workbook.Sheets[workbook.SheetNames[0]]
-        const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet)
-        if (!rows.length) {
-          setError('The attendance file is empty.')
-          return
-        }
-        setPreview(rows)
-      } catch {
-        setError('Could not read this file. Use the attendance template or a valid Excel/CSV file.')
+    try {
+      const rows = await parseUniversalRowsFile(file)
+      if (!rows.length) {
+        setError('The attendance file is empty.')
+        return
       }
+      setPreview(rows)
+    } catch (err: any) {
+      setError(err.message || 'Could not read this file. Use the attendance template or a supported upload file.')
     }
-    reader.readAsArrayBuffer(file)
   }
 
   async function upload() {
@@ -145,7 +139,7 @@ export function AttendanceImporter({ sessions }: AttendanceImporterProps) {
         <label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-300 bg-white px-4 text-sm font-medium hover:bg-zinc-100 lg:self-end">
           <Upload className="h-4 w-4" />
           Select file
-          <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(event) => event.target.files?.[0] && readFile(event.target.files[0])} />
+          <input type="file" accept={UNIVERSAL_UPLOAD_ACCEPT} className="hidden" onChange={(event) => event.target.files?.[0] && readFile(event.target.files[0])} />
         </label>
       </div>
 

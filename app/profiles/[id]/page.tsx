@@ -1,11 +1,11 @@
 import { getProfileDashboard } from '@/lib/actions/profile'
 import type React from 'react'
-import Image from 'next/image'
 import { getDomainColor } from '@/lib/domain-colors'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { SafeBackButton } from '@/components/navigation/safe-back-button'
 import Link from 'next/link'
+import { AvatarView } from '@/components/avatar/avatar-view'
 import {
   ArrowLeft,
   Award,
@@ -52,20 +52,18 @@ export default async function ProfileDashboardPage({ params }: { params: Promise
         <div className={`h-2 bg-gradient-to-r ${domainStyle.gradient}`} />
         <div className="grid gap-6 p-6 md:grid-cols-[1fr_320px] md:p-8">
           <div className="flex items-start gap-5">
-            {profile.avatar_url ? (
-              <Image
+            <AvatarView
                 src={profile.avatar_url}
                 alt={profile.full_name || profile.email}
-                width={80}
-                height={80}
-                unoptimized
+                size={80}
                 className="h-20 w-20 shrink-0 rounded-3xl border border-white bg-white object-cover shadow-lg"
+                interactive
+                fallback={(
+                  <div className={`flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl bg-gradient-to-br ${domainStyle.gradient} text-3xl font-bold shadow-lg`}>
+                    {profile.full_name?.charAt(0) || profile.email?.charAt(0) || '?'}
+                  </div>
+                )}
               />
-            ) : (
-              <div className={`flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl bg-gradient-to-br ${domainStyle.gradient} text-3xl font-bold shadow-lg`}>
-                {profile.full_name?.charAt(0) || profile.email?.charAt(0) || '?'}
-              </div>
-            )}
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">{profile.full_name || 'Unnamed Profile'}</h1>

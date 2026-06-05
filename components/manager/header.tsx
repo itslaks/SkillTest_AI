@@ -10,6 +10,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import type { Profile } from '@/lib/types/database'
 import { getNotificationVerb, type StaffNotification } from '@/lib/notifications'
 import { signOut } from '@/lib/actions/auth'
+import { Avatar3D } from '@/components/avatar/avatar-3d'
+import { getAvatar3DId } from '@/lib/avatar-options'
 
 interface ManagerHeaderProps {
   profile: Profile | null
@@ -17,6 +19,7 @@ interface ManagerHeaderProps {
 }
 
 export function ManagerHeader({ profile, notifications = [] }: ManagerHeaderProps) {
+  const avatarId = getAvatar3DId((profile as any)?.avatar_url)
 
   return (
     <header className="sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-border/50 bg-white/98 backdrop-blur-md px-4 md:px-6">
@@ -91,12 +94,14 @@ export function ManagerHeader({ profile, notifications = [] }: ManagerHeaderProp
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-2.5 h-9 pl-1.5 pr-3 rounded-xl hover:bg-muted/60 transition-colors">
-              <Avatar className="h-7 w-7 ring-2 ring-border">
-                <AvatarImage src={(profile as any)?.avatar_url || undefined} />
-                <AvatarFallback className="bg-gradient-to-br from-blue-500 to-violet-600 text-white text-xs font-bold">
-                  {profile?.full_name?.charAt(0) || 'M'}
-                </AvatarFallback>
-              </Avatar>
+              {avatarId ? (
+                <Avatar3D avatarId={avatarId} size={28} className="ring-2 ring-border" />
+              ) : (
+                <Avatar className="h-7 w-7 ring-2 ring-border">
+                  <AvatarImage src={(profile as any)?.avatar_url || undefined} />
+                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-violet-600 text-white text-xs font-bold">{profile?.full_name?.charAt(0) || 'M'}</AvatarFallback>
+                </Avatar>
+              )}
               <div className="hidden md:block text-left leading-none">
                 <p className="text-[13px] font-semibold text-foreground">{profile?.full_name?.split(' ')[0] || 'Manager'}</p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">Manager</p>
@@ -106,12 +111,14 @@ export function ManagerHeader({ profile, notifications = [] }: ManagerHeaderProp
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-60 rounded-xl shadow-xl border-border/60 p-1.5">
             <div className="flex items-center gap-3 px-2 py-2 mb-1">
-              <Avatar className="h-10 w-10 ring-2 ring-border">
-                <AvatarImage src={(profile as any)?.avatar_url || undefined} />
-                <AvatarFallback className="bg-gradient-to-br from-blue-500 to-violet-600 text-white font-bold">
-                  {profile?.full_name?.charAt(0) || 'M'}
-                </AvatarFallback>
-              </Avatar>
+              {avatarId ? (
+                <Avatar3D avatarId={avatarId} size={40} className="ring-2 ring-border" />
+              ) : (
+                <Avatar className="h-10 w-10 ring-2 ring-border">
+                  <AvatarImage src={(profile as any)?.avatar_url || undefined} />
+                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-violet-600 text-white font-bold">{profile?.full_name?.charAt(0) || 'M'}</AvatarFallback>
+                </Avatar>
+              )}
               <div className="min-w-0">
                 <p className="font-semibold text-sm truncate">{profile?.full_name || 'Manager'}</p>
                 <p className="text-xs text-muted-foreground truncate">{profile?.email}</p>

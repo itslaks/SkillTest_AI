@@ -25,6 +25,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { bulkCreateQuestions } from '@/lib/actions/quiz'
 import type { DifficultyLevel, CreateQuestionInput, ParsedQuestion } from '@/lib/types/database'
+import { parseUniversalRowsFile, UNIVERSAL_UPLOAD_ACCEPT, STRUCTURED_UPLOAD_ACCEPT } from '@/lib/file-utils'
 import * as XLSX from 'xlsx'
 
 const DIFFICULTIES: DifficultyLevel[] = ['easy', 'medium', 'hard', 'advanced', 'hardcore']
@@ -128,16 +129,16 @@ export function UnifiedQuizImporter({
       setSuccess(null)
       
       const fileName = file.name.toLowerCase()
-      const isDoc = fileName.endsWith('.pdf') || fileName.endsWith('.docx') || fileName.endsWith('.txt')
+      const isDoc = fileName.endsWith('.pdf') || fileName.endsWith('.docx')
       const isSpreadsheet = fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || fileName.endsWith('.csv')
       const isJson = fileName.endsWith('.json')
+      const isXml = fileName.endsWith('.xml')
       
       if (isDoc) {
         setUseAI(true)
-      } else if (isSpreadsheet || isJson) {
+      } else if (isSpreadsheet || isJson || isXml) {
         setUseAI(false)
-        if (isJson) parseJsonLocally(file)
-        else parseSpreadsheetLocally(file)
+        parseStructuredFileLocally(file)
       }
     }
   }
@@ -186,16 +187,12 @@ export function UnifiedQuizImporter({
     return { questions, errors }
   }
 
-  async function parseSpreadsheetLocally(file: File) {
+  async function parseStructuredFileLocally(file: File) {
     try {
-      const data = await file.arrayBuffer()
-      const workbook = XLSX.read(data)
-      const sheetName = workbook.SheetNames[0]
-      const worksheet = workbook.Sheets[sheetName]
-      const jsonData = XLSX.utils.sheet_to_json<QuestionSpreadsheetRow>(worksheet)
+      const jsonData = await parseUniversalRowsFile(file) as QuestionSpreadsheetRow[]
       
       if (jsonData.length === 0) {
-        setError('The spreadsheet appears to be empty.')
+        setError('The file appears to be empty.')
         return
       }
 
@@ -211,45 +208,11 @@ export function UnifiedQuizImporter({
         setError(`${errors.length} row(s) skipped: ${errors.slice(0, 3).join('; ')}`)
       }
       toast({
-        title: 'Spreadsheet Parsed',
+        title: 'File Parsed',
         description: `Found ${questions.length} valid questions ready to import.`,
       })
     } catch (err: any) {
-      setError('Failed to parse spreadsheet: ' + (err.message || 'Unknown error'))
-    }
-  }
-
-  async function parseJsonLocally(file: File) {
-    try {
-      const parsed = JSON.parse(await file.text())
-      const rows = Array.isArray(parsed)
-        ? parsed
-        : Array.isArray(parsed?.questions)
-          ? parsed.questions
-          : []
-
-      if (rows.length === 0) {
-        setError('JSON must be an array of questions or an object with a questions array.')
-        return
-      }
-
-      const { questions, errors } = parseRows(rows as QuestionSpreadsheetRow[])
-
-      if (questions.length === 0) {
-        setError(`No valid questions found in JSON. ${errors.slice(0, 3).join('; ')}`)
-        return
-      }
-
-      setParsedQuestions(questions)
-      if (errors.length > 0) {
-        setError(`${errors.length} JSON item(s) skipped: ${errors.slice(0, 3).join('; ')}`)
-      }
-      toast({
-        title: 'JSON Parsed',
-        description: `Found ${questions.length} valid questions ready to import.`,
-      })
-    } catch (err: any) {
-      setError('Failed to parse JSON: ' + (err.message || 'Unknown error'))
+      setError('Failed to parse file: ' + (err.message || 'Unknown error'))
     }
   }
 
@@ -472,7 +435,7 @@ export function UnifiedQuizImporter({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept={useAI ? ".pdf,.docx,.txt,.xlsx,.xls,.csv,.json" : ".xlsx,.xls,.csv,.json"}
+                accept={useAI ? UNIVERSAL_UPLOAD_ACCEPT : STRUCTURED_UPLOAD_ACCEPT}
                 onChange={handleFileSelect}
                 className="hidden"
               />
@@ -483,7 +446,7 @@ export function UnifiedQuizImporter({
                 {selectedFile ? selectedFile.name : 'Click to upload or drag and drop'}
               </p>
               <p className="text-xs text-muted-foreground mt-2">
-                {useAI ? 'PDF, DOCX, TXT, XLSX, XLS, CSV, or JSON content for AI generation' : 'XLSX, XLS, CSV, or JSON questions for direct import'}
+                {useAI ? 'CSV, XLSX, DOCX, PDF, XML, or JSON content for AI generation' : 'CSV, XLSX, XML, or JSON questions for direct import'}
               </p>
             </div>
           </TabsContent>
