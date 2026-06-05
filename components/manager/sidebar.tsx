@@ -21,6 +21,7 @@ import {
   BookOpen,
   FileCheck2,
   Bell,
+  TerminalSquare,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { signOut } from '@/lib/actions/auth'
@@ -38,6 +39,7 @@ const navigation = [
     items: [
       { name: 'Dashboard', href: '/manager', icon: LayoutDashboard, color: 'text-sky-400', bg: 'bg-sky-400/10', activeBg: 'bg-sky-500', description: 'Overview & stats' },
       { name: 'Training Ops', href: '/manager/operations', icon: CalendarDays, color: 'text-cyan-400', bg: 'bg-cyan-400/10', activeBg: 'bg-cyan-500', description: 'Batches & sessions' },
+      { name: 'AI Command', href: '/manager/ai-command', icon: TerminalSquare, color: 'text-amber-300', bg: 'bg-amber-300/10', activeBg: 'bg-amber-400', description: 'Execute admin ops' },
       { name: 'Admin Docs', href: '/manager/docs', icon: BookOpen, color: 'text-emerald-300', bg: 'bg-emerald-300/10', activeBg: 'bg-emerald-400', description: 'A to Z guide' },
       { name: 'Quizzes', href: '/manager/quizzes', icon: FileQuestion, color: 'text-violet-400', bg: 'bg-violet-400/10', activeBg: 'bg-violet-500', description: 'Manage assessments' },
       { name: 'Employees', href: '/manager/employees', icon: Users, color: 'text-emerald-400', bg: 'bg-emerald-400/10', activeBg: 'bg-emerald-500', description: 'Team management' },

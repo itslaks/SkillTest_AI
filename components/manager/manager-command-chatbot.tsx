@@ -2,6 +2,7 @@
 
 import { FormEvent, KeyboardEvent, ReactNode, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -315,11 +316,13 @@ export function ManagerCommandChatbot() {
 
       <Button
         type="button"
-        onClick={() => setOpen((value) => !value)}
+        asChild
         className="h-12 rounded-full border border-cyan-200/40 bg-zinc-950 px-4 text-white shadow-[0_16px_44px_rgba(2,6,23,0.35)] hover:bg-zinc-900"
       >
-        <ExternalLink className="mr-2 h-4 w-4 text-cyan-100" />
-        AI Command
+        <Link href="/manager/ai-command">
+          <ExternalLink className="mr-2 h-4 w-4 text-cyan-100" />
+          AI Command
+        </Link>
       </Button>
     </div>
   )
