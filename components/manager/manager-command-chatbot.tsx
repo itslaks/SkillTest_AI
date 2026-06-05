@@ -196,6 +196,11 @@ export function ManagerCommandChatbot() {
                 </div>
               </div>
               <div className="flex gap-1">
+                <Button type="button" size="icon" variant="ghost" className="h-8 w-8 rounded-full text-white hover:bg-white/10 hover:text-white" asChild aria-label="Open full AI Command console">
+                  <Link href="/manager/ai-command">
+                    <ExternalLink className="h-4 w-4" />
+                  </Link>
+                </Button>
                 <Button type="button" size="icon" variant="ghost" className="h-8 w-8 rounded-full text-white hover:bg-white/10 hover:text-white" onClick={copyLastAnswer} aria-label="Copy latest answer">
                   <Clipboard className="h-4 w-4" />
                 </Button>
@@ -316,13 +321,11 @@ export function ManagerCommandChatbot() {
 
       <Button
         type="button"
-        asChild
+        onClick={() => setOpen((value) => !value)}
         className="h-12 rounded-full border border-cyan-200/40 bg-zinc-950 px-4 text-white shadow-[0_16px_44px_rgba(2,6,23,0.35)] hover:bg-zinc-900"
       >
-        <Link href="/manager/ai-command">
-          <ExternalLink className="mr-2 h-4 w-4 text-cyan-100" />
-          AI Command
-        </Link>
+        <ExternalLink className="mr-2 h-4 w-4 text-cyan-100" />
+        AI Command
       </Button>
     </div>
   )

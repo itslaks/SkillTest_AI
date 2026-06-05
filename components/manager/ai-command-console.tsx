@@ -1,7 +1,6 @@
 'use client'
 
-import { FormEvent, KeyboardEvent, Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Bot,
@@ -21,7 +20,6 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import * as THREE from 'three'
 
 type ChatMessage = {
   role: 'user' | 'assistant'
@@ -145,25 +143,37 @@ export function AICommandConsole() {
   }
 
   return (
-    <div className="relative min-h-[calc(100vh-11rem)] overflow-hidden rounded-[2rem] border border-zinc-900 bg-[#07090d] text-white shadow-[0_40px_140px_rgba(2,6,23,0.45)]">
-      <div className="absolute inset-0 opacity-80">
-        <CommandScene />
-      </div>
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(7,9,13,0.98)_0%,rgba(7,9,13,0.86)_44%,rgba(7,9,13,0.7)_100%)]" />
-
-      <div className="relative grid min-h-[calc(100vh-11rem)] grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)_300px]">
-        <aside className="border-b border-white/10 p-5 xl:border-b-0 xl:border-r">
+    <div className="space-y-5">
+      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="grid h-12 w-12 place-items-center rounded-2xl border border-cyan-200/30 bg-cyan-200/10">
-              <DatabaseZap className="h-6 w-6 text-cyan-100" />
+            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-zinc-950 text-cyan-200">
+              <DatabaseZap className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="text-xl font-semibold tracking-tight">AI Command</h1>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-cyan-100/65">Admin execution cockpit</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-zinc-500">Admin execution cockpit</p>
+              <h1 className="text-2xl font-bold tracking-tight text-zinc-950">AI Command</h1>
+              <p className="mt-1 text-sm text-zinc-500">Use the popup for quick access, or this page for full admin workflows and command history.</p>
             </div>
           </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {moduleLinks.map((link) => {
+              const Icon = link.icon
+              return (
+                <a key={link.href} href={link.href} className="inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100">
+                  <Icon className="h-3.5 w-3.5" />
+                  {link.label}
+                </a>
+              )
+            })}
+          </div>
+        </div>
+      </section>
 
-          <div className="mt-6 grid gap-2">
+      <div className="grid min-h-[calc(100vh-17rem)] grid-cols-1 gap-5 xl:grid-cols-[300px_minmax(0,1fr)_320px]">
+        <aside className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">Command lanes</p>
+          <div className="mt-4 grid gap-2">
             {commandPacks.map((pack) => {
               const Icon = pack.icon
               const selected = pack.title === activePack
@@ -173,7 +183,7 @@ export function AICommandConsole() {
                   type="button"
                   onClick={() => setActivePack(pack.title)}
                   className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ${
-                    selected ? 'border-cyan-200/40 bg-white/10 text-white' : 'border-white/10 bg-white/[0.03] text-white/70 hover:bg-white/[0.07]'
+                    selected ? 'border-zinc-950 bg-zinc-950 text-white' : 'border-zinc-200 bg-zinc-50 text-zinc-600 hover:bg-zinc-100'
                   }`}
                 >
                   <Icon className="h-4 w-4" />
@@ -183,34 +193,26 @@ export function AICommandConsole() {
             })}
           </div>
 
-          <div className="mt-6 rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-emerald-100">
+          <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-emerald-800">
               <CheckCircle2 className="h-4 w-4" />
               Realtime execution
             </div>
-            <p className="mt-2 text-xs leading-relaxed text-emerald-50/70">
+            <p className="mt-2 text-xs leading-relaxed text-emerald-700">
               Create, update, delete, assign, approve, mark attendance, open feedback forms, and clear scheduled work directly from chat.
             </p>
           </div>
         </aside>
 
-        <main className="flex min-h-[640px] flex-col border-white/10 xl:border-r">
-          <div className="border-b border-white/10 p-5">
+        <main className="flex min-h-[640px] flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+          <div className="border-b border-zinc-200 bg-zinc-50 p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-white/45">Selected lane</p>
-                <h2 className="mt-1 text-2xl font-semibold">{active.title} operations</h2>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-zinc-500">Selected lane</p>
+                <h2 className="mt-1 text-2xl font-semibold text-zinc-950">{active.title} operations</h2>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {moduleLinks.map((link) => {
-                  const Icon = link.icon
-                  return (
-                    <a key={link.href} href={link.href} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white/75 hover:bg-white/10">
-                      <Icon className="h-3.5 w-3.5" />
-                      {link.label}
-                    </a>
-                  )
-                })}
+              <div className="rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-semibold text-cyan-800">
+                Live data commands
               </div>
             </div>
           </div>
@@ -220,10 +222,10 @@ export function AICommandConsole() {
               <div key={`${message.role}-${index}`} className={message.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
                 <div className={`max-w-[86%] rounded-3xl border p-4 text-sm leading-relaxed ${
                   message.role === 'user'
-                    ? 'rounded-br-md border-white/20 bg-white text-zinc-950'
+                    ? 'rounded-br-md border-zinc-900 bg-zinc-950 text-white'
                     : message.ok === false
-                      ? 'rounded-bl-md border-red-300/25 bg-red-500/10 text-red-50'
-                      : 'rounded-bl-md border-cyan-200/20 bg-cyan-200/[0.08] text-zinc-50'
+                      ? 'rounded-bl-md border-red-200 bg-red-50 text-red-800'
+                      : 'rounded-bl-md border-cyan-200 bg-cyan-50 text-zinc-800'
                 }`}>
                   <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.25em] opacity-70">
                     {message.role === 'user' ? <MessageSquareText className="h-3 w-3" /> : message.ok === false ? <XCircle className="h-3 w-3" /> : <Bot className="h-3 w-3" />}
@@ -234,14 +236,14 @@ export function AICommandConsole() {
               </div>
             ))}
             {loading && (
-              <div className="inline-flex items-center gap-2 rounded-full border border-cyan-200/20 bg-cyan-200/10 px-3 py-2 text-xs text-cyan-50">
+              <div className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs text-cyan-800">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 Executing command against live data
               </div>
             )}
           </div>
 
-          <form onSubmit={submit} className="border-t border-white/10 bg-black/30 p-5">
+          <form onSubmit={submit} className="border-t border-zinc-200 bg-zinc-50 p-5">
             <div className="flex items-end gap-3">
               <Textarea
                 ref={inputRef}
@@ -250,19 +252,19 @@ export function AICommandConsole() {
                 onKeyDown={keydown}
                 rows={2}
                 placeholder='Say: create employee email=... name="..." employee_id=... domain=...'
-                className="max-h-40 min-h-16 rounded-2xl border-white/15 bg-white/5 text-white placeholder:text-white/35 focus-visible:ring-cyan-300/40"
+                className="max-h-40 min-h-16 rounded-2xl border-zinc-200 bg-white text-zinc-950 placeholder:text-zinc-400 focus-visible:ring-cyan-300/40"
               />
-              <Button type="submit" disabled={loading || !input.trim()} className="h-16 rounded-2xl bg-cyan-200 px-5 text-zinc-950 hover:bg-cyan-100">
+              <Button type="submit" disabled={loading || !input.trim()} className="h-16 rounded-2xl bg-zinc-950 px-5 text-white hover:bg-zinc-800">
                 {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
               </Button>
             </div>
           </form>
         </main>
 
-        <aside className="space-y-4 p-5">
-          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
-            <div className="flex items-center gap-2 text-sm font-semibold">
-              <TerminalSquare className="h-4 w-4 text-amber-200" />
+        <aside className="space-y-4">
+          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center gap-2 text-sm font-semibold text-zinc-950">
+              <TerminalSquare className="h-4 w-4 text-amber-600" />
               Command examples
             </div>
             <div className="mt-4 grid gap-2">
@@ -271,7 +273,7 @@ export function AICommandConsole() {
                   key={prompt}
                   type="button"
                   onClick={() => setInput(prompt)}
-                  className="rounded-2xl border border-white/10 bg-black/25 px-3 py-3 text-left text-xs leading-relaxed text-white/75 transition hover:border-cyan-200/35 hover:bg-cyan-200/10 hover:text-white"
+                  className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-3 text-left text-xs leading-relaxed text-zinc-600 transition hover:border-cyan-200 hover:bg-cyan-50 hover:text-zinc-950"
                 >
                   {prompt}
                 </button>
@@ -279,56 +281,18 @@ export function AICommandConsole() {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-amber-300/20 bg-amber-300/10 p-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-amber-100">
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-amber-900">
               <Sparkles className="h-4 w-4" />
               Natural language
             </div>
-            <p className="mt-2 text-xs leading-relaxed text-amber-50/75">
+            <p className="mt-2 text-xs leading-relaxed text-amber-800">
               You can say “delete all feedback forms”, “mark attendance present for employee in session”, or “approve trainer by email”. The server executes and replies with the result.
             </p>
           </div>
         </aside>
       </div>
     </div>
-  )
-}
-
-function CommandScene() {
-  return (
-    <Suspense fallback={null}>
-      <Canvas camera={{ position: [0, 0, 7], fov: 48 }} dpr={[1, 1.5]}>
-        <ambientLight intensity={0.65} />
-        <directionalLight position={[4, 4, 6]} intensity={1.2} />
-        <CommandMesh />
-      </Canvas>
-    </Suspense>
-  )
-}
-
-function CommandMesh() {
-  const group = useRef<THREE.Group>(null)
-  useFrame((state) => {
-    if (!group.current) return
-    group.current.rotation.y = state.clock.elapsedTime * 0.16
-    group.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.28) * 0.16
-  })
-
-  return (
-    <group ref={group} position={[2.3, 0, 0]}>
-      <mesh>
-        <icosahedronGeometry args={[2.2, 1]} />
-        <meshStandardMaterial color="#22d3ee" wireframe transparent opacity={0.34} />
-      </mesh>
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[3.1, 0.018, 8, 96]} />
-        <meshStandardMaterial color="#f59e0b" emissive="#7c2d12" emissiveIntensity={0.35} />
-      </mesh>
-      <mesh rotation={[0, Math.PI / 2, 0]}>
-        <torusGeometry args={[2.72, 0.014, 8, 96]} />
-        <meshStandardMaterial color="#34d399" emissive="#064e3b" emissiveIntensity={0.35} />
-      </mesh>
-    </group>
   )
 }
 
