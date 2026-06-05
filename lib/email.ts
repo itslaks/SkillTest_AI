@@ -5,6 +5,7 @@
 import { Resend } from 'resend'
 import nodemailer from 'nodemailer'
 import { PRODUCT_EMAIL_FROM, PRODUCT_NAME, PRODUCT_TMS_LABEL } from '@/lib/branding'
+import { getSiteUrl } from '@/lib/security/env'
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 const smtpConfigured = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS)
@@ -166,8 +167,13 @@ export function buildFeedbackRequestEmail(opts: {
   batchTitle: string
   windowTitle: string
   closesAt: string
+  windowId?: string
   candidateName?: string
 }): string {
+  const feedbackHref = opts.windowId
+    ? `${getSiteUrl()}/employee/training/feedback/${opts.windowId}`
+    : `${getSiteUrl()}/employee/training`
+
   return `
   <div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#fff;">
     <div style="background:#059669;padding:20px 24px;border-radius:12px 12px 0 0;">
@@ -179,7 +185,7 @@ export function buildFeedbackRequestEmail(opts: {
       <p style="color:#3f3f46;">Your feedback is requested for the training program <strong>${opts.batchTitle}</strong>.</p>
       <p style="color:#3f3f46;">Please complete your feedback before the window closes on <strong>${opts.closesAt}</strong>.</p>
       <p style="color:#3f3f46;">Your ratings on <em>training content quality</em> and <em>trainer effectiveness</em> help us continuously improve.</p>
-      <a href="${process.env.NEXT_PUBLIC_APP_URL ?? 'https://skilltest.ai'}/employee/training" style="display:inline-block;background:#059669;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:8px;">Submit Feedback</a>
+      <a href="${feedbackHref}" style="display:inline-block;background:#059669;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:8px;">Submit Feedback</a>
     </div>
     <p style="color:#a1a1aa;font-size:12px;margin-top:16px;text-align:center;">${PRODUCT_NAME} | Feedback Request</p>
   </div>`

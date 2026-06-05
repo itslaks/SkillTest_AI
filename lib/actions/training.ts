@@ -1884,12 +1884,13 @@ export async function runTrainingAutomationSweep({
       for (const member of members || []) {
         const profile = (member as any).profile
         if (!profile?.email) continue
-        const html = buildFeedbackRequestEmail({
-          batchTitle: (window.batch as any)?.title || 'Training Batch',
-          windowTitle: window.title,
-          closesAt: new Date(window.closes_at).toLocaleString(),
-          candidateName: profile.full_name || profile.email,
-        })
+          const html = buildFeedbackRequestEmail({
+            batchTitle: (window.batch as any)?.title || 'Training Batch',
+            windowTitle: window.title,
+            closesAt: new Date(window.closes_at).toLocaleString(),
+            windowId: window.id,
+            candidateName: profile.full_name || profile.email,
+          })
         const emailResult = await sendEmail({ to: profile.email, subject: `Feedback Requested - ${(window.batch as any)?.title || window.title}`, html })
         sendAttempts++
         if (!emailResult.success) sendFailures++
@@ -1998,6 +1999,7 @@ export async function createFeedbackWindow(formData: FormData): Promise<ApiRespo
       batchTitle: batchInfo?.title || 'Training Batch',
       windowTitle: title,
       closesAt: new Date(closesAt).toLocaleString(),
+      windowId: window.id,
       candidateName: profile.full_name || profile.email,
     })
     const emailResult = await sendEmail({
