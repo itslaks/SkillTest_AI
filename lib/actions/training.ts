@@ -216,7 +216,7 @@ export async function getTrainingOpsManagerData() {
 
   const batchIds = batches.map((batch: any) => batch.id)
 
-  const [membersRes, sessionsRes, notificationsRes, feedbackRes, quizzesRes, batchTrainersRes, assessmentSetupsRes, projectEvaluationsRes, automationRunsRes, attendanceVersionsRes, assessmentUploadsRes, batchChangeAuditRes] = await Promise.all([
+  const [membersRes, sessionsRes, notificationsRes, feedbackRes, feedbackWindowsRes, quizzesRes, batchTrainersRes, assessmentSetupsRes, projectEvaluationsRes, automationRunsRes, attendanceVersionsRes, assessmentUploadsRes, batchChangeAuditRes] = await Promise.all([
     batchIds.length
       ? admin
           .from('batch_members')
@@ -259,6 +259,18 @@ export async function getTrainingOpsManagerData() {
             batch:batch_id(id, title),
             session:session_id(id, title, session_date),
             trainee:user_id(id, full_name, email)
+          `)
+          .in('batch_id', batchIds)
+          .order('created_at', { ascending: false })
+          .limit(12)
+      : Promise.resolve({ data: [] }),
+    batchIds.length
+      ? admin
+          .from('training_feedback_windows')
+          .select(`
+            *,
+            batch:batch_id(id, title),
+            session:session_id(id, title, session_date)
           `)
           .in('batch_id', batchIds)
           .order('created_at', { ascending: false })
@@ -328,6 +340,7 @@ export async function getTrainingOpsManagerData() {
   const sessions = sessionsRes.data || []
   const notifications = notificationsRes.data || []
   const feedback = feedbackRes.data || []
+  const feedbackWindows = feedbackWindowsRes.data || []
   const quizzes = quizzesRes.data || []
   const batchTrainers = batchTrainersRes.data || []
   const assessmentSetups = assessmentSetupsRes.data || []
@@ -432,6 +445,7 @@ export async function getTrainingOpsManagerData() {
     attendance,
     notifications,
     feedback,
+    feedbackWindows,
     quizzes,
     batchTrainers,
     assessmentSetups,
@@ -764,6 +778,54 @@ export async function deleteTrainingBatch(formData: FormData): Promise<ApiRespon
   return { data: true }
 }
 
+export async function clearScheduledTrainingSessions(formData: FormData): Promise<ApiResponse<boolean>> {
+  const { userId } = await requireManager()
+  const admin = createAdminClient()
+  const confirmation = asRequiredString(formData.get('confirmation'))
+
+  if (confirmation !== 'DELETE SCHEDULED') {
+    return { error: 'Type DELETE SCHEDULED to clear scheduled training sessions.' }
+  }
+
+  const batchId = asOptionalString(formData.get('batch_id'))
+  let query = admin.from('training_sessions').select('id, batch_id').eq('status', 'scheduled')
+  if (batchId) query = query.eq('batch_id', batchId)
+
+  const { data: sessions, error: readError } = await query
+  if (readError) return { error: readError.message }
+
+  const sessionIds = (sessions || []).map((session: any) => session.id)
+  if (!sessionIds.length) return { data: true }
+
+  const cleanup = async (label: string, promise: PromiseLike<{ error: any }>) => {
+    const { error } = await promise
+    return error ? `${label}: ${error.message}` : null
+  }
+
+  const issue =
+    await cleanup('attendance versions', admin.from('session_attendance_versions').delete().in('session_id', sessionIds) as any)
+    || await cleanup('attendance uploads', admin.from('training_attendance_uploads').delete().in('session_id', sessionIds) as any)
+    || await cleanup('attendance', admin.from('session_attendance').delete().in('session_id', sessionIds) as any)
+    || await cleanup('feedback windows', admin.from('training_feedback_windows').update({ session_id: null }).in('session_id', sessionIds) as any)
+    || await cleanup('feedback', admin.from('training_feedback').delete().in('session_id', sessionIds) as any)
+    || await cleanup('notifications', admin.from('training_notifications').delete().in('session_id', sessionIds) as any)
+    || await cleanup('sessions', admin.from('training_sessions').delete().in('id', sessionIds) as any)
+
+  if (issue) return { error: issue }
+
+  await admin.from('training_batch_change_audit').insert({
+    batch_id: batchId || null,
+    change_type: 'scheduled_sessions_cleared',
+    previous_value: { session_ids: sessionIds, count: sessionIds.length },
+    new_value: { status: 'deleted' },
+    changed_by: userId,
+  }).select('id').maybeSingle()
+
+  revalidatePath('/manager/operations')
+  revalidatePath('/employee/training')
+  return { data: true }
+}
+
 export async function clearAllTrainingData(formData: FormData): Promise<ApiResponse<boolean>> {
   const { userId, role } = await requireManager()
   const admin = createAdminClient()
@@ -1009,6 +1071,110 @@ export async function updateTrainingBatchDetails(formData: FormData): Promise<Ap
     changed_by: userId,
   })
   if (auditError) return { error: `Batch updated, but audit logging failed: ${auditError.message}` }
+
+  revalidatePath('/manager/operations')
+  revalidatePath('/employee/training')
+  return { data: true }
+}
+
+export async function updateTrainingSession(formData: FormData): Promise<ApiResponse<boolean>> {
+  const { userId, role } = await requireManager()
+  const admin = createAdminClient()
+
+  const sessionId = asRequiredString(formData.get('session_id'))
+  const title = asRequiredString(formData.get('title'))
+  const agenda = asOptionalString(formData.get('agenda'))
+  const trainerId = asOptionalString(formData.get('trainer_id'))
+  const sessionDate = asRequiredString(formData.get('session_date'))
+  const mode = (asRequiredString(formData.get('mode'), 'virtual') || 'virtual') as SessionMode
+  const status = (asRequiredString(formData.get('status'), 'scheduled') || 'scheduled') as SessionStatus
+  const attendanceRequired = asBoolean(formData.get('attendance_required'))
+
+  if (!sessionId || !title || !sessionDate) return { error: 'Session, title, and date are required.' }
+
+  const { data: previous } = await admin
+    .from('training_sessions')
+    .select('*, batch:batch_id(created_by, coordinator_id)')
+    .eq('id', sessionId)
+    .maybeSingle()
+  if (!previous) return { error: 'Training session was not found.' }
+
+  const canUpdate = role === 'admin'
+    || previous.created_by === userId
+    || (previous.batch as any)?.created_by === userId
+    || (previous.batch as any)?.coordinator_id === userId
+  if (!canUpdate) return { error: 'You do not have permission to update this session.' }
+
+  const { data: updated, error } = await admin
+    .from('training_sessions')
+    .update({
+      title,
+      agenda,
+      trainer_id: trainerId,
+      session_date: sessionDate,
+      mode,
+      status,
+      attendance_required: attendanceRequired,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', sessionId)
+    .select('id')
+  if (error) return { error: error.message }
+  if (!updated?.length) return { error: 'You do not have permission to update this session.' }
+
+  await admin.from('training_batch_change_audit').insert({
+    batch_id: previous.batch_id,
+    change_type: 'session_update',
+    previous_value: previous,
+    new_value: { title, agenda, trainerId, sessionDate, mode, status, attendanceRequired },
+    changed_by: userId,
+  }).select('id').maybeSingle()
+
+  revalidatePath('/manager/operations')
+  revalidatePath('/employee/training')
+  return { data: true }
+}
+
+export async function deleteTrainingSession(formData: FormData): Promise<ApiResponse<boolean>> {
+  const { userId, role } = await requireManager()
+  const admin = createAdminClient()
+  const sessionId = asRequiredString(formData.get('session_id'))
+  if (!sessionId) return { error: 'Session is required.' }
+
+  const { data: session } = await admin
+    .from('training_sessions')
+    .select('id, batch_id, title, created_by, batch:batch_id(created_by, coordinator_id)')
+    .eq('id', sessionId)
+    .maybeSingle()
+  if (!session) return { error: 'Training session was not found.' }
+
+  const canDelete = role === 'admin'
+    || session.created_by === userId
+    || (session.batch as any)?.created_by === userId
+    || (session.batch as any)?.coordinator_id === userId
+  if (!canDelete) return { error: 'You do not have permission to delete this session.' }
+
+  const cleanup = async (label: string, promise: PromiseLike<{ error: any }>) => {
+    const { error } = await promise
+    return error ? `${label}: ${error.message}` : null
+  }
+  const issue =
+    await cleanup('attendance versions', admin.from('session_attendance_versions').delete().eq('session_id', sessionId) as any)
+    || await cleanup('attendance uploads', admin.from('training_attendance_uploads').delete().eq('session_id', sessionId) as any)
+    || await cleanup('attendance', admin.from('session_attendance').delete().eq('session_id', sessionId) as any)
+    || await cleanup('feedback windows', admin.from('training_feedback_windows').update({ session_id: null }).eq('session_id', sessionId) as any)
+    || await cleanup('feedback', admin.from('training_feedback').delete().eq('session_id', sessionId) as any)
+    || await cleanup('notifications', admin.from('training_notifications').delete().eq('session_id', sessionId) as any)
+    || await cleanup('session', admin.from('training_sessions').delete().eq('id', sessionId) as any)
+  if (issue) return { error: issue }
+
+  await admin.from('training_batch_change_audit').insert({
+    batch_id: session.batch_id,
+    change_type: 'session_delete',
+    previous_value: session,
+    new_value: { deleted: true },
+    changed_by: userId,
+  }).select('id').maybeSingle()
 
   revalidatePath('/manager/operations')
   revalidatePath('/employee/training')
@@ -1286,6 +1452,78 @@ export async function createTrainingAssessmentSetup(formData: FormData): Promise
   return { data: true }
 }
 
+export async function updateTrainingAssessmentSetup(formData: FormData): Promise<ApiResponse<boolean>> {
+  const { userId } = await requireManager()
+  const admin = createAdminClient()
+
+  const setupId = asRequiredString(formData.get('assessment_setup_id'))
+  const title = asRequiredString(formData.get('title'))
+  const assessmentType = (asRequiredString(formData.get('assessment_type'), 'sprint_review') || 'sprint_review') as TrainingAssessmentType
+  const scheduledAt = asOptionalString(formData.get('scheduled_at'))
+  const templateName = asOptionalString(formData.get('template_name'))
+  const maxScore = Number(asRequiredString(formData.get('max_score'), '100')) || 100
+  const passingScore = Number(asRequiredString(formData.get('passing_score'), '70')) || 70
+  const status = asRequiredString(formData.get('status'), 'planned') || 'planned'
+
+  if (!setupId || !title) return { error: 'Assessment setup and title are required.' }
+
+  const { data: previous } = await admin.from('training_assessment_setups').select('*').eq('id', setupId).maybeSingle()
+  if (!previous) return { error: 'Assessment setup was not found.' }
+
+  const { error } = await admin
+    .from('training_assessment_setups')
+    .update({
+      title,
+      assessment_type: assessmentType,
+      scheduled_at: scheduledAt,
+      template_name: templateName,
+      max_score: maxScore,
+      passing_score: passingScore,
+      status,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', setupId)
+
+  if (error) return { error: error.message }
+
+  await admin.from('training_batch_change_audit').insert({
+    batch_id: previous.batch_id,
+    change_type: 'assessment_setup_update',
+    previous_value: previous,
+    new_value: { title, assessmentType, scheduledAt, templateName, maxScore, passingScore, status },
+    changed_by: userId,
+  }).select('id').maybeSingle()
+
+  revalidatePath('/manager/operations')
+  revalidatePath('/employee/training')
+  return { data: true }
+}
+
+export async function deleteTrainingAssessmentSetup(formData: FormData): Promise<ApiResponse<boolean>> {
+  const { userId } = await requireManager()
+  const admin = createAdminClient()
+  const setupId = asRequiredString(formData.get('assessment_setup_id'))
+  if (!setupId) return { error: 'Assessment setup is required.' }
+
+  const { data: previous } = await admin.from('training_assessment_setups').select('*').eq('id', setupId).maybeSingle()
+  if (!previous) return { error: 'Assessment setup was not found.' }
+
+  const { error } = await admin.from('training_assessment_setups').delete().eq('id', setupId)
+  if (error) return { error: error.message }
+
+  await admin.from('training_batch_change_audit').insert({
+    batch_id: previous.batch_id,
+    change_type: 'assessment_setup_delete',
+    previous_value: previous,
+    new_value: { deleted: true },
+    changed_by: userId,
+  }).select('id').maybeSingle()
+
+  revalidatePath('/manager/operations')
+  revalidatePath('/employee/training')
+  return { data: true }
+}
+
 export async function createProjectEvaluation(formData: FormData): Promise<ApiResponse<boolean>> {
   const { userId, role } = await requireTrainingStaff()
   const admin = createAdminClient()
@@ -1335,6 +1573,66 @@ export async function createProjectEvaluation(formData: FormData): Promise<ApiRe
     updated_at: new Date().toISOString(),
   }, { onConflict: 'batch_id,user_id,project_title' })
 
+  if (error) return { error: error.message }
+
+  revalidatePath('/manager/operations')
+  revalidatePath('/employee/training')
+  return { data: true }
+}
+
+export async function updateProjectEvaluation(formData: FormData): Promise<ApiResponse<boolean>> {
+  const { userId } = await requireTrainingStaff()
+  const admin = createAdminClient()
+
+  const evaluationId = asRequiredString(formData.get('project_evaluation_id'))
+  const projectTitle = asRequiredString(formData.get('project_title'))
+  const score = Number(asRequiredString(formData.get('score'), '0'))
+  const evidenceFileName = asOptionalString(formData.get('evidence_file_name'))
+  const remarks = asOptionalString(formData.get('remarks'))
+
+  if (!evaluationId || !projectTitle || Number.isNaN(score) || score < 0 || score > 100) {
+    return { error: 'Project evaluation, title, and score between 0 and 100 are required.' }
+  }
+
+  const { data: previous } = await admin.from('training_project_evaluations').select('*').eq('id', evaluationId).maybeSingle()
+  if (!previous) return { error: 'Project evaluation was not found.' }
+
+  const evidenceFile = formData.get('evidence_file')
+  let storedEvidence = evidenceFileName
+  if (isUploadFile(evidenceFile)) {
+    try {
+      storedEvidence = await uploadTrainingDocument(admin, evidenceFile, 'project-evaluations')
+    } catch (error: any) {
+      return { error: `Project evidence upload failed: ${error.message}` }
+    }
+  }
+
+  const { error } = await admin
+    .from('training_project_evaluations')
+    .update({
+      project_title: projectTitle,
+      score,
+      evidence_file_name: storedEvidence,
+      remarks,
+      evaluator_id: userId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', evaluationId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/manager/operations')
+  revalidatePath('/employee/training')
+  return { data: true }
+}
+
+export async function deleteProjectEvaluation(formData: FormData): Promise<ApiResponse<boolean>> {
+  await requireTrainingStaff()
+  const admin = createAdminClient()
+  const evaluationId = asRequiredString(formData.get('project_evaluation_id'))
+  if (!evaluationId) return { error: 'Project evaluation is required.' }
+
+  const { error } = await admin.from('training_project_evaluations').delete().eq('id', evaluationId)
   if (error) return { error: error.message }
 
   revalidatePath('/manager/operations')
@@ -1721,6 +2019,64 @@ export async function createFeedbackWindow(formData: FormData): Promise<ApiRespo
   }
 
   await finalizeEmailNotification(admin, notification?.id, sendAttempts, sendFailures)
+
+  revalidatePath('/manager/operations')
+  revalidatePath('/employee/training')
+  return { data: true }
+}
+
+export async function updateFeedbackWindow(formData: FormData): Promise<ApiResponse<boolean>> {
+  const { userId } = await requireManager()
+  const admin = createAdminClient()
+
+  const windowId = asRequiredString(formData.get('feedback_window_id'))
+  const title = asRequiredString(formData.get('title'))
+  const closesAt = asRequiredString(formData.get('closes_at'))
+  const status = asRequiredString(formData.get('status'), 'open') || 'open'
+
+  if (!windowId || !title || !closesAt) return { error: 'Feedback form, title, and close time are required.' }
+
+  const { data: previous } = await admin.from('training_feedback_windows').select('*').eq('id', windowId).maybeSingle()
+  if (!previous) return { error: 'Feedback form was not found.' }
+
+  const { error } = await admin
+    .from('training_feedback_windows')
+    .update({ title, closes_at: closesAt, status })
+    .eq('id', windowId)
+  if (error) return { error: error.message }
+
+  await admin.from('training_batch_change_audit').insert({
+    batch_id: previous.batch_id,
+    change_type: 'feedback_form_update',
+    previous_value: previous,
+    new_value: { title, closesAt, status },
+    changed_by: userId,
+  }).select('id').maybeSingle()
+
+  revalidatePath('/manager/operations')
+  revalidatePath('/employee/training')
+  return { data: true }
+}
+
+export async function deleteFeedbackWindow(formData: FormData): Promise<ApiResponse<boolean>> {
+  const { userId } = await requireManager()
+  const admin = createAdminClient()
+  const windowId = asRequiredString(formData.get('feedback_window_id'))
+  if (!windowId) return { error: 'Feedback form is required.' }
+
+  const { data: previous } = await admin.from('training_feedback_windows').select('*').eq('id', windowId).maybeSingle()
+  if (!previous) return { error: 'Feedback form was not found.' }
+
+  const { error } = await admin.from('training_feedback_windows').delete().eq('id', windowId)
+  if (error) return { error: error.message }
+
+  await admin.from('training_batch_change_audit').insert({
+    batch_id: previous.batch_id,
+    change_type: 'feedback_form_delete',
+    previous_value: previous,
+    new_value: { deleted: true },
+    changed_by: userId,
+  }).select('id').maybeSingle()
 
   revalidatePath('/manager/operations')
   revalidatePath('/employee/training')
