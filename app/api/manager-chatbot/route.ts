@@ -17,12 +17,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Message is required.' }, { status: 400 })
   }
 
-  if (isCommand(message)) {
+  const adminCommand = resolveAdminCommand(message)
+  if (adminCommand) {
     if (auth.role !== 'admin') {
       return NextResponse.json({ error: 'AI Command mutations require admin access.' }, { status: 403 })
     }
     const admin = createAdminClient()
-    const result = await executeAdminCommand(admin, auth.userId, message)
+    const result = await executeAdminCommand(admin, auth.userId, adminCommand)
     return NextResponse.json({
       message: result.error ? `Command failed: ${result.error}` : result.message,
       provider: 'skilltest_ai_command',
@@ -121,16 +122,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function isCommand(message: string) {
-  return /^run\s+/i.test(message.trim()) || /^execute\s+/i.test(message.trim())
-}
-
 type CommandResult = { message?: string; error?: string; data?: any }
+type ParsedCommand = { action: string; args: Record<string, string>; source: 'explicit' | 'natural' }
 
-async function executeAdminCommand(admin: ReturnType<typeof createAdminClient>, actorId: string, raw: string): Promise<CommandResult> {
-  const commandText = raw.trim().replace(/^(run|execute)\s+/i, '')
-  const { action, args } = parseCommand(commandText)
-
+async function executeAdminCommand(admin: ReturnType<typeof createAdminClient>, actorId: string, command: ParsedCommand): Promise<CommandResult> {
+  const { action, args } = command
   try {
     switch (action) {
       case 'create employee':
@@ -182,7 +178,16 @@ async function executeAdminCommand(admin: ReturnType<typeof createAdminClient>, 
   }
 }
 
-function parseCommand(text: string) {
+function resolveAdminCommand(message: string): ParsedCommand | null {
+  const trimmed = message.trim()
+  if (/^(run|execute)\s+/i.test(trimmed)) {
+    return { ...parseCommand(trimmed.replace(/^(run|execute)\s+/i, '')), source: 'explicit' }
+  }
+
+  return parseNaturalCommand(trimmed)
+}
+
+function parseCommand(text: string): Omit<ParsedCommand, 'source'> {
   const knownActions = [
     'create employee', 'delete employee', 'create quiz', 'delete quiz', 'activate quiz', 'deactivate quiz',
     'create batch', 'delete batch', 'remove batch', 'assign trainer', 'add trainer', 'approve trainer', 'reject trainer',
@@ -199,6 +204,165 @@ function parseCommand(text: string) {
     args[normalizeArgKey(match[1])] = (match[2] ?? match[3] ?? match[4] ?? '').trim()
   }
   return { action, args }
+}
+
+function parseNaturalCommand(text: string): ParsedCommand | null {
+  const lower = normalize(text)
+  const args: Record<string, string> = {}
+
+  if (/\b(remove|delete|clear)\b.*\bscheduled\b.*\b(training|session|sessions|roadmap|roadmaps)\b/.test(lower)) {
+    args.confirmation = 'DELETE SCHEDULED'
+    return { action: 'clear scheduled', args, source: 'natural' }
+  }
+
+  if (/\b(delete|clear|remove)\b.*\b(all\s+)?training\b/.test(lower)) {
+    args.confirmation = 'DELETE TRAINING'
+    return { action: 'clear training', args, source: 'natural' }
+  }
+
+  const createEmployee = text.match(/\b(?:create|add)\s+employee\b/i)
+  if (createEmployee) {
+    mergeKeyValues(args, text)
+    args.email ||= firstEmail(text)
+    args.name ||= quotedValueAfter(text, 'name') || phraseAfter(text, /\b(?:named|name)\b/i)
+    return { action: 'create employee', args, source: 'natural' }
+  }
+
+  if (/\b(delete|remove)\s+employee\b/i.test(text)) {
+    mergeKeyValues(args, text)
+    args.email ||= firstEmail(text)
+    args.name ||= quotedValueAfter(text, 'employee') || afterWords(text, ['employee'])
+    return { action: 'delete employee', args, source: 'natural' }
+  }
+
+  if (/\b(create|add)\s+quiz\b/i.test(text)) {
+    mergeKeyValues(args, text)
+    args.title ||= quotedValueAfter(text, 'quiz') || quotedValueAfter(text, 'title') || phraseAfter(text, /\bquiz\s+(?:called|named|title)?\b/i)
+    args.topic ||= valueAfterWord(text, 'topic') || valueAfterWord(text, 'domain')
+    return { action: 'create quiz', args, source: 'natural' }
+  }
+
+  if (/\b(delete|remove)\s+quiz\b/i.test(text)) {
+    mergeKeyValues(args, text)
+    args.title ||= quotedValueAfter(text, 'quiz') || afterWords(text, ['quiz'])
+    return { action: 'delete quiz', args, source: 'natural' }
+  }
+
+  if (/\b(activate|publish)\s+quiz\b/i.test(text)) {
+    mergeKeyValues(args, text)
+    args.title ||= quotedValueAfter(text, 'quiz') || afterWords(text, ['quiz'])
+    return { action: 'activate quiz', args, source: 'natural' }
+  }
+
+  if (/\b(deactivate|unpublish|draft)\s+quiz\b/i.test(text)) {
+    mergeKeyValues(args, text)
+    args.title ||= quotedValueAfter(text, 'quiz') || afterWords(text, ['quiz'])
+    return { action: 'deactivate quiz', args, source: 'natural' }
+  }
+
+  if (/\b(create|add)\s+batch\b/i.test(text)) {
+    mergeKeyValues(args, text)
+    args.title ||= quotedValueAfter(text, 'batch') || quotedValueAfter(text, 'title') || phraseAfter(text, /\bbatch\s+(?:called|named|title)?\b/i)
+    args.domain ||= valueAfterWord(text, 'domain')
+    args.trainer_email ||= emailAfterWord(text, 'trainer')
+    return { action: 'create batch', args, source: 'natural' }
+  }
+
+  if (/\b(delete|remove)\s+batch\b/i.test(text)) {
+    mergeKeyValues(args, text)
+    args.batch ||= quotedValueAfter(text, 'batch') || afterWords(text, ['batch'])
+    return { action: 'delete batch', args, source: 'natural' }
+  }
+
+  if (/\b(assign|add)\s+trainer\b/i.test(text)) {
+    mergeKeyValues(args, text)
+    args.trainer_email ||= firstEmail(text)
+    args.batch ||= quotedValueAfter(text, 'batch')
+    return { action: 'assign trainer', args, source: 'natural' }
+  }
+
+  if (/\bapprove\s+trainer\b/i.test(text)) {
+    mergeKeyValues(args, text)
+    args.email ||= firstEmail(text)
+    args.name ||= afterWords(text, ['trainer'])
+    return { action: 'approve trainer', args, source: 'natural' }
+  }
+
+  if (/\breject\s+trainer\b/i.test(text)) {
+    mergeKeyValues(args, text)
+    args.email ||= firstEmail(text)
+    args.name ||= afterWords(text, ['trainer'])
+    return { action: 'reject trainer', args, source: 'natural' }
+  }
+
+  if (/\b(create|add)\s+(session|roadmap)\b/i.test(text)) {
+    mergeKeyValues(args, text)
+    args.title ||= quotedValueAfter(text, 'session') || quotedValueAfter(text, 'roadmap') || quotedValueAfter(text, 'title')
+    args.batch ||= quotedValueAfter(text, 'batch')
+    args.date ||= valueAfterWord(text, 'date')
+    args.trainer_email ||= emailAfterWord(text, 'trainer')
+    return { action: 'create session', args, source: 'natural' }
+  }
+
+  if (/\b(update|edit)\s+(session|roadmap)\b/i.test(text)) {
+    mergeKeyValues(args, text)
+    args.title ||= quotedValueAfter(text, 'session') || quotedValueAfter(text, 'roadmap')
+    args.status ||= valueAfterWord(text, 'status')
+    return { action: 'update session', args, source: 'natural' }
+  }
+
+  if (/\b(delete|remove)\s+(session|roadmap)\b/i.test(text)) {
+    mergeKeyValues(args, text)
+    args.title ||= quotedValueAfter(text, 'session') || quotedValueAfter(text, 'roadmap') || afterWords(text, ['session', 'roadmap'])
+    return { action: 'delete session', args, source: 'natural' }
+  }
+
+  if (/\bmark\b.*\battendance\b/i.test(text)) {
+    mergeKeyValues(args, text)
+    args.email ||= firstEmail(text)
+    args.session ||= quotedValueAfter(text, 'session')
+    args.status ||= lower.match(/\b(present|late|absent|excused)\b/)?.[1] || 'present'
+    return { action: 'mark attendance', args, source: 'natural' }
+  }
+
+  return null
+}
+
+function mergeKeyValues(target: Record<string, string>, text: string) {
+  const parsed = parseCommand(`noop ${text}`)
+  Object.assign(target, parsed.args)
+}
+
+function firstEmail(text: string) {
+  return text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || ''
+}
+
+function emailAfterWord(text: string, word: string) {
+  const index = text.toLowerCase().indexOf(word.toLowerCase())
+  return index >= 0 ? firstEmail(text.slice(index)) : ''
+}
+
+function quotedValueAfter(text: string, word: string) {
+  const match = text.match(new RegExp(`${word}[^"'\\n]*["']([^"']+)["']`, 'i'))
+  return match?.[1]?.trim() || ''
+}
+
+function valueAfterWord(text: string, word: string) {
+  const match = text.match(new RegExp(`${word}\\s*(?:=|is|as|to)?\\s*["']?([^"',\\s]+)`, 'i'))
+  return match?.[1]?.trim() || ''
+}
+
+function phraseAfter(text: string, pattern: RegExp) {
+  const match = text.match(pattern)
+  if (!match || match.index === undefined) return ''
+  return text.slice(match.index + match[0].length).replace(/\s+(with|for|in|on|date|domain|trainer)\b.*$/i, '').trim().replace(/^["']|["']$/g, '')
+}
+
+function afterWords(text: string, words: string[]) {
+  const lower = text.toLowerCase()
+  const word = words.find((item) => lower.includes(item))
+  if (!word) return ''
+  return text.slice(lower.indexOf(word) + word.length).replace(/\b(email|id|named|called)\b/gi, '').trim().replace(/^["']|["']$/g, '')
 }
 
 function normalizeArgKey(key: string) {

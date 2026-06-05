@@ -1,6 +1,7 @@
 'use client'
 
 import { FormEvent, KeyboardEvent, ReactNode, useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -98,6 +99,7 @@ const fullPanels = [
 ]
 
 export function ManagerCommandChatbot() {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
@@ -133,6 +135,9 @@ export function ManagerCommandChatbot() {
         body: JSON.stringify({ message: trimmed }),
       })
       const payload = await response.json()
+      if (payload.provider === 'skilltest_ai_command' && !payload.error && !payload.message?.startsWith('Command failed')) {
+        router.refresh()
+      }
       setMessages((previous) => [
         ...previous,
         {
@@ -283,7 +288,7 @@ export function ManagerCommandChatbot() {
             {loading && (
               <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-2 text-xs text-cyan-50">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Reading quizzes, profiles, certificates, and attempts
+                Reading data or executing admin command
               </div>
             )}
           </div>
