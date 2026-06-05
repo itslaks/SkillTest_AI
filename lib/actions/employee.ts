@@ -366,25 +366,26 @@ export async function getQuizForAttempt(quizId: string) {
   // Shuffle questions for randomness
   const shuffled = questions ? [...questions].sort(() => Math.random() - 0.5) : []
 
-  // Shuffle options for each question without exposing the answer key.
+  // Shuffle options for each question; the UI uses the answer flag only after confirmation.
   const questionsWithShuffledOptions = shuffled.map(question => {
     if (question.options && Array.isArray(question.options)) {
       const optionsWithIndex = question.options.map((option: any, index: number) => ({
         text: option.text,
         optionId: index,
+        isCorrect: option.isCorrect === true,
       }))
 
       const shuffledOptions = [...optionsWithIndex].sort(() => Math.random() - 0.5)
       
       return {
         ...question,
-        explanation: null,
+        explanation: question.explanation || null,
         options: shuffledOptions
       }
     }
     return {
       ...question,
-      explanation: null,
+      explanation: question.explanation || null,
       options: [],
     }
   })

@@ -35,7 +35,11 @@ export async function POST(request: NextRequest) {
   const hasAI = !!(process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY || process.env.GOOGLE_GEMINI_API_KEY)
 
   const rawQuestions = hasAI ? await generateFromContentAI(content, distribution, topic) : []
-  const questions = ensureContentQuestionCount(rawQuestions, topic || 'Provided content', content, difficulty, count)
+  const questions = applyDifficultyPlan(
+    ensureContentQuestionCount(rawQuestions, topic || 'Provided content', content, difficulty, count),
+    distribution,
+    difficulty
+  )
 
   if (questions.length === 0) {
     return NextResponse.json({ 
@@ -238,4 +242,19 @@ function ensureContentQuestionCount(
   }
 
   return deduped.slice(0, requestedCount)
+}
+
+function applyDifficultyPlan(
+  questions: any[],
+  distribution: Record<DifficultyLevel, number>,
+  fallback: DifficultyLevel,
+) {
+  const plan = ALL_DIFFICULTIES.flatMap((difficulty) =>
+    Array.from({ length: distribution[difficulty] || 0 }, () => difficulty)
+  )
+
+  return questions.map((question, index) => ({
+    ...question,
+    difficulty: normalizeDifficulty(plan[index] || question?.difficulty, fallback),
+  }))
 }

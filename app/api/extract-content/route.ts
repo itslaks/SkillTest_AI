@@ -1,6 +1,7 @@
 import { requireManagerForApi } from '@/lib/rbac'
 import { NextRequest, NextResponse } from 'next/server'
 import mammoth from 'mammoth'
+import * as XLSX from 'xlsx'
 
 export async function POST(request: NextRequest) {
   const auth = await requireManagerForApi()
@@ -34,9 +35,13 @@ export async function POST(request: NextRequest) {
       } else if (fileName.endsWith('.txt')) {
         // Plain text file
         extractedText = buffer.toString('utf-8')
+      } else if (fileName.endsWith('.json')) {
+        extractedText = jsonBufferToText(buffer)
+      } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || fileName.endsWith('.csv')) {
+        extractedText = spreadsheetBufferToText(buffer)
       } else {
         return NextResponse.json({ 
-          error: 'Unsupported file type. Please upload PDF, DOCX, or TXT files.' 
+          error: 'Unsupported file type. Please upload PDF, DOCX, TXT, XLSX, XLS, CSV, or JSON files.' 
         }, { status: 400 })
       }
     } else {
@@ -66,6 +71,70 @@ export async function POST(request: NextRequest) {
       error: `Failed to extract content: ${error.message}` 
     }, { status: 500 })
   }
+}
+
+function spreadsheetBufferToText(buffer: Buffer) {
+  const workbook = XLSX.read(buffer, { type: 'buffer' })
+  const sections: string[] = []
+
+  for (const sheetName of workbook.SheetNames) {
+    const worksheet = workbook.Sheets[sheetName]
+    const rows = XLSX.utils.sheet_to_json<Array<string | number | boolean | null>>(worksheet, {
+      header: 1,
+      defval: '',
+      blankrows: false,
+    })
+
+    if (rows.length === 0) continue
+
+    const renderedRows = rows
+      .map((row) => row.map((cell) => String(cell ?? '').trim()).filter(Boolean).join(' | '))
+      .filter(Boolean)
+
+    if (renderedRows.length > 0) {
+      sections.push(`Sheet: ${sheetName}\n${renderedRows.join('\n')}`)
+    }
+  }
+
+  return sections.join('\n\n')
+}
+
+function jsonBufferToText(buffer: Buffer) {
+  const parsed = JSON.parse(buffer.toString('utf-8'))
+  return jsonToText(parsed)
+}
+
+function jsonToText(value: unknown, label = 'JSON'): string {
+  if (value === null || value === undefined) return ''
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return `${label}: ${String(value)}`
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item, index) => jsonToText(item, `${label} ${index + 1}`))
+      .filter(Boolean)
+      .join('\n\n')
+  }
+
+  if (typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+    const knownQuestionKeys = ['question_text', 'question', 'prompt', 'option_a', 'option_b', 'option_c', 'option_d', 'correct_answer', 'answer', 'difficulty', 'explanation']
+    const hasQuestionShape = knownQuestionKeys.some((key) => key in (value as Record<string, unknown>))
+
+    if (hasQuestionShape) {
+      return entries
+        .map(([key, item]) => `${key}: ${Array.isArray(item) || typeof item === 'object' ? jsonToText(item, key) : String(item ?? '')}`)
+        .join('\n')
+    }
+
+    return entries
+      .map(([key, item]) => jsonToText(item, key))
+      .filter(Boolean)
+      .join('\n')
+  }
+
+  return ''
 }
 
 function cleanExtractedText(text: string) {

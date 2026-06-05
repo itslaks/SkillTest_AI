@@ -12,7 +12,7 @@ import { createQuiz, bulkCreateQuestions } from '@/lib/actions/quiz'
 import {
   ArrowLeft, Sparkles, Wand2, Upload, FileSpreadsheet, Download,
   CheckCircle2, Clock, Target, AlarmClock,
-  Shuffle, Eye, Hash, BookOpen, Zap, ChevronRight,
+  Eye, Hash, BookOpen, Zap, ChevronRight,
   Info, XCircle, Settings2, FileUp,
 } from 'lucide-react'
 import type { DifficultyLevel, ParsedQuestion } from '@/lib/types/database'
@@ -77,8 +77,6 @@ export default function NewQuizPage() {
   // Settings
   const [passingScore, setPassingScore] = useState(60)
   const [timeLimit, setTimeLimit] = useState(30)
-  const [shuffleQuestions, setShuffleQuestions] = useState(false)
-  const [shuffleOptions, setShuffleOptions] = useState(false)
   const [showResults, setShowResults] = useState(true)
   const [allowRetakes, setAllowRetakes] = useState(false)
   const [maxRetakes, setMaxRetakes] = useState(1)
@@ -89,6 +87,7 @@ export default function NewQuizPage() {
   const [questionSource, setQuestionSource] = useState<'ai' | 'upload' | 'both'>('ai')
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [parsedQuestions, setParsedQuestions] = useState<ParsedQuestion[]>([])
+  const [extractedUploadContent, setExtractedUploadContent] = useState('')
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [aiAvailable, setAiAvailable] = useState<boolean | null>(null) // null = loading, true/false = available
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -112,36 +111,62 @@ export default function NewQuizPage() {
   const sectionComplete = {
     basics: !!topic && !!title,
     settings: true,
-    questions: questionSource === 'ai' || parsedQuestions.length > 0,
+    questions: questionSource === 'ai' || parsedQuestions.length > 0 || !!extractedUploadContent,
   }
 
-  function handleFileUpload(file: File) {
+  async function handleFileUpload(file: File) {
     setUploadError(null)
     setUploadedFile(file)
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      try {
-        const wb = XLSX.read(e.target?.result, { type: 'binary' })
-        const sheet = wb.Sheets[wb.SheetNames[0]]
-        const rows = XLSX.utils.sheet_to_json(sheet) as any[]
-        const questions = rows.map((r: any) => ({
-          question_text: r['question_text'] || r['Question'] || '',
-          option_a: r['option_a'] || r['Option A'] || '',
-          option_b: r['option_b'] || r['Option B'] || '',
-          option_c: r['option_c'] || r['Option C'] || '',
-          option_d: r['option_d'] || r['Option D'] || '',
-          correct_answer: r['correct_answer'] || r['Correct Answer'] || 'a',
-          difficulty: r['difficulty'] || r['Difficulty'] || difficulty,
-          explanation: r['explanation'] || r['Explanation'] || '',
-        })).filter((q: any) => q.question_text)
-        if (questions.length === 0) throw new Error('No valid questions found. Check column headers.')
-        setParsedQuestions(questions)
-      } catch (err: any) {
-        setUploadError(err.message || 'Failed to parse file')
-        setUploadedFile(null)
+    setParsedQuestions([])
+    setExtractedUploadContent('')
+
+    try {
+      const fileName = file.name.toLowerCase()
+
+      if (fileName.endsWith('.pdf') || fileName.endsWith('.docx') || fileName.endsWith('.txt')) {
+        const formData = new FormData()
+        formData.append('file', file)
+        const response = await fetch('/api/extract-content', { method: 'POST', body: formData })
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.error || 'Failed to extract document text')
+        setExtractedUploadContent(result.text)
+        toast({
+          title: 'Document Ready',
+          description: `Extracted ${result.wordCount} words. AI will convert it into questions.`,
+        })
+        return
       }
+
+      let rows: any[]
+      if (fileName.endsWith('.json')) {
+        rows = normalizeJsonRows(JSON.parse(await file.text()))
+      } else {
+        const workbook = XLSX.read(await file.arrayBuffer())
+        rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]) as any[]
+      }
+
+      const questions = rows.map((r: any) => ({
+        question_text: r['question_text'] || r['Question'] || r['question'] || r['prompt'] || '',
+        option_a: r['option_a'] || r['Option A'] || r['A'] || '',
+        option_b: r['option_b'] || r['Option B'] || r['B'] || '',
+        option_c: r['option_c'] || r['Option C'] || r['C'] || '',
+        option_d: r['option_d'] || r['Option D'] || r['D'] || '',
+        correct_answer: r['correct_answer'] || r['Correct Answer'] || r['Answer'] || r['answer'] || 'a',
+        difficulty: r['difficulty'] || r['Difficulty'] || difficulty,
+        explanation: r['explanation'] || r['Explanation'] || '',
+      })).filter((q: any) => q.question_text)
+      if (questions.length === 0) throw new Error('No valid questions found. Check column headers.')
+      setParsedQuestions(questions)
+    } catch (err: any) {
+      setUploadError(err.message || 'Failed to parse file')
+      setUploadedFile(null)
     }
-    reader.readAsBinaryString(file)
+  }
+
+  function normalizeJsonRows(parsed: any) {
+    if (Array.isArray(parsed)) return parsed
+    if (Array.isArray(parsed?.questions)) return parsed.questions
+    throw new Error('JSON must be an array of questions or an object with a questions array')
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -181,6 +206,36 @@ export default function NewQuizPage() {
             explanation: q.explanation || undefined,
           }))
           await bulkCreateQuestions(questionInputs)
+        }
+
+        if ((questionSource === 'upload' || questionSource === 'both') && extractedUploadContent) {
+          if (aiAvailable === false) {
+            setError('Document upload needs AI question generation. Please configure your API keys in the .env.local file.')
+            return
+          }
+
+          const response = await fetch('/api/generate-from-content', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              quiz_id: quizId,
+              content: extractedUploadContent,
+              difficulty,
+              count: questionCount,
+              topic,
+            }),
+          })
+
+          const result = await response.json()
+          if (!response.ok) {
+            setError(result.error || 'Failed to generate questions from uploaded document')
+            return
+          }
+
+          toast({
+            title: 'Document Questions Generated',
+            description: `Created ${result.generated} questions from ${uploadedFile?.name || 'the uploaded document'}.`,
+          })
         }
 
         // AI generation
@@ -417,10 +472,15 @@ export default function NewQuizPage() {
                 {/* Toggle grid */}
                 <div className="space-y-3">
                   <p className="text-sm font-medium">Quiz Behavior</p>
+                  <div className="flex items-start gap-3 rounded-xl border border-emerald-100 bg-emerald-50 p-4">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                    <div>
+                      <p className="text-sm font-medium text-emerald-800">Automatic randomization is enabled</p>
+                      <p className="text-xs text-emerald-700">Questions and answer options are shuffled for every employee attempt.</p>
+                    </div>
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {[
-                      { id: 'shuffle_q', icon: Shuffle, label: 'Shuffle Questions', desc: 'Random order for each employee', value: shuffleQuestions, set: setShuffleQuestions },
-                      { id: 'shuffle_o', icon: Shuffle, label: 'Shuffle Options', desc: 'Randomize answer choices', value: shuffleOptions, set: setShuffleOptions },
                       { id: 'show_results', icon: Eye, label: 'Show Results', desc: 'Display score after completion', value: showResults, set: setShowResults },
                       { id: 'show_explain', icon: BookOpen, label: 'Show Explanations', desc: 'Show correct answers after quiz', value: showExplanations, set: setShowExplanations },
                       { id: 'allow_retakes', icon: AlarmClock, label: 'Allow Retakes', desc: 'Let employees redo the quiz', value: allowRetakes, set: setAllowRetakes },
@@ -498,7 +558,7 @@ export default function NewQuizPage() {
                 <div className="grid grid-cols-3 gap-3">
                   {[
                     { id: 'ai', icon: Wand2, label: 'AI Generate', desc: 'Auto-create from topic', color: 'text-violet-600', bg: 'bg-violet-50', border: 'border-violet-200', activeBg: 'bg-violet-500' },
-                    { id: 'upload', icon: Upload, label: 'Upload File', desc: 'CSV or Excel sheet', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', activeBg: 'bg-blue-500' },
+                    { id: 'upload', icon: Upload, label: 'Upload File', desc: 'Excel, JSON, PDF, DOCX', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', activeBg: 'bg-blue-500' },
                     { id: 'both', icon: Zap, label: 'Both', desc: 'Combine AI + upload', color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200', activeBg: 'bg-amber-500' },
                   ].map(opt => (
                     <button
@@ -547,7 +607,7 @@ export default function NewQuizPage() {
                 {/* Upload zone */}
                 {(questionSource === 'upload' || questionSource === 'both') && (
                   <div className="space-y-3">
-                    <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f) }} />
+                    <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls,.json,.pdf,.docx,.txt" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f) }} />
 
                     {/* Template download */}
                     <div className="flex items-center justify-between p-3 rounded-xl bg-blue-50 border border-blue-100">
@@ -575,14 +635,16 @@ export default function NewQuizPage() {
                         <div className="space-y-2">
                           <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto" />
                           <p className="font-semibold text-emerald-700">{uploadedFile.name}</p>
-                          <p className="text-sm text-emerald-600">{parsedQuestions.length} questions ready to import</p>
-                          <button type="button" onClick={e => { e.stopPropagation(); setUploadedFile(null); setParsedQuestions([]) }} className="text-xs text-muted-foreground hover:text-destructive underline">Remove</button>
+                          <p className="text-sm text-emerald-600">
+                            {extractedUploadContent ? 'Document ready for AI question generation' : `${parsedQuestions.length} questions ready to import`}
+                          </p>
+                          <button type="button" onClick={e => { e.stopPropagation(); setUploadedFile(null); setParsedQuestions([]); setExtractedUploadContent('') }} className="text-xs text-muted-foreground hover:text-destructive underline">Remove</button>
                         </div>
                       ) : (
                         <div className="space-y-2">
                           <Upload className="h-10 w-10 text-muted-foreground/50 mx-auto" />
-                          <p className="font-medium text-sm">Drop your CSV/Excel file here or click to browse</p>
-                          <p className="text-xs text-muted-foreground">Required columns: question_text, option_a, option_b, option_c, option_d, correct_answer</p>
+                          <p className="font-medium text-sm">Drop Excel, CSV, JSON, PDF, DOCX, or TXT here</p>
+                          <p className="text-xs text-muted-foreground">Structured files import directly; documents are converted into questions with AI.</p>
                         </div>
                       )}
                     </div>

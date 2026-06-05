@@ -13,6 +13,7 @@ import { shiftDifficulty } from '@/lib/insights'
 import type { DifficultyLevel, SubmittedQuizAnswer } from '@/lib/types/database'
 import {
   Brain,
+  CheckCircle2,
   ChevronRight,
   Clock,
   ShieldAlert,
@@ -30,6 +31,7 @@ interface QuizPlayerProps {
 type QuizOption = {
   text: string
   optionId: number
+  isCorrect?: boolean
 }
 
 type QuizQuestion = {
@@ -403,10 +405,13 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
             <CardContent className="space-y-3 p-6">
               {currentQuestion?.options?.map((option, index: number) => {
                 const isSelected = selectedOption === index
+                const isCorrect = option.isCorrect === true
+                const isWrongSelection = showFeedback && isSelected && !isCorrect
                 let style = 'border-white/10 bg-white/5 hover:border-white/40'
 
                 if (showFeedback) {
-                  if (isSelected) style = 'border-white bg-white text-black'
+                  if (isCorrect) style = 'border-emerald-400 bg-emerald-500/15 text-emerald-50 shadow-[0_0_0_1px_rgba(52,211,153,0.35)]'
+                  else if (isWrongSelection) style = 'border-red-400 bg-red-500/15 text-red-50 shadow-[0_0_0_1px_rgba(248,113,113,0.35)]'
                   else style = 'border-white/5 bg-white/[0.03] text-zinc-500'
                 } else if (isSelected) {
                   style = 'border-white bg-white text-black'
@@ -421,24 +426,42 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
                   >
                     <div className="flex items-center gap-3">
                       <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-medium ${
-                        showFeedback && isSelected
-                            ? 'bg-white text-black'
+                        showFeedback && isCorrect
+                            ? 'bg-emerald-400 text-emerald-950'
+                            : isWrongSelection
+                              ? 'bg-red-400 text-red-950'
                             : isSelected
                               ? 'bg-black text-white'
                               : 'bg-white/10 text-white'
                       }`}>
-                        {String.fromCharCode(65 + index)}
+                        {showFeedback && isCorrect ? (
+                          <CheckCircle2 className="h-4 w-4" />
+                        ) : showFeedback && isWrongSelection ? (
+                          <XCircle className="h-4 w-4" />
+                        ) : (
+                          String.fromCharCode(65 + index)
+                        )}
                       </div>
                       <span className="text-sm">{option.text}</span>
+                      {showFeedback && isCorrect && (
+                        <Badge className="ml-auto border-emerald-300 bg-emerald-400 text-emerald-950">
+                          Correct
+                        </Badge>
+                      )}
+                      {isWrongSelection && (
+                        <Badge className="ml-auto border-red-300 bg-red-400 text-red-950">
+                          Wrong
+                        </Badge>
+                      )}
                     </div>
                   </button>
                 )
               })}
 
               {showFeedback && currentQuestion?.explanation && (
-                <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
-                  <p className="mb-1 text-sm font-medium text-white">Explanation</p>
-                  <p className="text-sm text-zinc-400">{currentQuestion.explanation}</p>
+                <div className="rounded-[1.5rem] border border-slate-500/30 bg-slate-500/10 p-4">
+                  <p className="mb-1 text-sm font-medium text-slate-100">Reasoning</p>
+                  <p className="text-sm text-slate-300">{currentQuestion.explanation}</p>
                 </div>
               )}
             </CardContent>

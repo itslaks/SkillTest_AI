@@ -19,6 +19,8 @@ import { bulkCreateQuestions } from '@/lib/actions/quiz'
 import type { DifficultyLevel, CreateQuestionInput } from '@/lib/types/database'
 import * as XLSX from 'xlsx'
 
+const DIFFICULTIES: DifficultyLevel[] = ['easy', 'medium', 'hard', 'advanced', 'hardcore']
+
 interface QuizImporterProps {
   quizId: string
   quizDifficulty: DifficultyLevel
@@ -34,6 +36,28 @@ interface ParsedQuestion {
   correct_answer: string
   difficulty?: DifficultyLevel
   explanation?: string
+}
+
+function normalizeDifficulty(value: unknown, fallback: DifficultyLevel): DifficultyLevel {
+  const normalized = String(value || '').toLowerCase().trim() as DifficultyLevel
+  return DIFFICULTIES.includes(normalized) ? normalized : fallback
+}
+
+function difficultyBadgeClass(difficulty?: DifficultyLevel) {
+  switch (difficulty) {
+    case 'easy':
+      return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+    case 'medium':
+      return 'border-blue-200 bg-blue-50 text-blue-700'
+    case 'hard':
+      return 'border-amber-200 bg-amber-50 text-amber-700'
+    case 'advanced':
+      return 'border-orange-200 bg-orange-50 text-orange-700'
+    case 'hardcore':
+      return 'border-red-200 bg-red-50 text-red-700'
+    default:
+      return 'border-muted bg-muted text-muted-foreground'
+  }
 }
 
 export function QuizImporter({ 
@@ -58,13 +82,15 @@ export function QuizImporter({
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'application/vnd.ms-excel',
         'text/csv',
+        'application/json',
       ]
       
       if (!validTypes.includes(file.type) && 
           !file.name.endsWith('.xlsx') && 
           !file.name.endsWith('.xls') &&
-          !file.name.endsWith('.csv')) {
-        setError('Please upload an Excel (.xlsx, .xls) or CSV file')
+          !file.name.endsWith('.csv') &&
+          !file.name.endsWith('.json')) {
+        setError('Please upload an Excel (.xlsx, .xls), CSV, or JSON file')
         return
       }
       
@@ -76,13 +102,25 @@ export function QuizImporter({
     }
   }
 
+  async function spreadsheetRows(file: File) {
+    const data = await file.arrayBuffer()
+    const workbook = XLSX.read(data)
+    const sheetName = workbook.SheetNames[0]
+    const worksheet = workbook.Sheets[sheetName]
+    return XLSX.utils.sheet_to_json(worksheet) as any[]
+  }
+
+  function normalizeJsonRows(parsed: any) {
+    if (Array.isArray(parsed)) return parsed
+    if (Array.isArray(parsed?.questions)) return parsed.questions
+    throw new Error('JSON must be an array of questions or an object with a questions array')
+  }
+
   async function parseFile(file: File) {
     try {
-      const data = await file.arrayBuffer()
-      const workbook = XLSX.read(data)
-      const sheetName = workbook.SheetNames[0]
-      const worksheet = workbook.Sheets[sheetName]
-      const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[]
+      const jsonData = file.name.toLowerCase().endsWith('.json')
+        ? normalizeJsonRows(JSON.parse(await file.text()))
+        : await spreadsheetRows(file)
       
       if (jsonData.length === 0) {
         setError('The file appears to be empty')
@@ -90,7 +128,7 @@ export function QuizImporter({
       }
 
       // Map to expected format - handle various column name formats
-      const questions: ParsedQuestion[] = jsonData.map((row) => {
+      const questions: ParsedQuestion[] = jsonData.map((row: any) => {
         const q: ParsedQuestion = {
           question_text: row['question_text'] || row['Question'] || row['question'] || row['Q'] || '',
           option_a: row['option_a'] || row['Option A'] || row['A'] || row['a'] || '',
@@ -98,11 +136,11 @@ export function QuizImporter({
           option_c: row['option_c'] || row['Option C'] || row['C'] || row['c'] || '',
           option_d: row['option_d'] || row['Option D'] || row['D'] || row['d'] || '',
           correct_answer: (row['correct_answer'] || row['Correct Answer'] || row['Answer'] || row['correct'] || 'A').toString().toUpperCase(),
-          difficulty: row['difficulty'] || row['Difficulty'] || quizDifficulty,
+          difficulty: normalizeDifficulty(row['difficulty'] || row['Difficulty'] || quizDifficulty, quizDifficulty),
           explanation: row['explanation'] || row['Explanation'] || '',
         }
         return q
-      }).filter(q => q.question_text && q.option_a && q.option_b)
+      }).filter((q: ParsedQuestion) => q.question_text && q.option_a && q.option_b)
 
       if (questions.length === 0) {
         setError('No valid questions found. Ensure columns include: question_text, option_a, option_b, option_c, option_d, correct_answer')
@@ -138,7 +176,7 @@ export function QuizImporter({
         quiz_id: quizId,
         question_text: q.question_text,
         options,
-        difficulty: q.difficulty || quizDifficulty,
+        difficulty: normalizeDifficulty(q.difficulty, quizDifficulty),
         explanation: q.explanation || undefined,
         status: 'approved' as const,
         order_index: i,
@@ -214,10 +252,10 @@ export function QuizImporter({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Upload className="h-5 w-5 text-primary" />
-          Import Questions from Excel
+          Import Questions from File
         </CardTitle>
         <CardDescription>
-          Upload an Excel file with your questions. Download the template to see the required format.
+          Upload Excel, CSV, or JSON questions. Download the template to see the required format.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -257,7 +295,7 @@ export function QuizImporter({
           <input
             ref={fileInputRef}
             type="file"
-            accept=".xlsx,.xls,.csv"
+            accept=".xlsx,.xls,.csv,.json"
             onChange={handleFileSelect}
             className="hidden"
           />
@@ -266,7 +304,7 @@ export function QuizImporter({
             {selectedFile ? selectedFile.name : 'Click to upload or drag and drop'}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            Excel (.xlsx, .xls) or CSV files
+            Excel (.xlsx, .xls), CSV, or JSON files
           </p>
         </div>
 
@@ -288,7 +326,9 @@ export function QuizImporter({
                   <div className="flex gap-2 mt-1 text-xs text-muted-foreground">
                     <span>Answer: {q.correct_answer}</span>
                     <span>•</span>
-                    <span className="capitalize">{q.difficulty}</span>
+                    <Badge variant="outline" className={difficultyBadgeClass(q.difficulty)}>
+                      {q.difficulty}
+                    </Badge>
                   </div>
                 </div>
               ))}
@@ -320,7 +360,7 @@ export function QuizImporter({
                 <li><code>question_text</code> - The question text</li>
                 <li><code>option_a, option_b, option_c, option_d</code> - Answer choices</li>
                 <li><code>correct_answer</code> - Letter of correct answer (A, B, C, or D)</li>
-                <li><code>difficulty</code> - Optional (easy, medium, hard, advanced, hardcore)</li>
+                <li><code>difficulty</code> - Optional color-coded level (easy, medium, hard, advanced, hardcore)</li>
                 <li><code>explanation</code> - Optional explanation</li>
               </ul>
             </div>

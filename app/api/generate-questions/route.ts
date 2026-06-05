@@ -42,7 +42,11 @@ export async function POST(request: NextRequest) {
     ? await generateWithAI(topic, distribution)
     : generateTemplateQuestions(topic, distribution)
 
-  const finalQuestions = ensureQuestionCount(questions, topic, difficulty, count)
+  const finalQuestions = applyDifficultyPlan(
+    ensureQuestionCount(questions, topic, difficulty, count),
+    distribution,
+    difficulty
+  )
 
   console.log(`Generated ${finalQuestions.length} questions using ${hasAI ? 'AI' : 'templates'}`)
 
@@ -213,6 +217,21 @@ function ensureQuestionCount(
   }
 
   return deduped.slice(0, requestedCount)
+}
+
+function applyDifficultyPlan(
+  questions: any[],
+  distribution: Record<DifficultyLevel, number>,
+  fallback: DifficultyLevel,
+) {
+  const plan = ALL_DIFFICULTIES.flatMap((difficulty) =>
+    Array.from({ length: distribution[difficulty] || 0 }, () => difficulty)
+  )
+
+  return questions.map((question, index) => ({
+    ...question,
+    difficulty: normalizeDifficulty(plan[index] || question?.difficulty, fallback),
+  }))
 }
 
 function createAnswerPositionPlan(count: number) {
