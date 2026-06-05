@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { AttendanceImporter } from '@/components/manager/attendance-importer'
+import { ManualAttendanceCard } from '@/components/manager/manual-attendance-card'
 import { AssessmentScoreImporter } from '@/components/manager/assessment-score-importer'
 import { BatchCandidateImporter } from '@/components/manager/batch-candidate-importer'
 import { DashboardSignalShowcase } from '@/components/insights/dashboard-signal-showcase'
@@ -80,12 +81,6 @@ async function createFeedbackWindowAction(formData: FormData) {
   redirectWithOpsResult(result, 'Feedback window opened.', 'feedback')
 }
 
-async function updateAttendanceStatusAction(formData: FormData) {
-  'use server'
-  const result = await updateAttendanceStatus(formData)
-  redirectWithOpsResult(result, 'Attendance updated.', 'attendance')
-}
-
 async function updateTrainingBatchDetailsAction(formData: FormData) {
   'use server'
   const result = await updateTrainingBatchDetails(formData)
@@ -135,19 +130,6 @@ function toneForBatchStatus(status: string) {
       return 'bg-rose-100 text-rose-700'
     default:
       return 'bg-amber-100 text-amber-700'
-  }
-}
-
-function toneForAttendance(status: string) {
-  switch (status) {
-    case 'present':
-      return 'bg-emerald-50 border-emerald-200 text-emerald-700'
-    case 'late':
-      return 'bg-amber-50 border-amber-200 text-amber-700'
-    case 'excused':
-      return 'bg-slate-50 border-slate-200 text-slate-700'
-    default:
-      return 'bg-rose-50 border-rose-200 text-rose-700'
   }
 }
 
@@ -430,6 +412,14 @@ export default async function ManagerOperationsPage({
           </div>
         </div>
       </section>
+
+      <AttendanceTrackerPanel
+        sessions={sessions}
+        membersByBatch={membersByBatch}
+        attendanceBySession={attendanceBySession}
+        attendanceRate={summary.attendanceRate}
+        updateAction={updateAttendanceStatus}
+      />
 
       {canCoordinate ? (
       <div className="grid gap-4 xl:grid-cols-3">
@@ -1155,92 +1145,6 @@ export default async function ManagerOperationsPage({
       </div>
 
       <DropPanel
-        id="attendance"
-        title="Attendance Tracker"
-        description="Upload or mark attendance for every visible session."
-        badge={`${summary.attendanceRate}% health`}
-        defaultOpen
-      >
-        <CardContent className="space-y-6">
-          <AttendanceImporter
-            sessions={sessions.map((session: any) => ({
-              id: session.id,
-              title: session.title,
-              batchTitle: session.batch?.title || 'Batch',
-              sessionDate: session.session_date,
-            }))}
-          />
-          {sessions.length === 0 ? (
-            <EmptyState text="No sessions scheduled yet. Attendance controls appear here after a session is created." />
-          ) : (
-            sessions.map((session: any) => {
-              const existingRecords = attendanceBySession.get(session.id) || []
-              const existingByUser = new Map(existingRecords.map((record: any) => [record.user_id, record]))
-              const roster = membersByBatch.get(session.batch_id) || []
-              const records = roster.length
-                ? roster.map((member: any) => existingByUser.get(member.user_id) || {
-                    id: null,
-                    session_id: session.id,
-                    user_id: member.user_id,
-                    status: 'absent',
-                    check_in_time: null,
-                    profile: member.profile,
-                  })
-                : existingRecords
-              return (
-                <div key={session.id} className="rounded-[1.5rem] border border-zinc-200 p-5">
-                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-lg font-semibold">{session.title}</h3>
-                        <Badge variant="outline" className="capitalize">{session.mode}</Badge>
-                        <Badge variant="outline" className="capitalize">{session.status}</Badge>
-                      </div>
-                      <p className="mt-1 text-sm text-zinc-500">
-                        {session.batch?.title || 'Batch'} - {new Date(session.session_date).toLocaleString()} - {session.trainer?.full_name || session.trainer?.email || 'Trainer TBD'}
-                      </p>
-                    </div>
-                    <div className="shrink-0 rounded-full bg-black px-4 py-2 text-sm font-medium text-white">
-                      {records.filter((record: any) => record.status === 'present' || record.status === 'late').length}/{records.length} marked
-                    </div>
-                  </div>
-
-                  <div className="mt-4 space-y-3">
-                    {records.length === 0 ? (
-                      <p className="text-sm text-zinc-500">Add learners to this batch to begin manual attendance marking.</p>
-                    ) : (
-                      records.map((record: any) => (
-                        <div key={record.id || `${record.session_id}-${record.user_id}`} className={`rounded-2xl border p-4 ${toneForAttendance(record.status)}`}>
-                          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                            <div>
-                              <p className="font-medium">{record.profile?.full_name || record.profile?.email || 'Learner'}</p>
-                              <p className="text-sm opacity-80">{record.status.toUpperCase()} {record.check_in_time ? `- ${new Date(record.check_in_time).toLocaleTimeString()}` : ''}</p>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              {(['present', 'late', 'excused', 'absent'] as const).map((status) => (
-                                <form key={status} action={updateAttendanceStatusAction}>
-                                  <input type="hidden" name="session_id" value={session.id} />
-                                  <input type="hidden" name="user_id" value={record.user_id} />
-                                  <input type="hidden" name="status" value={status} />
-                                  <Button type="submit" size="sm" variant={record.status === status ? 'default' : 'outline'} className="rounded-full capitalize">
-                                    {status}
-                                  </Button>
-                                </form>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )
-            })
-          )}
-        </CardContent>
-      </DropPanel>
-
-      <DropPanel
         id="assessment"
         title="Assessment Score Upload"
         description="Upload sprint, coding, and project-linked assessment scores."
@@ -1400,6 +1304,68 @@ function CommandProofStrip({ metrics }: { metrics: { brdReadiness: number; evide
         )
       })}
     </section>
+  )
+}
+
+function AttendanceTrackerPanel({
+  sessions,
+  membersByBatch,
+  attendanceBySession,
+  attendanceRate,
+  updateAction,
+}: {
+  sessions: any[]
+  membersByBatch: Map<string, any[]>
+  attendanceBySession: Map<string, any[]>
+  attendanceRate: number
+  updateAction: (formData: FormData) => Promise<{ error?: string } | unknown>
+}) {
+  return (
+    <DropPanel
+      id="attendance"
+      title="Attendance Tracker"
+      description="Mark a session quickly, or upload an Excel sheet when the whole batch is ready."
+      badge={`${attendanceRate}% health`}
+      defaultOpen
+    >
+      <CardContent className="space-y-6">
+        <AttendanceImporter
+          sessions={sessions.map((session: any) => ({
+            id: session.id,
+            title: session.title,
+            batchTitle: session.batch?.title || 'Batch',
+            sessionDate: session.session_date,
+          }))}
+        />
+        {sessions.length === 0 ? (
+          <EmptyState text="No sessions scheduled yet. Attendance controls appear here after a session is created." />
+        ) : (
+          sessions.map((session: any) => {
+            const existingRecords = attendanceBySession.get(session.id) || []
+            const existingByUser = new Map(existingRecords.map((record: any) => [record.user_id, record]))
+            const roster = membersByBatch.get(session.batch_id) || []
+            const records = roster.length
+              ? roster.map((member: any) => existingByUser.get(member.user_id) || {
+                  id: null,
+                  session_id: session.id,
+                  user_id: member.user_id,
+                  status: 'absent',
+                  check_in_time: null,
+                  profile: member.profile,
+                })
+              : existingRecords
+            return (
+              <ManualAttendanceCard
+                key={session.id}
+                session={session}
+                records={records}
+                action={updateAction}
+              />
+            )
+          })
+        )}
+      </CardContent>
+    </DropPanel>
   )
 }
 
