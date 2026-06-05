@@ -15,7 +15,6 @@ export const AVATAR_3D_IDS = [
   'f5',
   'f6',
   'f7',
-  'x1',
 ] as const
 
 export type Avatar3DId = (typeof AVATAR_3D_IDS)[number]
