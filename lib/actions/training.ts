@@ -1937,7 +1937,7 @@ export async function runTrainingAutomation(formData: FormData): Promise<ApiResp
   return { data: true }
 }
 
-export async function createFeedbackWindow(formData: FormData): Promise<ApiResponse<boolean>> {
+export async function createFeedbackWindow(formData: FormData): Promise<ApiResponse<{ windowId: string; recipients: number; sent: number; failed: number }>> {
   const { userId } = await requireManager()
   const admin = createAdminClient()
 
@@ -1992,9 +1992,11 @@ export async function createFeedbackWindow(formData: FormData): Promise<ApiRespo
   const { data: batchInfo } = await admin.from('training_batches').select('title').eq('id', batchId).maybeSingle()
   let sendAttempts = 0
   let sendFailures = 0
+  let recipientCount = 0
   for (const member of members || []) {
     const profile = (member as any).profile
     if (!profile?.email) continue
+    recipientCount++
     const html = buildFeedbackRequestEmail({
       batchTitle: batchInfo?.title || 'Training Batch',
       windowTitle: title,
@@ -2024,7 +2026,14 @@ export async function createFeedbackWindow(formData: FormData): Promise<ApiRespo
 
   revalidatePath('/manager/operations')
   revalidatePath('/employee/training')
-  return { data: true }
+  return {
+    data: {
+      windowId: window.id,
+      recipients: recipientCount,
+      sent: sendAttempts - sendFailures,
+      failed: sendFailures,
+    },
+  }
 }
 
 export async function updateFeedbackWindow(formData: FormData): Promise<ApiResponse<boolean>> {

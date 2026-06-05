@@ -34,6 +34,8 @@ import { DashboardSignalShowcase } from '@/components/insights/dashboard-signal-
 import { BatchComparisonChart } from '@/components/manager/batch-comparison-chart'
 import { BatchMemberStatusDropdown } from '@/components/manager/batch-member-status-dropdown'
 import { OpsAutoRefresh } from '@/components/manager/ops-auto-refresh'
+import { OpsResultToast } from '@/components/manager/ops-result-toast'
+import { OpsSubmitButton } from '@/components/manager/ops-submit-button'
 import { FeedbackSentimentChart } from '@/components/manager/feedback-sentiment-chart'
 import { createAdminClient } from '@/lib/supabase/server'
 import {
@@ -105,7 +107,11 @@ async function createTrainingNotificationAction(formData: FormData) {
 async function createFeedbackWindowAction(formData: FormData) {
   'use server'
   const result = await createFeedbackWindow(formData)
-  redirectWithOpsResult(result, 'Feedback window opened.', 'feedback')
+  const details = result.data
+  const message = details
+    ? `Feedback form created. Email requested for ${details.recipients} learner(s): ${details.sent} sent/logged, ${details.failed} failed.`
+    : 'Feedback form created and email delivery was triggered.'
+  redirectWithOpsResult(result, message, 'feedback')
 }
 
 async function updateFeedbackWindowAction(formData: FormData) {
@@ -393,6 +399,7 @@ export default async function ManagerOperationsPage({
 
   return (
     <div className="space-y-8">
+      <OpsResultToast />
       <OpsAutoRefresh intervalMs={15000} />
       <section className="rounded-[2rem] border border-zinc-900 bg-black p-6 text-white shadow-[0_40px_120px_rgba(0,0,0,0.55)] md:p-8 dashboard-grid-bg maverick-command-band">
         <div className="grid gap-6 xl:grid-cols-[0.82fr_1.18fr]">
@@ -566,7 +573,7 @@ export default async function ManagerOperationsPage({
               </div>
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
                 <p>New batches start as planned. Add sessions and attendance after creation.</p>
-                <Button type="submit" className="rounded-full bg-black text-white hover:bg-zinc-800">Create batch</Button>
+                <OpsSubmitButton pendingLabel="Creating batch..." className="rounded-full bg-black text-white hover:bg-zinc-800">Create batch</OpsSubmitButton>
               </div>
             </form>
           </CardContent>
@@ -638,7 +645,7 @@ export default async function ManagerOperationsPage({
                 <input type="checkbox" name="attendance_required" defaultChecked className="h-4 w-4 rounded border-zinc-300" />
                 Attendance required for this session
               </label>
-              <Button type="submit" className="rounded-full bg-black text-white hover:bg-zinc-800">Schedule session</Button>
+              <OpsSubmitButton pendingLabel="Scheduling..." className="rounded-full bg-black text-white hover:bg-zinc-800">Schedule session</OpsSubmitButton>
             </form>
 
             <form action={clearScheduledTrainingSessionsAction} className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
@@ -663,9 +670,9 @@ export default async function ManagerOperationsPage({
                   <span className="font-medium text-rose-950">Type DELETE SCHEDULED</span>
                   <input name="confirmation" className="h-11 rounded-xl border border-rose-200 bg-white px-3" placeholder="DELETE SCHEDULED" />
                 </label>
-                <Button type="submit" className="rounded-full bg-rose-700 text-white hover:bg-rose-800">
+                <OpsSubmitButton pendingLabel="Clearing..." className="rounded-full bg-rose-700 text-white hover:bg-rose-800">
                   Clear scheduled
-                </Button>
+                </OpsSubmitButton>
               </div>
             </form>
 
@@ -712,7 +719,7 @@ export default async function ManagerOperationsPage({
                           <option value="cancelled">Cancelled</option>
                         </select>
                       </label>
-                      <Button type="submit" size="sm" variant="outline" className="h-9 rounded-full bg-white">Update</Button>
+                      <OpsSubmitButton pendingLabel="Updating..." size="sm" variant="outline" className="h-9 rounded-full bg-white">Update</OpsSubmitButton>
                       <input type="hidden" name="agenda" value={session.agenda || ''} />
                       <label className="flex items-center gap-2 text-xs lg:col-span-2">
                         <input type="checkbox" name="attendance_required" defaultChecked={session.attendance_required} className="h-4 w-4 rounded border-zinc-300" />
@@ -722,7 +729,7 @@ export default async function ManagerOperationsPage({
                     </form>
                     <form action={deleteTrainingSessionAction} className="flex justify-end">
                       <input type="hidden" name="session_id" value={session.id} />
-                      <Button type="submit" size="sm" variant="outline" className="h-8 rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">Delete session</Button>
+                      <OpsSubmitButton pendingLabel="Deleting..." size="sm" variant="outline" className="h-8 rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">Delete session</OpsSubmitButton>
                     </form>
                   </div>
                 ))}
@@ -791,7 +798,7 @@ export default async function ManagerOperationsPage({
                 <span className="font-medium">Schedule for</span>
                 <input name="scheduled_for" type="datetime-local" className="h-11 w-full min-w-0 rounded-xl border border-zinc-200 px-3" />
               </label>
-              <Button type="submit" variant="outline" className="rounded-full">Create notification</Button>
+              <OpsSubmitButton pendingLabel="Creating..." variant="outline" className="rounded-full">Create notification</OpsSubmitButton>
             </form>
           </CardContent>
         </DropPanel>
@@ -823,9 +830,9 @@ export default async function ManagerOperationsPage({
                       Type DELETE
                       <input name="confirmation" className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" placeholder="DELETE" />
                     </label>
-                    <Button type="submit" variant="outline" size="sm" className="mt-3 rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">
+                    <OpsSubmitButton pendingLabel="Deleting..." variant="outline" size="sm" className="mt-3 rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">
                       Delete batch
-                    </Button>
+                    </OpsSubmitButton>
                   </form>
                 ))}
               </div>
@@ -844,9 +851,9 @@ export default async function ManagerOperationsPage({
                   Type DELETE TRAINING
                   <input name="confirmation" className="h-10 rounded-lg border border-rose-200 bg-white px-2 text-sm" placeholder="DELETE TRAINING" />
                 </label>
-                <Button type="submit" className="mt-3 rounded-full bg-rose-700 text-white hover:bg-rose-800">
+                <OpsSubmitButton pendingLabel="Removing..." className="mt-3 rounded-full bg-rose-700 text-white hover:bg-rose-800">
                   Remove all training
-                </Button>
+                </OpsSubmitButton>
               </form>
             ) : (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
@@ -947,7 +954,7 @@ export default async function ManagerOperationsPage({
                 <span className="font-medium">Upload question file</span>
                 <input name="question_file" type="file" accept=".xlsx,.xls,.csv,.pdf,.doc,.docx" className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-3 py-3 text-sm" />
               </label>
-              <Button type="submit" className="w-fit rounded-full bg-black text-white hover:bg-zinc-800">Create assessment setup</Button>
+              <OpsSubmitButton pendingLabel="Creating..." className="w-fit rounded-full bg-black text-white hover:bg-zinc-800">Create assessment setup</OpsSubmitButton>
             </form>
             <div className="mt-5 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -997,11 +1004,11 @@ export default async function ManagerOperationsPage({
                           <option value="cancelled">Cancelled</option>
                         </select>
                       </label>
-                      <Button type="submit" size="sm" variant="outline" className="h-9 rounded-full bg-white">Update</Button>
+                      <OpsSubmitButton pendingLabel="Updating..." size="sm" variant="outline" className="h-9 rounded-full bg-white">Update</OpsSubmitButton>
                     </form>
                     <form action={deleteTrainingAssessmentSetupAction} className="mt-2 flex justify-end">
                       <input type="hidden" name="assessment_setup_id" value={setup.id} />
-                      <Button type="submit" size="sm" variant="outline" className="h-8 rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">Delete</Button>
+                      <OpsSubmitButton pendingLabel="Deleting..." size="sm" variant="outline" className="h-8 rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">Delete</OpsSubmitButton>
                     </form>
                   </div>
                 ))}
@@ -1059,7 +1066,7 @@ export default async function ManagerOperationsPage({
                 <span className="font-medium">Remarks</span>
                 <textarea name="remarks" rows={3} className="rounded-xl border border-zinc-200 px-3 py-3" placeholder="Evaluation notes, strengths, and improvement actions." />
               </label>
-              <Button type="submit" className="w-fit rounded-full bg-black text-white hover:bg-zinc-800">Save project evaluation</Button>
+              <OpsSubmitButton pendingLabel="Saving..." className="w-fit rounded-full bg-black text-white hover:bg-zinc-800">Save project evaluation</OpsSubmitButton>
             </form>
             <div className="mt-5 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1085,7 +1092,7 @@ export default async function ManagerOperationsPage({
                         <span className="font-medium">Evidence</span>
                         <input name="evidence_file_name" defaultValue={evaluation.evidence_file_name || ''} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
                       </label>
-                      <Button type="submit" size="sm" variant="outline" className="h-9 rounded-full bg-white">Update</Button>
+                      <OpsSubmitButton pendingLabel="Updating..." size="sm" variant="outline" className="h-9 rounded-full bg-white">Update</OpsSubmitButton>
                       <label className="grid gap-1 text-xs lg:col-span-3">
                         <span className="font-medium">Remarks</span>
                         <input name="remarks" defaultValue={evaluation.remarks || ''} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
@@ -1094,7 +1101,7 @@ export default async function ManagerOperationsPage({
                     </form>
                     <form action={deleteProjectEvaluationAction} className="mt-2 flex justify-end">
                       <input type="hidden" name="project_evaluation_id" value={evaluation.id} />
-                      <Button type="submit" size="sm" variant="outline" className="h-8 rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">Delete</Button>
+                      <OpsSubmitButton pendingLabel="Deleting..." size="sm" variant="outline" className="h-8 rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">Delete</OpsSubmitButton>
                     </form>
                   </div>
                 ))}
@@ -1142,7 +1149,7 @@ export default async function ManagerOperationsPage({
                   {batches.map((batch: any) => <option key={batch.id} value={batch.id}>{batch.title}</option>)}
                 </select>
               </label>
-              <Button type="submit" variant="outline" className="mt-4 rounded-full bg-white">Run governed check</Button>
+              <OpsSubmitButton pendingLabel="Running..." variant="outline" className="mt-4 rounded-full bg-white">Run governed check</OpsSubmitButton>
             </form>
           )})}
         </CardContent>
@@ -1210,8 +1217,11 @@ export default async function ManagerOperationsPage({
                   <span className="font-medium">Close by</span>
                   <input name="closes_at" type="datetime-local" required className="h-11 rounded-xl border border-white/10 bg-white px-3 text-zinc-950" />
                 </label>
-                <Button type="submit" className="rounded-full bg-white text-black hover:bg-zinc-200">Create form</Button>
+                <OpsSubmitButton pendingLabel="Creating and emailing..." className="rounded-full bg-white text-black hover:bg-zinc-200">Create form</OpsSubmitButton>
               </div>
+              <p className="mt-3 text-xs text-zinc-400">
+                You will see a confirmation message with learner email counts after the form is created.
+              </p>
               <label className="mt-3 grid gap-2 text-sm">
                 <span className="font-medium">Form title</span>
                 <input name="title" defaultValue="Training content and trainer feedback" className="h-11 rounded-xl border border-white/10 bg-white px-3 text-zinc-950" />
@@ -1264,12 +1274,12 @@ export default async function ManagerOperationsPage({
                           </label>
                         </div>
                         <div className="flex flex-wrap justify-end gap-2">
-                          <Button type="submit" size="sm" variant="outline" className="h-8 rounded-full bg-white">Update</Button>
+                          <OpsSubmitButton pendingLabel="Updating..." size="sm" variant="outline" className="h-8 rounded-full bg-white">Update</OpsSubmitButton>
                         </div>
                       </form>
                       <form action={deleteFeedbackWindowAction} className="border-t border-zinc-200 p-3 text-right">
                         <input type="hidden" name="feedback_window_id" value={window.id} />
-                        <Button type="submit" size="sm" variant="outline" className="h-8 rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">Delete</Button>
+                        <OpsSubmitButton pendingLabel="Deleting..." size="sm" variant="outline" className="h-8 rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">Delete</OpsSubmitButton>
                       </form>
                     </details>
                   </div>
@@ -1602,7 +1612,7 @@ function LiveBatchBoard({
                       <input name="end_date" type="date" defaultValue={batch.end_date || ''} className="h-10 rounded-xl border border-zinc-200 bg-white px-3" />
                     </label>
                   </div>
-                  <Button type="submit" variant="outline" className="w-fit rounded-full bg-white">Save quick edit</Button>
+                  <OpsSubmitButton pendingLabel="Saving..." variant="outline" className="w-fit rounded-full bg-white">Save quick edit</OpsSubmitButton>
                 </form>
               </details>
             ) : null}
