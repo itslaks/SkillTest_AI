@@ -51,6 +51,7 @@ The application is designed for **admins, managers, training coordinators, train
 | Learner engagement | Gamified dashboard, points, streaks, badges, leaderboards |
 | Reporting | Download Excel/PDF reports for attendance, assessment, feedback, toppers, and BRD evidence |
 | AI coaching | Generate questions, manager insights, employee learning tips, and assessment chat |
+| AI proctoring | Enable per-quiz camera/fullscreen integrity checks with private evidence and staff review |
 
 ---
 
@@ -59,6 +60,7 @@ The application is designed for **admins, managers, training coordinators, train
 | Feature | Description |
 |---|---|
 | 🤖 AI Quiz Generation | Generate MCQs from a topic or extracted CSV/XLSX/DOCX/PDF/XML/JSON content |
+| 🛡️ AI Proctoring | Optional per-quiz camera/microphone pre-checks, fullscreen enforcement, live violation events, auto-submit, private evidence storage, and staff review |
 | 🧠 AI Manager Insights | Short coaching recommendations for batch health, attendance, trainer performance, and quiz outcomes |
 | 🎓 AI Learner Coach | Personalized recommendations based on streaks, quiz history, readiness, and retention signals |
 | 📊 Assessment Analyzer | Upload assessment results and chat with AI about scores, weak areas, and remediation |
@@ -68,7 +70,7 @@ The application is designed for **admins, managers, training coordinators, train
 | 🏅 Certificates | Admin-only certificate automation with flexible score thresholds, uploaded image templates, personalized employee/course names, stronger visual preview, and automatic issuing |
 | 🎖️ Badge Universe | 250+ styled badges across 12+ categories with color, rarity, and shape metadata |
 | ✉️ Email Automation | Assignment and completion emails through SMTP or Resend, including score, badge, and certificate updates |
-| 🤖 Manager Command Chatbot | Sleek DB-aware chatbot for admins/trainers with professional answers, Enter-to-send input, markdown cleanup, and no visible internal provider/status labels |
+| 🤖 Manager Command Chatbot | DB-aware command chatbot that answers true stats and creates structured quizzes from natural-language commands instead of saving raw prompts as titles |
 | 🧑‍🏫 Training Operations | Simplified batch creation, trainer assignment, sessions, attendance, assessments, feedback, reports |
 | ✅ Attendance Governance | Cutoff enforcement, late reason capture, version history, bulk import |
 | 📥 Import Workflows | Employee imports, quiz-question imports, batch candidate imports, attendance imports, assessment score imports, and analyzer uploads support CSV, XLSX/XLS, DOCX, PDF, XML, and JSON where upload parsing is used |
@@ -113,6 +115,7 @@ The application is designed for **admins, managers, training coordinators, train
 | Admin console | `admin` only |
 | Trainer actions | Scoped to assigned batches |
 | Employee quizzes | Only assigned and active quizzes |
+| Proctoring evidence | Employees cannot read normalized evidence; training staff/admins review private signed evidence URLs |
 | Employee exports | Admin sees all; non-admin training staff are domain-scoped |
 | Reports | Manager/training staff with route-level checks and scoped queries |
 
@@ -179,6 +182,8 @@ route.ts -> controller -> service -> repository -> database
 | `lib/topper.ts` | Topper score calculations |
 | `lib/leaderboard.ts` | Leaderboard aggregation |
 | `lib/email.ts` | SMTP/Resend email helpers |
+| `lib/proctoring.ts` | Proctoring risk weights, risk levels, and auto-submit threshold logic |
+| `lib/proctoring-server.ts` | Server-side proctoring session validation, event recording, private evidence storage |
 | `lib/security/env.ts` | Runtime environment validation |
 | `lib/security/validation.ts` | Zod schemas for user input |
 
@@ -309,9 +314,9 @@ Run the SQL scripts in `scripts/` in numeric order.
 
 | Scenario | What To Run |
 |---|---|
-| Fresh Supabase project | Run `001` through `035` |
-| Existing DB already at `030` | Run `031_backfill_old_certificates.sql`, `032_harden_badge_awards.sql`, `033_harden_quiz_certificate_rls.sql`, `034_reset_meaningful_badges.sql`, then `035_repair_training_ops_current_schema.sql` |
-| Current project state | Migration `035` is the latest Training Ops repair step and should be applied after `034` |
+| Fresh Supabase project | Run `001` through `038` |
+| Existing DB already at `030` | Run `031_backfill_old_certificates.sql` through `038_add_normalized_quiz_proctoring.sql` in order |
+| Current project state | Migration `038` is the latest AI proctoring normalization step and should be applied after `037` |
 
 ### 🧾 Latest Migration
 
@@ -324,6 +329,9 @@ Run the SQL scripts in `scripts/` in numeric order.
 | `033_harden_quiz_certificate_rls.sql` | Restricts direct Supabase reads for quiz attempts and certificates while preserving learner and scoped training-staff access |
 | `034_reset_meaningful_badges.sql` | Clears existing employee badge awards and replaces the catalog with a smaller useful milestone set while preserving quiz and training history |
 | `035_repair_training_ops_current_schema.sql` | Reasserts current Training Ops tables, constraints, timestamps, notification states, and project-evaluation edit keys |
+| `036_add_quiz_proctoring.sql` | Adds attempt-level proctoring status, violation count, event summary, and auto-submit fields |
+| `037_add_proctoring_risk_engine.sql` | Adds weighted proctoring risk score, risk level, and integrity report fields |
+| `038_add_normalized_quiz_proctoring.sql` | Adds optional per-quiz proctoring flag, normalized sessions/events/evidence tables, private evidence bucket, RLS policies, and safe inline-evidence cleanup |
 
 ### ⚠️ Important Database Notes
 
@@ -340,6 +348,8 @@ Run the SQL scripts in `scripts/` in numeric order.
 | Attempt And Certificate Privacy | Migration `033` should be applied after `032` to prevent broad direct reads of answer JSON, certificate identity, and score data |
 | Badge Reset | Migration `034` starts employee badges from scratch with a smaller useful catalog; it does not delete quiz attempts or training records |
 | Training Ops Repair | Migration `035` should be run after `034` so post-batch workflows have the required columns and CHECK values |
+| AI Proctoring | Migrations `036` through `038` enable optional proctoring; existing and new quizzes default to `proctoring_required = false` until an admin enables it |
+| Evidence Privacy | Migration `038` stores new evidence in the private `quiz-proctoring-evidence` bucket and gives evidence read access only to authorized training staff/admin roles |
 
 ---
 
@@ -392,12 +402,13 @@ ALLOW_DEMO_SEED_CREDENTIALS=1 node scripts/seed_admin.js
 | `/certificates/[id]` | Authenticated users | Professional certificate view with uploaded template, employee name, course name, score, and print/download |
 | `/manager/analytics` | Manager | Assessment analyzer and AI chat |
 | `/manager/employees` | Manager | Employee import, export, edit, delete, quiz assignment |
+| `/manager/integrity` | Training staff/admin | AI proctoring command center with flagged attempts, violation timeline, signed evidence previews, and review actions |
 | `/manager/leaderboard` | Manager | Quiz and cumulative leaderboard |
 | `/manager/operations` | Manager/trainer | Batches, sessions, attendance, scores, feedback |
 | `/manager/quizzes` | Manager | Quiz list and management |
-| `/manager/quizzes/new` | Manager | Create quiz manually, from upload, or AI |
+| `/manager/quizzes/new` | Manager | Create quiz manually, from upload, or AI; optional AI proctoring toggle defaults off |
 | `/manager/quizzes/[id]` | Manager | Quiz details |
-| `/manager/quizzes/[id]/edit` | Manager | Edit quiz/questions |
+| `/manager/quizzes/[id]/edit` | Manager | Edit quiz/questions and enable or disable AI proctoring |
 | `/manager/reports` | Manager | Reports, trainer performance, exports |
 | `/manager/settings` | Manager | Profile/settings |
 | `/manager/compliance` | Manager | BRD proof matrix |
@@ -409,7 +420,7 @@ ALLOW_DEMO_SEED_CREDENTIALS=1 node scripts/seed_admin.js
 | `/employee` | Learner dashboard and AI recommendation |
 | `/employee/training` | Training schedule, attendance, feedback |
 | `/employee/quizzes` | Assigned quizzes |
-| `/employee/quizzes/[quizId]` | Take quiz |
+| `/employee/quizzes/[quizId]` | Take quiz; proctored quizzes require camera, microphone, fullscreen, and consent pre-checks |
 | `/employee/quizzes/[quizId]/results` | Quiz result |
 | `/employee/quizzes/[quizId]/leaderboard` | Quiz leaderboard |
 | `/employee/leaderboard` | Cumulative leaderboard |
@@ -427,6 +438,7 @@ ALLOW_DEMO_SEED_CREDENTIALS=1 node scripts/seed_admin.js
 | `GET` | `/api/ai-status` | AI provider availability |
 | `POST` | `/api/ai-chat` | Chat with assessment dataset |
 | `POST` | `/api/manager-chatbot` | Admin/trainer DB-aware command chatbot |
+| `POST` | `/api/proctoring/events` | Authenticated employee proctoring violation event logging with ownership/session validation |
 | `POST` | `/api/ai-insight` | Manager dashboard coaching insight |
 | `POST` | `/api/ai-recommend` | Employee learning recommendation |
 | `POST` | `/api/generate-questions` | Generate topic-based MCQs |
@@ -488,6 +500,7 @@ All provider calls go through `lib/ai.ts`.
 | Employee recommendation | Learner stats and risk prompt | 150 |
 | Assessment chat | Compact assessment context and chat history | 600 |
 | Manager command chatbot | Computes exact DB stats first, then AI summarizes only supplied context | 180 |
+| Chatbot quiz creation | Parses natural-language quiz creation commands, creates structured quizzes, generates questions, and assigns employees/teams where matched | 4000 for question generation |
 
 ### 🤖 Manager Command Chatbot
 
@@ -500,8 +513,24 @@ The floating command chatbot is built to avoid fake numbers while keeping the UI
 | Employee summary | `ashtoush performance` | Employee completed attempts |
 | Certificate eligibility | `certificate eligible employees` | Enabled certificate rules + attempts + issued certificates |
 | Weak areas | `weakest topic` | Topic averages from completed attempts |
+| Natural quiz creation | `Create quiz on LLM, difficulty medium and assign it to Ram` | Creates `LLM Assessment`, generates questions, assigns matching employee |
+| Team question generation | `Generate 15 hard SQL questions for the Data Engineering team` | Creates `SQL Assessment`, generates 15 hard questions, assigns matching department/domain employees |
 
 If exact data is missing, it says so professionally. The UI hides internal scope, provider, answer-mode, and fallback labels from admins.
+
+### 🛡️ AI Proctoring
+
+AI proctoring is optional per quiz and defaults off for both existing and new quizzes.
+
+| Area | Behavior |
+|---|---|
+| Admin setup | Managers/admins use `Enable AI Proctoring` in quiz create/edit screens |
+| Employee pre-check | Camera, microphone, browser support, fullscreen readiness, and consent are checked before a proctored quiz can start |
+| Event logging | `/api/proctoring/events` validates the authenticated employee, attempt ownership, active session, and in-progress attempt status |
+| Evidence | Camera frames are uploaded to the private `quiz-proctoring-evidence` bucket and referenced by normalized evidence rows |
+| Auto-submit | Three valid violations or critical risk can auto-submit and flag the attempt for review |
+| Staff review | `/manager/integrity` shows flagged attempts, timeline, signed evidence previews, and approve/reject/retest/escalate actions |
+| Employee privacy | Employee result pages show safe review status only and do not fetch evidence paths, signed URLs, or blobs |
 
 ### 🧑‍🏫 Batch Lifecycle Management
 
@@ -577,11 +606,13 @@ npx playwright install chromium
 
 | Item | Required |
 |---|---:|
-| Supabase migrations through `035` applied | Required |
+| Supabase migrations through `038` applied | Required |
 | Real Supabase URL/anon/service keys configured | ✅ |
 | `CRON_SECRET` configured | Recommended |
-| AI provider key configured | Recommended |
-| SMTP or Resend configured | Recommended |
+| AI provider key configured for AI-generated questions | Recommended |
+| SMTP or Resend configured for quiz completion and proctoring alerts | Recommended |
+| `quiz-proctoring-evidence` bucket is private | Required before enabling AI proctoring |
+| Staging proctoring checklist completed | Required before enabling AI proctoring for real employees |
 | Demo seed credentials disabled | ✅ |
 | Admin/trainer seed passwords stored securely | ✅ |
 
@@ -598,6 +629,8 @@ npx playwright install chromium
 | RBAC | Centralized in `lib/rbac.ts` |
 | Batch access | Scoped in `lib/training-access.ts` |
 | Service role usage | Used only after server-side authorization checks |
+| Proctoring evidence | Stored in a private Supabase bucket with signed staff review URLs; employee result pages do not fetch evidence |
+| Answer secrecy | Employee quiz payloads strip correct-answer flags before submission; results fetch answer keys only after completion |
 | Seed passwords | Env-driven; demo defaults require explicit opt-in |
 
 ---
@@ -608,7 +641,12 @@ npx playwright install chromium
 |---|---|---|
 | `Supabase is not configured` | Missing/placeholder env vars | Fill `.env.local` with real Supabase values |
 | Employees cannot see quiz | Quiz not active or not assigned | Confirm assignment and `status = active`; migration `029` syncs visibility |
+| Proctored quiz start is disabled | Camera, microphone, fullscreen readiness, browser support, or consent missing | Complete the pre-check screen and allow browser permissions |
+| Camera prompt does not appear | Browser permission already denied, unsupported browser, insecure URL, or camera in use | Reset site permissions, use HTTPS/current desktop browser, close apps using the camera |
+| Integrity dashboard has no evidence preview | No evidence frame captured or storage upload failed | Check `quiz_proctoring_evidence`, private bucket, and signed URL generation |
+| Staff proctoring email not received | Email provider missing or staff profile lacks email | Configure SMTP/Resend and verify admin/trainer emails |
 | AI generation unavailable | No AI provider key | Set `OPENAI_API_KEY`, `GROQ_API_KEY`, or `GOOGLE_GEMINI_API_KEY` |
+| Chatbot creates template questions | AI provider key missing or AI call failed | Configure AI key; template fallback prevents empty quizzes |
 | Smoke test fails for browser | Playwright browser missing | Run `npx playwright install chromium` |
 | Trainer cannot upload | Trainer not assigned to batch | Assign trainer in training operations |
 | Cron returns 401 | Missing/wrong bearer token | Send `Authorization: Bearer <CRON_SECRET>` |
@@ -636,6 +674,7 @@ npx playwright install chromium
 |---|---|
 | `docs/TECHNICAL_OVERVIEW.md` | Owner-level route, stack, API, deployment overview |
 | `docs/ARCHITECTURE.md` | Backend layering rules |
+| `docs/ai-proctoring-chatbot-staging-handoff.md` | Staging validation checklist and deployment handoff for AI proctoring and chatbot quiz creation |
 | `ENHANCED_WORKFLOW.md` | Workflow explanation |
 | `EXECUTE.md` | Execution/demo guidance |
 | `PRESENTATION_SCRIPT.md` | Presentation narrative |

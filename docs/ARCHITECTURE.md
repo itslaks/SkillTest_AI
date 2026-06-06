@@ -14,6 +14,8 @@ The application keeps UI and backend responsibilities separated by folder:
 - `lib/insights.ts`: shared behavioral analysis, readiness, retention, and impact calculations.
 - `lib/ai.ts`: shared OpenAI, Groq, and Gemini provider selection.
 - `lib/email.ts`: SMTP, Resend, and development email fallback.
+- `lib/proctoring.ts`: proctoring risk weights, severity levels, and auto-submit thresholds.
+- `lib/proctoring-server.ts`: server-side proctoring sessions, active-attempt validation, event recording, summaries, and private evidence upload.
 - `lib/domain-options.ts`: canonical signup/assignment domain options.
 - `lib/avatar-options.ts`: built-in Three.js 3D avatar preset IDs and helpers.
 - `components/avatar/`: reusable Three.js avatar renderer, preset picker, and profile avatar view.
@@ -33,6 +35,7 @@ Some older and fast-moving modules still use server actions or route handlers di
 | `lib/actions/manager.ts` | Form-driven manager/admin mutations such as employee import, assignment, certificate rules |
 | `lib/actions/profile.ts` | Authenticated profile dashboard reads |
 | `app/api/manager-chatbot/route.ts` | Deterministic command chatbot stats and compact DB context for AI fallback |
+| `app/api/proctoring/events/route.ts` | Live proctoring events endpoint kept in-route while the proctoring helper module absorbs session, risk, and evidence logic |
 
 When changing these files, keep business rules small and extracted into shared helpers where possible.
 
@@ -53,11 +56,32 @@ The manager chatbot follows this order:
 
 1. Load scoped quizzes, completed attempts, profiles, badges, certificates, certificate rules, and attendance.
 2. Try deterministic handlers for exact stats such as employee quiz score, quiz average, weak areas, and certificate eligibility.
-3. If no deterministic handler matches, send compact context to AI.
-4. AI must answer only from supplied context and keep responses short.
-5. The client renders only polished admin-facing answers and hides internal scope, provider, answer-mode, and fallback labels.
+3. Parse natural-language quiz creation commands such as `Create quiz on LLM, difficulty medium and assign it to Ram` and create structured quizzes with generated questions.
+4. If no deterministic handler or command matches, send compact context to AI.
+5. AI must answer only from supplied context and keep responses short.
+6. The client renders only polished admin-facing answers and hides internal scope, provider, answer-mode, and fallback labels.
 
 This avoids fake scores while keeping broad natural-language coverage.
+
+## AI Proctoring Architecture
+
+```text
+manager quiz form -> quizzes.proctoring_required
+employee pre-check -> startQuizAttempt() -> proctoring_sessions
+browser signal -> /api/proctoring/events -> recordProctoringEvent()
+evidence frame -> private Supabase storage -> quiz_proctoring_evidence
+flagged attempt -> /manager/integrity -> review_status / review_notes
+```
+
+Proctoring is intentionally opt-in per quiz. Existing and new quizzes default to non-proctored unless an admin/manager enables `Enable AI Proctoring`.
+
+Security boundaries:
+
+- Employee quiz payloads omit correct-answer flags before submission.
+- Employees can create/read their own session metadata but cannot read normalized evidence.
+- Evidence files are stored in the private `quiz-proctoring-evidence` bucket.
+- Staff evidence previews use short-lived signed URLs.
+- `/api/proctoring/events` validates authenticated user, attempt ownership, active session, and in-progress attempt state before writing events.
 
 ## Training Operations Architecture
 
