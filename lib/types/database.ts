@@ -67,7 +67,10 @@ export interface QuizAttempt {
   status: AttemptStatus
   proctoring_status?: 'clear' | 'flagged' | null
   proctoring_violations_count?: number | null
+  proctoring_risk_score?: number | null
+  proctoring_risk_level?: ProctoringRiskLevel | null
   proctoring_events?: ProctoringEvent[] | null
+  integrity_report?: Record<string, unknown> | null
   auto_submitted?: boolean | null
   started_at: string
   completed_at: string | null
@@ -482,26 +485,46 @@ export interface SubmittedQuizAnswer {
 
 export type ProctoringEventType =
   | 'camera-denied'
+  | 'microphone-denied'
   | 'fullscreen-exit'
   | 'tab-hidden'
   | 'window-blur'
   | 'blocked-shortcut'
   | 'back-navigation'
   | 'context-menu'
+  | 'copy-attempt'
+  | 'paste-attempt'
+  | 'devtools-open'
   | 'camera-lost'
+  | 'network-offline'
+  | 'no-face'
+  | 'multiple-faces'
+  | 'face-covered'
+  | 'gaze-away'
+  | 'phone-detected'
+  | 'second-screen'
+  | 'notes-detected'
+  | 'audio-anomaly'
+  | 'voice-assistance'
   | 'auto-submit'
+
+export type ProctoringRiskLevel = 'low' | 'medium' | 'high' | 'critical'
 
 export interface ProctoringEvent {
   type: ProctoringEventType
   label: string
   occurredAt: string
   questionIndex?: number
+  riskScore?: number
+  riskLevel?: ProctoringRiskLevel
   evidenceImage?: string | null
 }
 
 export interface ProctoringSubmission {
   enabled: boolean
   violationCount: number
+  riskScore: number
+  riskLevel: ProctoringRiskLevel
   autoSubmitted: boolean
   events: ProctoringEvent[]
 }

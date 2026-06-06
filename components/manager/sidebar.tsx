@@ -17,6 +17,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   ShieldCheck,
+  ShieldAlert,
   Crown,
   BookOpen,
   FileCheck2,
@@ -51,6 +52,7 @@ const navigation = [
     items: [
       { name: 'Leaderboard', href: '/manager/leaderboard', icon: Trophy, color: 'text-amber-400', bg: 'bg-amber-400/10', activeBg: 'bg-amber-500', description: 'Rankings & scores' },
       { name: 'Analytics & AI', href: '/manager/analytics', icon: Brain, color: 'text-pink-400', bg: 'bg-pink-400/10', activeBg: 'bg-pink-500', description: 'AI-powered insights' },
+      { name: 'Integrity Center', href: '/manager/integrity', icon: ShieldAlert, color: 'text-red-300', bg: 'bg-red-300/10', activeBg: 'bg-red-400', description: 'Proctoring evidence' },
       { name: 'Reports', href: '/manager/reports', icon: BarChart3, color: 'text-orange-400', bg: 'bg-orange-400/10', activeBg: 'bg-orange-500', description: 'Download reports' },
       { name: 'BRD Proof', href: '/manager/compliance', icon: FileCheck2, color: 'text-cyan-300', bg: 'bg-cyan-300/10', activeBg: 'bg-cyan-400', description: 'Requirement coverage' },
       { name: 'Notifications', href: '/manager/notifications', icon: Bell, color: 'text-rose-300', bg: 'bg-rose-300/10', activeBg: 'bg-rose-400', description: 'Action log' },
@@ -153,7 +155,7 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
               {group.items.filter((item) => {
                 // Trainer only sees Dashboard and Training Ops
                 if (profile?.role === 'trainer') {
-                  return ['/manager', '/manager/operations', '/manager/docs', '/manager/quizzes', '/manager/employees', '/manager/notifications'].includes(item.href)
+                  return ['/manager', '/manager/operations', '/manager/docs', '/manager/quizzes', '/manager/employees', '/manager/integrity', '/manager/notifications'].includes(item.href)
                 }
                 // Admin Console only for admins
                 if (item.href === '/manager/admin') return profile?.role === 'admin'

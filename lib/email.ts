@@ -311,11 +311,15 @@ export function buildQuizProctoringFlagEmail(opts: {
   quizTitle: string
   score: number
   violationCount: number
+  riskScore: number
+  riskLevel: string
   autoSubmitted: boolean
   events: Array<{
     type: string
     label: string
     occurredAt: string
+    riskScore?: number
+    riskLevel?: string
     evidenceImage?: string | null
   }>
 }) {
@@ -332,7 +336,7 @@ export function buildQuizProctoringFlagEmail(opts: {
         <td style="vertical-align:top;padding:10px;border-bottom:1px solid #fee2e2;font-weight:700;">${index + 1}</td>
         <td style="vertical-align:top;padding:10px;border-bottom:1px solid #fee2e2;">
           <strong>${escapeHtml(event.label)}</strong><br/>
-          <span style="color:#6b7280;font-size:12px;">${escapeHtml(event.type)} - ${escapeHtml(new Date(event.occurredAt).toLocaleString('en-IN'))}</span>
+          <span style="color:#6b7280;font-size:12px;">${escapeHtml(event.type)} - ${escapeHtml(new Date(event.occurredAt).toLocaleString('en-IN'))} - risk ${event.riskScore ?? 0}</span>
           ${evidence}
         </td>
       </tr>`
@@ -348,6 +352,7 @@ export function buildQuizProctoringFlagEmail(opts: {
       <p><strong>${employeeName}</strong> (${employeeEmail}) was flagged during <strong>${quizTitle}</strong>.</p>
       <table style="width:100%;border-collapse:collapse;margin:18px 0;">
         <tr><td style="padding:10px;background:#fee2e2;font-weight:700;width:38%;">Violations</td><td style="padding:10px;background:#fff7ed;">${opts.violationCount}</td></tr>
+        <tr><td style="padding:10px;background:#fee2e2;font-weight:700;">Risk score</td><td style="padding:10px;background:#fff7ed;">${opts.riskScore} (${escapeHtml(opts.riskLevel)})</td></tr>
         <tr><td style="padding:10px;background:#fee2e2;font-weight:700;">Auto submitted</td><td style="padding:10px;background:#fff7ed;">${opts.autoSubmitted ? 'Yes' : 'No'}</td></tr>
         <tr><td style="padding:10px;background:#fee2e2;font-weight:700;">Final score</td><td style="padding:10px;background:#fff7ed;">${opts.score}%</td></tr>
       </table>
@@ -356,6 +361,32 @@ export function buildQuizProctoringFlagEmail(opts: {
         ${rows || '<tr><td style="padding:12px;">No event details were submitted.</td></tr>'}
       </table>
       <p style="color:#7f1d1d;font-size:13px;margin-top:16px;">Review this attempt before accepting the result. Evidence images are browser camera frames captured at trigger time.</p>
+    </div>
+  </div>`
+}
+
+export function buildCandidateProctoringNoticeEmail(opts: {
+  employeeName?: string | null
+  quizTitle: string
+  violationCount: number
+  riskScore: number
+  riskLevel: string
+}) {
+  return `
+  <div style="font-family:system-ui,sans-serif;max-width:620px;margin:0 auto;padding:24px;background:#f8fafc;">
+    <div style="background:#7f1d1d;color:#fff;padding:24px;border-radius:18px 18px 0 0;">
+      <p style="margin:0;color:#fecaca;font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;">SkillTest_AI Assessment Integrity</p>
+      <h1 style="margin:10px 0 0;font-size:24px;">Assessment submitted for review</h1>
+    </div>
+    <div style="background:#fff;border:1px solid #fecaca;border-top:0;padding:24px;border-radius:0 0 18px 18px;">
+      <p>Hi ${escapeHtml(opts.employeeName || 'Learner')},</p>
+      <p>Your assessment <strong>${escapeHtml(opts.quizTitle)}</strong> was automatically submitted because repeated integrity violations were detected.</p>
+      <table style="width:100%;border-collapse:collapse;margin:18px 0;">
+        <tr><td style="padding:10px;background:#fee2e2;font-weight:700;">Violations</td><td style="padding:10px;background:#fff7ed;">${opts.violationCount}</td></tr>
+        <tr><td style="padding:10px;background:#fee2e2;font-weight:700;">Risk score</td><td style="padding:10px;background:#fff7ed;">${opts.riskScore} (${escapeHtml(opts.riskLevel)})</td></tr>
+        <tr><td style="padding:10px;background:#fee2e2;font-weight:700;">Status</td><td style="padding:10px;background:#fff7ed;">Flagged for trainer/admin review</td></tr>
+      </table>
+      <p style="color:#7f1d1d;font-size:13px;">Your trainer or administrator will review the evidence package and decide the final outcome.</p>
     </div>
   </div>`
 }

@@ -11,7 +11,8 @@ import {
   getTopicAttempts,
 } from '@/lib/insights'
 import type { SubmitQuizInput, LeaderboardEntry, QuizAnswer, DifficultyLevel } from '@/lib/types/database'
-import { buildQuizCompletedEmail, buildQuizProctoringFlagEmail, sendEmail } from '@/lib/email'
+import { buildCandidateProctoringNoticeEmail, buildQuizCompletedEmail, buildQuizProctoringFlagEmail, sendEmail } from '@/lib/email'
+import { calculateProctoringRisk, shouldAutoSubmitForIntegrity } from '@/lib/proctoring'
 
 // ─── Start a quiz attempt ─────────────────────────────────────────────
 export async function startQuizAttempt(quizId: string) {
@@ -156,7 +157,30 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
     const rawInsight = analyzeAttemptPattern(enrichedAnswers, quiz.difficulty, topicAttempts)
     const proctoringEvents = proctoring?.events || []
     const proctoringViolationCount = proctoring?.violationCount || 0
-    const isProctoringFlagged = Boolean(proctoring?.enabled && proctoringViolationCount >= 3)
+    const proctoringRisk = calculateProctoringRisk(proctoringEvents)
+    const isIntegrityAutoSubmit = shouldAutoSubmitForIntegrity(proctoringEvents, proctoringViolationCount)
+    const isProctoringFlagged = Boolean(proctoring?.enabled && (isIntegrityAutoSubmit || proctoringRisk.level === 'high' || proctoringRisk.level === 'critical'))
+    const integrityReport = proctoring?.enabled
+      ? {
+          generatedAt: new Date().toISOString(),
+          quizId: quiz_id,
+          userId: user.id,
+          quizTitle: quiz.title,
+          status: isProctoringFlagged ? 'flagged_for_review' : 'clear',
+          riskScore: proctoringRisk.score,
+          riskLevel: proctoringRisk.level,
+          violationCount: proctoringViolationCount,
+          autoSubmitted: Boolean(proctoring?.autoSubmitted || isIntegrityAutoSubmit),
+          timeline: proctoringEvents.map((event) => ({
+            type: event.type,
+            label: event.label,
+            occurredAt: event.occurredAt,
+            questionIndex: event.questionIndex,
+            riskScore: event.riskScore,
+            hasEvidence: Boolean(event.evidenceImage),
+          })),
+        }
+      : null
 
     // Points: base 10 per correct + speed bonus
     const speedBonus = time_taken_seconds < (quiz.time_limit_minutes * 60 * 0.5) ? 25 : 0
@@ -180,8 +204,11 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
         completed_at: new Date().toISOString(),
         proctoring_status: isProctoringFlagged ? 'flagged' : (proctoring?.enabled ? 'clear' : null),
         proctoring_violations_count: proctoringViolationCount,
+        proctoring_risk_score: proctoringRisk.score,
+        proctoring_risk_level: proctoring?.enabled ? proctoringRisk.level : null,
         proctoring_events: proctoringEvents,
-        auto_submitted: Boolean(proctoring?.autoSubmitted),
+        integrity_report: integrityReport,
+        auto_submitted: Boolean(proctoring?.autoSubmitted || isIntegrityAutoSubmit),
       })
       .eq('quiz_id', quiz_id)
       .eq('user_id', user.id)
@@ -232,7 +259,9 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
             quizTitle: quiz.title,
             score,
             violationCount: proctoringViolationCount,
-            autoSubmitted: Boolean(proctoring?.autoSubmitted),
+            riskScore: proctoringRisk.score,
+            riskLevel: proctoringRisk.level,
+            autoSubmitted: Boolean(proctoring?.autoSubmitted || isIntegrityAutoSubmit),
             events: proctoringEvents,
           })
 
@@ -254,6 +283,19 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
           sent_at: new Date().toISOString(),
           created_by: quiz.created_by || user.id,
         })
+        if (profile?.email) {
+          await sendEmail({
+            to: profile.email,
+            subject: `Assessment Submitted for Review: ${quiz.title}`,
+            html: buildCandidateProctoringNoticeEmail({
+              employeeName: profile.full_name,
+              quizTitle: quiz.title,
+              violationCount: proctoringViolationCount,
+              riskScore: proctoringRisk.score,
+              riskLevel: proctoringRisk.level,
+            }),
+          })
+        }
       } catch (mailError) {
         console.warn('Proctoring alert failed (non-fatal):', mailError)
       }

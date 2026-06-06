@@ -197,18 +197,34 @@ export const submitQuizSchema = z
       events: z.array(z.object({
         type: z.enum([
           'camera-denied',
+          'microphone-denied',
           'fullscreen-exit',
           'tab-hidden',
           'window-blur',
           'blocked-shortcut',
           'back-navigation',
           'context-menu',
+          'copy-attempt',
+          'paste-attempt',
+          'devtools-open',
           'camera-lost',
+          'network-offline',
+          'no-face',
+          'multiple-faces',
+          'face-covered',
+          'gaze-away',
+          'phone-detected',
+          'second-screen',
+          'notes-detected',
+          'audio-anomaly',
+          'voice-assistance',
           'auto-submit',
         ]),
         label: sanitizedString(180),
         occurredAt: z.string().datetime(),
         questionIndex: z.number().int().min(0).max(1000).optional(),
+        riskScore: z.number().int().min(0).max(100).optional(),
+        riskLevel: z.enum(['low', 'medium', 'high', 'critical']).optional(),
         evidenceImage: z
           .string()
           .max(1_100_000, 'Evidence image is too large')
@@ -216,6 +232,8 @@ export const submitQuizSchema = z
           .optional()
           .nullable(),
       })).max(50),
+      riskScore: z.number().int().min(0).max(1000),
+      riskLevel: z.enum(['low', 'medium', 'high', 'critical']),
     }).optional(),
   })
   .strict()
