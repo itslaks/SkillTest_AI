@@ -13,7 +13,7 @@ import {
   ArrowLeft, Sparkles, Wand2, Upload, FileSpreadsheet, Download,
   CheckCircle2, Clock, Target, AlarmClock,
   Eye, Hash, BookOpen, Zap, ChevronRight,
-  Info, XCircle, Settings2, FileUp,
+  Info, XCircle, Settings2, FileUp, ShieldAlert,
 } from 'lucide-react'
 import type { DifficultyLevel, ParsedQuestion } from '@/lib/types/database'
 import { cn } from '@/lib/utils'
@@ -82,6 +82,7 @@ export default function NewQuizPage() {
   const [maxRetakes, setMaxRetakes] = useState(1)
   const [showExplanations, setShowExplanations] = useState(true)
   const [feedbackFormUrl, setFeedbackFormUrl] = useState('')
+  const [proctoringRequired, setProctoringRequired] = useState(false)
 
   // Questions
   const [questionSource, setQuestionSource] = useState<'ai' | 'upload' | 'both'>('ai')
@@ -170,6 +171,7 @@ export default function NewQuizPage() {
       question_count: questionCount,
       passing_score: passingScore,
       feedback_form_url: feedbackFormUrl || undefined,
+      proctoring_required: proctoringRequired,
       status: 'active', // Ensure quiz is active immediately
     }
 
@@ -506,8 +508,28 @@ export default function NewQuizPage() {
                           <div className={cn('absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all', opt.value ? 'left-4' : 'left-0.5')} />
                         </div>
                       </button>
-                    ))}
+                  ))}
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setProctoringRequired(!proctoringRequired)}
+                    className={cn(
+                      'flex items-center gap-3 rounded-xl border p-4 text-left transition-all',
+                      proctoringRequired ? 'border-red-300 bg-red-50' : 'border-border bg-muted/20 hover:border-border/80'
+                    )}
+                  >
+                    <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', proctoringRequired ? 'bg-red-600 text-white' : 'bg-muted text-muted-foreground')}>
+                      <ShieldAlert className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium">Enable AI Proctoring</p>
+                      <p className="text-xs text-muted-foreground">Requires camera access and fullscreen mode before employees can start.</p>
+                    </div>
+                    <div className={cn('relative h-5 w-9 shrink-0 rounded-full transition-colors', proctoringRequired ? 'bg-red-600' : 'bg-muted')}>
+                      <div className={cn('absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all', proctoringRequired ? 'left-4' : 'left-0.5')} />
+                    </div>
+                  </button>
 
                   {allowRetakes && (
                     <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-100">
@@ -691,6 +713,7 @@ export default function NewQuizPage() {
                   { label: 'Time Limit', value: `${timeLimit}m`, color: 'text-amber-600', bg: 'bg-amber-50' },
                   { label: 'Pass Score', value: `${passingScore}%`, color: 'text-emerald-600', bg: 'bg-emerald-50' },
                   { label: 'Difficulty', value: difficulty, color: 'text-violet-600', bg: 'bg-violet-50' },
+                  { label: 'Proctoring', value: proctoringRequired ? 'On' : 'Off', color: proctoringRequired ? 'text-red-600' : 'text-zinc-600', bg: proctoringRequired ? 'bg-red-50' : 'bg-zinc-50' },
                 ].map(s => (
                   <div key={s.label} className={cn('rounded-xl p-3', s.bg)}>
                     <p className={cn('text-lg font-bold capitalize', s.color)}>{s.value}</p>

@@ -430,6 +430,7 @@ export interface CreateQuizInput {
   question_count: number
   passing_score?: number
   feedback_form_url?: string
+  proctoring_required?: boolean
   starts_at?: string | null
   ends_at?: string | null
 }

@@ -303,7 +303,7 @@ function parseNaturalCommand(text: string): ParsedCommand | null {
     return { action: 'delete trainer', args, source: 'natural' }
   }
 
-  if (/\b(create|add)\s+quiz\b/i.test(text)) {
+  if (/\b(create|add)\s+quiz\b/i.test(text) || /\bgenerate\b.*\bquestions?\b/i.test(text)) {
     mergeKeyValues(args, text)
     const intent = extractQuizCreationIntent(text)
     Object.assign(args, { ...intent, ...args })
@@ -1147,6 +1147,7 @@ function extractQuizCreationIntent(text: string) {
   const topicPatterns = [
     /\b(?:create|add)\s+(?:a\s+|an\s+)?(?:easy|medium|hard|advanced|hardcore)?\s*(?:quiz|assessment)\s+on\s+(.+?)(?:\s*,|\s+difficulty\b|\s+and\s+assign\b|\s+for\b|\s+due\b|$)/i,
     /\b(?:create|add)\s+(?:a\s+|an\s+)?(?:easy|medium|hard|advanced|hardcore)?\s*(.+?)\s+(?:quiz|assessment)\b/i,
+    /\bgenerate\s+(?:\d{1,3}\s+)?(?:easy|medium|hard|advanced|hardcore)?\s*(.+?)\s+questions?\b/i,
     /\bgenerate\s+(?:\d{1,3}\s+)?questions?\s+on\s+(.+?)(?:\s*,|\s+difficulty\b|\s+and\s+assign\b|\s+for\b|\s+due\b|$)/i,
   ]
   for (const pattern of topicPatterns) {
@@ -1175,7 +1176,7 @@ function cleanTopic(value: string) {
 }
 
 function cleanEntity(value: string) {
-  return value.replace(/^["']|["']$/g, '').replace(/\b(and|with)\b.*$/i, '').trim()
+  return value.replace(/^["']|["']$/g, '').replace(/\b(and|with)\b.*$/i, '').replace(/^(the|a|an)\s+/i, '').trim()
 }
 
 function normalizeDifficultyArg(value?: string): DifficultyLevel {

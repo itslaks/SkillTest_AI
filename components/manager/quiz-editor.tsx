@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { updateQuiz, updateQuestion, deleteQuestion, createQuestion } from '@/lib/actions/quiz'
 import type { Quiz, Question, DifficultyLevel, CreateQuestionInput } from '@/lib/types/database'
-import { Save, Trash2, Plus, CheckCircle2, XCircle, ChevronDown, ChevronUp, Clock } from 'lucide-react'
+import { Save, Trash2, Plus, CheckCircle2, XCircle, ChevronDown, ChevronUp, Clock, ShieldAlert } from 'lucide-react'
 import { UnifiedQuizImporter } from './unified-quiz-importer'
 
 const DIFFICULTIES: DifficultyLevel[] = ['easy', 'medium', 'hard', 'advanced', 'hardcore']
@@ -47,6 +47,9 @@ export function QuizEditor({ quiz: initialQuiz, questions: initialQuestions }: Q
         question_count: quiz.question_count,
         passing_score: quiz.passing_score,
         feedback_form_url: quiz.feedback_form_url || undefined,
+        proctoring_required: Boolean(quiz.proctoring_required),
+        starts_at: quiz.starts_at,
+        ends_at: quiz.ends_at,
       })
       if (res.error) {
         setError(res.error)
@@ -231,6 +234,27 @@ export function QuizEditor({ quiz: initialQuiz, questions: initialQuestions }: Q
               Employees will be required to click this link after completing the quiz to exit.
             </p>
           </div>
+
+          <button
+            type="button"
+            onClick={() => handleQuizChange('proctoring_required', !quiz.proctoring_required)}
+            className={`flex w-full items-center gap-3 rounded-2xl border p-4 text-left transition-all ${
+              quiz.proctoring_required ? 'border-red-300 bg-red-50' : 'border-border bg-muted/20 hover:border-border/80'
+            }`}
+          >
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+              quiz.proctoring_required ? 'bg-red-600 text-white' : 'bg-muted text-muted-foreground'
+            }`}>
+              <ShieldAlert className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-bold">Enable AI Proctoring</p>
+              <p className="text-xs text-muted-foreground">Requires camera access and fullscreen mode before employees can start.</p>
+            </div>
+            <div className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${quiz.proctoring_required ? 'bg-red-600' : 'bg-muted'}`}>
+              <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all ${quiz.proctoring_required ? 'left-4' : 'left-0.5'}`} />
+            </div>
+          </button>
 
           {/* Quiz Scheduling */}
           <div className="space-y-3 p-4 bg-blue-500/5 rounded-2xl border border-blue-500/10">

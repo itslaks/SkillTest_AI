@@ -4,6 +4,16 @@
 ALTER TABLE public.quizzes
   ADD COLUMN IF NOT EXISTS proctoring_required BOOLEAN NOT NULL DEFAULT FALSE;
 
+ALTER TABLE public.quizzes
+  ALTER COLUMN proctoring_required SET DEFAULT FALSE;
+
+UPDATE public.quizzes
+SET proctoring_required = FALSE
+WHERE proctoring_required IS NULL;
+
+ALTER TABLE public.quizzes
+  ALTER COLUMN proctoring_required SET NOT NULL;
+
 ALTER TABLE public.quiz_attempts
   ADD COLUMN IF NOT EXISTS review_status TEXT NOT NULL DEFAULT 'pending'
     CHECK (review_status IN ('pending', 'under_review', 'approved', 'rejected', 'retest_required', 'escalated')),
@@ -96,7 +106,7 @@ CREATE POLICY "Training staff can read scoped proctoring sessions" ON public.pro
     EXISTS (
       SELECT 1 FROM public.profiles p
       WHERE p.id = auth.uid()
-        AND p.role IN ('trainer', 'training_coordinator', 'manager', 'admin')
+        AND p.role IN ('trainer', 'training_staff', 'training_coordinator', 'manager', 'admin')
     )
     OR EXISTS (
       SELECT 1 FROM public.quizzes q
@@ -118,7 +128,7 @@ CREATE POLICY "Training staff can update proctoring sessions" ON public.proctori
     EXISTS (
       SELECT 1 FROM public.profiles p
       WHERE p.id = auth.uid()
-        AND p.role IN ('trainer', 'training_coordinator', 'manager', 'admin')
+        AND p.role IN ('trainer', 'training_staff', 'training_coordinator', 'manager', 'admin')
     )
   );
 
@@ -132,7 +142,7 @@ CREATE POLICY "Training staff can read scoped proctoring events" ON public.quiz_
     EXISTS (
       SELECT 1 FROM public.profiles p
       WHERE p.id = auth.uid()
-        AND p.role IN ('trainer', 'training_coordinator', 'manager', 'admin')
+        AND p.role IN ('trainer', 'training_staff', 'training_coordinator', 'manager', 'admin')
     )
     OR EXISTS (
       SELECT 1 FROM public.quizzes q
@@ -154,7 +164,7 @@ CREATE POLICY "Training staff can read scoped proctoring evidence" ON public.qui
     EXISTS (
       SELECT 1 FROM public.profiles p
       WHERE p.id = auth.uid()
-        AND p.role IN ('trainer', 'training_coordinator', 'manager', 'admin')
+        AND p.role IN ('trainer', 'training_staff', 'training_coordinator', 'manager', 'admin')
     )
     OR EXISTS (
       SELECT 1 FROM public.quizzes q
@@ -181,7 +191,7 @@ CREATE POLICY "Training staff can read quiz proctoring storage" ON storage.objec
     AND EXISTS (
       SELECT 1 FROM public.profiles p
       WHERE p.id = auth.uid()
-        AND p.role IN ('trainer', 'training_coordinator', 'manager', 'admin')
+        AND p.role IN ('trainer', 'training_staff', 'training_coordinator', 'manager', 'admin')
     )
   );
 
