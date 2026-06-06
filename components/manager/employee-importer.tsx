@@ -8,7 +8,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { importEmployees } from '@/lib/actions/manager'
 import type { EmployeeImport, EmployeeImportResult } from '@/lib/types/database'
 import { Upload, Users, CheckCircle2, XCircle, FileSpreadsheet } from 'lucide-react'
-import * as XLSX from 'xlsx'
+import { parseUniversalRowsFile, UNIVERSAL_UPLOAD_ACCEPT } from '@/lib/file-utils'
 
 type SpreadsheetRow = Record<string, string | number | boolean | null | undefined>
 type EmployeeImportPreview = EmployeeImport & { s_no: string }
@@ -39,68 +39,68 @@ export function EmployeeImporter() {
   const [error, setError] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
 
-  function processFile(file: File) {
+  async function processFile(file: File) {
     if (!file) return
 
     setError(null)
     setResult(null)
+    setPreview(null)
 
-    const reader = new FileReader()
-    reader.onload = (evt) => {
-      try {
-        const data = new Uint8Array(evt.target?.result as ArrayBuffer)
-        const workbook = XLSX.read(data, { type: 'array' })
-        const sheet = workbook.Sheets[workbook.SheetNames[0]]
-        const json = XLSX.utils.sheet_to_json<SpreadsheetRow>(sheet)
+    try {
+      const rows = await parseUniversalRowsFile(file) as SpreadsheetRow[]
 
-        if (json.length === 0) {
-          setError('Excel file is empty')
-          return
-        }
-
-        const normalized: EmployeeImportPreview[] = json.map((row) => ({
-          s_no: getCell(row, EMPLOYEE_COLUMNS.serial),
-          email: getCell(row, EMPLOYEE_COLUMNS.email).toLowerCase(),
-          full_name: getCell(row, EMPLOYEE_COLUMNS.name),
-          domain: getCell(row, EMPLOYEE_COLUMNS.domain) || 'General',
-          employee_id: getCell(row, EMPLOYEE_COLUMNS.employeeId) || undefined,
-        }))
-        const seenEmails = new Set<string>()
-        const validRows: EmployeeImportPreview[] = []
-        const rowErrors: string[] = []
-
-        normalized.forEach((row, index) => {
-          const rowNumber = row.s_no || String(index + 1)
-          if (!row.email || !row.full_name) {
-            rowErrors.push(`Row ${rowNumber}: missing email or name`)
-            return
-          }
-          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) {
-            rowErrors.push(`Row ${rowNumber}: invalid email`)
-            return
-          }
-          if (seenEmails.has(row.email)) {
-            rowErrors.push(`Row ${rowNumber}: duplicate email`)
-            return
-          }
-          seenEmails.add(row.email)
-          validRows.push(row)
-        })
-
-        if (validRows.length === 0) {
-          setError(`No valid employees found. Accepted columns: Email, name/full_name, domain/department, employee_id. ${rowErrors.slice(0, 3).join('; ')}`)
-          return
-        }
-
-        setPreview(validRows)
-        if (rowErrors.length > 0) {
-          setError(`${rowErrors.length} row(s) skipped: ${rowErrors.slice(0, 3).join('; ')}`)
-        }
-      } catch {
-        setError('Failed to parse file. Use Excel or CSV with Email and name columns.')
+      if (rows.length === 0) {
+        setError('No rows could be extracted from the file. Ensure it contains structured employee data or try a different format.')
+        return
       }
+
+      const normalized: EmployeeImportPreview[] = rows.map((row) => ({
+        s_no: getCell(row, EMPLOYEE_COLUMNS.serial),
+        email: getCell(row, EMPLOYEE_COLUMNS.email).toLowerCase(),
+        full_name: getCell(row, EMPLOYEE_COLUMNS.name),
+        domain: getCell(row, EMPLOYEE_COLUMNS.domain),
+        employee_id: getCell(row, EMPLOYEE_COLUMNS.employeeId) || undefined,
+      }))
+
+      const seenEmails = new Set<string>()
+      const validRows: EmployeeImportPreview[] = []
+      const rowErrors: string[] = []
+
+      normalized.forEach((row, index) => {
+        const rowNumber = row.s_no || String(index + 1)
+        if (!row.email || !row.full_name) {
+          rowErrors.push(`Row ${rowNumber}: missing email or name`)
+          return
+        }
+        if (!row.employee_id || !row.domain) {
+          rowErrors.push(`Row ${rowNumber}: missing employee ID or domain`)
+          return
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) {
+          rowErrors.push(`Row ${rowNumber}: invalid email`)
+          return
+        }
+        if (seenEmails.has(row.email)) {
+          rowErrors.push(`Row ${rowNumber}: duplicate email`)
+          return
+        }
+        seenEmails.add(row.email)
+        validRows.push(row)
+      })
+
+      if (validRows.length === 0) {
+        setError(`No valid employees found. Accepted columns: Email, name/full_name, domain/department, employee_id. ${rowErrors.slice(0, 3).join('; ')}`)
+        return
+      }
+
+      setPreview(validRows)
+      if (rowErrors.length > 0) {
+        setError(`${rowErrors.length} row(s) skipped: ${rowErrors.slice(0, 3).join('; ')}`)
+      }
+    } catch (err: any) {
+      console.error('Employee import parse failed:', err)
+      setError(err?.message || 'Failed to parse file. Use CSV, XLSX, DOCX, PDF, XML, or JSON with employee records.')
     }
-    reader.readAsArrayBuffer(file)
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -147,8 +147,7 @@ export function EmployeeImporter() {
           Import Employees
         </CardTitle>
         <CardDescription className="text-base mt-2">
-          Upload Excel or CSV with <strong>Email</strong> and <strong>name</strong>.
-          Optional columns: <strong>domain</strong>, <strong>department</strong>, <strong>employee_id</strong>.
+          Upload Excel or CSV with <strong>Email</strong>, <strong>name</strong>, <strong>employee_id</strong>, and <strong>domain</strong>.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -170,10 +169,12 @@ export function EmployeeImporter() {
               {result.failed > 0 && ` ${result.failed} failed.`}
             </p>
             {result.errors.length > 0 && (
-              <div className="mt-3 p-3 bg-red-500/5 rounded-lg border border-red-500/10 text-sm">
-                <p className="font-bold text-red-600 mb-2">Errors:</p>
+              <div className={`mt-3 rounded-lg border p-3 text-sm ${result.failed > 0 ? 'border-red-500/10 bg-red-500/5' : 'border-amber-500/20 bg-amber-500/10'}`}>
+                <p className={`mb-2 font-bold ${result.failed > 0 ? 'text-red-600' : 'text-amber-700'}`}>
+                  {result.failed > 0 ? 'Rows needing correction:' : 'Setup email warnings:'}
+                </p>
                 {result.errors.slice(0, 5).map((err, i) => (
-                  <p key={i} className="text-xs text-red-500 font-mono">Row {err.row}: {err.email} - {err.error}</p>
+                  <p key={i} className={`font-mono text-xs ${result.failed > 0 ? 'text-red-500' : 'text-amber-700'}`}>Row {err.row}: {err.email} - {err.error}</p>
                 ))}
               </div>
             )}
@@ -197,10 +198,10 @@ export function EmployeeImporter() {
             </div>
             <div>
               <p className="text-xl font-display font-medium mb-1">
-                {isDragging ? "Drop it here!" : "Drag & drop your Excel file"}
+                {isDragging ? "Drop it here!" : "Drag & drop your file"}
               </p>
               <p className="text-muted-foreground mt-2">
-                or click to browse your computer
+                Accepts CSV, XLSX, DOCX, PDF, XML, or JSON
               </p>
             </div>
             <label className="mt-4">
@@ -209,7 +210,7 @@ export function EmployeeImporter() {
               </span>
               <input
                 type="file"
-                accept=".xlsx,.xls,.csv"
+                accept={UNIVERSAL_UPLOAD_ACCEPT}
                 onChange={handleFileChange}
                 className="hidden"
               />
@@ -271,4 +272,3 @@ export function EmployeeImporter() {
     </Card>
   )
 }
-

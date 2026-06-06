@@ -8,13 +8,18 @@ import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import type { Profile } from '@/lib/types/database'
+import { getNotificationVerb, type StaffNotification } from '@/lib/notifications'
 import { signOut } from '@/lib/actions/auth'
+import { Avatar3D } from '@/components/avatar/avatar-3d'
+import { getAvatar3DId } from '@/lib/avatar-options'
 
 interface ManagerHeaderProps {
   profile: Profile | null
+  notifications?: StaffNotification[]
 }
 
-export function ManagerHeader({ profile }: ManagerHeaderProps) {
+export function ManagerHeader({ profile, notifications = [] }: ManagerHeaderProps) {
+  const avatarId = getAvatar3DId((profile as any)?.avatar_url)
 
   return (
     <header className="sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-border/50 bg-white/98 backdrop-blur-md px-4 md:px-6">
@@ -43,24 +48,60 @@ export function ManagerHeader({ profile }: ManagerHeaderProps) {
           </Link>
         </Button>
 
-        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/60">
-          <HelpCircle className="h-4.5 w-4.5" />
+        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/60" asChild>
+          <Link href="/manager/docs" title="Admin guide">
+            <HelpCircle className="h-4.5 w-4.5" />
+          </Link>
         </Button>
 
-        <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/60">
-          <Bell className="h-4.5 w-4.5" />
-          <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-red-500 rounded-full ring-1 ring-white" />
-        </Button>
+        {(profile?.role === 'admin' || profile?.role === 'trainer') && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/60">
+                <Bell className="h-4.5 w-4.5" />
+                {notifications.length > 0 && <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-red-500 rounded-full ring-1 ring-white" />}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-96 rounded-xl border-border/60 p-2 shadow-xl">
+              <div className="flex items-center justify-between px-2 py-2">
+                <div>
+                  <p className="text-sm font-semibold">Notifications</p>
+                  <p className="text-xs text-muted-foreground">Latest activity log</p>
+                </div>
+                <Button variant="outline" size="sm" className="h-8 rounded-lg" asChild>
+                  <Link href="/manager/notifications">View all</Link>
+                </Button>
+              </div>
+              <DropdownMenuSeparator className="my-1" />
+              {notifications.length === 0 ? (
+                <div className="px-3 py-6 text-center text-sm text-muted-foreground">No notification records yet.</div>
+              ) : notifications.slice(0, 5).map((notification) => (
+                <DropdownMenuItem key={notification.id} className="cursor-default rounded-lg p-3 focus:bg-muted/70">
+                  <div className="min-w-0">
+                    <div className="mb-1 flex items-center gap-2">
+                      <Badge variant="outline" className="h-5 px-1.5 text-[10px]">{getNotificationVerb(notification)}</Badge>
+                      <span className="text-[10px] text-muted-foreground">{new Date(notification.created_at).toLocaleString()}</span>
+                    </div>
+                    <p className="truncate text-sm font-medium">{notification.title}</p>
+                    <p className="line-clamp-2 text-xs text-muted-foreground">{notification.message}</p>
+                  </div>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-2.5 h-9 pl-1.5 pr-3 rounded-xl hover:bg-muted/60 transition-colors">
-              <Avatar className="h-7 w-7 ring-2 ring-border">
-                <AvatarImage src={(profile as any)?.avatar_url || undefined} />
-                <AvatarFallback className="bg-gradient-to-br from-blue-500 to-violet-600 text-white text-xs font-bold">
-                  {profile?.full_name?.charAt(0) || 'M'}
-                </AvatarFallback>
-              </Avatar>
+              {avatarId ? (
+                <Avatar3D avatarId={avatarId} size={28} className="ring-2 ring-border" />
+              ) : (
+                <Avatar className="h-7 w-7 ring-2 ring-border">
+                  <AvatarImage src={(profile as any)?.avatar_url || undefined} />
+                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-violet-600 text-white text-xs font-bold">{profile?.full_name?.charAt(0) || 'M'}</AvatarFallback>
+                </Avatar>
+              )}
               <div className="hidden md:block text-left leading-none">
                 <p className="text-[13px] font-semibold text-foreground">{profile?.full_name?.split(' ')[0] || 'Manager'}</p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">Manager</p>
@@ -70,12 +111,14 @@ export function ManagerHeader({ profile }: ManagerHeaderProps) {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-60 rounded-xl shadow-xl border-border/60 p-1.5">
             <div className="flex items-center gap-3 px-2 py-2 mb-1">
-              <Avatar className="h-10 w-10 ring-2 ring-border">
-                <AvatarImage src={(profile as any)?.avatar_url || undefined} />
-                <AvatarFallback className="bg-gradient-to-br from-blue-500 to-violet-600 text-white font-bold">
-                  {profile?.full_name?.charAt(0) || 'M'}
-                </AvatarFallback>
-              </Avatar>
+              {avatarId ? (
+                <Avatar3D avatarId={avatarId} size={40} className="ring-2 ring-border" />
+              ) : (
+                <Avatar className="h-10 w-10 ring-2 ring-border">
+                  <AvatarImage src={(profile as any)?.avatar_url || undefined} />
+                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-violet-600 text-white font-bold">{profile?.full_name?.charAt(0) || 'M'}</AvatarFallback>
+                </Avatar>
+              )}
               <div className="min-w-0">
                 <p className="font-semibold text-sm truncate">{profile?.full_name || 'Manager'}</p>
                 <p className="text-xs text-muted-foreground truncate">{profile?.email}</p>

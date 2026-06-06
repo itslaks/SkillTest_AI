@@ -15,7 +15,8 @@ The application keeps UI and backend responsibilities separated by folder:
 - `lib/ai.ts`: shared OpenAI, Groq, and Gemini provider selection.
 - `lib/email.ts`: SMTP, Resend, and development email fallback.
 - `lib/domain-options.ts`: canonical signup/assignment domain options.
-- `lib/avatar-options.ts`: built-in default avatar faces.
+- `lib/avatar-options.ts`: built-in Three.js 3D avatar preset IDs and helpers.
+- `components/avatar/`: reusable Three.js avatar renderer, preset picker, and profile avatar view.
 
 New backend work should follow this flow:
 

@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Upload, FileSpreadsheet, CheckCircle2, XCircle, Download } from 'lucide-react'
-import * as XLSX from 'xlsx'
+import { parseUniversalRowsFile, UNIVERSAL_UPLOAD_ACCEPT } from '@/lib/file-utils'
 
 type SessionOption = {
   id: string
@@ -22,6 +22,7 @@ type UploadResult = {
   successfulRecords: number
   failedRecords: number
   errors?: Array<{ row: number; error: string; email?: string; employeeId?: string }>
+  warnings?: Array<{ area?: string; message: string }>
   uploadedAfterCutoff?: boolean
 }
 
@@ -38,27 +39,21 @@ export function AttendanceImporter({ sessions }: AttendanceImporterProps) {
   const [loading, setLoading] = useState(false)
   const [progress, setProgress] = useState<UploadProgress>(null)
 
-  function readFile(file: File) {
+  async function readFile(file: File) {
     setError('')
     setResult(null)
     setProgress(null)
     setFileName(file.name)
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      try {
-        const workbook = XLSX.read(event.target?.result, { type: 'array' })
-        const sheet = workbook.Sheets[workbook.SheetNames[0]]
-        const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet)
-        if (!rows.length) {
-          setError('The attendance file is empty.')
-          return
-        }
-        setPreview(rows)
-      } catch {
-        setError('Could not read this file. Use the attendance template or a valid Excel/CSV file.')
+    try {
+      const rows = await parseUniversalRowsFile(file)
+      if (!rows.length) {
+        setError('The attendance file is empty.')
+        return
       }
+      setPreview(rows)
+    } catch (err: any) {
+      setError(err.message || 'Could not read this file. Use the attendance template or a supported upload file.')
     }
-    reader.readAsArrayBuffer(file)
   }
 
   async function upload() {
@@ -92,6 +87,10 @@ export function AttendanceImporter({ sessions }: AttendanceImporterProps) {
         aggregate.failedRecords += payload.failedRecords || 0
         aggregate.uploadedAfterCutoff = aggregate.uploadedAfterCutoff || Boolean(payload.uploadedAfterCutoff)
         aggregate.errors?.push(...((payload.errors || []).map((item: any) => ({ ...item, row: item.row + (index * CHUNK_SIZE) }))))
+        aggregate.warnings = [
+          ...(aggregate.warnings || []),
+          ...((payload.warnings || []).map((item: any) => ({ area: item.area, message: item.message || String(item) }))),
+        ]
         setProgress({
           current: index + 1,
           total: chunks.length,
@@ -140,7 +139,7 @@ export function AttendanceImporter({ sessions }: AttendanceImporterProps) {
         <label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-300 bg-white px-4 text-sm font-medium hover:bg-zinc-100 lg:self-end">
           <Upload className="h-4 w-4" />
           Select file
-          <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(event) => event.target.files?.[0] && readFile(event.target.files[0])} />
+          <input type="file" accept={UNIVERSAL_UPLOAD_ACCEPT} className="hidden" onChange={(event) => event.target.files?.[0] && readFile(event.target.files[0])} />
         </label>
       </div>
 
@@ -195,6 +194,14 @@ export function AttendanceImporter({ sessions }: AttendanceImporterProps) {
             ) : null}
           </div>
           <p className="mt-1">{result.successfulRecords}/{result.totalRecords} rows updated. {result.failedRecords} row(s) need review.{result.uploadedAfterCutoff ? ' Late upload reason captured in the audit log.' : ''}</p>
+          {result.warnings?.length ? (
+            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+              <p className="font-semibold">Attendance was marked, but these background logs need review:</p>
+              {result.warnings.slice(0, 3).map((warning, index) => (
+                <p key={`${warning.area || 'warning'}-${index}`} className="mt-1">{warning.message}</p>
+              ))}
+            </div>
+          ) : null}
           {result.errors?.length ? (
             <div className="mt-3 overflow-hidden rounded-xl border border-rose-200 bg-white text-xs text-rose-800">
               <div className="grid grid-cols-[4.5rem_1fr_1fr_1.4fr] gap-2 border-b border-rose-100 bg-rose-50 px-3 py-2 font-semibold">

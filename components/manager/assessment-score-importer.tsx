@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { CheckCircle2, FileSpreadsheet, Upload, XCircle, Download } from 'lucide-react'
-import * as XLSX from 'xlsx'
+import { parseUniversalRowsFile, UNIVERSAL_UPLOAD_ACCEPT } from '@/lib/file-utils'
 
 type BatchOption = { id: string; title: string }
 type AssessmentOption = { id: string; batch_id: string; title: string; assessment_type: string }
@@ -30,28 +30,22 @@ export function AssessmentScoreImporter({
 
   const visibleAssessments = assessments.filter((assessment) => !batchId || assessment.batch_id === batchId)
 
-  function readFile(file: File) {
+  async function readFile(file: File) {
     setError('')
     setMessage('')
     setUploadErrors([])
     setProgress(null)
     setFileName(file.name)
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      try {
-        const workbook = XLSX.read(event.target?.result, { type: 'array' })
-        const sheet = workbook.Sheets[workbook.SheetNames[0]]
-        const parsed = XLSX.utils.sheet_to_json<Record<string, any>>(sheet)
-        if (!parsed.length) {
-          setError('The assessment score file is empty.')
-          return
-        }
-        setRows(parsed)
-      } catch {
-        setError('Could not read this file. Use Excel or CSV.')
+    try {
+      const parsed = await parseUniversalRowsFile(file)
+      if (!parsed.length) {
+        setError('The assessment score file is empty.')
+        return
       }
+      setRows(parsed)
+    } catch (err: any) {
+      setError(err.message || 'Could not read this file. Use a supported upload format.')
     }
-    reader.readAsArrayBuffer(file)
   }
 
   async function upload() {
@@ -144,7 +138,7 @@ export function AssessmentScoreImporter({
         <label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-300 bg-white px-4 text-sm font-medium hover:bg-zinc-100 lg:self-end">
           <Upload className="h-4 w-4" />
           Select file
-          <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(event) => event.target.files?.[0] && readFile(event.target.files[0])} />
+          <input type="file" accept={UNIVERSAL_UPLOAD_ACCEPT} className="hidden" onChange={(event) => event.target.files?.[0] && readFile(event.target.files[0])} />
         </label>
       </div>
 

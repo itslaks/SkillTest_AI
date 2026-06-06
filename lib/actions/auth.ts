@@ -227,6 +227,7 @@ export async function updateProfile(formData: FormData) {
   }
 
   const { fullName, department, avatarUrl } = parsed.data
+  const employeeId = parsed.data.employeeId?.trim() || null
   const domain = normalizeDomain(parsed.data.domain)
 
   const supabase = await createClient()
@@ -237,10 +238,21 @@ export async function updateProfile(formData: FormData) {
   }
 
   const adminClient = createAdminClient()
+  const { data: profile } = await adminClient
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (profile?.role === 'employee' && !employeeId) {
+    return { error: 'Employee ID is required.' }
+  }
+
   const { error } = await adminClient
     .from('profiles')
     .update({
       full_name: fullName,
+      employee_id: employeeId,
       domain,
       department,
       avatar_url: avatarUrl,

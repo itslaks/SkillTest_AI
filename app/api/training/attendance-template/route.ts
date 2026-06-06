@@ -1,9 +1,9 @@
-import { requireManagerForApi } from '@/lib/rbac'
+import { requireTrainingStaffForApi } from '@/lib/rbac'
 import { NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
 
 export async function GET() {
-  const auth = await requireManagerForApi()
+  const auth = await requireTrainingStaffForApi()
   if (auth instanceof NextResponse) return auth
 
   const rows = [

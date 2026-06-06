@@ -10,13 +10,12 @@ import { MonochromeOrb } from '@/components/insights/monochrome-orb'
 import { ReadinessMeter } from '@/components/insights/readiness-meter'
 import { startQuizAttempt, submitQuizAttempt } from '@/lib/actions/employee'
 import { shiftDifficulty } from '@/lib/insights'
-import type { DifficultyLevel, QuizAnswer } from '@/lib/types/database'
+import type { DifficultyLevel, SubmittedQuizAnswer } from '@/lib/types/database'
 import {
   Brain,
   CheckCircle2,
   ChevronRight,
   Clock,
-  Flame,
   ShieldAlert,
   Snowflake,
   Sparkles,
@@ -31,7 +30,8 @@ interface QuizPlayerProps {
 
 type QuizOption = {
   text: string
-  isCorrect: boolean
+  optionId: number
+  isCorrect?: boolean
 }
 
 type QuizQuestion = {
@@ -59,15 +59,14 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const [questionOrder, setQuestionOrder] = useState<string[]>(
     (quiz.questions || []).map((question: any) => question.id)
   )
-  const [answers, setAnswers] = useState<QuizAnswer[]>([])
-  const answersRef = useRef<QuizAnswer[]>([])
+  const [answers, setAnswers] = useState<SubmittedQuizAnswer[]>([])
+  const answersRef = useRef<SubmittedQuizAnswer[]>([])
   useEffect(() => {
     answersRef.current = answers
   }, [answers])
 
   const [selectedOption, setSelectedOption] = useState<number | null>(null)
   const [showFeedback, setShowFeedback] = useState(false)
-  const [streak, setStreak] = useState(0)
   const [totalTime, setTotalTime] = useState(0)
   const totalTimeRef = useRef(0)
   useEffect(() => {
@@ -94,7 +93,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const progress = totalQuestions > 0 ? ((currentIndex + (showFeedback ? 1 : 0)) / totalQuestions) * 100 : 0
   const readiness = quiz.insights?.readiness
 
-  const doSubmit = useCallback((finalAnswers: QuizAnswer[]) => {
+  const doSubmit = useCallback((finalAnswers: SubmittedQuizAnswer[]) => {
     setSubmitting(true)
     startTransition(async () => {
       const result = await submitQuizAttempt({
@@ -176,21 +175,21 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
 
     const timeSpent = Math.round((Date.now() - questionStartTime) / 1000)
     const questionDifficulty = (currentQuestion.difficulty || quiz.difficulty || 'medium') as DifficultyLevel
-    const isCorrect = currentQuestion.options[selectedOption]?.isCorrect === true
     const cognitiveLoadFlag = questionDifficulty === 'easy' && timeSpent > 15
-    const panicSignal = !isCorrect && timeSpent <= 5
-    const recentFastWrong = [...answersRef.current.slice(-1), { panicSignal }].filter((answer) => answer.panicSignal).length
-    const panicMode = recentFastWrong >= 2
+    const panicSignal = false
+    const panicMode = false
     const adaptiveDifficulty = quiz.insights?.antiGamingDetected
       ? shiftDifficulty(questionDifficulty, 1)
-      : cognitiveLoadFlag || panicMode
+      : cognitiveLoadFlag
         ? shiftDifficulty(questionDifficulty, -1)
         : shiftDifficulty(questionDifficulty, 1)
+    const selectedOriginalOption = currentQuestion.options[selectedOption]?.optionId
 
-    const answer: QuizAnswer = {
+    if (selectedOriginalOption === undefined) return
+
+    const answer: SubmittedQuizAnswer = {
       questionId: currentQuestion.id,
-      selectedOption,
-      isCorrect,
+      selectedOption: selectedOriginalOption,
       timeSpent,
       questionDifficulty,
       cognitiveLoadFlag,
@@ -214,9 +213,6 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
           : 'Stable rhythm detected. The next question is being tuned upward in real time.',
     })
     buildAdaptiveOrder(adaptiveDifficulty)
-
-    if (isCorrect) setStreak((previous) => previous + 1)
-    else setStreak(0)
   }
 
   function handleNext() {
@@ -368,12 +364,6 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
                 <Clock className="h-4 w-4" />
                 {quiz.time_limit_minutes > 0 ? formatTime(timeRemaining) : formatTime(totalTime)}
               </div>
-              {streak >= 2 && (
-                <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-medium text-black">
-                  <Flame className="h-4 w-4" />
-                  {streak} streak
-                </div>
-              )}
               <Badge variant="outline" className="border-white/20 bg-transparent text-white">
                 Adaptive target: {liveState.adaptiveDifficulty}
               </Badge>
@@ -415,12 +405,13 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
             <CardContent className="space-y-3 p-6">
               {currentQuestion?.options?.map((option, index: number) => {
                 const isSelected = selectedOption === index
-                const isCorrect = option.isCorrect
+                const isCorrect = option.isCorrect === true
+                const isWrongSelection = showFeedback && isSelected && !isCorrect
                 let style = 'border-white/10 bg-white/5 hover:border-white/40'
 
                 if (showFeedback) {
-                  if (isCorrect) style = 'border-white bg-white text-black'
-                  else if (isSelected && !isCorrect) style = 'border-zinc-500 bg-zinc-900 text-white'
+                  if (isCorrect) style = 'border-emerald-400 bg-emerald-500/15 text-emerald-50 shadow-[0_0_0_1px_rgba(52,211,153,0.35)]'
+                  else if (isWrongSelection) style = 'border-red-400 bg-red-500/15 text-red-50 shadow-[0_0_0_1px_rgba(248,113,113,0.35)]'
                   else style = 'border-white/5 bg-white/[0.03] text-zinc-500'
                 } else if (isSelected) {
                   style = 'border-white bg-white text-black'
@@ -436,25 +427,41 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
                     <div className="flex items-center gap-3">
                       <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-medium ${
                         showFeedback && isCorrect
-                          ? 'bg-black text-white'
-                          : showFeedback && isSelected && !isCorrect
-                            ? 'bg-white text-black'
+                            ? 'bg-emerald-400 text-emerald-950'
+                            : isWrongSelection
+                              ? 'bg-red-400 text-red-950'
                             : isSelected
                               ? 'bg-black text-white'
                               : 'bg-white/10 text-white'
                       }`}>
-                        {showFeedback && isCorrect ? <CheckCircle2 className="h-4 w-4" /> : String.fromCharCode(65 + index)}
+                        {showFeedback && isCorrect ? (
+                          <CheckCircle2 className="h-4 w-4" />
+                        ) : showFeedback && isWrongSelection ? (
+                          <XCircle className="h-4 w-4" />
+                        ) : (
+                          String.fromCharCode(65 + index)
+                        )}
                       </div>
                       <span className="text-sm">{option.text}</span>
+                      {showFeedback && isCorrect && (
+                        <Badge className="ml-auto border-emerald-300 bg-emerald-400 text-emerald-950">
+                          Correct
+                        </Badge>
+                      )}
+                      {isWrongSelection && (
+                        <Badge className="ml-auto border-red-300 bg-red-400 text-red-950">
+                          Wrong
+                        </Badge>
+                      )}
                     </div>
                   </button>
                 )
               })}
 
               {showFeedback && currentQuestion?.explanation && (
-                <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
-                  <p className="mb-1 text-sm font-medium text-white">Explanation</p>
-                  <p className="text-sm text-zinc-400">{currentQuestion.explanation}</p>
+                <div className="rounded-[1.5rem] border border-slate-500/30 bg-slate-500/10 p-4">
+                  <p className="mb-1 text-sm font-medium text-slate-100">Reasoning</p>
+                  <p className="text-sm text-slate-300">{currentQuestion.explanation}</p>
                 </div>
               )}
             </CardContent>

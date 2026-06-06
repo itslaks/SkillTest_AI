@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select'
 import { UserPlus, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { DOMAIN_OPTIONS } from '@/lib/domain-options'
 
 interface AddEmployeeDialogProps {
   onEmployeeAdded?: () => void
@@ -39,7 +40,7 @@ export function AddEmployeeDialog({ onEmployeeAdded }: AddEmployeeDialogProps) {
     full_name: '',
     employee_id: '',
     department: '',
-    domain: 'General'
+    domain: ''
   })
 
   const departments = [
@@ -47,17 +48,13 @@ export function AddEmployeeDialog({ onEmployeeAdded }: AddEmployeeDialogProps) {
     'Operations', 'Product', 'Design', 'Customer Success', 'Other'
   ]
 
-  const domains = [
-    'Tech', 'Business', 'Creative', 'Operations', 'General'
-  ]
-
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     
-    if (!formData.email || !formData.full_name) {
+    if (!formData.email || !formData.full_name || !formData.employee_id || !formData.domain) {
       toast({
         title: 'Missing Information',
-        description: 'Email and Full Name are required.',
+        description: 'Email, full name, employee ID, and domain are required.',
         variant: 'destructive'
       })
       return
@@ -74,16 +71,19 @@ export function AddEmployeeDialog({ onEmployeeAdded }: AddEmployeeDialogProps) {
         const result = await response.json()
 
         if (response.ok) {
+          const warnings = Array.isArray(result.errors) ? result.errors : []
           toast({
-            title: 'Employee Added',
-            description: `${formData.full_name} has been added successfully.`
+            title: warnings.length ? 'Employee Added With Warning' : 'Employee Added',
+            description: warnings.length
+              ? warnings[0]
+              : `${formData.full_name} has been added successfully and received a password setup email.`
           })
           setFormData({
             email: '',
             full_name: '',
             employee_id: '',
             department: '',
-            domain: 'General'
+            domain: ''
           })
           setOpen(false)
           onEmployeeAdded?.()
@@ -153,6 +153,7 @@ export function AddEmployeeDialog({ onEmployeeAdded }: AddEmployeeDialogProps) {
                 placeholder="EMP001"
                 value={formData.employee_id}
                 onChange={(e) => setFormData(prev => ({ ...prev, employee_id: e.target.value }))}
+                required
               />
             </div>
 
@@ -174,10 +175,10 @@ export function AddEmployeeDialog({ onEmployeeAdded }: AddEmployeeDialogProps) {
               <Label htmlFor="domain">Domain</Label>
               <Select value={formData.domain} onValueChange={(value) => setFormData(prev => ({ ...prev, domain: value }))}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select domain" />
                 </SelectTrigger>
                 <SelectContent>
-                  {domains.map((domain) => (
+                  {DOMAIN_OPTIONS.map((domain) => (
                     <SelectItem key={domain} value={domain}>{domain}</SelectItem>
                   ))}
                 </SelectContent>

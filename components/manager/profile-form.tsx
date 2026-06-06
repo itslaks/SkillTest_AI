@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import Image from 'next/image'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,9 +15,11 @@ import {
 import { Spinner } from '@/components/ui/spinner'
 import { updateProfile } from '@/lib/actions/auth'
 import type { Profile } from '@/lib/types/database'
-import { DEFAULT_AVATARS } from '@/lib/avatar-options'
+import { DEFAULT_AVATARS, getAvatar3DId, toAvatar3DValue, type Avatar3DId } from '@/lib/avatar-options'
 import { DOMAIN_OPTIONS } from '@/lib/domain-options'
 import { Save, User, CheckCircle2, Camera, Image as ImageIcon } from 'lucide-react'
+import { AvatarPicker } from '@/components/avatar/avatar-3d'
+import { AvatarView } from '@/components/avatar/avatar-view'
 
 interface ProfileFormProps {
   profile: Profile
@@ -89,13 +90,12 @@ export function ProfileForm({ profile }: ProfileFormProps) {
 
           <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
             <div className="flex flex-wrap items-center gap-4">
-              <Image
+              <AvatarView
                 src={avatarUrl}
                 alt="Profile avatar preview"
-                width={80}
-                height={80}
-                unoptimized
+                size={80}
                 className="h-20 w-20 rounded-2xl border border-white bg-white object-cover shadow-sm"
+                interactive
               />
               <div className="min-w-0 flex-1">
                 <Label htmlFor="avatar-upload" className="mb-2 flex items-center gap-2 font-semibold">
@@ -109,23 +109,14 @@ export function ProfileForm({ profile }: ProfileFormProps) {
                   onChange={handleAvatarUpload}
                   className="bg-white"
                 />
-                <p className="mt-2 text-xs text-muted-foreground">Upload a small photo, or choose one of the default faces below.</p>
+                <p className="mt-2 text-xs text-muted-foreground">Upload a small photo, or choose one of the 3D emoji style presets below.</p>
               </div>
             </div>
-            <div className="mt-4 grid grid-cols-5 gap-2 sm:grid-cols-8">
-              {DEFAULT_AVATARS.map((avatar, index) => (
-                <button
-                  key={avatar}
-                  type="button"
-                  onClick={() => setAvatarUrl(avatar)}
-                  className={`rounded-xl border bg-white p-1 transition-all ${
-                    avatarUrl === avatar ? 'border-black ring-2 ring-black/10' : 'border-zinc-200 hover:border-zinc-400'
-                  }`}
-                  aria-label={`Choose default face ${index + 1}`}
-                >
-                  <Image src={avatar} alt="" width={40} height={40} unoptimized className="h-10 w-10 rounded-lg object-cover" />
-                </button>
-              ))}
+            <div className="mt-4">
+              <AvatarPicker
+                value={getAvatar3DId(avatarUrl)}
+                onChange={(id: Avatar3DId) => setAvatarUrl(toAvatar3DValue(id))}
+              />
             </div>
           </div>
 
@@ -165,6 +156,16 @@ export function ProfileForm({ profile }: ProfileFormProps) {
               </Select>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="employee_id">Employee ID{profile.role === 'employee' ? ' *' : ''}</Label>
+              <Input
+                id="employee_id"
+                name="employeeId"
+                defaultValue={profile.employee_id || ''}
+                placeholder="e.g., EMP1024"
+                required={profile.role === 'employee'}
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="department">Department</Label>
               <Input
                 id="department"
@@ -173,7 +174,7 @@ export function ProfileForm({ profile }: ProfileFormProps) {
                 placeholder="e.g., Engineering"
               />
             </div>
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-2">
               <Label>Role</Label>
               <Input
                 value={profile.role}

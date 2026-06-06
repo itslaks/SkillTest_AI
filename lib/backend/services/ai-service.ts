@@ -24,7 +24,7 @@ export function getAIProviderStatus(): AIProviderStatus {
     hasOpenAI,
     hasGroq,
     hasGemini,
-    hasAnyAI: true,
+    hasAnyAI: hasOpenAI || hasGroq || hasGemini,
     hasExternalAI: hasOpenAI || hasGroq || hasGemini,
     providers: [
       ...(hasOpenAI ? ['OpenAI'] : []),

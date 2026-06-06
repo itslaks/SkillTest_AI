@@ -10,7 +10,7 @@ import {
   getDaysInTraining,
   getTopicAttempts,
 } from '@/lib/insights'
-import type { SubmitQuizInput, LeaderboardEntry, QuizAnswer } from '@/lib/types/database'
+import type { SubmitQuizInput, LeaderboardEntry, QuizAnswer, DifficultyLevel } from '@/lib/types/database'
 import { buildQuizCompletedEmail, sendEmail } from '@/lib/email'
 
 // ─── Start a quiz attempt ─────────────────────────────────────────────
@@ -88,11 +88,22 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
   const { quiz_id, answers, time_taken_seconds } = parsed.data
 
   try {
+    const adminClient = createAdminClient()
+    const { data: assignment } = await adminClient
+      .from('quiz_assignments')
+      .select('id')
+      .eq('quiz_id', quiz_id)
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (!assignment) return { error: 'This quiz has not been assigned to you' }
+
     // Fetch quiz to calculate score
-    const { data: quiz, error: quizError } = await supabase
+    const { data: quiz, error: quizError } = await adminClient
       .from('quizzes')
       .select('*, questions(*)')
       .eq('id', quiz_id)
+      .eq('is_active', true)
       .single()
 
     if (quizError || !quiz) {
@@ -106,27 +117,47 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
       .eq('user_id', user.id)
       .eq('status', 'completed')
 
-    // Calculate score
-    const totalQuestions = answers.length
-    const correctAnswers = answers.filter(a => a.isCorrect).length
-    const score = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0
-
+    const questions = Array.isArray(quiz.questions) ? quiz.questions : []
+    const questionById = new Map<string, any>(questions.map((question: any) => [question.id, question]))
+    const seenQuestionIds = new Set<string>()
     const topicAttempts = getTopicAttempts(previousAttempts || [], quiz.topic)
-    const rawInsight = analyzeAttemptPattern(answers as QuizAnswer[], quiz.difficulty, topicAttempts)
-    const enrichedAnswers = answers.map((answer) => ({
-      ...answer,
-      questionDifficulty: answer.questionDifficulty || quiz.questions?.find((question: any) => question.id === answer.questionId)?.difficulty || quiz.difficulty,
-      cognitiveLoadFlag: answer.cognitiveLoadFlag ?? (
-        (answer.questionDifficulty || quiz.questions?.find((question: any) => question.id === answer.questionId)?.difficulty || quiz.difficulty) === 'easy'
-        && answer.timeSpent > 15
-      ),
-      panicSignal: answer.panicSignal ?? (!answer.isCorrect && answer.timeSpent <= 5),
-      adaptiveDifficulty: answer.adaptiveDifficulty || rawInsight.suggestedNextDifficulty,
-    }))
+    const baselineInsight = analyzeAttemptPattern([], quiz.difficulty, topicAttempts)
+
+    const enrichedAnswers: QuizAnswer[] = []
+    for (const answer of answers) {
+      const question = questionById.get(answer.questionId)
+      if (!question) return { error: 'Submitted answer contains a question that does not belong to this quiz' }
+      if (seenQuestionIds.has(answer.questionId)) return { error: 'Duplicate question answer submitted' }
+      seenQuestionIds.add(answer.questionId)
+
+      const options = Array.isArray(question.options) ? question.options : []
+      const selectedOption = Number(answer.selectedOption)
+      if (!Number.isInteger(selectedOption) || selectedOption < 0 || selectedOption >= options.length) {
+        return { error: 'Submitted answer contains an invalid option' }
+      }
+
+      const questionDifficulty = (question.difficulty || quiz.difficulty || 'medium') as DifficultyLevel
+      const isCorrect = options[selectedOption]?.isCorrect === true
+      enrichedAnswers.push({
+        questionId: answer.questionId,
+        selectedOption,
+        isCorrect,
+        timeSpent: answer.timeSpent,
+        questionDifficulty,
+        cognitiveLoadFlag: questionDifficulty === 'easy' && answer.timeSpent > 15,
+        panicSignal: !isCorrect && answer.timeSpent <= 5,
+        adaptiveDifficulty: answer.adaptiveDifficulty || baselineInsight.suggestedNextDifficulty,
+      })
+    }
+
+    const totalQuestions = questions.length
+    const correctAnswers = enrichedAnswers.filter((answer) => answer.isCorrect).length
+    const score = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0
+    const rawInsight = analyzeAttemptPattern(enrichedAnswers, quiz.difficulty, topicAttempts)
 
     // Points: base 10 per correct + speed bonus
     const speedBonus = time_taken_seconds < (quiz.time_limit_minutes * 60 * 0.5) ? 25 : 0
-    const streakBonus = correctAnswers >= totalQuestions ? 50 : 0
+    const streakBonus = totalQuestions > 0 && correctAnswers >= totalQuestions ? 50 : 0
     const composureBonus = rawInsight.panicModeDetected ? 0 : 15
     const learningPenalty = rawInsight.antiGamingDetected ? -15 : 0
     const pointsEarned = Math.max(0, (correctAnswers * 10) + speedBonus + streakBonus + composureBonus + learningPenalty)
@@ -147,6 +178,7 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
       })
       .eq('quiz_id', quiz_id)
       .eq('user_id', user.id)
+      .eq('status', 'in_progress')
       .select()
       .single()
 
@@ -156,7 +188,6 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
     }
 
     try {
-      const adminClient = createAdminClient()
       const [{ data: profile }, { data: earnedBadges }, { data: certificate }] = await Promise.all([
         adminClient.from('profiles').select('full_name, email').eq('id', user.id).maybeSingle(),
         adminClient.from('user_badges').select('id').eq('user_id', user.id),
@@ -335,24 +366,28 @@ export async function getQuizForAttempt(quizId: string) {
   // Shuffle questions for randomness
   const shuffled = questions ? [...questions].sort(() => Math.random() - 0.5) : []
 
-  // Shuffle options for each question to prevent all answers being option A
+  // Shuffle options for each question; the UI uses the answer flag only after confirmation.
   const questionsWithShuffledOptions = shuffled.map(question => {
     if (question.options && Array.isArray(question.options)) {
-      // Create a copy of options with original indices for tracking correct answer
       const optionsWithIndex = question.options.map((option: any, index: number) => ({
-        ...option,
-        originalIndex: index
+        text: option.text,
+        optionId: index,
+        isCorrect: option.isCorrect === true,
       }))
-      
-      // Shuffle the options
+
       const shuffledOptions = [...optionsWithIndex].sort(() => Math.random() - 0.5)
       
       return {
         ...question,
+        explanation: question.explanation || null,
         options: shuffledOptions
       }
     }
-    return question
+    return {
+      ...question,
+      explanation: question.explanation || null,
+      options: [],
+    }
   })
 
   const topicAttempts = getTopicAttempts(previousAttempts || [], quiz.topic)

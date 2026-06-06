@@ -7,12 +7,12 @@ SkillTest_AI: Mavericks Execution Platform is a Next.js training management and 
 | Area | Current Capability |
 | --- | --- |
 | Authentication | Supabase Auth with employee/trainer signup, trainer approval, and role redirects |
-| Profiles | Searchable profile dashboards with employee ID, domain, quiz history, badges, certificates, attendance, avatar support, and a direct dashboard return action |
+| Profiles | Searchable profile dashboards with employee ID, domain, quiz history, badges, certificates, attendance, uploaded photos, and 15 Three.js 3D avatar presets |
 | Domains | Employee signup and assignment workflows use domain/vertical values such as Data Engineering, Java, C Sharp, Dotnet, Mainframe, Python, Cloud, DevOps, Testing, BA, UI/UX, and General |
 | Quizzes | Create, import, generate, publish/draft, assign, attempt, score, and analyze quizzes |
 | Assignment | Domain/vertical search and color-coded filters for large employee groups |
 | Certificates | Admin-configured thresholds, uploaded certificate format images, personalized certificate/course names, auto-issue triggers, and old-attempt backfill |
-| Badges | 250+ styled badges across 12+ categories with rarity, colors, shapes, and hardened award criteria |
+| Badges | Practical milestone catalog with quality, speed, streak, consistency, readiness, and domain award criteria |
 | Email | SMTP via Nodemailer first, Resend fallback, console fallback in development |
 | AI | OpenAI primary, Groq fallback, Gemini fallback, plus local deterministic stats where possible |
 | Chatbot | Manager/admin command chatbot answers true computed stats first, then AI summarizes only provided DB context with professional admin-facing wording |
@@ -53,7 +53,8 @@ SkillTest_AI: Mavericks Execution Platform is a Next.js training management and 
 | `lib/email.ts` | SMTP/Resend mail sending and templates |
 | `lib/insights.ts` | Readiness, retention, behavioral analysis, trainer impact |
 | `lib/domain-options.ts` | Shared domain/vertical list |
-| `lib/avatar-options.ts` | 15 built-in default avatar faces |
+| `lib/avatar-options.ts` | 15 built-in Three.js 3D avatar preset IDs |
+| `components/avatar/` | Three.js avatar renderer, preset picker, and avatar view wrapper |
 | `scripts/` | Supabase migrations, seed scripts, fixtures, smoke test |
 
 ## Important Routes
@@ -96,7 +97,7 @@ Examples it should handle:
 | --- | --- |
 | Migration `030` | Creates `certificate_rules`, `certificates`, trigger, badge style columns, and badge seed data |
 | Migration `031` | Adds template/personalization columns and backfills old eligible attempts |
-| Admin settings | `/manager/admin` lets admins enable certificates, set any threshold such as 90%, set title/name/message/color, and upload a template image |
+| Admin settings | `/manager/admin` lets admins enable certificates, set any threshold such as 90%, set title/name/message/color, upload a template image, and preview a polished credential frame |
 | Auto issue | New completed attempts create/update certificates when score meets enabled rule |
 | Backfill | Run `031` after saving rules to issue missing certificates for old attempts |
 | Certificate page | `/certificates/[id]` renders uploaded background with employee/course/score/date details |
@@ -132,8 +133,11 @@ Run SQL scripts in `scripts/` in numeric order. Current latest migration is:
 | `030_certificates_badge_expansion.sql` | Adds certificates, trigger, badge metadata, 260 badges |
 | `031_backfill_old_certificates.sql` | Adds certificate template columns and backfills old eligible certificates |
 | `032_harden_badge_awards.sql` | Tightens badge award rules so a single quiz completion does not unlock too many badges |
+| `033_harden_quiz_certificate_rls.sql` | Scopes direct reads of quiz attempts and certificates to learners and authorized training staff |
+| `034_reset_meaningful_badges.sql` | Clears earned badge awards and replaces the old catalog with a smaller useful milestone set |
+| `035_repair_training_ops_current_schema.sql` | Reasserts current Training Ops schema compatibility for sessions, attendance, notifications, feedback, assessments, and project edits |
 
-If `030` is already executed, run `031` after saving certificate rules in `/manager/admin`, then run `032` to harden badge awards. It is safe to run `031` again because it uses conflict update.
+If `030` is already executed, run `031` after saving certificate rules in `/manager/admin`, then run `032` to harden badge awards, `033` to harden quiz-attempt and certificate RLS, `034` to reset badges from scratch, and `035` to repair Training Ops schema compatibility. It is safe to run `031` again because it uses conflict update.
 
 ## Verification
 

@@ -4,6 +4,7 @@ import { useTransition } from 'react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { updateBatchMemberStatus } from '@/lib/actions/training'
 import { Loader2 } from 'lucide-react'
+import { useToast } from '@/hooks/use-toast'
 
 export function BatchMemberStatusDropdown({
   memberId,
@@ -17,6 +18,7 @@ export function BatchMemberStatusDropdown({
   canEdit?: boolean
 }) {
   const [isPending, startTransition] = useTransition()
+  const { toast } = useToast()
 
   const handleStatusChange = (value: string) => {
     if (value === currentStatus) return
@@ -24,7 +26,19 @@ export function BatchMemberStatusDropdown({
       const formData = new FormData()
       formData.append('member_id', memberId)
       formData.append('enrollment_status', value)
-      await updateBatchMemberStatus(formData)
+      const result = await updateBatchMemberStatus(formData)
+      if (result.error) {
+        toast({
+          title: 'Status not updated',
+          description: result.error,
+          variant: 'destructive',
+        })
+        return
+      }
+      toast({
+        title: 'Learner status updated',
+        description: `${name} is now ${value.replace('_', ' ')}.`,
+      })
     })
   }
 

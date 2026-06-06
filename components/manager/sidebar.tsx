@@ -20,10 +20,14 @@ import {
   Crown,
   BookOpen,
   FileCheck2,
+  Bell,
+  TerminalSquare,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { signOut } from '@/lib/actions/auth'
 import { useEffect, useState } from 'react'
+import { Avatar3D } from '@/components/avatar/avatar-3d'
+import { getAvatar3DId } from '@/lib/avatar-options'
 
 interface ManagerSidebarProps {
   profile: Profile | null
@@ -35,6 +39,8 @@ const navigation = [
     items: [
       { name: 'Dashboard', href: '/manager', icon: LayoutDashboard, color: 'text-sky-400', bg: 'bg-sky-400/10', activeBg: 'bg-sky-500', description: 'Overview & stats' },
       { name: 'Training Ops', href: '/manager/operations', icon: CalendarDays, color: 'text-cyan-400', bg: 'bg-cyan-400/10', activeBg: 'bg-cyan-500', description: 'Batches & sessions' },
+      { name: 'AI Command', href: '/manager/ai-command', icon: TerminalSquare, color: 'text-amber-300', bg: 'bg-amber-300/10', activeBg: 'bg-amber-400', description: 'Execute admin ops' },
+      { name: 'Admin Docs', href: '/manager/docs', icon: BookOpen, color: 'text-emerald-300', bg: 'bg-emerald-300/10', activeBg: 'bg-emerald-400', description: 'A to Z guide' },
       { name: 'Quizzes', href: '/manager/quizzes', icon: FileQuestion, color: 'text-violet-400', bg: 'bg-violet-400/10', activeBg: 'bg-violet-500', description: 'Manage assessments' },
       { name: 'Employees', href: '/manager/employees', icon: Users, color: 'text-emerald-400', bg: 'bg-emerald-400/10', activeBg: 'bg-emerald-500', description: 'Team management' },
       { name: 'Profiles', href: '/profiles', icon: Users, color: 'text-indigo-400', bg: 'bg-indigo-400/10', activeBg: 'bg-indigo-500', description: 'People search' },
@@ -47,6 +53,7 @@ const navigation = [
       { name: 'Analytics & AI', href: '/manager/analytics', icon: Brain, color: 'text-pink-400', bg: 'bg-pink-400/10', activeBg: 'bg-pink-500', description: 'AI-powered insights' },
       { name: 'Reports', href: '/manager/reports', icon: BarChart3, color: 'text-orange-400', bg: 'bg-orange-400/10', activeBg: 'bg-orange-500', description: 'Download reports' },
       { name: 'BRD Proof', href: '/manager/compliance', icon: FileCheck2, color: 'text-cyan-300', bg: 'bg-cyan-300/10', activeBg: 'bg-cyan-400', description: 'Requirement coverage' },
+      { name: 'Notifications', href: '/manager/notifications', icon: Bell, color: 'text-rose-300', bg: 'bg-rose-300/10', activeBg: 'bg-rose-400', description: 'Action log' },
       { name: 'Admin Console', href: '/manager/admin', icon: ShieldCheck, color: 'text-yellow-400', bg: 'bg-yellow-400/10', activeBg: 'bg-yellow-500', description: 'Roles & controls' },
     ]
   },
@@ -71,6 +78,7 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
   const roleBadge = getRoleBadge(profile?.role)
   const RoleBadgeIcon = roleBadge.icon
+  const avatarId = getAvatar3DId((profile as any)?.avatar_url)
 
   useEffect(() => {
     document.documentElement.style.setProperty('--manager-sidebar-width', collapsed ? '68px' : '16rem')
@@ -145,10 +153,11 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
               {group.items.filter((item) => {
                 // Trainer only sees Dashboard and Training Ops
                 if (profile?.role === 'trainer') {
-                  return ['/manager', '/manager/operations', '/manager/quizzes', '/manager/employees'].includes(item.href)
+                  return ['/manager', '/manager/operations', '/manager/docs', '/manager/quizzes', '/manager/employees', '/manager/notifications'].includes(item.href)
                 }
                 // Admin Console only for admins
                 if (item.href === '/manager/admin') return profile?.role === 'admin'
+                if (item.href === '/manager/notifications') return profile?.role === 'admin'
                 return true
               }).map((item) => {
                 const isActive = pathname === item.href ||
@@ -210,12 +219,16 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
 
         {/* User */}
         <div className={cn('flex items-center gap-3 p-2 rounded-xl cursor-default', collapsed && 'justify-center')}>
-          <Avatar className="h-8 w-8 shrink-0 ring-1 ring-white/20">
-            <AvatarImage src={(profile as any)?.avatar_url || undefined} />
-            <AvatarFallback className={cn('text-white text-xs font-bold bg-gradient-to-br', sidebarAccent)}>
-              {profile?.full_name?.charAt(0) || profile?.email?.charAt(0) || 'M'}
-            </AvatarFallback>
-          </Avatar>
+          {avatarId ? (
+            <Avatar3D avatarId={avatarId} size={32} className="shrink-0 ring-1 ring-white/20" />
+          ) : (
+            <Avatar className="h-8 w-8 shrink-0 ring-1 ring-white/20">
+              <AvatarImage src={(profile as any)?.avatar_url || undefined} />
+              <AvatarFallback className={cn('text-white text-xs font-bold bg-gradient-to-br', sidebarAccent)}>
+                {profile?.full_name?.charAt(0) || profile?.email?.charAt(0) || 'M'}
+              </AvatarFallback>
+            </Avatar>
+          )}
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <p className="text-[13px] font-semibold text-white/90 truncate">{profile?.full_name || 'Staff'}</p>

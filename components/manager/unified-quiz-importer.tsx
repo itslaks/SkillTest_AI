@@ -25,6 +25,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { bulkCreateQuestions } from '@/lib/actions/quiz'
 import type { DifficultyLevel, CreateQuestionInput, ParsedQuestion } from '@/lib/types/database'
+import { parseUniversalRowsFile, UNIVERSAL_UPLOAD_ACCEPT, STRUCTURED_UPLOAD_ACCEPT } from '@/lib/file-utils'
 import * as XLSX from 'xlsx'
 
 const DIFFICULTIES: DifficultyLevel[] = ['easy', 'medium', 'hard', 'advanced', 'hardcore']
@@ -65,6 +66,23 @@ function normalizeCorrectAnswer(rawAnswer: string, options: string[]) {
   const answerText = answer.toLowerCase()
   const matchIndex = options.findIndex((option) => option.trim().toLowerCase() === answerText)
   return matchIndex >= 0 ? ['A', 'B', 'C', 'D'][matchIndex] : ''
+}
+
+function difficultyBadgeClass(difficulty?: DifficultyLevel) {
+  switch (difficulty) {
+    case 'easy':
+      return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+    case 'medium':
+      return 'border-blue-200 bg-blue-50 text-blue-700'
+    case 'hard':
+      return 'border-amber-200 bg-amber-50 text-amber-700'
+    case 'advanced':
+      return 'border-orange-200 bg-orange-50 text-orange-700'
+    case 'hardcore':
+      return 'border-red-200 bg-red-50 text-red-700'
+    default:
+      return 'border-muted bg-muted text-muted-foreground'
+  }
 }
 
 interface UnifiedQuizImporterProps {
@@ -110,71 +128,75 @@ export function UnifiedQuizImporter({
       setError(null)
       setSuccess(null)
       
-      // Auto-check AI for docs, uncheck for spreadsheets
-      const isDoc = file.name.endsWith('.pdf') || file.name.endsWith('.docx') || file.name.endsWith('.txt')
-      const isSpreadsheet = file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || file.name.endsWith('.csv')
+      const fileName = file.name.toLowerCase()
+      const isDoc = fileName.endsWith('.pdf') || fileName.endsWith('.docx')
+      const isSpreadsheet = fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || fileName.endsWith('.csv')
+      const isJson = fileName.endsWith('.json')
+      const isXml = fileName.endsWith('.xml')
       
       if (isDoc) {
         setUseAI(true)
-      } else if (isSpreadsheet) {
+      } else if (isSpreadsheet || isJson || isXml) {
         setUseAI(false)
-        parseSpreadsheetLocally(file)
+        parseStructuredFileLocally(file)
       }
     }
   }
 
-  async function parseSpreadsheetLocally(file: File) {
-    try {
-      const data = await file.arrayBuffer()
-      const workbook = XLSX.read(data)
-      const sheetName = workbook.SheetNames[0]
-      const worksheet = workbook.Sheets[sheetName]
-      const jsonData = XLSX.utils.sheet_to_json<QuestionSpreadsheetRow>(worksheet)
-      
-      if (jsonData.length === 0) {
-        setError('The spreadsheet appears to be empty.')
+  function parseRows(jsonData: QuestionSpreadsheetRow[]) {
+    const errors: string[] = []
+    const seenQuestions = new Set<string>()
+    const questions: ParsedQuestion[] = []
+
+    jsonData.forEach((row, index) => {
+      const questionText = getCell(row, QUESTION_COLUMNS.question)
+      const optionA = getCell(row, QUESTION_COLUMNS.optionA)
+      const optionB = getCell(row, QUESTION_COLUMNS.optionB)
+      const optionC = getCell(row, QUESTION_COLUMNS.optionC)
+      const optionD = getCell(row, QUESTION_COLUMNS.optionD)
+      const options = [optionA, optionB, optionC, optionD]
+      const correctAnswer = normalizeCorrectAnswer(getCell(row, QUESTION_COLUMNS.correct), options)
+      const duplicateKey = questionText.toLowerCase().replace(/\s+/g, ' ').trim()
+
+      if (!questionText || options.some((option) => !option)) {
+        errors.push(`Row ${index + 1}: question and all 4 options are required`)
+        return
+      }
+      if (!correctAnswer) {
+        errors.push(`Row ${index + 1}: correct answer must be A, B, C, D, or exact option text`)
+        return
+      }
+      if (seenQuestions.has(duplicateKey)) {
+        errors.push(`Row ${index + 1}: duplicate question skipped`)
         return
       }
 
-      const errors: string[] = []
-      const seenQuestions = new Set<string>()
-      const questions: ParsedQuestion[] = []
-
-      jsonData.forEach((row, index) => {
-        const questionText = getCell(row, QUESTION_COLUMNS.question)
-        const optionA = getCell(row, QUESTION_COLUMNS.optionA)
-        const optionB = getCell(row, QUESTION_COLUMNS.optionB)
-        const optionC = getCell(row, QUESTION_COLUMNS.optionC)
-        const optionD = getCell(row, QUESTION_COLUMNS.optionD)
-        const options = [optionA, optionB, optionC, optionD]
-        const correctAnswer = normalizeCorrectAnswer(getCell(row, QUESTION_COLUMNS.correct), options)
-        const duplicateKey = questionText.toLowerCase().replace(/\s+/g, ' ').trim()
-
-        if (!questionText || options.some((option) => !option)) {
-          errors.push(`Row ${index + 1}: question and all 4 options are required`)
-          return
-        }
-        if (!correctAnswer) {
-          errors.push(`Row ${index + 1}: correct answer must be A, B, C, D, or exact option text`)
-          return
-        }
-        if (seenQuestions.has(duplicateKey)) {
-          errors.push(`Row ${index + 1}: duplicate question skipped`)
-          return
-        }
-
-        seenQuestions.add(duplicateKey)
-        questions.push({
-          question_text: questionText,
-          option_a: optionA,
-          option_b: optionB,
-          option_c: optionC,
-          option_d: optionD,
-          correct_answer: correctAnswer,
-          difficulty: normalizeDifficulty(getCell(row, QUESTION_COLUMNS.difficulty), quizDifficulty),
-          explanation: getCell(row, QUESTION_COLUMNS.explanation),
-        })
+      seenQuestions.add(duplicateKey)
+      questions.push({
+        question_text: questionText,
+        option_a: optionA,
+        option_b: optionB,
+        option_c: optionC,
+        option_d: optionD,
+        correct_answer: correctAnswer,
+        difficulty: normalizeDifficulty(getCell(row, QUESTION_COLUMNS.difficulty), quizDifficulty),
+        explanation: getCell(row, QUESTION_COLUMNS.explanation),
       })
+    })
+
+    return { questions, errors }
+  }
+
+  async function parseStructuredFileLocally(file: File) {
+    try {
+      const jsonData = await parseUniversalRowsFile(file) as QuestionSpreadsheetRow[]
+      
+      if (jsonData.length === 0) {
+        setError('The file appears to be empty.')
+        return
+      }
+
+      const { questions, errors } = parseRows(jsonData)
 
       if (questions.length === 0) {
         setError(`No valid questions found. Required columns: question_text, option_a, option_b, option_c, option_d, correct_answer. ${errors.slice(0, 3).join('; ')}`)
@@ -186,11 +208,11 @@ export function UnifiedQuizImporter({
         setError(`${errors.length} row(s) skipped: ${errors.slice(0, 3).join('; ')}`)
       }
       toast({
-        title: 'Spreadsheet Parsed',
+        title: 'File Parsed',
         description: `Found ${questions.length} valid questions ready to import.`,
       })
     } catch (err: any) {
-      setError('Failed to parse spreadsheet: ' + (err.message || 'Unknown error'))
+      setError('Failed to parse file: ' + (err.message || 'Unknown error'))
     }
   }
 
@@ -413,7 +435,7 @@ export function UnifiedQuizImporter({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept={useAI ? ".pdf,.docx,.txt" : ".xlsx,.xls,.csv"}
+                accept={useAI ? UNIVERSAL_UPLOAD_ACCEPT : STRUCTURED_UPLOAD_ACCEPT}
                 onChange={handleFileSelect}
                 className="hidden"
               />
@@ -424,7 +446,7 @@ export function UnifiedQuizImporter({
                 {selectedFile ? selectedFile.name : 'Click to upload or drag and drop'}
               </p>
               <p className="text-xs text-muted-foreground mt-2">
-                {useAI ? 'PDF, DOCX, or TXT documents for AI generation' : 'XLSX, XLS, or CSV spreadsheets for direct import'}
+                {useAI ? 'CSV, XLSX, DOCX, PDF, XML, or JSON content for AI generation' : 'CSV, XLSX, XML, or JSON questions for direct import'}
               </p>
             </div>
           </TabsContent>
@@ -505,7 +527,14 @@ export function UnifiedQuizImporter({
               {parsedQuestions.slice(0, 3).map((q, i) => (
                 <div key={i} className="p-3">
                   <p className="text-sm font-medium line-clamp-1">{i + 1}. {q.question_text}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Ans: {q.correct_answer} • {q.difficulty}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                    <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">
+                      Answer {q.correct_answer}
+                    </Badge>
+                    <Badge variant="outline" className={difficultyBadgeClass(q.difficulty)}>
+                      {q.difficulty}
+                    </Badge>
+                  </div>
                 </div>
               ))}
               {parsedQuestions.length > 3 && (

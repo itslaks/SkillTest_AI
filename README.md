@@ -58,25 +58,40 @@ The application is designed for **admins, managers, training coordinators, train
 
 | Feature | Description |
 |---|---|
-| 🤖 AI Quiz Generation | Generate MCQs from a topic or extracted PDF/DOCX/TXT content |
+| 🤖 AI Quiz Generation | Generate MCQs from a topic or extracted CSV/XLSX/DOCX/PDF/XML/JSON content |
 | 🧠 AI Manager Insights | Short coaching recommendations for batch health, attendance, trainer performance, and quiz outcomes |
 | 🎓 AI Learner Coach | Personalized recommendations based on streaks, quiz history, readiness, and retention signals |
 | 📊 Assessment Analyzer | Upload assessment results and chat with AI about scores, weak areas, and remediation |
 | 🧑‍💼 Profile Dashboards | Search anyone by name, email, employee ID, domain, or role and view quiz, badge, certificate, attendance, and training history |
-| 🖼️ Profile Photos | Users can upload a small profile photo or choose from 15 built-in default face avatars |
+| 🖼️ Profile Photos | Users can upload a small profile photo or choose from 15 built-in Three.js 3D emoji-style avatar presets |
 | 🧭 Smart Domain Assignment | Filter large employee lists by vertical/domain with color-coded chips before assigning quizzes |
-| 🏅 Certificates | Admin-only certificate automation with flexible score thresholds, uploaded certificate formats, personalized employee/course names, and automatic issuing |
+| 🏅 Certificates | Admin-only certificate automation with flexible score thresholds, uploaded image templates, personalized employee/course names, stronger visual preview, and automatic issuing |
 | 🎖️ Badge Universe | 250+ styled badges across 12+ categories with color, rarity, and shape metadata |
 | ✉️ Email Automation | Assignment and completion emails through SMTP or Resend, including score, badge, and certificate updates |
 | 🤖 Manager Command Chatbot | Sleek DB-aware chatbot for admins/trainers with professional answers, Enter-to-send input, markdown cleanup, and no visible internal provider/status labels |
 | 🧑‍🏫 Training Operations | Simplified batch creation, trainer assignment, sessions, attendance, assessments, feedback, reports |
 | ✅ Attendance Governance | Cutoff enforcement, late reason capture, version history, bulk import |
-| 📥 Import Workflows | Employee imports, batch candidate imports, attendance imports, assessment score imports |
+| 📥 Import Workflows | Employee imports, quiz-question imports, batch candidate imports, attendance imports, assessment score imports, and analyzer uploads support CSV, XLSX/XLS, DOCX, PDF, XML, and JSON where upload parsing is used |
 | 🏆 Accomplishments | Harder-earned badges, employee certificate access, downloadable certificates, live leaderboards, cumulative reports |
 | 📄 Reports | Excel and PDF exports for training operations, employees, attendance, assessments, feedback, toppers |
 | 🔐 RBAC | Admin, manager, training coordinator, trainer, and employee access boundaries |
 | 📬 Notifications | In-app and email notification workflows through SMTP or Resend |
 | 🧾 BRD Evidence Pack | `/manager/compliance` plus downloadable evidence workbook for judge/client review |
+
+---
+
+## 📥 Upload And Extraction Support
+
+| Upload Area | Supported Formats | Notes |
+|---|---|---|
+| Quiz question import | CSV, XLSX/XLS, XML, JSON, DOCX, PDF | Structured files import directly; DOCX/PDF content is extracted for AI question generation or parsed when it contains table-like text |
+| Employee import | CSV, XLSX/XLS, XML, JSON, DOCX, PDF | Reads email, name, domain/vertical, and employee ID from flexible headers |
+| Attendance upload | CSV, XLSX/XLS, XML, JSON, DOCX, PDF | Supports email or employee ID plus attendance status |
+| Batch candidate upload | CSV, XLSX/XLS, XML, JSON, DOCX, PDF | Maps employee/candidate rows into training batches |
+| Assessment score upload/analyzer | CSV, XLSX/XLS, XML, JSON, DOCX, PDF | Validates score ranges, candidates, duplicates, and batch membership |
+| AI content extraction | CSV, XLSX/XLS, XML, JSON, DOCX, PDF | `/api/extract-content` converts supported files into clean text for AI |
+
+> OCR note: PDF and DOCX extraction works best when the document has selectable text. Image-only scanned PDFs should be OCR-processed before upload, or the app will return a clear “too short / scanned PDF” message instead of guessing.
 
 ---
 
@@ -294,9 +309,9 @@ Run the SQL scripts in `scripts/` in numeric order.
 
 | Scenario | What To Run |
 |---|---|
-| Fresh Supabase project | Run `001` through `032` |
-| Existing DB already at `030` | Run `031_backfill_old_certificates.sql` after enabling certificate rules, then run `032_harden_badge_awards.sql` |
-| Current project state | Migration `032` has already been executed in Supabase; no extra SQL is required for the latest UI/workflow polish |
+| Fresh Supabase project | Run `001` through `035` |
+| Existing DB already at `030` | Run `031_backfill_old_certificates.sql`, `032_harden_badge_awards.sql`, `033_harden_quiz_certificate_rls.sql`, `034_reset_meaningful_badges.sql`, then `035_repair_training_ops_current_schema.sql` |
+| Current project state | Migration `035` is the latest Training Ops repair step and should be applied after `034` |
 
 ### 🧾 Latest Migration
 
@@ -306,6 +321,9 @@ Run the SQL scripts in `scripts/` in numeric order.
 | `030_certificates_badge_expansion.sql` | Adds certificate automation tables, certificate issuing trigger, badge style columns, and 260 seeded badges |
 | `031_backfill_old_certificates.sql` | Adds certificate template personalization fields and issues missing certificates for old completed attempts that already meet enabled certificate rules |
 | `032_harden_badge_awards.sql` | Makes badge awards more selective so one quiz completion does not unlock large batches of badges |
+| `033_harden_quiz_certificate_rls.sql` | Restricts direct Supabase reads for quiz attempts and certificates while preserving learner and scoped training-staff access |
+| `034_reset_meaningful_badges.sql` | Clears existing employee badge awards and replaces the catalog with a smaller useful milestone set while preserving quiz and training history |
+| `035_repair_training_ops_current_schema.sql` | Reasserts current Training Ops tables, constraints, timestamps, notification states, and project-evaluation edit keys |
 
 ### ⚠️ Important Database Notes
 
@@ -319,6 +337,9 @@ Run the SQL scripts in `scripts/` in numeric order.
 | Certificates | Migration `030` creates `certificate_rules` and `certificates`; admin certificate controls require this migration |
 | Old Quiz Certificates | Enable certificate rules in `/manager/admin`, set threshold/template, then run migration `031` to backfill old attempts |
 | Badge Awards | Migration `032` should be applied after the badge expansion so employee badges are harder to unlock and reflect sustained achievement |
+| Attempt And Certificate Privacy | Migration `033` should be applied after `032` to prevent broad direct reads of answer JSON, certificate identity, and score data |
+| Badge Reset | Migration `034` starts employee badges from scratch with a smaller useful catalog; it does not delete quiz attempts or training records |
+| Training Ops Repair | Migration `035` should be run after `034` so post-batch workflows have the required columns and CHECK values |
 
 ---
 
@@ -410,7 +431,7 @@ ALLOW_DEMO_SEED_CREDENTIALS=1 node scripts/seed_admin.js
 | `POST` | `/api/ai-recommend` | Employee learning recommendation |
 | `POST` | `/api/generate-questions` | Generate topic-based MCQs |
 | `POST` | `/api/generate-from-content` | Generate content-based MCQs |
-| `POST` | `/api/extract-content` | Extract text from PDF/DOCX/TXT |
+| `POST` | `/api/extract-content` | Extract text from CSV, XLSX/XLS, DOCX, PDF, XML, or JSON |
 
 ### 📥 Imports And Templates
 
@@ -556,7 +577,7 @@ npx playwright install chromium
 
 | Item | Required |
 |---|---:|
-| Supabase migrations through `032` applied when badge hardening is needed | ✅ |
+| Supabase migrations through `035` applied | Required |
 | Real Supabase URL/anon/service keys configured | ✅ |
 | `CRON_SECRET` configured | Recommended |
 | AI provider key configured | Recommended |

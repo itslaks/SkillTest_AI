@@ -12,7 +12,14 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient()
 
   try {
-    const { quizId, batchId, assessmentSetupId, records, fileName, chunkIndex, chunkTotal } = await request.json()
+    let payload: any
+    try {
+      payload = await request.json()
+    } catch {
+      return NextResponse.json({ error: 'Invalid assessment upload payload. Please retry with the assessment template.' }, { status: 400 })
+    }
+
+    const { quizId, batchId, assessmentSetupId, records, fileName, chunkIndex, chunkTotal } = payload
 
     if (!records || !Array.isArray(records) || records.length === 0) {
       return NextResponse.json({ error: 'No records provided' }, { status: 400 })
@@ -38,6 +45,18 @@ export async function POST(request: NextRequest) {
         .maybeSingle()
       if (!setup) {
         return NextResponse.json({ error: 'Assessment setup does not belong to the selected batch.' }, { status: 400 })
+      }
+    }
+
+    if (batchId && !assessmentSetupId) {
+      const admin = createAdminClient()
+      const { data: batch } = await admin
+        .from('training_batches')
+        .select('id')
+        .eq('id', batchId)
+        .maybeSingle()
+      if (!batch) {
+        return NextResponse.json({ error: 'Selected batch was not found.' }, { status: 404 })
       }
     }
 
@@ -189,16 +208,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Update import status
-    await supabase
+    const { error: importStatusError } = await supabase
       .from('assessment_imports')
       .update({
         status: errors.length === 0 ? 'completed' : insertedCount > 0 ? 'completed' : 'failed',
         updated_at: new Date().toISOString(),
       })
       .eq('id', importRecord.id)
+    if (importStatusError) {
+      return NextResponse.json({ error: `Assessment rows processed, but import status update failed: ${importStatusError.message}` }, { status: 500 })
+    }
 
     if (batchId) {
-      await supabase.from('training_assessment_uploads').insert({
+      const { error: uploadLogError } = await supabase.from('training_assessment_uploads').insert({
         assessment_setup_id: assessmentSetupId || null,
         batch_id: batchId,
         uploaded_by: userId,
@@ -211,6 +233,9 @@ export async function POST(request: NextRequest) {
         chunk_index: Number.isFinite(Number(chunkIndex)) ? Number(chunkIndex) : null,
         chunk_total: Number.isFinite(Number(chunkTotal)) ? Number(chunkTotal) : null,
       })
+      if (uploadLogError) {
+        return NextResponse.json({ error: `Assessment rows processed, but upload logging failed: ${uploadLogError.message}` }, { status: 500 })
+      }
     }
 
     // Send upload confirmation email to uploader
@@ -219,7 +244,7 @@ export async function POST(request: NextRequest) {
         .from('profiles')
         .select('full_name, email')
         .eq('id', userId)
-        .single()
+        .maybeSingle()
       if (uploaderProfile?.email) {
         const emailHtml = buildUploadConfirmationEmail({
           uploaderName: uploaderProfile.full_name || 'Trainer',

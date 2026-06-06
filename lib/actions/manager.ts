@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import type { ApiResponse, EmployeeImport, EmployeeImportError, EmployeeImportResult } from '@/lib/types/database'
 import { approveTrainer, rejectTrainer } from '@/lib/actions/auth'
 import { buildQuizAssignedEmail, sendEmail } from '@/lib/email'
+import { createEmployeeWithSetupEmail, sendEmployeeSetupEmail } from '@/lib/employee-onboarding'
 
 // ─── Pending Trainer Sign-Ups (Admin only) ────────────────────────────
 
@@ -111,10 +112,18 @@ export async function importEmployees(employees: EmployeeImport[]): Promise<ApiR
     const emp = employees[i]
     const email = emp.email?.trim().toLowerCase()
     const fullName = emp.full_name?.trim()
+    const employeeId = emp.employee_id?.trim()
+    const domain = emp.domain?.trim()
 
     if (!email || !fullName) {
       failed++
       errors.push({ row: i + 1, email: email || 'N/A', error: 'Missing email or name' })
+      continue
+    }
+
+    if (!employeeId || !domain) {
+      failed++
+      errors.push({ row: i + 1, email, error: 'Employee ID and domain are required' })
       continue
     }
 
@@ -135,16 +144,16 @@ export async function importEmployees(employees: EmployeeImport[]): Promise<ApiR
       .from('profiles')
       .select('id')
       .eq('email', email)
-      .single()
+      .maybeSingle()
 
     if (existingProfile) {
       const { error } = await supabase
         .from('profiles')
         .update({
           full_name: fullName,
-          domain: emp.domain || 'General',
-          department: emp.domain || 'General',
-          employee_id: emp.employee_id || null,
+          domain,
+          department: domain,
+          employee_id: employeeId,
           updated_at: new Date().toISOString(),
         })
         .eq('id', existingProfile.id)
@@ -153,44 +162,34 @@ export async function importEmployees(employees: EmployeeImport[]): Promise<ApiR
         errors.push({ row: i + 1, email, error: error.message })
         continue
       }
+      const setupResult = await sendEmployeeSetupEmail(supabase, email, fullName)
+      if (!setupResult.success) {
+        errors.push({
+          row: i + 1,
+          email,
+          error: `Profile updated, but setup email failed: ${setupResult.error}`,
+        })
+      }
       successful++
     } else {
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email,
-        password: generateTempPassword(),
-        email_confirm: true,
-        user_metadata: {
-          role: 'employee',
-          full_name: fullName,
-        },
-      })
-
-      if (authError || !authData.user) {
-        failed++
-        errors.push({ row: i + 1, email, error: authError?.message || 'Could not create user' })
-        continue
-      }
-
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: authData.user.id,
+      try {
+        const { warning } = await createEmployeeWithSetupEmail(supabase, {
           email,
-          full_name: fullName,
-          employee_id: emp.employee_id || null,
-          department: emp.domain || 'General',
-          domain: emp.domain || 'General',
-          role: 'employee',
+          fullName,
+          employeeId,
+          department: domain,
+          domain,
         })
 
-      if (profileError) {
-        await supabase.auth.admin.deleteUser(authData.user.id)
+        if (warning) {
+          errors.push({ row: i + 1, email, error: warning })
+        }
+        successful++
+      } catch (error: any) {
         failed++
-        errors.push({ row: i + 1, email, error: profileError.message })
+        errors.push({ row: i + 1, email, error: error.message })
         continue
       }
-
-      successful++
     }
   }
 
@@ -205,7 +204,18 @@ export async function importEmployees(employees: EmployeeImport[]): Promise<ApiR
     error_log: errors.length > 0 ? errors : null,
   })
 
+  await supabase.from('training_notifications').insert({
+    title: 'Employee import processed',
+    message: `${successful} of ${employees.length} employee row(s) were processed. ${failed} failed.${errors.length > failed ? ` ${errors.length - failed} setup email warning(s) need review.` : ''}`,
+    audience: 'trainers',
+    channel: 'in_app',
+    delivery_status: failed === 0 ? 'sent' : 'logged',
+    sent_at: failed === 0 ? new Date().toISOString() : null,
+    created_by: userId,
+  })
+
   revalidatePath('/manager/employees', 'layout')
+  revalidatePath('/manager/notifications')
   return {
     data: {
       total: employees.length,
@@ -214,15 +224,6 @@ export async function importEmployees(employees: EmployeeImport[]): Promise<ApiR
       errors,
     }
   }
-}
-
-function generateTempPassword(): string {
-  const chars = 'ABCDEFGHJKLMNOPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
-  let password = ''
-  for (let i = 0; i < 12; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return `${password}!`
 }
 
 // ─── Get all employees (for manager view) ─────────────────────────────
@@ -358,16 +359,28 @@ export async function assignQuizToEmployees(quizId: string, employeeIds: string[
     ])
 
     await Promise.all((profiles || []).map((profile: any) =>
-      sendEmail({
-        to: profile.email,
-        subject: `Quiz Assigned: ${quiz?.title || 'SkillTest_AI Assessment'}`,
-        html: buildQuizAssignedEmail({
-          employeeName: profile.full_name,
-          quizTitle: quiz?.title || 'SkillTest_AI Assessment',
-          topic: quiz?.topic || 'General',
-          difficulty: quiz?.difficulty || 'medium',
+      Promise.all([
+        sendEmail({
+          to: profile.email,
+          subject: `Quiz Assigned: ${quiz?.title || 'SkillTest_AI Assessment'}`,
+          html: buildQuizAssignedEmail({
+            employeeName: profile.full_name,
+            quizTitle: quiz?.title || 'SkillTest_AI Assessment',
+            topic: quiz?.topic || 'General',
+            difficulty: quiz?.difficulty || 'medium',
+          }),
         }),
-      })
+        supabase.from('training_notifications').insert({
+          recipient_user_id: profile.id,
+          title: `Quiz assigned: ${quiz?.title || 'SkillTest_AI Assessment'}`,
+          message: `${profile.full_name || profile.email} was assigned ${quiz?.title || 'a SkillTest_AI assessment'}.`,
+          audience: 'individual',
+          channel: 'in_app',
+          delivery_status: 'sent',
+          sent_at: new Date().toISOString(),
+          created_by: userId,
+        }),
+      ])
     ))
   }
 

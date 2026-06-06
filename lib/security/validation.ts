@@ -58,7 +58,7 @@ const optionalSafeImageUrl = z
   .string()
   .trim()
   .max(1_100_000, 'Image is too large')
-  .refine((val) => /^https?:\/\//i.test(val) || /^data:image\/(png|jpe?g|webp|svg\+xml);/i.test(val), 'Image must be http(s) or a safe image data URL')
+  .refine((val) => /^https?:\/\//i.test(val) || /^data:image\/(png|jpe?g|webp|svg\+xml);/i.test(val) || /^avatar3d:[a-z0-9_-]+$/i.test(val), 'Image must be http(s), a safe image data URL, or a 3D avatar preset')
   .optional()
   .nullable()
   .or(z.literal('').transform(() => null))
@@ -117,6 +117,7 @@ export const magicLinkSchema = z
 export const updateProfileSchema = z
   .object({
     fullName: sanitizedString(150),
+    employeeId: sanitizedString(50).optional().nullable().or(z.literal('').transform(() => null)),
     domain: sanitizedString(150),
     department: sanitizedString(150).optional().nullable().or(z.literal('').transform(() => null)),
     avatarUrl: optionalSafeImageUrl,
@@ -182,7 +183,6 @@ export const submitQuizSchema = z
     answers: z.array(z.object({
       questionId: z.string().uuid(),
       selectedOption: z.number().int().min(0),
-      isCorrect: z.boolean(),
       timeSpent: z.number().int().min(0),
       questionDifficulty: difficultyLevelSchema.optional(),
       cognitiveLoadFlag: z.boolean().optional(),

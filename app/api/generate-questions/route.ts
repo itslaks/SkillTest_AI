@@ -35,14 +35,18 @@ export async function POST(request: NextRequest) {
   // Calculate distribution
   const distribution = calculateDistribution(difficulty, count)
 
-  const hasAI = !!(process.env.OPENAI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY)
+  const hasAI = !!(process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY || process.env.GOOGLE_GEMINI_API_KEY)
 
   // Single AI call for all difficulty groups, or template fallback
   const questions = hasAI
     ? await generateWithAI(topic, distribution)
     : generateTemplateQuestions(topic, distribution)
 
-  const finalQuestions = ensureQuestionCount(questions, topic, difficulty, count)
+  const finalQuestions = applyDifficultyPlan(
+    ensureQuestionCount(questions, topic, difficulty, count),
+    distribution,
+    difficulty
+  )
 
   console.log(`Generated ${finalQuestions.length} questions using ${hasAI ? 'AI' : 'templates'}`)
 
@@ -71,7 +75,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  const generationMethod = process.env.OPENAI_API_KEY ? 'OpenAI' : process.env.GOOGLE_GEMINI_API_KEY ? 'Gemini' : 'Template-based'
+  const generationMethod = process.env.OPENAI_API_KEY
+    ? 'OpenAI'
+    : process.env.GROQ_API_KEY
+      ? 'Groq'
+      : process.env.GOOGLE_GEMINI_API_KEY
+        ? 'Gemini'
+        : 'Template-based'
   
   return NextResponse.json({ 
     data, 
@@ -207,6 +217,21 @@ function ensureQuestionCount(
   }
 
   return deduped.slice(0, requestedCount)
+}
+
+function applyDifficultyPlan(
+  questions: any[],
+  distribution: Record<DifficultyLevel, number>,
+  fallback: DifficultyLevel,
+) {
+  const plan = ALL_DIFFICULTIES.flatMap((difficulty) =>
+    Array.from({ length: distribution[difficulty] || 0 }, () => difficulty)
+  )
+
+  return questions.map((question, index) => ({
+    ...question,
+    difficulty: normalizeDifficulty(plan[index] || question?.difficulty, fallback),
+  }))
 }
 
 function createAnswerPositionPlan(count: number) {

@@ -8,18 +8,18 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/hooks/use-toast'
-import { createQuiz, bulkCreateQuestions } from '@/lib/actions/quiz'
+import { createQuiz, bulkCreateQuestions, deleteQuiz } from '@/lib/actions/quiz'
 import {
   ArrowLeft, Sparkles, Wand2, Upload, FileSpreadsheet, Download,
   CheckCircle2, Clock, Target, AlarmClock,
-  Shuffle, Eye, Hash, BookOpen, Zap, ChevronRight,
+  Eye, Hash, BookOpen, Zap, ChevronRight,
   Info, XCircle, Settings2, FileUp,
 } from 'lucide-react'
-import Link from 'next/link'
 import type { DifficultyLevel, ParsedQuestion } from '@/lib/types/database'
 import { cn } from '@/lib/utils'
-import * as XLSX from 'xlsx'
+import { parseUniversalRowsFile, UNIVERSAL_UPLOAD_ACCEPT, normalizeHeader } from '@/lib/file-utils'
 import { AISetupInstructions } from '@/components/manager/ai-setup-instructions'
+import { SafeBackButton } from '@/components/navigation/safe-back-button'
 
 const ALL_DIFFICULTIES: DifficultyLevel[] = ['easy', 'medium', 'hard', 'advanced', 'hardcore']
 
@@ -77,8 +77,6 @@ export default function NewQuizPage() {
   // Settings
   const [passingScore, setPassingScore] = useState(60)
   const [timeLimit, setTimeLimit] = useState(30)
-  const [shuffleQuestions, setShuffleQuestions] = useState(false)
-  const [shuffleOptions, setShuffleOptions] = useState(false)
   const [showResults, setShowResults] = useState(true)
   const [allowRetakes, setAllowRetakes] = useState(false)
   const [maxRetakes, setMaxRetakes] = useState(1)
@@ -89,6 +87,7 @@ export default function NewQuizPage() {
   const [questionSource, setQuestionSource] = useState<'ai' | 'upload' | 'both'>('ai')
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [parsedQuestions, setParsedQuestions] = useState<ParsedQuestion[]>([])
+  const [extractedUploadContent, setExtractedUploadContent] = useState('')
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [aiAvailable, setAiAvailable] = useState<boolean | null>(null) // null = loading, true/false = available
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -112,36 +111,50 @@ export default function NewQuizPage() {
   const sectionComplete = {
     basics: !!topic && !!title,
     settings: true,
-    questions: questionSource === 'ai' || parsedQuestions.length > 0,
+    questions: questionSource === 'ai' || parsedQuestions.length > 0 || !!extractedUploadContent,
   }
 
-  function handleFileUpload(file: File) {
+  async function handleFileUpload(file: File) {
     setUploadError(null)
     setUploadedFile(file)
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      try {
-        const wb = XLSX.read(e.target?.result, { type: 'binary' })
-        const sheet = wb.Sheets[wb.SheetNames[0]]
-        const rows = XLSX.utils.sheet_to_json(sheet) as any[]
-        const questions = rows.map((r: any) => ({
-          question_text: r['question_text'] || r['Question'] || '',
-          option_a: r['option_a'] || r['Option A'] || '',
-          option_b: r['option_b'] || r['Option B'] || '',
-          option_c: r['option_c'] || r['Option C'] || '',
-          option_d: r['option_d'] || r['Option D'] || '',
-          correct_answer: r['correct_answer'] || r['Correct Answer'] || 'a',
-          difficulty: r['difficulty'] || r['Difficulty'] || difficulty,
-          explanation: r['explanation'] || r['Explanation'] || '',
-        })).filter((q: any) => q.question_text)
-        if (questions.length === 0) throw new Error('No valid questions found. Check column headers.')
-        setParsedQuestions(questions)
-      } catch (err: any) {
-        setUploadError(err.message || 'Failed to parse file')
-        setUploadedFile(null)
+    setParsedQuestions([])
+    setExtractedUploadContent('')
+
+    try {
+      const fileName = file.name.toLowerCase()
+
+      if (fileName.endsWith('.pdf') || fileName.endsWith('.docx')) {
+        const formData = new FormData()
+        formData.append('file', file)
+        const response = await fetch('/api/extract-content', { method: 'POST', body: formData })
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.error || 'Failed to extract document text')
+        setExtractedUploadContent(result.text)
+        toast({
+          title: 'Document Ready',
+          description: `Extracted ${result.wordCount} words. AI will convert it into questions.`,
+        })
+        return
       }
+
+      const rows = await parseUniversalRowsFile(file) as any[]
+
+      const questions = rows.map((r: any) => ({
+        question_text: rowCell(r, ['question_text', 'Question', 'question', 'prompt']),
+        option_a: rowCell(r, ['option_a', 'Option A', 'A', 'choice_a', 'answer_a']),
+        option_b: rowCell(r, ['option_b', 'Option B', 'B', 'choice_b', 'answer_b']),
+        option_c: rowCell(r, ['option_c', 'Option C', 'C', 'choice_c', 'answer_c']),
+        option_d: rowCell(r, ['option_d', 'Option D', 'D', 'choice_d', 'answer_d']),
+        correct_answer: rowCell(r, ['correct_answer', 'Correct Answer', 'Answer', 'answer', 'key']) || 'a',
+        difficulty: normalizeDifficulty(rowCell(r, ['difficulty', 'Difficulty', 'level']), difficulty),
+        explanation: rowCell(r, ['explanation', 'Explanation', 'reason', 'rationale']),
+      })).filter((q: any) => q.question_text)
+      if (questions.length === 0) throw new Error('No valid questions found. Check column headers.')
+      setParsedQuestions(questions)
+    } catch (err: any) {
+      setUploadError(err.message || 'Failed to parse file')
+      setUploadedFile(null)
     }
-    reader.readAsBinaryString(file)
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -166,57 +179,101 @@ export default function NewQuizPage() {
       const quizId = result.data?.id
 
       if (quizId) {
-        // Upload questions from file
-        if ((questionSource === 'upload' || questionSource === 'both') && parsedQuestions.length > 0) {
-          const questionInputs = parsedQuestions.map(q => ({
-            quiz_id: quizId,
-            question_text: q.question_text,
-            options: [
-              { text: q.option_a, isCorrect: q.correct_answer?.toLowerCase() === 'a' },
-              { text: q.option_b, isCorrect: q.correct_answer?.toLowerCase() === 'b' },
-              { text: q.option_c, isCorrect: q.correct_answer?.toLowerCase() === 'c' },
-              { text: q.option_d, isCorrect: q.correct_answer?.toLowerCase() === 'd' },
-            ],
-            difficulty: (q.difficulty || difficulty) as DifficultyLevel,
-            explanation: q.explanation || undefined,
-          }))
-          await bulkCreateQuestions(questionInputs)
+        const cleanupQuiz = async (reason: string) => {
+          await deleteQuiz(quizId)
+          setError(`Quiz creation rolled back: ${reason}`)
         }
 
-        // AI generation
-        if (questionSource === 'ai' || questionSource === 'both') {
-          if (aiAvailable === false) {
-            setError('AI question generation is not available. Please configure your API keys in the .env.local file.')
-            return
+        try {
+          if ((questionSource === 'upload' || questionSource === 'both') && parsedQuestions.length > 0) {
+            const questionInputs = parsedQuestions.map(q => ({
+              quiz_id: quizId,
+              question_text: q.question_text,
+              options: [
+                { text: q.option_a, isCorrect: q.correct_answer?.toLowerCase() === 'a' },
+                { text: q.option_b, isCorrect: q.correct_answer?.toLowerCase() === 'b' },
+                { text: q.option_c, isCorrect: q.correct_answer?.toLowerCase() === 'c' },
+                { text: q.option_d, isCorrect: q.correct_answer?.toLowerCase() === 'd' },
+              ],
+              difficulty: (q.difficulty || difficulty) as DifficultyLevel,
+              explanation: q.explanation || undefined,
+            }))
+
+            const questionResult = await bulkCreateQuestions(questionInputs)
+            if (questionResult.error) {
+              await cleanupQuiz(questionResult.error)
+              return
+            }
           }
-          
-          setIsGenerating(true)
-          try {
-            const response = await fetch('/api/generate-questions', {
+
+          if ((questionSource === 'upload' || questionSource === 'both') && extractedUploadContent) {
+            if (aiAvailable === false) {
+              await cleanupQuiz('Document upload requires AI question generation, but AI is not configured.')
+              return
+            }
+
+            const response = await fetch('/api/generate-from-content', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ quiz_id: quizId, topic, difficulty, count: questionCount }),
+              body: JSON.stringify({
+                quiz_id: quizId,
+                content: extractedUploadContent,
+                difficulty,
+                count: questionCount,
+                topic,
+              }),
             })
-            
+
             const result = await response.json()
-            
             if (!response.ok) {
-              throw new Error(result.error || 'Failed to generate questions')
+              await cleanupQuiz(result.error || 'Failed to generate questions from uploaded document')
+              return
             }
-            
-            console.log('Questions generated successfully:', result)
+
             toast({
-              title: 'Questions Generated! 🎉',
-              description: result.success || `Successfully generated ${result.generated} questions using ${result.method}`,
+              title: 'Document Questions Generated',
+              description: `Created ${result.generated} questions from ${uploadedFile?.name || 'the uploaded document'}.`,
             })
-          } catch (error) {
-            console.error('AI question generation failed:', error)
-            setError(error instanceof Error ? error.message : 'Failed to generate AI questions')
           }
-          setIsGenerating(false)
+
+          if (questionSource === 'ai' || questionSource === 'both') {
+            if (aiAvailable === false) {
+              await cleanupQuiz('AI question generation is not available. Please configure your API keys in .env.local.')
+              return
+            }
+
+            setIsGenerating(true)
+            try {
+              const response = await fetch('/api/generate-questions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ quiz_id: quizId, topic, difficulty, count: questionCount }),
+              })
+
+              const result = await response.json()
+              if (!response.ok) {
+                throw new Error(result.error || 'Failed to generate questions')
+              }
+
+              toast({
+                title: 'Questions Generated! 🎉',
+                description: result.success || `Successfully generated ${result.generated} questions using ${result.method}`,
+              })
+            } catch (error) {
+              console.error('AI question generation failed:', error)
+              await cleanupQuiz(error instanceof Error ? error.message : 'Failed to generate AI questions')
+              return
+            } finally {
+              setIsGenerating(false)
+            }
+          }
+        } catch (error: any) {
+          console.error('Quiz creation failed after initial save:', error)
+          await cleanupQuiz(error?.message || 'Unexpected failure while creating quiz questions')
+          return
         }
       }
-      // Redirect to quiz detail page for review
+
       router.push(`/manager/quizzes/${quizId}?assign=1`)
     })
   }
@@ -231,9 +288,9 @@ export default function NewQuizPage() {
     <div className="max-w-3xl mx-auto">
       {/* Top bar */}
       <div className="flex items-center gap-4 mb-8">
-        <Button variant="ghost" size="icon" asChild className="rounded-xl">
-          <Link href="/manager/quizzes"><ArrowLeft className="h-4 w-4" /></Link>
-        </Button>
+        <SafeBackButton fallbackHref="/manager/quizzes" size="icon" className="rounded-xl">
+          <ArrowLeft className="h-4 w-4" />
+        </SafeBackButton>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Create New Quiz</h1>
           <p className="text-sm text-muted-foreground">Set up your employee assessment in 3 easy steps</p>
@@ -417,10 +474,15 @@ export default function NewQuizPage() {
                 {/* Toggle grid */}
                 <div className="space-y-3">
                   <p className="text-sm font-medium">Quiz Behavior</p>
+                  <div className="flex items-start gap-3 rounded-xl border border-emerald-100 bg-emerald-50 p-4">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                    <div>
+                      <p className="text-sm font-medium text-emerald-800">Automatic randomization is enabled</p>
+                      <p className="text-xs text-emerald-700">Questions and answer options are shuffled for every employee attempt.</p>
+                    </div>
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {[
-                      { id: 'shuffle_q', icon: Shuffle, label: 'Shuffle Questions', desc: 'Random order for each employee', value: shuffleQuestions, set: setShuffleQuestions },
-                      { id: 'shuffle_o', icon: Shuffle, label: 'Shuffle Options', desc: 'Randomize answer choices', value: shuffleOptions, set: setShuffleOptions },
                       { id: 'show_results', icon: Eye, label: 'Show Results', desc: 'Display score after completion', value: showResults, set: setShowResults },
                       { id: 'show_explain', icon: BookOpen, label: 'Show Explanations', desc: 'Show correct answers after quiz', value: showExplanations, set: setShowExplanations },
                       { id: 'allow_retakes', icon: AlarmClock, label: 'Allow Retakes', desc: 'Let employees redo the quiz', value: allowRetakes, set: setAllowRetakes },
@@ -498,7 +560,7 @@ export default function NewQuizPage() {
                 <div className="grid grid-cols-3 gap-3">
                   {[
                     { id: 'ai', icon: Wand2, label: 'AI Generate', desc: 'Auto-create from topic', color: 'text-violet-600', bg: 'bg-violet-50', border: 'border-violet-200', activeBg: 'bg-violet-500' },
-                    { id: 'upload', icon: Upload, label: 'Upload File', desc: 'CSV or Excel sheet', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', activeBg: 'bg-blue-500' },
+                    { id: 'upload', icon: Upload, label: 'Upload File', desc: 'Excel, JSON, PDF, DOCX', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', activeBg: 'bg-blue-500' },
                     { id: 'both', icon: Zap, label: 'Both', desc: 'Combine AI + upload', color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200', activeBg: 'bg-amber-500' },
                   ].map(opt => (
                     <button
@@ -547,7 +609,7 @@ export default function NewQuizPage() {
                 {/* Upload zone */}
                 {(questionSource === 'upload' || questionSource === 'both') && (
                   <div className="space-y-3">
-                    <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f) }} />
+                    <input ref={fileInputRef} type="file" accept={UNIVERSAL_UPLOAD_ACCEPT} className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f) }} />
 
                     {/* Template download */}
                     <div className="flex items-center justify-between p-3 rounded-xl bg-blue-50 border border-blue-100">
@@ -575,14 +637,16 @@ export default function NewQuizPage() {
                         <div className="space-y-2">
                           <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto" />
                           <p className="font-semibold text-emerald-700">{uploadedFile.name}</p>
-                          <p className="text-sm text-emerald-600">{parsedQuestions.length} questions ready to import</p>
-                          <button type="button" onClick={e => { e.stopPropagation(); setUploadedFile(null); setParsedQuestions([]) }} className="text-xs text-muted-foreground hover:text-destructive underline">Remove</button>
+                          <p className="text-sm text-emerald-600">
+                            {extractedUploadContent ? 'Document ready for AI question generation' : `${parsedQuestions.length} questions ready to import`}
+                          </p>
+                          <button type="button" onClick={e => { e.stopPropagation(); setUploadedFile(null); setParsedQuestions([]); setExtractedUploadContent('') }} className="text-xs text-muted-foreground hover:text-destructive underline">Remove</button>
                         </div>
                       ) : (
                         <div className="space-y-2">
                           <Upload className="h-10 w-10 text-muted-foreground/50 mx-auto" />
-                          <p className="font-medium text-sm">Drop your CSV/Excel file here or click to browse</p>
-                          <p className="text-xs text-muted-foreground">Required columns: question_text, option_a, option_b, option_c, option_d, correct_answer</p>
+                          <p className="font-medium text-sm">Drop CSV, XLSX, DOCX, PDF, XML, or JSON here</p>
+                          <p className="text-xs text-muted-foreground">Structured files import directly; documents are converted into questions with AI.</p>
                         </div>
                       )}
                     </div>
@@ -657,4 +721,16 @@ export default function NewQuizPage() {
       </form>
     </div>
   )
+}
+
+function rowCell(row: Record<string, any>, aliases: string[]) {
+  const normalizedAliases = new Set(aliases.map(normalizeHeader))
+  const key = Object.keys(row).find((candidate) => normalizedAliases.has(normalizeHeader(candidate)))
+  const value = key ? row[key] : undefined
+  return value === null || value === undefined ? '' : String(value).trim()
+}
+
+function normalizeDifficulty(value: string, fallback: DifficultyLevel): DifficultyLevel {
+  const normalized = value.toLowerCase() as DifficultyLevel
+  return ALL_DIFFICULTIES.includes(normalized) ? normalized : fallback
 }

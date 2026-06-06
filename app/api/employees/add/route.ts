@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { requireManager } from '@/lib/rbac'
+import { requireManagerForApi } from '@/lib/rbac'
+import { createEmployeeWithSetupEmail } from '@/lib/employee-onboarding'
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify manager authentication
-    await requireManager()
+    const auth = await requireManagerForApi()
+    if (auth instanceof NextResponse) return auth
     
     const employees = await request.json()
     
@@ -23,60 +24,22 @@ export async function POST(request: NextRequest) {
     for (const emp of employees) {
       const { email, full_name, employee_id, department, domain } = emp
 
-      if (!email || !full_name) {
-        errors.push(`Missing required fields for ${email || 'unknown employee'}`)
+      if (!email || !full_name || !employee_id || !domain) {
+        errors.push(`Missing required fields for ${email || 'unknown employee'}: email, full name, employee ID, and domain are required`)
         continue
       }
 
       try {
-        // Check if employee already exists
-        const { data: existing } = await supabase
-          .from('profiles')
-          .select('id, email')
-          .eq('email', email)
-          .single()
-
-        if (existing) {
-          errors.push(`Employee with email ${email} already exists`)
-          continue
-        }
-
-        // Create auth user first
-        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        const { profile, warning } = await createEmployeeWithSetupEmail(supabase, {
           email,
-          password: generateTempPassword(),
-          email_confirm: true,
-          user_metadata: {
-            role: 'employee',
-            full_name
-          }
+          fullName: full_name,
+          employeeId: employee_id,
+          department: department || null,
+          domain,
         })
 
-        if (authError) {
-          errors.push(`Auth error for ${email}: ${authError.message}`)
-          continue
-        }
-
-        // Create profile
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: authData.user.id,
-            email: email,
-            full_name: full_name,
-            employee_id: employee_id || null,
-            department: department || null,
-            domain: domain || 'General',
-            role: 'employee'
-          })
-          .select()
-          .single()
-
-        if (profileError) {
-          // Clean up auth user if profile creation fails
-          await supabase.auth.admin.deleteUser(authData.user.id)
-          errors.push(`Profile error for ${email}: ${profileError.message}`)
-          continue
+        if (warning) {
+          errors.push(`Employee ${email}: ${warning}`)
         }
 
         results.push(profile)
@@ -92,6 +55,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    await supabase.from('training_notifications').insert({
+      title: results.length === 1 ? 'Employee profile processed' : 'Employee profiles processed',
+      message: `${results.length} employee profile(s) were created or updated.${errors.length ? ` ${errors.length} setup issue(s) need review.` : ''}`,
+      audience: 'trainers',
+      channel: 'in_app',
+      delivery_status: errors.length ? 'logged' : 'sent',
+      sent_at: errors.length ? null : new Date().toISOString(),
+      created_by: auth.userId,
+    })
+
     return NextResponse.json({
       success: true,
       added: results.length,
@@ -106,13 +79,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-}
-
-function generateTempPassword(): string {
-  const chars = 'ABCDEFGHJKLMNOPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
-  let password = ''
-  for (let i = 0; i < 12; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return password + '!'
 }

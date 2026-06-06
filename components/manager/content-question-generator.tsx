@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import type { DifficultyLevel } from '@/lib/types/database'
+import { UNIVERSAL_UPLOAD_ACCEPT } from '@/lib/file-utils'
 
 const DIFFICULTIES: DifficultyLevel[] = ['easy', 'medium', 'hard', 'advanced', 'hardcore']
 
@@ -68,17 +69,8 @@ export function ContentQuestionGenerator({
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (file) {
-      const validTypes = [
-        'application/pdf',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'text/plain',
-      ]
-      
-      if (!validTypes.includes(file.type) && 
-          !file.name.endsWith('.pdf') && 
-          !file.name.endsWith('.docx') && 
-          !file.name.endsWith('.txt')) {
-        setError('Please upload a PDF, DOCX, or TXT file')
+      if (!/\.(csv|xlsx|xls|json|xml|pdf|docx)$/i.test(file.name)) {
+        setError('Please upload CSV, XLSX, DOCX, PDF, XML, or JSON content.')
         return
       }
       
@@ -189,7 +181,7 @@ export function ContentQuestionGenerator({
           Generate Questions from Content
         </CardTitle>
         <CardDescription>
-          Upload a PDF/DOCX file, or paste text content to generate quiz questions with AI
+          Upload CSV, XLSX, DOCX, PDF, XML, or JSON content, or paste text to generate quiz questions with AI
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -231,7 +223,7 @@ export function ContentQuestionGenerator({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                  accept={UNIVERSAL_UPLOAD_ACCEPT}
                   onChange={handleFileSelect}
                   className="hidden"
                   id="file-upload"
@@ -242,7 +234,7 @@ export function ContentQuestionGenerator({
                     {selectedFile ? selectedFile.name : 'Click to upload or drag and drop'}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    PDF, DOCX, or TXT (max 10MB)
+                    CSV, XLSX, DOCX, PDF, XML, or JSON
                   </p>
                 </label>
               </div>

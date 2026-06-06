@@ -1,32 +1,49 @@
 import {
   createProjectEvaluation,
+  clearAllTrainingData,
+  clearScheduledTrainingSessions,
   createTrainingAssessmentSetup,
   createTrainingBatch,
   createFeedbackWindow,
   createTrainingNotification,
   createTrainingSession,
+  deleteFeedbackWindow,
+  deleteProjectEvaluation,
+  deleteTrainingAssessmentSetup,
+  deleteTrainingBatch,
+  deleteTrainingSession,
   getTrainingOpsManagerData,
   runTrainingAutomation,
+  updateFeedbackWindow,
+  updateProjectEvaluation,
+  updateTrainingAssessmentSetup,
   updateTrainingBatchDetails,
+  updateTrainingSession,
   updateAttendanceStatus,
 } from '@/lib/actions/training'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { AttendanceImporter } from '@/components/manager/attendance-importer'
+import { ManualAttendanceCard } from '@/components/manager/manual-attendance-card'
 import { AssessmentScoreImporter } from '@/components/manager/assessment-score-importer'
 import { BatchCandidateImporter } from '@/components/manager/batch-candidate-importer'
 import { DashboardSignalShowcase } from '@/components/insights/dashboard-signal-showcase'
 import { BatchComparisonChart } from '@/components/manager/batch-comparison-chart'
 import { BatchMemberStatusDropdown } from '@/components/manager/batch-member-status-dropdown'
 import { OpsAutoRefresh } from '@/components/manager/ops-auto-refresh'
+import { OpsResultToast } from '@/components/manager/ops-result-toast'
+import { OpsSubmitButton } from '@/components/manager/ops-submit-button'
 import { FeedbackSentimentChart } from '@/components/manager/feedback-sentiment-chart'
 import { createAdminClient } from '@/lib/supabase/server'
 import {
   BellRing,
   CalendarDays,
+  ChevronDown,
   ClipboardCheck,
+  Trash2,
   FileText,
   FileCheck2,
   FileSpreadsheet,
@@ -37,50 +54,136 @@ import {
   ShieldAlert,
   Users,
 } from 'lucide-react'
+import type { ReactNode } from 'react'
 
 async function createTrainingBatchAction(formData: FormData) {
   'use server'
-  await createTrainingBatch(formData)
+  const result = await createTrainingBatch(formData)
+  redirectWithOpsResult(result, 'Batch created.', 'create-batch')
+}
+
+async function deleteTrainingBatchAction(formData: FormData) {
+  'use server'
+  const result = await deleteTrainingBatch(formData)
+  redirectWithOpsResult(result, 'Training batch deleted.', 'manage-training')
+}
+
+async function clearAllTrainingDataAction(formData: FormData) {
+  'use server'
+  const result = await clearAllTrainingData(formData)
+  redirectWithOpsResult(result, 'All existing training data removed.', 'manage-training')
+}
+
+async function clearScheduledTrainingSessionsAction(formData: FormData) {
+  'use server'
+  const result = await clearScheduledTrainingSessions(formData)
+  redirectWithOpsResult(result, 'Scheduled training sessions cleared.', 'schedule-session')
 }
 
 async function createTrainingSessionAction(formData: FormData) {
   'use server'
-  await createTrainingSession(formData)
+  const result = await createTrainingSession(formData)
+  redirectWithOpsResult(result, 'Session scheduled.', 'schedule-session')
+}
+
+async function updateTrainingSessionAction(formData: FormData) {
+  'use server'
+  const result = await updateTrainingSession(formData)
+  redirectWithOpsResult(result, 'Session updated.', 'schedule-session')
+}
+
+async function deleteTrainingSessionAction(formData: FormData) {
+  'use server'
+  const result = await deleteTrainingSession(formData)
+  redirectWithOpsResult(result, 'Session deleted.', 'schedule-session')
 }
 
 async function createTrainingNotificationAction(formData: FormData) {
   'use server'
-  await createTrainingNotification(formData)
+  const result = await createTrainingNotification(formData)
+  redirectWithOpsResult(result, 'Notification created.', 'schedule-session')
 }
 
 async function createFeedbackWindowAction(formData: FormData) {
   'use server'
-  await createFeedbackWindow(formData)
+  const result = await createFeedbackWindow(formData)
+  const details = result.data
+  const message = details
+    ? `Feedback form created. Email requested for ${details.recipients} learner(s): ${details.sent} sent/logged, ${details.failed} failed.`
+    : 'Feedback form created and email delivery was triggered.'
+  redirectWithOpsResult(result, message, 'feedback')
 }
 
-async function updateAttendanceStatusAction(formData: FormData) {
+async function updateFeedbackWindowAction(formData: FormData) {
   'use server'
-  await updateAttendanceStatus(formData)
+  const result = await updateFeedbackWindow(formData)
+  redirectWithOpsResult(result, 'Feedback form updated.', 'feedback')
+}
+
+async function deleteFeedbackWindowAction(formData: FormData) {
+  'use server'
+  const result = await deleteFeedbackWindow(formData)
+  redirectWithOpsResult(result, 'Feedback form deleted.', 'feedback')
 }
 
 async function updateTrainingBatchDetailsAction(formData: FormData) {
   'use server'
-  await updateTrainingBatchDetails(formData)
+  const result = await updateTrainingBatchDetails(formData)
+  redirectWithOpsResult(result, 'Batch edits saved.', 'batch-board')
 }
 
 async function createTrainingAssessmentSetupAction(formData: FormData) {
   'use server'
-  await createTrainingAssessmentSetup(formData)
+  const result = await createTrainingAssessmentSetup(formData)
+  redirectWithOpsResult(result, 'Assessment setup created.', 'assessment-setup')
+}
+
+async function updateTrainingAssessmentSetupAction(formData: FormData) {
+  'use server'
+  const result = await updateTrainingAssessmentSetup(formData)
+  redirectWithOpsResult(result, 'Assessment setup updated.', 'assessment-setup')
+}
+
+async function deleteTrainingAssessmentSetupAction(formData: FormData) {
+  'use server'
+  const result = await deleteTrainingAssessmentSetup(formData)
+  redirectWithOpsResult(result, 'Assessment setup deleted.', 'assessment-setup')
 }
 
 async function createProjectEvaluationAction(formData: FormData) {
   'use server'
-  await createProjectEvaluation(formData)
+  const result = await createProjectEvaluation(formData)
+  redirectWithOpsResult(result, 'Project evaluation saved.', 'project-evaluation')
+}
+
+async function updateProjectEvaluationAction(formData: FormData) {
+  'use server'
+  const result = await updateProjectEvaluation(formData)
+  redirectWithOpsResult(result, 'Project evaluation updated.', 'project-evaluation')
+}
+
+async function deleteProjectEvaluationAction(formData: FormData) {
+  'use server'
+  const result = await deleteProjectEvaluation(formData)
+  redirectWithOpsResult(result, 'Project evaluation deleted.', 'project-evaluation')
 }
 
 async function runTrainingAutomationAction(formData: FormData) {
   'use server'
-  await runTrainingAutomation(formData)
+  try {
+    const result = await runTrainingAutomation(formData)
+    redirectWithOpsResult(result, 'Automation run completed.', 'automation')
+  } catch (error: any) {
+    redirectWithOpsResult({ error: error?.message || 'Automation run failed.' }, 'Automation run completed.', 'automation')
+  }
+}
+
+function redirectWithOpsResult(result: { error?: string } | unknown, success: string, anchor: string) {
+  const maybeError = result && typeof result === 'object' && 'error' in result ? String((result as { error?: string }).error || '') : ''
+  const params = new URLSearchParams()
+  if (maybeError) params.set('ops_error', maybeError)
+  else params.set('ops_status', success)
+  redirect(`/manager/operations?${params.toString()}#${anchor}`)
 }
 
 function toneForBatchStatus(status: string) {
@@ -99,20 +202,20 @@ function toneForBatchStatus(status: string) {
   }
 }
 
-function toneForAttendance(status: string) {
-  switch (status) {
-    case 'present':
-      return 'bg-emerald-50 border-emerald-200 text-emerald-700'
-    case 'late':
-      return 'bg-amber-50 border-amber-200 text-amber-700'
-    case 'excused':
-      return 'bg-slate-50 border-slate-200 text-slate-700'
-    default:
-      return 'bg-rose-50 border-rose-200 text-rose-700'
-  }
+function toDateTimeLocal(value: string | null | undefined) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+  return local.toISOString().slice(0, 16)
 }
 
-export default async function ManagerOperationsPage() {
+export default async function ManagerOperationsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ ops_status?: string; ops_error?: string }>
+}) {
+  const operationMessage = await searchParams
   const {
     role,
     summary,
@@ -124,6 +227,7 @@ export default async function ManagerOperationsPage() {
     attendance,
     notifications,
     feedback,
+    feedbackWindows,
     quizzes,
     batchTrainers,
     assessmentSetups,
@@ -311,14 +415,15 @@ export default async function ManagerOperationsPage() {
 
   return (
     <div className="space-y-8">
-      <OpsAutoRefresh />
+      <OpsResultToast />
+      <OpsAutoRefresh intervalMs={15000} />
       <section className="rounded-[2rem] border border-zinc-900 bg-black p-6 text-white shadow-[0_40px_120px_rgba(0,0,0,0.55)] md:p-8 dashboard-grid-bg maverick-command-band">
         <div className="grid gap-6 xl:grid-cols-[0.82fr_1.18fr]">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-[10px] uppercase tracking-[0.35em] text-zinc-400">
+            <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-[10px] uppercase tracking-[0.18em] text-zinc-400 sm:tracking-[0.28em]">
               Training Execution Platform
             </div>
-            <h1 className="mt-4 text-3xl font-semibold tracking-tight md:text-5xl">Operations control room for batches, trainers, attendance, and reminders</h1>
+            <h1 className="mt-4 max-w-4xl text-3xl font-semibold tracking-tight md:text-5xl">Operations control room for training delivery</h1>
             <p className="mt-4 max-w-3xl text-sm leading-relaxed text-zinc-400">
               Your daily control room for batch health, attendance discipline, trainer ownership, reminders, feedback, and exports.
             </p>
@@ -340,7 +445,26 @@ export default async function ManagerOperationsPage() {
         </div>
       </section>
 
-      <CommandProofStrip metrics={proofMetrics} />
+      <PriorityOpsWorkbench
+        canCoordinate={canCoordinate}
+        attendanceDue={summary.attendanceDueToday}
+        absenceAlerts={summary.absenceAlerts}
+        activeBatches={summary.activeBatches}
+        upcomingSessions={summary.upcomingSessions}
+        remainingCandidates={summary.remainingCandidates}
+        assessmentClearance={overallAssessmentClearance}
+        negativeFeedback={summary.negativeFeedbackCount}
+      />
+
+      {(operationMessage?.ops_status || operationMessage?.ops_error) ? (
+        <div className={`rounded-2xl border p-4 text-sm font-medium ${
+          operationMessage.ops_error
+            ? 'border-rose-200 bg-rose-50 text-rose-800'
+            : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+        }`}>
+          {operationMessage.ops_error || operationMessage.ops_status}
+        </div>
+      ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[17rem_1fr]">
         <aside className="self-start rounded-[1.5rem] border border-zinc-200 bg-white p-3 shadow-sm xl:sticky xl:top-24">
@@ -404,13 +528,14 @@ export default async function ManagerOperationsPage() {
 
       <section id="setup" className="scroll-mt-32">
       {canCoordinate ? (
-      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <Card className="border-zinc-200 shadow-sm spotlight-card">
-          <CardHeader>
-            <CardTitle>Create Training Batch</CardTitle>
-            <CardDescription>Keep setup simple: name the batch, choose a trainer, add learners, and optionally link assessments.</CardDescription>
-          </CardHeader>
-          <CardContent>
+      <div className="grid gap-4 xl:grid-cols-3">
+        <DropPanel
+          id="create-batch"
+          title="Create Training Batch"
+          description="Name it, choose trainers, add learners, and link assessments."
+          badge="Setup"
+        >
+          <CardContent className="pt-5">
             <form action={createTrainingBatchAction} className="grid gap-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="grid gap-2 text-sm">
@@ -475,17 +600,18 @@ export default async function ManagerOperationsPage() {
               </div>
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
                 <p>New batches start as planned. Add sessions and attendance after creation.</p>
-                <Button type="submit" className="rounded-full bg-black text-white hover:bg-zinc-800">Create batch</Button>
+                <OpsSubmitButton pendingLabel="Creating batch..." className="rounded-full bg-black text-white hover:bg-zinc-800">Create batch</OpsSubmitButton>
               </div>
             </form>
           </CardContent>
-        </Card>
+        </DropPanel>
 
-        <Card className="border-zinc-200 shadow-sm spotlight-card">
-          <CardHeader>
-            <CardTitle>Session Planner & Notifications</CardTitle>
-            <CardDescription>Schedule trainer-led sessions and trigger communication without leaving this screen.</CardDescription>
-          </CardHeader>
+        <DropPanel
+          id="schedule-session"
+          title="Session Planner"
+          description="Schedule a session or send a quick batch notification."
+          badge={`${sessions.length} sessions`}
+        >
           <CardContent className="space-y-6">
             <form action={createTrainingSessionAction} className="grid gap-4">
               <label className="grid gap-2 text-sm">
@@ -546,8 +672,96 @@ export default async function ManagerOperationsPage() {
                 <input type="checkbox" name="attendance_required" defaultChecked className="h-4 w-4 rounded border-zinc-300" />
                 Attendance required for this session
               </label>
-              <Button type="submit" className="rounded-full bg-black text-white hover:bg-zinc-800">Schedule session</Button>
+              <OpsSubmitButton pendingLabel="Scheduling..." className="rounded-full bg-black text-white hover:bg-zinc-800">Schedule session</OpsSubmitButton>
             </form>
+
+            <form action={clearScheduledTrainingSessionsAction} className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-rose-950">Clear duplicated scheduled training</p>
+                  <p className="mt-1 text-xs leading-5 text-rose-800">Deletes sessions still marked scheduled, including their attendance setup and linked session notifications. Completed sessions are kept.</p>
+                </div>
+                <Badge variant="outline" className="w-fit border-rose-200 bg-white text-rose-800">
+                  {sessions.filter((session: any) => session.status === 'scheduled').length} scheduled
+                </Badge>
+              </div>
+              <div className="mt-4 grid gap-3 md:grid-cols-[1fr_12rem_auto] md:items-end">
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium text-rose-950">Batch scope</span>
+                  <select name="batch_id" className="h-11 rounded-xl border border-rose-200 bg-white px-3">
+                    <option value="">All batches</option>
+                    {batches.map((batch: any) => <option key={batch.id} value={batch.id}>{batch.title}</option>)}
+                  </select>
+                </label>
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium text-rose-950">Type DELETE SCHEDULED</span>
+                  <input name="confirmation" className="h-11 rounded-xl border border-rose-200 bg-white px-3" placeholder="DELETE SCHEDULED" />
+                </label>
+                <OpsSubmitButton pendingLabel="Clearing..." className="rounded-full bg-rose-700 text-white hover:bg-rose-800">
+                  Clear scheduled
+                </OpsSubmitButton>
+              </div>
+            </form>
+
+            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-zinc-950">Session CRUD</p>
+                <Badge variant="outline" className="bg-white">{sessions.length} total</Badge>
+              </div>
+              <div className="mt-3 grid gap-3">
+                {sessions.length === 0 ? (
+                  <EmptyState text="No sessions yet." compact />
+                ) : sessions.slice(0, 8).map((session: any) => (
+                  <div key={session.id} className="grid gap-3 rounded-xl border border-zinc-200 bg-white p-3">
+                    <form action={updateTrainingSessionAction} className="grid gap-2 lg:grid-cols-[1.2fr_1fr_0.8fr_0.8fr_0.8fr_auto] lg:items-end">
+                      <input type="hidden" name="session_id" value={session.id} />
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Title</span>
+                        <input name="title" defaultValue={session.title} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
+                      </label>
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Date</span>
+                        <input name="session_date" type="datetime-local" defaultValue={toDateTimeLocal(session.session_date)} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
+                      </label>
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Trainer</span>
+                        <select name="trainer_id" defaultValue={session.trainer_id || ''} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm">
+                          <option value="">Unassigned</option>
+                          {trainers.map((trainer: any) => <option key={trainer.id} value={trainer.id}>{trainer.full_name || trainer.email}</option>)}
+                        </select>
+                      </label>
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Mode</span>
+                        <select name="mode" defaultValue={session.mode} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm">
+                          <option value="virtual">Virtual</option>
+                          <option value="classroom">Classroom</option>
+                          <option value="hybrid">Hybrid</option>
+                        </select>
+                      </label>
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Status</span>
+                        <select name="status" defaultValue={session.status} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm">
+                          <option value="scheduled">Scheduled</option>
+                          <option value="completed">Completed</option>
+                          <option value="cancelled">Cancelled</option>
+                        </select>
+                      </label>
+                      <OpsSubmitButton pendingLabel="Updating..." size="sm" variant="outline" className="h-9 rounded-full bg-white">Update</OpsSubmitButton>
+                      <input type="hidden" name="agenda" value={session.agenda || ''} />
+                      <label className="flex items-center gap-2 text-xs lg:col-span-2">
+                        <input type="checkbox" name="attendance_required" defaultChecked={session.attendance_required} className="h-4 w-4 rounded border-zinc-300" />
+                        Attendance required
+                      </label>
+                      <p className="text-xs text-zinc-500 lg:col-span-3">{session.batch?.title || 'Batch'} - {session.trainer?.full_name || session.trainer?.email || 'Trainer TBD'}</p>
+                    </form>
+                    <form action={deleteTrainingSessionAction} className="flex justify-end">
+                      <input type="hidden" name="session_id" value={session.id} />
+                      <OpsSubmitButton pendingLabel="Deleting..." size="sm" variant="outline" className="h-8 rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">Delete session</OpsSubmitButton>
+                    </form>
+                  </div>
+                ))}
+              </div>
+            </div>
 
             <div className="h-px bg-zinc-200" />
 
@@ -611,10 +825,70 @@ export default async function ManagerOperationsPage() {
                 <span className="font-medium">Schedule for</span>
                 <input name="scheduled_for" type="datetime-local" className="h-11 w-full min-w-0 rounded-xl border border-zinc-200 px-3" />
               </label>
-              <Button type="submit" variant="outline" className="rounded-full">Create notification</Button>
+              <OpsSubmitButton pendingLabel="Creating..." variant="outline" className="rounded-full">Create notification</OpsSubmitButton>
             </form>
           </CardContent>
-        </Card>
+        </DropPanel>
+
+        <DropPanel
+          id="manage-training"
+          title="Manage Training"
+          description="Delete wrong batches or clear training data without touching employees."
+          badge={`${batches.length} batches`}
+        >
+          <CardContent className="space-y-5">
+            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Trash2 className="h-4 w-4" />
+                Delete one batch
+              </div>
+              <p className="mt-1 text-xs leading-5 text-zinc-500">
+                Removes that batch with its sessions, attendance, members, feedback, trainer links, and training audit records.
+              </p>
+              <div className="mt-4 max-h-80 space-y-3 overflow-y-auto pr-1">
+                {batches.length === 0 ? (
+                  <p className="rounded-xl border border-dashed border-zinc-300 bg-white p-3 text-sm text-zinc-500">No training batches exist.</p>
+                ) : batches.map((batch: any) => (
+                  <form key={batch.id} action={deleteTrainingBatchAction} className="rounded-xl border border-zinc-200 bg-white p-3">
+                    <input type="hidden" name="batch_id" value={batch.id} />
+                    <p className="text-sm font-semibold text-zinc-950">{batch.title}</p>
+                    <p className="mt-1 text-xs text-zinc-500">{batch.status.replace('_', ' ')} - {(membersByBatch.get(batch.id) || []).length} learner(s), {sessions.filter((session: any) => session.batch_id === batch.id).length} session(s)</p>
+                    <label className="mt-3 grid gap-1 text-xs font-medium text-zinc-600">
+                      Type DELETE
+                      <input name="confirmation" className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" placeholder="DELETE" />
+                    </label>
+                    <OpsSubmitButton pendingLabel="Deleting..." variant="outline" size="sm" className="mt-3 rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">
+                      Delete batch
+                    </OpsSubmitButton>
+                  </form>
+                ))}
+              </div>
+            </div>
+
+            {role === 'admin' ? (
+              <form action={clearAllTrainingDataAction} className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-rose-900">
+                  <ShieldAlert className="h-4 w-4" />
+                  Remove all existing training
+                </div>
+                <p className="mt-1 text-xs leading-5 text-rose-800">
+                  Clears all training batches, sessions, attendance, candidate batch links, training feedback, assessment setup, project evaluations, automation logs, and notifications. Employees and quizzes stay available.
+                </p>
+                <label className="mt-3 grid gap-1 text-xs font-medium text-rose-900">
+                  Type DELETE TRAINING
+                  <input name="confirmation" className="h-10 rounded-lg border border-rose-200 bg-white px-2 text-sm" placeholder="DELETE TRAINING" />
+                </label>
+                <OpsSubmitButton pendingLabel="Removing..." className="mt-3 rounded-full bg-rose-700 text-white hover:bg-rose-800">
+                  Remove all training
+                </OpsSubmitButton>
+              </form>
+            ) : (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                Only admins can remove all existing training data. Coordinators can delete batches they own.
+              </div>
+            )}
+          </CardContent>
+        </DropPanel>
       </div>
       ) : (
         <Card className="border-cyan-200 bg-cyan-50 shadow-sm">
@@ -653,12 +927,13 @@ export default async function ManagerOperationsPage() {
 
       <section id="assessment" className="scroll-mt-32 grid gap-6 xl:grid-cols-[1fr_1fr]">
         {canCoordinate ? (
-        <Card className="border-zinc-200 shadow-sm spotlight-card">
-          <CardHeader>
-            <CardTitle>Assessment Governance</CardTitle>
-            <CardDescription>Define assessment type, date, template, question file, and score rules before trainers upload results.</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <DropPanel
+          id="assessment-setup"
+          title="Assessment Governance"
+          description="Define type, date, template, question file, and score rules."
+          badge={`${assessmentSetups.length} setups`}
+        >
+          <CardContent className="pt-5">
             <form action={createTrainingAssessmentSetupAction} className="grid gap-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="grid gap-2 text-sm">
@@ -709,20 +984,79 @@ export default async function ManagerOperationsPage() {
               </div>
               <label className="grid gap-2 text-sm">
                 <span className="font-medium">Upload question file</span>
-                <input name="question_file" type="file" accept=".xlsx,.xls,.csv,.pdf,.doc,.docx" className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-3 py-3 text-sm" />
+                <input name="question_file" type="file" accept=".csv,.xlsx,.xls,.json,.xml,.pdf,.docx" className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-3 py-3 text-sm" />
               </label>
-              <Button type="submit" className="w-fit rounded-full bg-black text-white hover:bg-zinc-800">Create assessment setup</Button>
+              <OpsSubmitButton pendingLabel="Creating..." className="w-fit rounded-full bg-black text-white hover:bg-zinc-800">Create assessment setup</OpsSubmitButton>
             </form>
+            <div className="mt-5 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-zinc-950">Assessment setup CRUD</p>
+                <Badge variant="outline" className="bg-white">{assessmentSetups.length} setup(s)</Badge>
+              </div>
+              <div className="mt-3 grid gap-3">
+                {assessmentSetups.length === 0 ? (
+                  <EmptyState text="No assessment setups yet." compact />
+                ) : assessmentSetups.slice(0, 8).map((setup: any) => (
+                  <div key={setup.id} className="rounded-xl border border-zinc-200 bg-white p-3">
+                    <form action={updateTrainingAssessmentSetupAction} className="grid gap-2 lg:grid-cols-[1.2fr_0.9fr_0.9fr_0.7fr_0.7fr_0.8fr_auto] lg:items-end">
+                      <input type="hidden" name="assessment_setup_id" value={setup.id} />
+                      <input type="hidden" name="template_name" value={setup.template_name || ''} />
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Title</span>
+                        <input name="title" defaultValue={setup.title} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
+                      </label>
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Type</span>
+                        <select name="assessment_type" defaultValue={setup.assessment_type} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm">
+                          <option value="sprint_review">Sprint review</option>
+                          <option value="api_coding">API and coding</option>
+                          <option value="coding">Coding</option>
+                          <option value="project">Project</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </label>
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Schedule</span>
+                        <input name="scheduled_at" type="datetime-local" defaultValue={toDateTimeLocal(setup.scheduled_at)} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
+                      </label>
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Max</span>
+                        <input name="max_score" type="number" defaultValue={setup.max_score || 100} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
+                      </label>
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Pass</span>
+                        <input name="passing_score" type="number" defaultValue={setup.passing_score || 70} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
+                      </label>
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Status</span>
+                        <select name="status" defaultValue={setup.status} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm">
+                          <option value="planned">Planned</option>
+                          <option value="open">Open</option>
+                          <option value="completed">Completed</option>
+                          <option value="cancelled">Cancelled</option>
+                        </select>
+                      </label>
+                      <OpsSubmitButton pendingLabel="Updating..." size="sm" variant="outline" className="h-9 rounded-full bg-white">Update</OpsSubmitButton>
+                    </form>
+                    <form action={deleteTrainingAssessmentSetupAction} className="mt-2 flex justify-end">
+                      <input type="hidden" name="assessment_setup_id" value={setup.id} />
+                      <OpsSubmitButton pendingLabel="Deleting..." size="sm" variant="outline" className="h-8 rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">Delete</OpsSubmitButton>
+                    </form>
+                  </div>
+                ))}
+              </div>
+            </div>
           </CardContent>
-        </Card>
+        </DropPanel>
         ) : null}
 
-        <Card id="projects" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
-          <CardHeader>
-            <CardTitle>Project Evaluation Evidence</CardTitle>
-            <CardDescription>Trainer-uploaded project scores and evidence filenames are tracked as a first-class TMS artifact.</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <DropPanel
+          id="projects"
+          title="Project Evaluation"
+          description="Score projects and attach evidence filenames or files."
+          badge={`${projectEvaluations.length} records`}
+        >
+          <CardContent className="pt-5">
             <form action={createProjectEvaluationAction} className="grid gap-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="grid gap-2 text-sm">
@@ -758,24 +1092,64 @@ export default async function ManagerOperationsPage() {
               </div>
               <label className="grid gap-2 text-sm">
                 <span className="font-medium">Upload evidence file</span>
-                <input name="evidence_file" type="file" accept=".xlsx,.xls,.csv,.pdf,.doc,.docx,.png,.jpg,.jpeg,.zip" className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-3 py-3 text-sm" />
+                <input name="evidence_file" type="file" accept=".csv,.xlsx,.xls,.json,.xml,.pdf,.docx,.png,.jpg,.jpeg,.zip" className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-3 py-3 text-sm" />
               </label>
               <label className="grid gap-2 text-sm">
                 <span className="font-medium">Remarks</span>
                 <textarea name="remarks" rows={3} className="rounded-xl border border-zinc-200 px-3 py-3" placeholder="Evaluation notes, strengths, and improvement actions." />
               </label>
-              <Button type="submit" className="w-fit rounded-full bg-black text-white hover:bg-zinc-800">Save project evaluation</Button>
+              <OpsSubmitButton pendingLabel="Saving..." className="w-fit rounded-full bg-black text-white hover:bg-zinc-800">Save project evaluation</OpsSubmitButton>
             </form>
+            <div className="mt-5 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-zinc-950">Project evaluation CRUD</p>
+                <Badge variant="outline" className="bg-white">{projectEvaluations.length} record(s)</Badge>
+              </div>
+              <div className="mt-3 grid gap-3">
+                {projectEvaluations.length === 0 ? (
+                  <EmptyState text="No project evaluations yet." compact />
+                ) : projectEvaluations.slice(0, 8).map((evaluation: any) => (
+                  <div key={evaluation.id} className="rounded-xl border border-zinc-200 bg-white p-3">
+                    <form action={updateProjectEvaluationAction} className="grid gap-2 lg:grid-cols-[1fr_0.5fr_1fr_auto] lg:items-end">
+                      <input type="hidden" name="project_evaluation_id" value={evaluation.id} />
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Project</span>
+                        <input name="project_title" defaultValue={evaluation.project_title} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
+                      </label>
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Score</span>
+                        <input name="score" type="number" min="0" max="100" defaultValue={evaluation.score} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
+                      </label>
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Evidence</span>
+                        <input name="evidence_file_name" defaultValue={evaluation.evidence_file_name || ''} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
+                      </label>
+                      <OpsSubmitButton pendingLabel="Updating..." size="sm" variant="outline" className="h-9 rounded-full bg-white">Update</OpsSubmitButton>
+                      <label className="grid gap-1 text-xs lg:col-span-3">
+                        <span className="font-medium">Remarks</span>
+                        <input name="remarks" defaultValue={evaluation.remarks || ''} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
+                      </label>
+                      <p className="text-xs text-zinc-500">{evaluation.trainee?.full_name || evaluation.trainee?.email || 'Candidate'}</p>
+                    </form>
+                    <form action={deleteProjectEvaluationAction} className="mt-2 flex justify-end">
+                      <input type="hidden" name="project_evaluation_id" value={evaluation.id} />
+                      <OpsSubmitButton pendingLabel="Deleting..." size="sm" variant="outline" className="h-8 rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">Delete</OpsSubmitButton>
+                    </form>
+                  </div>
+                ))}
+              </div>
+            </div>
           </CardContent>
-        </Card>
+        </DropPanel>
       </section>
 
       {canCoordinate ? (
-      <Card id="automation" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
-        <CardHeader>
-          <CardTitle>Automation Runbook</CardTitle>
-          <CardDescription>Each governed check has a business rule, an operator override, and an audit record after execution.</CardDescription>
-        </CardHeader>
+      <DropPanel
+        id="automation"
+        title="Automation Runbook"
+        description="Run attendance, absence, assessment, and feedback checks on demand."
+        badge={`${automationRuns.length} runs`}
+      >
         <CardContent className="grid gap-4 md:grid-cols-2">
           {automationRunTypes.map((runType) => {
             const latestForType = automationRuns.find((item: any) => item.run_type === runType)
@@ -807,176 +1181,151 @@ export default async function ManagerOperationsPage() {
                   {batches.map((batch: any) => <option key={batch.id} value={batch.id}>{batch.title}</option>)}
                 </select>
               </label>
-              <Button type="submit" variant="outline" className="mt-4 rounded-full bg-white">Run governed check</Button>
+              <OpsSubmitButton pendingLabel="Running..." variant="outline" className="mt-4 rounded-full bg-white">Run governed check</OpsSubmitButton>
             </form>
           )})}
         </CardContent>
-      </Card>
+      </DropPanel>
       ) : null}
 
-      <section id="schedule" className="scroll-mt-32">
-        <ScheduleTimeline items={scheduleTimeline} />
-      </section>
-
-      <section id="documents" className="scroll-mt-32">
-        <AssessmentDocumentLibrary
-          assessments={assessmentSetups}
-          projectEvaluations={projectEvaluations}
-          batches={batches.map((batch: any) => ({ id: batch.id, title: batch.title }))}
-        />
-      </section>
-
-      <section id="analytics" className="scroll-mt-32 space-y-6">
-        {batchComparisonData.length > 0 && (
-          <BatchComparisonChart data={batchComparisonData} />
-        )}
-
-        <TrainerScorecardDeck items={trainerScorecards} />
-      </section>
-
+      <section id="batches" className="scroll-mt-32">
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <Card id="batches" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
-          <CardHeader>
-            <CardTitle>Live Batch Board</CardTitle>
-            <CardDescription>Operational visibility across lifecycle, trainer ownership, enrolled learners, and linked assessments.</CardDescription>
-          </CardHeader>
+        <DropPanel
+          id="batch-board-panel"
+          title="Live Batch Board"
+          description="Scan batch health, attendance, trainers, and next action without opening every admin control."
+          badge={`${batches.length} batches`}
+          defaultOpen
+        >
+          <LiveBatchBoard
+            batches={batches}
+            sessions={sessions}
+            attendance={attendance}
+            membersByBatch={membersByBatch}
+            trainersByBatch={trainersByBatch}
+            assessmentsByBatch={assessmentsByBatch}
+            quizzesByBatch={quizzesByBatch}
+            canCoordinate={canCoordinate}
+          />
+        </DropPanel>
+
+        <DropPanel
+          id="communication"
+          title="Feedback Pulse"
+          description="Create feedback forms, track open windows, and review learner sentiment."
+          badge={`${feedbackWindows.length} forms`}
+        >
           <CardContent className="space-y-4">
-            {batches.length === 0 ? (
-              <EmptyState text="No training batches yet. Create the first batch above to unlock session planning, attendance, and communication workflows." />
-            ) : (
-              batches.map((batch: any) => {
-                const batchMembers = membersByBatch.get(batch.id) || []
-                const batchQuizzes = quizzesByBatch.get(batch.id) || []
-                const assignedTrainers = trainersByBatch.get(batch.id) || []
-                const batchAssessments = assessmentsByBatch.get(batch.id) || []
-                return (
-                  <div key={batch.id} className="rounded-[1.5rem] border border-zinc-200 p-5">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="text-xl font-semibold">{batch.title}</h2>
-                          <span className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] ${toneForBatchStatus(batch.status)}`}>
-                            {batch.status.replace('_', ' ')}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-sm text-zinc-500">{batch.description || 'No description added yet.'}</p>
-                      </div>
-                      <div className="shrink-0 text-sm text-zinc-500 md:text-right">
-                        <p>{batch.start_date ? new Date(batch.start_date).toLocaleDateString() : 'TBD'} to {batch.end_date ? new Date(batch.end_date).toLocaleDateString() : 'TBD'}</p>
-                        <p className="mt-1">Trainer: {batch.trainer?.full_name || batch.trainer?.email || 'Unassigned'}</p>
-                      </div>
-                    </div>
+            <form action={createFeedbackWindowAction} className="rounded-[1.5rem] border border-zinc-900 bg-black p-5 text-white">
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Create Feedback Form</p>
+                  <h3 className="mt-2 text-lg font-semibold">Open a learner feedback form from Ops</h3>
+                  <p className="mt-1 text-sm text-zinc-400">Pick the batch, optionally link a session, set the close time, and learners receive the feedback request.</p>
+                </div>
+                <Badge variant="outline" className="w-fit border-white/15 bg-white/10 text-white">
+                  {feedbackWindows.filter((item: any) => item.status === 'open').length} open
+                </Badge>
+              </div>
+              <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr_1fr_auto] lg:items-end">
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Batch</span>
+                  <select name="batch_id" required className="h-11 rounded-xl border border-white/10 bg-white px-3 text-zinc-950">
+                    <option value="">Select batch</option>
+                    {batches.map((batch: any) => (
+                      <option key={batch.id} value={batch.id}>{batch.title}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Related session</span>
+                  <select name="session_id" className="h-11 rounded-xl border border-white/10 bg-white px-3 text-zinc-950">
+                    <option value="">Optional</option>
+                    {sessions.map((session: any) => (
+                      <option key={session.id} value={session.id}>{session.title}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Close by</span>
+                  <input name="closes_at" type="datetime-local" required className="h-11 rounded-xl border border-white/10 bg-white px-3 text-zinc-950" />
+                </label>
+                <OpsSubmitButton pendingLabel="Creating and emailing..." className="rounded-full bg-white text-black hover:bg-zinc-200">Create form</OpsSubmitButton>
+              </div>
+              <p className="mt-3 text-xs text-zinc-400">
+                You will see a confirmation message with learner email counts after the form is created.
+              </p>
+              <label className="mt-3 grid gap-2 text-sm">
+                <span className="font-medium">Form title</span>
+                <input name="title" defaultValue="Training content and trainer feedback" className="h-11 rounded-xl border border-white/10 bg-white px-3 text-zinc-950" />
+              </label>
+            </form>
 
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                      <MiniMetric label="Learners" value={`${batchMembers.length}`} />
-                      <MiniMetric label="Sessions" value={`${batch.training_sessions?.[0]?.count || 0}`} />
-                      <MiniMetric label="Assessments" value={`${batchQuizzes.length}`} />
-                      <MiniMetric label="Trainers" value={`${Math.max(assignedTrainers.length, batch.trainer ? 1 : 0)}`} />
-                    </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              <MiniMetric label="Open feedback forms" value={`${feedbackWindows.filter((item: any) => item.status === 'open').length}`} />
+              <MiniMetric label="Submitted feedback" value={`${feedback.length}`} />
+              <MiniMetric label="Negative feedback" value={`${summary.negativeFeedbackCount}`} />
+            </div>
 
-                    {canCoordinate ? (
-                    <form action={updateTrainingBatchDetailsAction} className="mt-4 grid gap-3 rounded-2xl border border-zinc-200 bg-white p-4">
-                      <input type="hidden" name="batch_id" value={batch.id} />
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <label className="grid gap-2 text-sm">
-                          <span className="font-medium">Batch name</span>
-                          <input name="title" defaultValue={batch.title} className="h-11 rounded-xl border border-zinc-200 px-3" />
-                        </label>
-                        <label className="grid gap-2 text-sm">
-                          <span className="font-medium">Domain</span>
-                          <input name="domain" defaultValue={batch.domain || ''} className="h-11 rounded-xl border border-zinc-200 px-3" />
-                        </label>
-                      </div>
-                      <label className="grid gap-2 text-sm">
-                        <span className="font-medium">Description</span>
-                        <textarea name="description" defaultValue={batch.description || ''} rows={2} className="rounded-xl border border-zinc-200 px-3 py-3" />
-                      </label>
-                      <div className="grid gap-3 md:grid-cols-4">
-                        <label className="grid gap-2 text-sm">
-                          <span className="font-medium">Status</span>
-                          <select name="status" defaultValue={batch.status === 'active' || batch.status === 'at_risk' ? 'running' : batch.status} className="h-11 rounded-xl border border-zinc-200 px-3">
-                            <option value="planned">Planned</option>
-                            <option value="running">Running</option>
-                            <option value="completed">Completed</option>
-                            <option value="closed">Closed</option>
-                          </select>
-                        </label>
-                        <label className="grid gap-2 text-sm">
-                          <span className="font-medium">Start</span>
-                          <input name="start_date" type="date" defaultValue={batch.start_date || ''} className="h-11 rounded-xl border border-zinc-200 px-3" />
-                        </label>
-                        <label className="grid gap-2 text-sm">
-                          <span className="font-medium">End</span>
-                          <input name="end_date" type="date" defaultValue={batch.end_date || ''} className="h-11 rounded-xl border border-zinc-200 px-3" />
-                        </label>
-                        <label className="grid gap-2 text-sm">
-                          <span className="font-medium">Trainer panel</span>
-                          <select name="trainer_ids" multiple defaultValue={assignedTrainers.map((item: any) => item.trainer_id)} className="min-h-11 rounded-xl border border-zinc-200 px-3 py-2">
-                            {trainers.filter((trainer: any) => trainer.role === 'trainer').map((trainer: any) => (
-                              <option key={trainer.id} value={trainer.id}>{trainer.full_name || trainer.email}</option>
-                            ))}
-                          </select>
-                        </label>
-                      </div>
-                      <Button type="submit" variant="outline" className="w-fit rounded-full">Save batch edits</Button>
-                    </form>
-                    ) : null}
-
-                    <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                      <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-                        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Learner cohort</p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {batchMembers.length > 0 ? batchMembers.map((member: any) => (
-                            <BatchMemberStatusDropdown
-                              key={member.id}
-                              memberId={member.id}
-                              currentStatus={member.enrollment_status}
-                              name={member.profile?.full_name || member.profile?.email || 'Unknown'}
-                              canEdit={canCoordinate}
-                            />
-                          )) : <p className="text-sm text-zinc-500">No learners added yet.</p>}
-                        </div>
-                      </div>
-                      <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-                        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Linked assessments</p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {batchAssessments.length > 0 ? batchAssessments.map((setup: any) => (
-                            <Badge key={setup.id} variant="outline" className="rounded-full bg-white">
-                              {setup.title} - {setup.assessment_type.replace('_', ' ')}
-                              {setup.question_file_name ? (
-                                <EvidenceLink path={setup.question_file_name} label="file" />
-                              ) : null}
-                            </Badge>
-                          )) : batchQuizzes.length > 0 ? batchQuizzes.map((quiz: any) => (
-                            <Badge key={quiz.id} variant="outline" className="rounded-full bg-white">
-                              {quiz.title}
-                            </Badge>
-                          )) : <p className="text-sm text-zinc-500">No quizzes linked yet.</p>}
-                        </div>
-                      </div>
-                    </div>
+            <div className="rounded-[1.5rem] border border-zinc-200 bg-zinc-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Feedback forms</p>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                {feedbackWindows.length === 0 ? (
+                  <div className="md:col-span-2">
+                    <EmptyState text="No feedback forms have been created yet." compact />
                   </div>
-                )
-              })
-            )}
-          </CardContent>
-        </Card>
+                ) : feedbackWindows.slice(0, 6).map((window: any) => (
+                  <div key={window.id} className="rounded-2xl border border-zinc-200 bg-white p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-zinc-950" title={window.title}>{window.title}</p>
+                        <p className="mt-1 text-xs text-zinc-500">{window.batch?.title || 'Batch'}{window.session?.title ? ` - ${window.session.title}` : ''}</p>
+                      </div>
+                      <Badge variant="outline" className="capitalize">{window.status}</Badge>
+                    </div>
+                    <p className="mt-3 text-xs text-zinc-500">Closes {new Date(window.closes_at).toLocaleString()}</p>
+                    <details className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50">
+                      <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-zinc-700">Edit form</summary>
+                      <form action={updateFeedbackWindowAction} className="grid gap-2 border-t border-zinc-200 p-3">
+                        <input type="hidden" name="feedback_window_id" value={window.id} />
+                        <label className="grid gap-1 text-xs">
+                          <span className="font-medium">Title</span>
+                          <input name="title" defaultValue={window.title} className="h-9 rounded-lg border border-zinc-200 bg-white px-2 text-sm" />
+                        </label>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <label className="grid gap-1 text-xs">
+                            <span className="font-medium">Close by</span>
+                            <input name="closes_at" type="datetime-local" defaultValue={toDateTimeLocal(window.closes_at)} className="h-9 rounded-lg border border-zinc-200 bg-white px-2 text-sm" />
+                          </label>
+                          <label className="grid gap-1 text-xs">
+                            <span className="font-medium">Status</span>
+                            <select name="status" defaultValue={window.status} className="h-9 rounded-lg border border-zinc-200 bg-white px-2 text-sm">
+                              <option value="draft">Draft</option>
+                              <option value="open">Open</option>
+                              <option value="closed">Closed</option>
+                            </select>
+                          </label>
+                        </div>
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <OpsSubmitButton pendingLabel="Updating..." size="sm" variant="outline" className="h-8 rounded-full bg-white">Update</OpsSubmitButton>
+                        </div>
+                      </form>
+                      <form action={deleteFeedbackWindowAction} className="border-t border-zinc-200 p-3 text-right">
+                        <input type="hidden" name="feedback_window_id" value={window.id} />
+                        <OpsSubmitButton pendingLabel="Deleting..." size="sm" variant="outline" className="h-8 rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">Delete</OpsSubmitButton>
+                      </form>
+                    </details>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-        <Card id="communication" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
-          <CardHeader>
-            <CardTitle>Feedback & Reminder Pulse</CardTitle>
-            <CardDescription>Recent learner sentiment and communication activity tied to training execution.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
             <FeedbackAnalyticsPanel
               analytics={feedbackAnalytics}
               batches={batches.map((batch: any) => ({ id: batch.id, title: batch.title }))}
             />
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <MiniMetric label="Notifications sent" value={`${summary.notificationsSent}`} />
-              <MiniMetric label="Negative feedback" value={`${summary.negativeFeedbackCount}`} />
-            </div>
+            <MiniMetric label="Notifications sent" value={`${summary.notificationsSent}`} />
 
             <div className="rounded-[1.5rem] border border-zinc-200 bg-zinc-50 p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1047,131 +1396,25 @@ export default async function ManagerOperationsPage() {
               )}
             </div>
 
-            <form action={createFeedbackWindowAction} className="rounded-[1.5rem] border border-zinc-200 bg-zinc-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Open feedback window</p>
-              <div className="mt-4 grid gap-3">
-                <label className="grid gap-2 text-sm">
-                  <span className="font-medium">Batch</span>
-                  <select name="batch_id" required className="h-11 rounded-xl border border-zinc-200 bg-white px-3">
-                    <option value="">Select batch</option>
-                    {batches.map((batch: any) => (
-                      <option key={batch.id} value={batch.id}>{batch.title}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="grid gap-2 text-sm">
-                  <span className="font-medium">Related session</span>
-                  <select name="session_id" className="h-11 rounded-xl border border-zinc-200 bg-white px-3">
-                    <option value="">Optional</option>
-                    {sessions.map((session: any) => (
-                      <option key={session.id} value={session.id}>{session.title}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="grid gap-2 text-sm">
-                  <span className="font-medium">Feedback title</span>
-                  <input name="title" defaultValue="Training content and trainer feedback" className="h-11 rounded-xl border border-zinc-200 bg-white px-3" />
-                </label>
-                <label className="grid gap-2 text-sm">
-                  <span className="font-medium">Close by</span>
-                  <input name="closes_at" type="datetime-local" required className="h-11 rounded-xl border border-zinc-200 bg-white px-3" />
-                </label>
-                <Button type="submit" className="rounded-full bg-black text-white hover:bg-zinc-800">Trigger feedback email</Button>
-              </div>
-            </form>
           </CardContent>
-        </Card>
+        </DropPanel>
       </div>
+      </section>
 
-      <Card id="attendance" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
-        <CardHeader>
-          <CardTitle>Attendance Tracker</CardTitle>
-          <CardDescription>Session-level attendance now has physical controls in the UI and persists through the backend.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <AttendanceImporter
-            sessions={sessions.map((session: any) => ({
-              id: session.id,
-              title: session.title,
-              batchTitle: session.batch?.title || 'Batch',
-              sessionDate: session.session_date,
-            }))}
-          />
-          {sessions.length === 0 ? (
-            <EmptyState text="No sessions scheduled yet. Attendance controls appear here after a session is created." />
-          ) : (
-            sessions.slice(0, 6).map((session: any) => {
-              const existingRecords = attendanceBySession.get(session.id) || []
-              const existingByUser = new Map(existingRecords.map((record: any) => [record.user_id, record]))
-              const roster = membersByBatch.get(session.batch_id) || []
-              const records = roster.length
-                ? roster.map((member: any) => existingByUser.get(member.user_id) || {
-                    id: null,
-                    session_id: session.id,
-                    user_id: member.user_id,
-                    status: 'absent',
-                    check_in_time: null,
-                    profile: member.profile,
-                  })
-                : existingRecords
-              return (
-                <div key={session.id} className="rounded-[1.5rem] border border-zinc-200 p-5">
-                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-lg font-semibold">{session.title}</h3>
-                        <Badge variant="outline" className="capitalize">{session.mode}</Badge>
-                        <Badge variant="outline" className="capitalize">{session.status}</Badge>
-                      </div>
-                      <p className="mt-1 text-sm text-zinc-500">
-                        {session.batch?.title || 'Batch'} - {new Date(session.session_date).toLocaleString()} - {session.trainer?.full_name || session.trainer?.email || 'Trainer TBD'}
-                      </p>
-                    </div>
-                    <div className="shrink-0 rounded-full bg-black px-4 py-2 text-sm font-medium text-white">
-                      {records.filter((record: any) => record.status === 'present' || record.status === 'late').length}/{records.length} marked
-                    </div>
-                  </div>
+      <AttendanceTrackerPanel
+        sessions={sessions}
+        membersByBatch={membersByBatch}
+        attendanceBySession={attendanceBySession}
+        attendanceRate={summary.attendanceRate}
+        updateAction={updateAttendanceStatus}
+      />
 
-                  <div className="mt-4 space-y-3">
-                    {records.length === 0 ? (
-                      <p className="text-sm text-zinc-500">Add learners to this batch to begin manual attendance marking.</p>
-                    ) : (
-                      records.map((record: any) => (
-                        <div key={record.id || `${record.session_id}-${record.user_id}`} className={`rounded-2xl border p-4 ${toneForAttendance(record.status)}`}>
-                          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                            <div>
-                              <p className="font-medium">{record.profile?.full_name || record.profile?.email || 'Learner'}</p>
-                              <p className="text-sm opacity-80">{record.status.toUpperCase()} {record.check_in_time ? `- ${new Date(record.check_in_time).toLocaleTimeString()}` : ''}</p>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              {(['present', 'late', 'excused', 'absent'] as const).map((status) => (
-                                <form key={status} action={updateAttendanceStatusAction}>
-                                  <input type="hidden" name="session_id" value={session.id} />
-                                  <input type="hidden" name="user_id" value={record.user_id} />
-                                  <input type="hidden" name="status" value={status} />
-                                  <Button type="submit" size="sm" variant={record.status === status ? 'default' : 'outline'} className="rounded-full capitalize">
-                                    {status}
-                                  </Button>
-                                </form>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )
-            })
-          )}
-        </CardContent>
-      </Card>
-
-      <Card id="assessment-upload" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
-        <CardHeader>
-          <CardTitle>Assessment Score Upload</CardTitle>
-          <CardDescription>Trainers can upload sprint review, API/coding, and project-linked assessment scores for assigned batches.</CardDescription>
-        </CardHeader>
+      <DropPanel
+        id="assessment-upload"
+        title="Assessment Score Upload"
+        description="Upload sprint, coding, and project-linked assessment scores."
+        badge={`${assessmentUploads.length} uploads`}
+      >
         <CardContent>
           <AssessmentScoreImporter
             batches={batches.map((batch: any) => ({ id: batch.id, title: batch.title }))}
@@ -1183,7 +1426,29 @@ export default async function ManagerOperationsPage() {
             }))}
           />
         </CardContent>
-      </Card>
+      </DropPanel>
+
+      <section id="schedule" className="scroll-mt-32">
+        <ScheduleTimeline items={scheduleTimeline} />
+      </section>
+
+      <section id="documents" className="scroll-mt-32">
+        <AssessmentDocumentLibrary
+          assessments={assessmentSetups}
+          projectEvaluations={projectEvaluations}
+          batches={batches.map((batch: any) => ({ id: batch.id, title: batch.title }))}
+        />
+      </section>
+
+      <section id="analytics" className="scroll-mt-32 space-y-6">
+        {batchComparisonData.length > 0 && (
+          <BatchComparisonChart data={batchComparisonData} />
+        )}
+
+        <TrainerScorecardDeck items={trainerScorecards} />
+      </section>
+
+      <CommandProofStrip metrics={proofMetrics} />
 
       <section id="audit" className="scroll-mt-32 grid gap-6 xl:grid-cols-4">
         <AuditPanel
@@ -1256,6 +1521,158 @@ function StatCard({ label, value, icon: Icon }: { label: string; value: string; 
   )
 }
 
+function LiveBatchBoard({
+  batches,
+  sessions,
+  attendance,
+  membersByBatch,
+  trainersByBatch,
+  assessmentsByBatch,
+  quizzesByBatch,
+  canCoordinate,
+}: {
+  batches: any[]
+  sessions: any[]
+  attendance: any[]
+  membersByBatch: Map<string, any[]>
+  trainersByBatch: Map<string, any[]>
+  assessmentsByBatch: Map<string, any[]>
+  quizzesByBatch: Map<string, any[]>
+  canCoordinate: boolean
+}) {
+  if (batches.length === 0) {
+    return (
+      <CardContent>
+        <EmptyState text="No training batches yet. Create the first batch above to unlock session planning, attendance, and feedback workflows." />
+      </CardContent>
+    )
+  }
+
+  return (
+    <CardContent className="grid gap-4 lg:grid-cols-2">
+      {batches.map((batch: any) => {
+        const batchMembers = membersByBatch.get(batch.id) || []
+        const batchSessions = sessions.filter((session: any) => session.batch_id === batch.id)
+        const batchSessionIds = new Set(batchSessions.map((session: any) => session.id))
+        const batchAttendance = attendance.filter((record: any) => batchSessionIds.has(record.session_id))
+        const positiveAttendance = batchAttendance.filter((record: any) => record.status === 'present' || record.status === 'late').length
+        const attendanceRate = batchAttendance.length ? Math.round((positiveAttendance / batchAttendance.length) * 100) : 0
+        const scheduledCount = batchSessions.filter((session: any) => session.status === 'scheduled').length
+        const completedCount = batchSessions.filter((session: any) => session.status === 'completed').length
+        const assignedTrainers = trainersByBatch.get(batch.id) || []
+        const trainerNames = [
+          ...assignedTrainers.map((item: any) => item.trainer?.full_name || item.trainer?.email).filter(Boolean),
+          batch.trainer?.full_name || batch.trainer?.email,
+        ].filter(Boolean)
+        const uniqueTrainerNames = Array.from(new Set(trainerNames))
+        const assessments = assessmentsByBatch.get(batch.id) || []
+        const quizzes = quizzesByBatch.get(batch.id) || []
+        const existingTrainerIds = Array.from(new Set([
+          ...assignedTrainers.map((item: any) => item.trainer_id).filter(Boolean),
+          batch.trainer_id,
+        ].filter(Boolean)))
+
+        return (
+          <div key={batch.id} className="rounded-[1.35rem] border border-zinc-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="truncate text-lg font-semibold text-zinc-950" title={batch.title}>{batch.title}</h3>
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] ${toneForBatchStatus(batch.status)}`}>
+                    {batch.status.replace('_', ' ')}
+                  </span>
+                </div>
+                <p className="mt-1 text-sm text-zinc-500">{batch.domain || 'General'} - {batch.start_date ? new Date(batch.start_date).toLocaleDateString() : 'TBD'} to {batch.end_date ? new Date(batch.end_date).toLocaleDateString() : 'TBD'}</p>
+              </div>
+              <Badge variant="outline" className={attendanceRate >= 75 ? 'w-fit bg-emerald-50 text-emerald-700' : 'w-fit bg-amber-50 text-amber-800'}>
+                {attendanceRate}% attend
+              </Badge>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-2 xl:grid-cols-4">
+              <MiniMetric label="Learners" value={`${batchMembers.length}`} />
+              <MiniMetric label="Scheduled" value={`${scheduledCount}`} />
+              <MiniMetric label="Completed" value={`${completedCount}`} />
+              <MiniMetric label="Assessments" value={`${assessments.length || quizzes.length}`} />
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Trainers</p>
+                <p className="mt-2 text-sm text-zinc-700">{uniqueTrainerNames.length ? uniqueTrainerNames.join(', ') : 'Unassigned'}</p>
+              </div>
+              <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Next session</p>
+                <p className="mt-2 text-sm text-zinc-700">
+                  {batchSessions.find((session: any) => session.status === 'scheduled')
+                    ? `${batchSessions.find((session: any) => session.status === 'scheduled')?.title} - ${new Date(batchSessions.find((session: any) => session.status === 'scheduled')?.session_date).toLocaleDateString()}`
+                    : 'No scheduled session'}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              {batchMembers.slice(0, 6).map((member: any) => (
+                <BatchMemberStatusDropdown
+                  key={member.id}
+                  memberId={member.id}
+                  currentStatus={member.enrollment_status}
+                  name={member.profile?.full_name || member.profile?.email || 'Unknown'}
+                  canEdit={canCoordinate}
+                />
+              ))}
+              {batchMembers.length > 6 ? <Badge variant="outline" className="rounded-full bg-zinc-50">+{batchMembers.length - 6} more</Badge> : null}
+            </div>
+
+            {canCoordinate ? (
+              <details className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50">
+                <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-zinc-800">Quick edit</summary>
+                <form action={updateTrainingBatchDetailsAction} className="grid gap-3 border-t border-zinc-200 p-4">
+                  <input type="hidden" name="batch_id" value={batch.id} />
+                  {existingTrainerIds.map((trainerId) => (
+                    <input key={trainerId} type="hidden" name="trainer_ids" value={trainerId} />
+                  ))}
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <label className="grid gap-2 text-sm">
+                      <span className="font-medium">Batch name</span>
+                      <input name="title" defaultValue={batch.title} className="h-10 rounded-xl border border-zinc-200 bg-white px-3" />
+                    </label>
+                    <label className="grid gap-2 text-sm">
+                      <span className="font-medium">Domain</span>
+                      <input name="domain" defaultValue={batch.domain || ''} className="h-10 rounded-xl border border-zinc-200 bg-white px-3" />
+                    </label>
+                  </div>
+                  <input type="hidden" name="description" value={batch.description || ''} />
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <label className="grid gap-2 text-sm">
+                      <span className="font-medium">Status</span>
+                      <select name="status" defaultValue={batch.status === 'active' || batch.status === 'at_risk' ? 'running' : batch.status} className="h-10 rounded-xl border border-zinc-200 bg-white px-3">
+                        <option value="planned">Planned</option>
+                        <option value="running">Running</option>
+                        <option value="completed">Completed</option>
+                        <option value="closed">Closed</option>
+                      </select>
+                    </label>
+                    <label className="grid gap-2 text-sm">
+                      <span className="font-medium">Start</span>
+                      <input name="start_date" type="date" defaultValue={batch.start_date || ''} className="h-10 rounded-xl border border-zinc-200 bg-white px-3" />
+                    </label>
+                    <label className="grid gap-2 text-sm">
+                      <span className="font-medium">End</span>
+                      <input name="end_date" type="date" defaultValue={batch.end_date || ''} className="h-10 rounded-xl border border-zinc-200 bg-white px-3" />
+                    </label>
+                  </div>
+                  <OpsSubmitButton pendingLabel="Saving..." variant="outline" className="w-fit rounded-full bg-white">Save quick edit</OpsSubmitButton>
+                </form>
+              </details>
+            ) : null}
+          </div>
+        )
+      })}
+    </CardContent>
+  )
+}
+
 function CommandProofStrip({ metrics }: { metrics: { brdReadiness: number; evidenceFiles: number; auditRows: number; comparisonReady: number } }) {
   const items = [
     {
@@ -1315,6 +1732,238 @@ function CommandProofStrip({ metrics }: { metrics: { brdReadiness: number; evide
   )
 }
 
+function AttendanceTrackerPanel({
+  sessions,
+  membersByBatch,
+  attendanceBySession,
+  attendanceRate,
+  updateAction,
+}: {
+  sessions: any[]
+  membersByBatch: Map<string, any[]>
+  attendanceBySession: Map<string, any[]>
+  attendanceRate: number
+  updateAction: (formData: FormData) => Promise<{ error?: string } | unknown>
+}) {
+  return (
+    <DropPanel
+      id="attendance"
+      title="Attendance Tracker"
+      description="Mark a session quickly, or upload an Excel sheet when the whole batch is ready."
+      badge={`${attendanceRate}% health`}
+      defaultOpen
+    >
+      <CardContent className="space-y-6">
+        <AttendanceImporter
+          sessions={sessions.map((session: any) => ({
+            id: session.id,
+            title: session.title,
+            batchTitle: session.batch?.title || 'Batch',
+            sessionDate: session.session_date,
+          }))}
+        />
+        {sessions.length === 0 ? (
+          <EmptyState text="No sessions scheduled yet. Attendance controls appear here after a session is created." />
+        ) : (
+          sessions.map((session: any) => {
+            const existingRecords = attendanceBySession.get(session.id) || []
+            const existingByUser = new Map(existingRecords.map((record: any) => [record.user_id, record]))
+            const roster = membersByBatch.get(session.batch_id) || []
+            const records = roster.length
+              ? roster.map((member: any) => existingByUser.get(member.user_id) || {
+                  id: null,
+                  session_id: session.id,
+                  user_id: member.user_id,
+                  status: 'absent',
+                  check_in_time: null,
+                  profile: member.profile,
+                })
+              : existingRecords
+            return (
+              <ManualAttendanceCard
+                key={session.id}
+                session={session}
+                records={records}
+                action={updateAction}
+              />
+            )
+          })
+        )}
+      </CardContent>
+    </DropPanel>
+  )
+}
+
+function DropPanel({
+  id,
+  title,
+  description,
+  badge,
+  defaultOpen = false,
+  children,
+}: {
+  id: string
+  title: string
+  description: string
+  badge?: string
+  defaultOpen?: boolean
+  children: ReactNode
+}) {
+  return (
+    <details id={id} open={defaultOpen} className="group scroll-mt-32 overflow-hidden rounded-[1.35rem] border border-zinc-200 bg-white shadow-sm transition open:shadow-md">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 marker:hidden">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-base font-semibold text-zinc-950">{title}</h2>
+            {badge ? <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">{badge}</span> : null}
+          </div>
+          <p className="mt-1 text-sm leading-5 text-zinc-500">{description}</p>
+        </div>
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-zinc-50 text-zinc-600 transition group-open:rotate-180">
+          <ChevronDown className="h-4 w-4" />
+        </div>
+      </summary>
+      <div className="border-t border-zinc-100 bg-white">
+        {children}
+      </div>
+    </details>
+  )
+}
+
+function PriorityOpsWorkbench({
+  canCoordinate,
+  attendanceDue,
+  absenceAlerts,
+  activeBatches,
+  upcomingSessions,
+  remainingCandidates,
+  assessmentClearance,
+  negativeFeedback,
+}: {
+  canCoordinate: boolean
+  attendanceDue: number
+  absenceAlerts: number
+  activeBatches: number
+  upcomingSessions: number
+  remainingCandidates: number
+  assessmentClearance: number
+  negativeFeedback: number
+}) {
+  const tasks = [
+    {
+      title: 'Add employees',
+      detail: 'Create learners with Employee ID and Domain',
+      href: '/manager/employees',
+      icon: Users,
+      tone: 'border-emerald-200 bg-emerald-50 text-emerald-950',
+      enabled: canCoordinate,
+    },
+    {
+      title: 'Assign quiz',
+      detail: 'Create or assign assessment before batch execution',
+      href: '/manager/quizzes',
+      icon: FileText,
+      tone: 'border-violet-200 bg-violet-50 text-violet-950',
+      enabled: canCoordinate,
+    },
+    {
+      title: 'Fix attendance first',
+      detail: attendanceDue > 0 ? `${attendanceDue} session(s) need attention` : 'No overdue attendance right now',
+      href: '#attendance',
+      icon: ClipboardCheck,
+      tone: attendanceDue > 0 ? 'border-rose-200 bg-rose-50 text-rose-950' : 'border-emerald-200 bg-emerald-50 text-emerald-950',
+      enabled: true,
+    },
+    {
+      title: 'Review live batches',
+      detail: `${activeBatches} active batch(es), ${remainingCandidates} learner(s) in training`,
+      href: '#batch-board',
+      icon: Users,
+      tone: 'border-zinc-200 bg-white text-zinc-950',
+      enabled: true,
+    },
+    {
+      title: 'Create or edit batch',
+      detail: canCoordinate ? 'Add learners, trainer, dates, and quizzes' : 'Coordinator access required',
+      href: canCoordinate ? '#create-batch' : '/manager/docs#create-training-batch',
+      icon: CalendarDays,
+      tone: 'border-cyan-200 bg-cyan-50 text-cyan-950',
+      enabled: true,
+    },
+    {
+      title: 'Plan sessions',
+      detail: `${upcomingSessions} upcoming session(s)`,
+      href: canCoordinate ? '#schedule-session' : '#schedule-planner',
+      icon: CalendarDays,
+      tone: 'border-blue-200 bg-blue-50 text-blue-950',
+      enabled: true,
+    },
+    {
+      title: 'Assessments and projects',
+      detail: `Clearance signal ${assessmentClearance}%`,
+      href: canCoordinate ? '#assessment-setup' : '#assessment',
+      icon: FileSpreadsheet,
+      tone: 'border-amber-200 bg-amber-50 text-amber-950',
+      enabled: true,
+    },
+    {
+      title: 'Feedback and reminders',
+      detail: negativeFeedback > 0 ? `${negativeFeedback} negative feedback item(s)` : 'Open windows and reminders',
+      href: '#feedback',
+      icon: MessageSquareQuote,
+      tone: negativeFeedback > 0 ? 'border-rose-200 bg-rose-50 text-rose-950' : 'border-violet-200 bg-violet-50 text-violet-950',
+      enabled: true,
+    },
+    {
+      title: 'Run automation',
+      detail: `${absenceAlerts} absence risk(s) visible`,
+      href: canCoordinate ? '#automation' : '/manager/docs#automation-runbook',
+      icon: RadioTower,
+      tone: 'border-zinc-200 bg-zinc-50 text-zinc-950',
+      enabled: true,
+    },
+    {
+      title: 'Read the guide',
+      detail: 'A to Z non-technical instructions',
+      href: '/manager/docs',
+      icon: FileText,
+      tone: 'border-emerald-200 bg-emerald-50 text-emerald-950',
+      enabled: true,
+    },
+  ]
+
+  return (
+    <section className="rounded-[1.5rem] border border-zinc-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">Manager workbench</p>
+          <h2 className="mt-2 text-xl font-semibold tracking-tight text-zinc-950">Do these in priority order</h2>
+        </div>
+        <p className="max-w-xl text-sm leading-6 text-zinc-500">
+          The dense tools are still below, but this strip puts the highest-value actions first so a non-technical admin knows where to click.
+        </p>
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {tasks.filter((task) => task.enabled).map((task, index) => {
+          const Icon = task.icon
+          return (
+            <Link key={task.title} href={task.href} className={`group rounded-2xl border p-4 transition hover:-translate-y-0.5 hover:shadow-md ${task.tone}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/80 shadow-sm">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <span className="rounded-full bg-white/80 px-2 py-1 text-[10px] font-bold">Step {index + 1}</span>
+              </div>
+              <p className="mt-4 text-sm font-semibold">{task.title}</p>
+              <p className="mt-1 text-xs leading-5 opacity-75">{task.detail}</p>
+            </Link>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
 function MiniMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
@@ -1364,7 +2013,7 @@ function ScheduleTimeline({ items }: { items: Array<{ id: string; type: string; 
   }, new Map<string, typeof nextItems>())
 
   return (
-    <Card className="border-zinc-200 shadow-sm spotlight-card">
+    <Card id="schedule-planner" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
       <CardHeader>
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
@@ -1505,7 +2154,7 @@ function AssessmentDocumentLibrary({
   ]
 
   return (
-    <Card className="border-zinc-200 shadow-sm spotlight-card">
+    <Card id="document-library" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
       <CardHeader>
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
@@ -1660,18 +2309,6 @@ function EmptyState({ text, compact = false }: { text: string; compact?: boolean
       <MessageSquareQuote className="mx-auto mb-3 h-5 w-5 opacity-50" />
       <p>{text}</p>
     </div>
-  )
-}
-
-function EvidenceLink({ path, label }: { path: string; label: string }) {
-  if (!path.startsWith('training-evidence/')) return null
-  return (
-    <a
-      href={`/api/training/evidence?path=${encodeURIComponent(path)}`}
-      className="ml-2 underline decoration-zinc-400 underline-offset-2"
-    >
-      {label}
-    </a>
   )
 }
 

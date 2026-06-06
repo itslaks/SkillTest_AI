@@ -17,7 +17,10 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { bulkCreateQuestions } from '@/lib/actions/quiz'
 import type { DifficultyLevel, CreateQuestionInput } from '@/lib/types/database'
+import { parseUniversalRowsFile, UNIVERSAL_UPLOAD_ACCEPT, normalizeHeader } from '@/lib/file-utils'
 import * as XLSX from 'xlsx'
+
+const DIFFICULTIES: DifficultyLevel[] = ['easy', 'medium', 'hard', 'advanced', 'hardcore']
 
 interface QuizImporterProps {
   quizId: string
@@ -34,6 +37,28 @@ interface ParsedQuestion {
   correct_answer: string
   difficulty?: DifficultyLevel
   explanation?: string
+}
+
+function normalizeDifficulty(value: unknown, fallback: DifficultyLevel): DifficultyLevel {
+  const normalized = String(value || '').toLowerCase().trim() as DifficultyLevel
+  return DIFFICULTIES.includes(normalized) ? normalized : fallback
+}
+
+function difficultyBadgeClass(difficulty?: DifficultyLevel) {
+  switch (difficulty) {
+    case 'easy':
+      return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+    case 'medium':
+      return 'border-blue-200 bg-blue-50 text-blue-700'
+    case 'hard':
+      return 'border-amber-200 bg-amber-50 text-amber-700'
+    case 'advanced':
+      return 'border-orange-200 bg-orange-50 text-orange-700'
+    case 'hardcore':
+      return 'border-red-200 bg-red-50 text-red-700'
+    default:
+      return 'border-muted bg-muted text-muted-foreground'
+  }
 }
 
 export function QuizImporter({ 
@@ -54,20 +79,6 @@ export function QuizImporter({
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (file) {
-      const validTypes = [
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'application/vnd.ms-excel',
-        'text/csv',
-      ]
-      
-      if (!validTypes.includes(file.type) && 
-          !file.name.endsWith('.xlsx') && 
-          !file.name.endsWith('.xls') &&
-          !file.name.endsWith('.csv')) {
-        setError('Please upload an Excel (.xlsx, .xls) or CSV file')
-        return
-      }
-      
       setSelectedFile(file)
       setParsedQuestions([])
       setError(null)
@@ -78,11 +89,7 @@ export function QuizImporter({
 
   async function parseFile(file: File) {
     try {
-      const data = await file.arrayBuffer()
-      const workbook = XLSX.read(data)
-      const sheetName = workbook.SheetNames[0]
-      const worksheet = workbook.Sheets[sheetName]
-      const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[]
+      const jsonData = await parseUniversalRowsFile(file) as any[]
       
       if (jsonData.length === 0) {
         setError('The file appears to be empty')
@@ -90,19 +97,19 @@ export function QuizImporter({
       }
 
       // Map to expected format - handle various column name formats
-      const questions: ParsedQuestion[] = jsonData.map((row) => {
+      const questions: ParsedQuestion[] = jsonData.map((row: any) => {
         const q: ParsedQuestion = {
-          question_text: row['question_text'] || row['Question'] || row['question'] || row['Q'] || '',
-          option_a: row['option_a'] || row['Option A'] || row['A'] || row['a'] || '',
-          option_b: row['option_b'] || row['Option B'] || row['B'] || row['b'] || '',
-          option_c: row['option_c'] || row['Option C'] || row['C'] || row['c'] || '',
-          option_d: row['option_d'] || row['Option D'] || row['D'] || row['d'] || '',
-          correct_answer: (row['correct_answer'] || row['Correct Answer'] || row['Answer'] || row['correct'] || 'A').toString().toUpperCase(),
-          difficulty: row['difficulty'] || row['Difficulty'] || quizDifficulty,
-          explanation: row['explanation'] || row['Explanation'] || '',
+          question_text: rowCell(row, ['question_text', 'Question', 'question', 'Q', 'prompt']),
+          option_a: rowCell(row, ['option_a', 'Option A', 'A', 'choice_a', 'answer_a']),
+          option_b: rowCell(row, ['option_b', 'Option B', 'B', 'choice_b', 'answer_b']),
+          option_c: rowCell(row, ['option_c', 'Option C', 'C', 'choice_c', 'answer_c']),
+          option_d: rowCell(row, ['option_d', 'Option D', 'D', 'choice_d', 'answer_d']),
+          correct_answer: (rowCell(row, ['correct_answer', 'Correct Answer', 'Answer', 'correct', 'key']) || 'A').toUpperCase(),
+          difficulty: normalizeDifficulty(rowCell(row, ['difficulty', 'Difficulty', 'level']) || quizDifficulty, quizDifficulty),
+          explanation: rowCell(row, ['explanation', 'Explanation', 'reason', 'rationale']),
         }
         return q
-      }).filter(q => q.question_text && q.option_a && q.option_b)
+      }).filter((q: ParsedQuestion) => q.question_text && q.option_a && q.option_b)
 
       if (questions.length === 0) {
         setError('No valid questions found. Ensure columns include: question_text, option_a, option_b, option_c, option_d, correct_answer')
@@ -138,7 +145,7 @@ export function QuizImporter({
         quiz_id: quizId,
         question_text: q.question_text,
         options,
-        difficulty: q.difficulty || quizDifficulty,
+        difficulty: normalizeDifficulty(q.difficulty, quizDifficulty),
         explanation: q.explanation || undefined,
         status: 'approved' as const,
         order_index: i,
@@ -214,10 +221,10 @@ export function QuizImporter({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Upload className="h-5 w-5 text-primary" />
-          Import Questions from Excel
+          Import Questions from File
         </CardTitle>
         <CardDescription>
-          Upload an Excel file with your questions. Download the template to see the required format.
+          Upload CSV, XLSX, DOCX, PDF, XML, or JSON questions. Download the template to see the required format.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -257,7 +264,7 @@ export function QuizImporter({
           <input
             ref={fileInputRef}
             type="file"
-            accept=".xlsx,.xls,.csv"
+            accept={UNIVERSAL_UPLOAD_ACCEPT}
             onChange={handleFileSelect}
             className="hidden"
           />
@@ -266,7 +273,7 @@ export function QuizImporter({
             {selectedFile ? selectedFile.name : 'Click to upload or drag and drop'}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            Excel (.xlsx, .xls) or CSV files
+            CSV, XLSX, DOCX, PDF, XML, or JSON files
           </p>
         </div>
 
@@ -288,7 +295,9 @@ export function QuizImporter({
                   <div className="flex gap-2 mt-1 text-xs text-muted-foreground">
                     <span>Answer: {q.correct_answer}</span>
                     <span>•</span>
-                    <span className="capitalize">{q.difficulty}</span>
+                    <Badge variant="outline" className={difficultyBadgeClass(q.difficulty)}>
+                      {q.difficulty}
+                    </Badge>
                   </div>
                 </div>
               ))}
@@ -320,7 +329,7 @@ export function QuizImporter({
                 <li><code>question_text</code> - The question text</li>
                 <li><code>option_a, option_b, option_c, option_d</code> - Answer choices</li>
                 <li><code>correct_answer</code> - Letter of correct answer (A, B, C, or D)</li>
-                <li><code>difficulty</code> - Optional (easy, medium, hard, advanced, hardcore)</li>
+                <li><code>difficulty</code> - Optional color-coded level (easy, medium, hard, advanced, hardcore)</li>
                 <li><code>explanation</code> - Optional explanation</li>
               </ul>
             </div>
@@ -329,4 +338,11 @@ export function QuizImporter({
       </CardContent>
     </Card>
   )
+}
+
+function rowCell(row: Record<string, any>, aliases: string[]) {
+  const normalizedAliases = new Set(aliases.map(normalizeHeader))
+  const key = Object.keys(row).find((candidate) => normalizedAliases.has(normalizeHeader(candidate)))
+  const value = key ? row[key] : undefined
+  return value === null || value === undefined ? '' : String(value).trim()
 }

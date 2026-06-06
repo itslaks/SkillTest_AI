@@ -204,82 +204,96 @@ export default async function AdminConsolePage() {
         </Card>
       </div>
 
-      <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-white shadow-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Medal className="h-5 w-5 text-amber-600" />
-            Certificate Automation
-          </CardTitle>
-          <CardDescription>
-            Admin-only control: choose the exact score threshold, certificate name, message, and uploaded certificate format for each quiz.
-          </CardDescription>
+      <Card className="border-zinc-200 bg-white shadow-sm">
+        <CardHeader className="border-b border-zinc-100">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Medal className="h-5 w-5 text-amber-600" />
+                Certificate Automation
+              </CardTitle>
+              <CardDescription className="mt-1">
+                Compact controls for certificate eligibility, naming, template, and preview.
+              </CardDescription>
+            </div>
+            <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
+              {(certificateQuizzes || []).length} quiz rules
+            </span>
+          </div>
         </CardHeader>
         <CardContent className="space-y-3">
           {(certificateQuizzes || []).length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-amber-200 bg-white p-6 text-center text-sm text-amber-700">No quizzes available for certificate rules.</p>
+            <p className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50 p-6 text-center text-sm text-zinc-500">No quizzes available for certificate rules.</p>
           ) : (certificateQuizzes || []).slice(0, 20).map((quiz: any) => (
-            <form key={quiz.id} action={certificateRuleAction} className="grid gap-4 rounded-2xl border border-amber-100 bg-white p-4 xl:grid-cols-[0.9fr_0.78fr_0.95fr_0.9fr_auto] xl:items-end">
+            <form key={quiz.id} action={certificateRuleAction} className="rounded-2xl border border-zinc-200 bg-zinc-50/70 p-3">
               <input type="hidden" name="quiz_id" value={quiz.id} />
               <input type="hidden" name="existing_template_image_url" value={quiz.certificate_rule?.template_image_url || ''} />
-              <label className="flex items-start gap-3">
-                <input
-                  name="enabled"
-                  type="checkbox"
-                  defaultChecked={quiz.certificate_rule?.enabled || false}
-                  className="mt-1 h-4 w-4 rounded border-amber-300"
-                />
-                <span>
-                  <span className="block font-semibold text-zinc-950">{quiz.title}</span>
-                  <span className="text-xs text-zinc-500">{quiz.topic} - {quiz.difficulty}</span>
-                  <span className="mt-2 block text-xs font-semibold text-amber-700">
-                    Current rule: {quiz.certificate_rule?.enabled ? `score >= ${quiz.certificate_rule?.min_score || 70}%` : 'disabled'}
+              <div className="grid items-end gap-3 md:grid-cols-[minmax(0,1fr)_9rem_8rem_auto]">
+                <label className="flex min-w-0 items-start gap-3">
+                  <input
+                    name="enabled"
+                    type="checkbox"
+                    defaultChecked={quiz.certificate_rule?.enabled || false}
+                    className="mt-1 h-4 w-4 rounded border-zinc-300"
+                  />
+                  <span className="min-w-0">
+                    <span className="block truncate font-semibold text-zinc-950" title={quiz.title}>{quiz.title}</span>
+                    <span className="text-xs text-zinc-500">{quiz.topic} - {quiz.difficulty}</span>
+                    <span className="mt-1 block text-xs font-semibold text-amber-700">
+                      {quiz.certificate_rule?.enabled ? `Active at ${quiz.certificate_rule?.min_score || 70}%` : 'Disabled'}
+                    </span>
                   </span>
-                </span>
-              </label>
-              <div className="grid gap-2">
-                <label className="grid gap-1 text-xs font-medium text-zinc-600">
-                  Minimum score for certificate
-                  <input name="min_score" type="number" min="0" max="100" defaultValue={quiz.certificate_rule?.min_score || 90} className="h-10 rounded-xl border border-amber-200 px-3" />
                 </label>
                 <label className="grid gap-1 text-xs font-medium text-zinc-600">
-                  Accent color
-                  <input name="template_accent_color" type="color" defaultValue={quiz.certificate_rule?.template_accent_color || '#d97706'} className="h-10 w-full rounded-xl border border-amber-200 px-2" />
+                  Minimum score
+                  <input name="min_score" type="number" min="0" max="100" defaultValue={quiz.certificate_rule?.min_score || 90} className="h-10 rounded-xl border border-zinc-200 bg-white px-3" />
                 </label>
+                <label className="grid gap-1 text-xs font-medium text-zinc-600">
+                  Accent
+                  <input name="template_accent_color" type="color" defaultValue={quiz.certificate_rule?.template_accent_color || '#d97706'} className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-2" />
+                </label>
+                <Button type="submit" className="h-10 rounded-xl bg-zinc-950 text-white hover:bg-zinc-800">Save rule</Button>
               </div>
-              <div className="grid gap-2">
-                <label className="grid gap-1 text-xs font-medium text-zinc-600">
-                  Certificate name shown to employee
-                  <input name="certificate_name" defaultValue={quiz.certificate_rule?.certificate_name || `${quiz.topic} Course Completion`} className="h-10 rounded-xl border border-amber-200 px-3" />
-                </label>
-                <label className="grid gap-1 text-xs font-medium text-zinc-600">
-                  Certificate title / heading
-                  <input name="title" defaultValue={quiz.certificate_rule?.title || `Certificate of Achievement - ${quiz.topic}`} className="h-10 rounded-xl border border-amber-200 px-3" />
-                </label>
-                <label className="grid gap-1 text-xs font-medium text-zinc-600">
-                  Message
-                  <input name="message" defaultValue={quiz.certificate_rule?.message || 'Awarded for successful course completion.'} className="h-10 rounded-xl border border-amber-100 px-3" />
-                </label>
-                <label className="grid gap-1 text-xs font-medium text-zinc-600">
-                  Upload certificate format
-                  <input name="template_file" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="rounded-xl border border-amber-100 px-3 py-2 text-xs" />
-                  {quiz.certificate_rule?.template_image_url && <span className="text-[10px] text-emerald-700">Template uploaded. New upload replaces it.</span>}
-                </label>
-                <label className="grid gap-1 text-xs font-medium text-zinc-600">
-                  Template notes
-                  <input name="template_notes" defaultValue={quiz.certificate_rule?.template_notes || 'Employee name, course name, score, and issue date are rendered automatically.'} className="h-10 rounded-xl border border-amber-100 px-3" />
-                </label>
-              </div>
-              <div className="grid gap-2">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Preview</p>
-                <CertificatePreview
-                  compact
-                  employeeName="Laksham S J"
-                  topic={quiz.topic || quiz.title}
-                  message={quiz.certificate_rule?.message || `has been awarded this certificate in recognition of outstanding performance in the quiz on ${quiz.topic || quiz.title}`}
-                  accent={quiz.certificate_rule?.template_accent_color || '#6f5ab8'}
-                />
-              </div>
-              <Button type="submit" className="rounded-full bg-amber-600 text-white hover:bg-amber-700">Save</Button>
+              <details className="mt-3 rounded-xl border border-zinc-200 bg-white p-3">
+                <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Advanced certificate content and preview</summary>
+                <div className="mt-3 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(260px,0.7fr)]">
+                  <div className="grid gap-2 md:grid-cols-2">
+                    <label className="grid gap-1 text-xs font-medium text-zinc-600">
+                      Certificate name shown to employee
+                      <input name="certificate_name" defaultValue={quiz.certificate_rule?.certificate_name || `${quiz.topic} Course Completion`} className="h-10 rounded-xl border border-zinc-200 px-3" />
+                    </label>
+                    <label className="grid gap-1 text-xs font-medium text-zinc-600">
+                      Certificate title / heading
+                      <input name="title" defaultValue={quiz.certificate_rule?.title || `Certificate of Achievement - ${quiz.topic}`} className="h-10 rounded-xl border border-zinc-200 px-3" />
+                    </label>
+                    <label className="grid gap-1 text-xs font-medium text-zinc-600 md:col-span-2">
+                      Message
+                      <input name="message" defaultValue={quiz.certificate_rule?.message || 'Awarded for successful course completion.'} className="h-10 rounded-xl border border-zinc-200 px-3" />
+                    </label>
+                    <label className="grid gap-1 text-xs font-medium text-zinc-600">
+                      Upload certificate format
+                      <input name="template_file" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="rounded-xl border border-zinc-200 px-3 py-2 text-xs" />
+                      {quiz.certificate_rule?.template_image_url && <span className="text-[10px] text-emerald-700">Template uploaded. New upload replaces it.</span>}
+                    </label>
+                    <label className="grid gap-1 text-xs font-medium text-zinc-600">
+                      Template notes
+                      <input name="template_notes" defaultValue={quiz.certificate_rule?.template_notes || 'Employee name, course name, score, and issue date are rendered automatically.'} className="h-10 rounded-xl border border-zinc-200 px-3" />
+                    </label>
+                  </div>
+                  <CertificatePreview
+                    compact
+                    employeeName="Laksham S J"
+                    topic={quiz.topic || quiz.title}
+                    certificateTitle={quiz.certificate_rule?.certificate_name || `${quiz.topic || quiz.title} Completion`}
+                    message={quiz.certificate_rule?.message || `has completed ${quiz.topic || quiz.title} and demonstrated the required proficiency for this credential.`}
+                    issueDate={new Date().toLocaleDateString('en-IN')}
+                    score={quiz.certificate_rule?.min_score || 90}
+                    employeeId="EMP1024"
+                    templateImageUrl={quiz.certificate_rule?.template_image_url || null}
+                    accent={quiz.certificate_rule?.template_accent_color || '#6f5ab8'}
+                  />
+                </div>
+              </details>
             </form>
           ))}
         </CardContent>
