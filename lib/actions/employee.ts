@@ -11,7 +11,7 @@ import {
   getTopicAttempts,
 } from '@/lib/insights'
 import type { SubmitQuizInput, LeaderboardEntry, QuizAnswer, DifficultyLevel } from '@/lib/types/database'
-import { buildQuizCompletedEmail, sendEmail } from '@/lib/email'
+import { buildQuizCompletedEmail, buildQuizProctoringFlagEmail, sendEmail } from '@/lib/email'
 
 // ─── Start a quiz attempt ─────────────────────────────────────────────
 export async function startQuizAttempt(quizId: string) {
@@ -85,7 +85,7 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
     return { error: 'Not authenticated' }
   }
 
-  const { quiz_id, answers, time_taken_seconds } = parsed.data
+  const { quiz_id, answers, time_taken_seconds, proctoring } = parsed.data
 
   try {
     const adminClient = createAdminClient()
@@ -154,6 +154,9 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
     const correctAnswers = enrichedAnswers.filter((answer) => answer.isCorrect).length
     const score = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0
     const rawInsight = analyzeAttemptPattern(enrichedAnswers, quiz.difficulty, topicAttempts)
+    const proctoringEvents = proctoring?.events || []
+    const proctoringViolationCount = proctoring?.violationCount || 0
+    const isProctoringFlagged = Boolean(proctoring?.enabled && proctoringViolationCount >= 3)
 
     // Points: base 10 per correct + speed bonus
     const speedBonus = time_taken_seconds < (quiz.time_limit_minutes * 60 * 0.5) ? 25 : 0
@@ -175,6 +178,10 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
         points_earned: pointsEarned,
         status: 'completed',
         completed_at: new Date().toISOString(),
+        proctoring_status: isProctoringFlagged ? 'flagged' : (proctoring?.enabled ? 'clear' : null),
+        proctoring_violations_count: proctoringViolationCount,
+        proctoring_events: proctoringEvents,
+        auto_submitted: Boolean(proctoring?.autoSubmitted),
       })
       .eq('quiz_id', quiz_id)
       .eq('user_id', user.id)
@@ -211,6 +218,47 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
       console.warn('Quiz completion email failed (non-fatal):', mailError)
     }
 
+    if (isProctoringFlagged) {
+      try {
+        const recipients = await getProctoringAlertRecipients(adminClient, quiz)
+        const [{ data: profile }] = await Promise.all([
+          adminClient.from('profiles').select('full_name, email').eq('id', user.id).maybeSingle(),
+        ])
+
+        if (recipients.length > 0) {
+          const html = buildQuizProctoringFlagEmail({
+            employeeName: profile?.full_name,
+            employeeEmail: profile?.email,
+            quizTitle: quiz.title,
+            score,
+            violationCount: proctoringViolationCount,
+            autoSubmitted: Boolean(proctoring?.autoSubmitted),
+            events: proctoringEvents,
+          })
+
+          await sendEmail({
+            to: recipients,
+            subject: `Proctoring Flag: ${quiz.title} - ${profile?.full_name || profile?.email || 'Employee'}`,
+            html,
+          })
+        }
+
+        await adminClient.from('training_notifications').insert({
+          batch_id: quiz.batch_id || null,
+          recipient_user_id: quiz.created_by || null,
+          title: 'Quiz proctoring flag',
+          message: `${profile?.full_name || profile?.email || 'An employee'} was flagged during ${quiz.title} after ${proctoringViolationCount} proctoring violation(s).`,
+          audience: 'trainers',
+          channel: 'email',
+          delivery_status: recipients.length > 0 ? 'sent' : 'logged',
+          sent_at: new Date().toISOString(),
+          created_by: quiz.created_by || user.id,
+        })
+      } catch (mailError) {
+        console.warn('Proctoring alert failed (non-fatal):', mailError)
+      }
+    }
+
     console.log(`Quiz submission successful for user ${user.id}, quiz ${quiz_id}`)
     revalidatePath('/employee', 'layout')
     revalidatePath('/employee/quizzes')
@@ -225,6 +273,43 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
     console.error('Quiz submission unexpected error:', error)
     return { error: 'An unexpected error occurred during quiz submission' }
   }
+}
+
+async function getProctoringAlertRecipients(adminClient: ReturnType<typeof createAdminClient>, quiz: any) {
+  const recipientIds = new Set<string>()
+  if (quiz.created_by) recipientIds.add(quiz.created_by)
+
+  const [{ data: admins }, { data: batchTrainers }] = await Promise.all([
+    adminClient
+      .from('profiles')
+      .select('id, email')
+      .in('role', ['admin'])
+      .not('email', 'is', null),
+    quiz.batch_id
+      ? adminClient
+          .from('training_batch_trainers')
+          .select('trainer_id')
+          .eq('batch_id', quiz.batch_id)
+      : Promise.resolve({ data: [] }),
+  ])
+
+  for (const admin of admins || []) {
+    if (admin.id) recipientIds.add(admin.id)
+  }
+  for (const trainer of batchTrainers || []) {
+    if (trainer.trainer_id) recipientIds.add(trainer.trainer_id)
+  }
+
+  const ids = Array.from(recipientIds)
+  if (ids.length === 0) return []
+
+  const { data: profiles } = await adminClient
+    .from('profiles')
+    .select('email')
+    .in('id', ids)
+    .not('email', 'is', null)
+
+  return Array.from(new Set((profiles || []).map((profile: any) => profile.email).filter(Boolean)))
 }
 
 // ─── Get available quizzes for employees (only assigned ones) ─────────

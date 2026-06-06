@@ -65,6 +65,10 @@ export interface QuizAttempt {
   time_taken_seconds: number
   points_earned: number
   status: AttemptStatus
+  proctoring_status?: 'clear' | 'flagged' | null
+  proctoring_violations_count?: number | null
+  proctoring_events?: ProctoringEvent[] | null
+  auto_submitted?: boolean | null
   started_at: string
   completed_at: string | null
   created_at: string
@@ -446,6 +450,7 @@ export interface SubmitQuizInput {
   quiz_id: string
   answers: SubmittedQuizAnswer[]
   time_taken_seconds: number
+  proctoring?: ProctoringSubmission
 }
 
 // API Response types
@@ -473,6 +478,32 @@ export interface SubmittedQuizAnswer {
   cognitiveLoadFlag?: boolean
   panicSignal?: boolean
   adaptiveDifficulty?: DifficultyLevel
+}
+
+export type ProctoringEventType =
+  | 'camera-denied'
+  | 'fullscreen-exit'
+  | 'tab-hidden'
+  | 'window-blur'
+  | 'blocked-shortcut'
+  | 'back-navigation'
+  | 'context-menu'
+  | 'camera-lost'
+  | 'auto-submit'
+
+export interface ProctoringEvent {
+  type: ProctoringEventType
+  label: string
+  occurredAt: string
+  questionIndex?: number
+  evidenceImage?: string | null
+}
+
+export interface ProctoringSubmission {
+  enabled: boolean
+  violationCount: number
+  autoSubmitted: boolean
+  events: ProctoringEvent[]
 }
 
 export interface ReadinessInsight {

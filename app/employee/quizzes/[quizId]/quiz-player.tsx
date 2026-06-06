@@ -10,12 +10,15 @@ import { MonochromeOrb } from '@/components/insights/monochrome-orb'
 import { ReadinessMeter } from '@/components/insights/readiness-meter'
 import { startQuizAttempt, submitQuizAttempt } from '@/lib/actions/employee'
 import { shiftDifficulty } from '@/lib/insights'
-import type { DifficultyLevel, SubmittedQuizAnswer } from '@/lib/types/database'
+import type { DifficultyLevel, ProctoringEvent, ProctoringEventType, ProctoringSubmission, SubmittedQuizAnswer } from '@/lib/types/database'
 import {
+  Camera,
   Brain,
   CheckCircle2,
   ChevronRight,
   Clock,
+  Eye,
+  LockKeyhole,
   ShieldAlert,
   Snowflake,
   Sparkles,
@@ -27,6 +30,8 @@ import {
 interface QuizPlayerProps {
   quiz: any
 }
+
+const PROCTORING_VIOLATION_LIMIT = 3
 
 type QuizOption = {
   text: string
@@ -85,6 +90,16 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     adaptiveDifficulty: quiz.insights?.suggestedNextDifficulty || quiz.difficulty || 'medium',
     message: 'System is tracking rhythm, hesitation, and topic pressure in real time.',
   })
+  const [cameraReady, setCameraReady] = useState(false)
+  const [cameraError, setCameraError] = useState<string | null>(null)
+  const [violationCount, setViolationCount] = useState(0)
+  const [latestViolation, setLatestViolation] = useState<string | null>(null)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const mediaStreamRef = useRef<MediaStream | null>(null)
+  const proctoringEventsRef = useRef<ProctoringEvent[]>([])
+  const violationCountRef = useRef(0)
+  const submittingRef = useRef(false)
 
   const questions = (quiz.questions || []) as QuizQuestion[]
   const questionMap = new Map<string, QuizQuestion>(questions.map((question) => [question.id, question]))
@@ -93,31 +108,93 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const progress = totalQuestions > 0 ? ((currentIndex + (showFeedback ? 1 : 0)) / totalQuestions) * 100 : 0
   const readiness = quiz.insights?.readiness
 
-  const doSubmit = useCallback((finalAnswers: SubmittedQuizAnswer[]) => {
+  const stopCamera = useCallback(() => {
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop())
+    mediaStreamRef.current = null
+  }, [])
+
+  const buildProctoringSubmission = useCallback((autoSubmitted: boolean, extraEvents: ProctoringEvent[] = []): ProctoringSubmission => ({
+    enabled: true,
+    violationCount: Math.max(violationCountRef.current, violationCount),
+    autoSubmitted,
+    events: [...proctoringEventsRef.current, ...extraEvents].slice(-50),
+  }), [violationCount])
+
+  const doSubmit = useCallback((finalAnswers: SubmittedQuizAnswer[], proctoring?: ProctoringSubmission) => {
+    if (submittingRef.current) return
+    submittingRef.current = true
     setSubmitting(true)
+    stopCamera()
     startTransition(async () => {
       const result = await submitQuizAttempt({
         quiz_id: quiz.id,
         answers: finalAnswers,
         time_taken_seconds: totalTimeRef.current,
+        proctoring: proctoring || buildProctoringSubmission(false),
       })
 
       if (result.error) {
+        submittingRef.current = false
         setSubmitting(false)
         return
       }
 
       router.push(`/employee/quizzes/${quiz.id}/results`)
     })
-  }, [quiz.id, router, startTransition])
+  }, [buildProctoringSubmission, quiz.id, router, startTransition, stopCamera])
 
-  const handleAutoSubmit = useCallback(() => {
+  const captureEvidenceFrame = useCallback(() => {
+    const video = videoRef.current
+    const canvas = canvasRef.current
+    if (!video || !canvas || video.readyState < 2) return null
+
+    const width = video.videoWidth || 320
+    const height = video.videoHeight || 240
+    canvas.width = width
+    canvas.height = height
+    const context = canvas.getContext('2d')
+    if (!context) return null
+    context.drawImage(video, 0, 0, width, height)
+    return canvas.toDataURL('image/jpeg', 0.58)
+  }, [])
+
+  const handleAutoSubmit = useCallback((proctoring?: ProctoringSubmission) => {
     if (!finishedRef.current) {
       finishedRef.current = true
       setFinished(true)
-      doSubmit(answersRef.current)
+      doSubmit(answersRef.current, proctoring || buildProctoringSubmission(true))
     }
-  }, [doSubmit])
+  }, [buildProctoringSubmission, doSubmit])
+
+  const recordProctoringViolation = useCallback((type: ProctoringEventType, label: string) => {
+    if (!started || finishedRef.current || submittingRef.current) return
+
+    const nextCount = violationCountRef.current + 1
+    violationCountRef.current = nextCount
+    setViolationCount(nextCount)
+    setLatestViolation(label)
+
+    const event: ProctoringEvent = {
+      type,
+      label,
+      occurredAt: new Date().toISOString(),
+      questionIndex: currentIndex,
+      evidenceImage: captureEvidenceFrame(),
+    }
+    proctoringEventsRef.current = [...proctoringEventsRef.current, event].slice(-50)
+
+    if (nextCount >= PROCTORING_VIOLATION_LIMIT) {
+      const autoSubmitEvent: ProctoringEvent = {
+        type: 'auto-submit',
+        label: 'Violation limit reached. Quiz auto-submitted and employee flagged.',
+        occurredAt: new Date().toISOString(),
+        questionIndex: currentIndex,
+        evidenceImage: event.evidenceImage,
+      }
+      const summary = buildProctoringSubmission(true, [autoSubmitEvent])
+      handleAutoSubmit(summary)
+    }
+  }, [buildProctoringSubmission, captureEvidenceFrame, currentIndex, handleAutoSubmit, started])
 
   useEffect(() => {
     if (!started || finished) return
@@ -126,7 +203,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
         setTimeRemaining((previous: number) => {
           if (previous <= 1) {
             clearInterval(interval)
-            handleAutoSubmit()
+            handleAutoSubmit(buildProctoringSubmission(false))
             return 0
           }
           return previous - 1
@@ -135,10 +212,39 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       setTotalTime((previous) => previous + 1)
     }, 1000)
     return () => clearInterval(interval)
-  }, [started, finished, quiz.time_limit_minutes, handleAutoSubmit])
+  }, [started, finished, quiz.time_limit_minutes, handleAutoSubmit, buildProctoringSubmission])
 
-  function handleStart() {
+  async function enableProctoring() {
+    setCameraError(null)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: false,
+      })
+      mediaStreamRef.current = stream
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        await videoRef.current.play()
+      }
+      setCameraReady(true)
+    } catch {
+      setCameraReady(false)
+      setCameraError('Camera permission is required before starting a proctored quiz.')
+    }
+  }
+
+  async function handleStart() {
     setStartError(null)
+    if (!cameraReady) {
+      setStartError('Enable camera proctoring before launching the quiz.')
+      return
+    }
+    try {
+      await document.documentElement.requestFullscreen?.()
+    } catch {
+      setStartError('Fullscreen could not be started. Continue only if your browser allows fullscreen.')
+    }
+    window.history.pushState({ proctoredQuiz: true }, '', window.location.href)
     startTransition(async () => {
       const result = await startQuizAttempt(quiz.id)
       if (result.error) {
@@ -149,6 +255,73 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       setQuestionStartTime(Date.now())
     })
   }
+
+  useEffect(() => {
+    return () => stopCamera()
+  }, [stopCamera])
+
+  useEffect(() => {
+    if (!cameraReady || !videoRef.current || !mediaStreamRef.current) return
+    if (videoRef.current.srcObject !== mediaStreamRef.current) {
+      videoRef.current.srcObject = mediaStreamRef.current
+      videoRef.current.play().catch(() => undefined)
+    }
+  }, [cameraReady, started])
+
+  useEffect(() => {
+    if (!started || finished) return
+
+    const onVisibilityChange = () => {
+      if (document.hidden) recordProctoringViolation('tab-hidden', 'Quiz tab was hidden or another tab/app was opened.')
+    }
+    const onBlur = () => recordProctoringViolation('window-blur', 'Quiz window lost focus.')
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement) recordProctoringViolation('fullscreen-exit', 'Fullscreen proctoring mode was exited.')
+    }
+    const onPopState = () => {
+      window.history.pushState({ proctoredQuiz: true }, '', window.location.href)
+      recordProctoringViolation('back-navigation', 'Back navigation was attempted during the quiz.')
+    }
+    const onContextMenu = (event: MouseEvent) => {
+      event.preventDefault()
+      recordProctoringViolation('context-menu', 'Context menu was opened during the quiz.')
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase()
+      const blocked = event.metaKey || event.ctrlKey || event.altKey || key === 'f11'
+      if (!blocked) return
+      event.preventDefault()
+      recordProctoringViolation('blocked-shortcut', `Blocked restricted keyboard shortcut: ${event.key}.`)
+    }
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+      recordProctoringViolation('tab-hidden', 'Attempted to close or reload the quiz tab.')
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('blur', onBlur)
+    document.addEventListener('fullscreenchange', onFullscreenChange)
+    window.addEventListener('popstate', onPopState)
+    document.addEventListener('contextmenu', onContextMenu)
+    window.addEventListener('keydown', onKeyDown, true)
+    window.addEventListener('beforeunload', onBeforeUnload)
+
+    const tracks = mediaStreamRef.current?.getVideoTracks() || []
+    const onCameraEnded = () => recordProctoringViolation('camera-lost', 'Camera stream stopped during the quiz.')
+    tracks.forEach((track) => track.addEventListener('ended', onCameraEnded))
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('blur', onBlur)
+      document.removeEventListener('fullscreenchange', onFullscreenChange)
+      window.removeEventListener('popstate', onPopState)
+      document.removeEventListener('contextmenu', onContextMenu)
+      window.removeEventListener('keydown', onKeyDown, true)
+      window.removeEventListener('beforeunload', onBeforeUnload)
+      tracks.forEach((track) => track.removeEventListener('ended', onCameraEnded))
+    }
+  }, [finished, recordProctoringViolation, started])
 
   function handleSelectOption(optionIndex: number) {
     if (showFeedback || finished) return
@@ -219,7 +392,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     if (currentIndex + 1 >= totalQuestions) {
       finishedRef.current = true
       setFinished(true)
-      doSubmit([...answersRef.current])
+      doSubmit([...answersRef.current], buildProctoringSubmission(false))
       return
     }
 
@@ -259,6 +432,18 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
               </div>
 
               <div className="grid gap-3">
+                <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 text-sm text-zinc-300">
+                  <div className="flex items-start gap-3">
+                    <LockKeyhole className="mt-0.5 h-5 w-5 text-white" />
+                    <div>
+                      <p className="font-medium text-white">AI camera proctoring required</p>
+                      <p className="mt-1 text-zinc-400">
+                        Keep this tab focused, stay in fullscreen, and keep your face visible. Three violations auto-submit the test and notify staff with captured proof.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 {quiz.insights?.retentionCheck?.daysSinceLastAssessment >= 14 && (
                   <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 text-sm text-zinc-300">
                     <div className="flex items-start gap-3">
@@ -288,13 +473,46 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
                 )}
               </div>
 
+              <div className="grid gap-3 rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 sm:grid-cols-[160px_1fr]">
+                <div className="relative aspect-video overflow-hidden rounded-2xl border border-white/10 bg-zinc-950">
+                  <video ref={videoRef} muted playsInline className="h-full w-full object-cover" />
+                  {!cameraReady && (
+                    <div className="absolute inset-0 flex items-center justify-center text-zinc-500">
+                      <Camera className="h-8 w-8" />
+                    </div>
+                  )}
+                  <canvas ref={canvasRef} className="hidden" />
+                </div>
+                <div className="flex flex-col justify-center gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-white">
+                      {cameraReady ? 'Camera verified' : 'Enable proctoring camera'}
+                    </p>
+                    <p className="mt-1 text-xs text-zinc-500">
+                      The app captures evidence frames only when a violation is detected.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-fit rounded-full border-white/20 bg-transparent text-white hover:bg-white hover:text-black"
+                    onClick={enableProctoring}
+                    disabled={cameraReady}
+                  >
+                    <Camera className="mr-2 h-4 w-4" />
+                    {cameraReady ? 'Camera on' : 'Turn on camera'}
+                  </Button>
+                  {cameraError && <p className="text-xs font-medium text-red-300">{cameraError}</p>}
+                </div>
+              </div>
+
               <Button
                 size="lg"
                 className="h-14 rounded-full bg-white px-8 text-base font-semibold text-black hover:bg-zinc-200"
                 onClick={handleStart}
-                disabled={isPending}
+                disabled={isPending || !cameraReady}
               >
-                {isPending ? 'Starting session...' : 'Launch adaptive quiz'}
+                {isPending ? 'Starting session...' : 'Launch proctored quiz'}
               </Button>
               {startError && (
                 <p className="text-sm font-medium text-red-300">{startError}</p>
@@ -314,8 +532,12 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
                     <span className="text-white">On</span>
                   </div>
                   <div className="flex items-center justify-between rounded-2xl border border-white/10 px-4 py-3">
-                    <span>Emotional state inference</span>
-                    <span className="text-white">On</span>
+                    <span>Fullscreen lock</span>
+                    <span className="text-white">Required</span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-2xl border border-white/10 px-4 py-3">
+                    <span>Violation auto-submit</span>
+                    <span className="text-white">3 strikes</span>
                   </div>
                   <div className="flex items-center justify-between rounded-2xl border border-white/10 px-4 py-3">
                     <span>Predictive readiness gate</span>
@@ -405,13 +627,10 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
             <CardContent className="space-y-3 p-6">
               {currentQuestion?.options?.map((option, index: number) => {
                 const isSelected = selectedOption === index
-                const isCorrect = option.isCorrect === true
-                const isWrongSelection = showFeedback && isSelected && !isCorrect
                 let style = 'border-white/10 bg-white/5 hover:border-white/40'
 
                 if (showFeedback) {
-                  if (isCorrect) style = 'border-emerald-400 bg-emerald-500/15 text-emerald-50 shadow-[0_0_0_1px_rgba(52,211,153,0.35)]'
-                  else if (isWrongSelection) style = 'border-red-400 bg-red-500/15 text-red-50 shadow-[0_0_0_1px_rgba(248,113,113,0.35)]'
+                  if (isSelected) style = 'border-white bg-white text-black'
                   else style = 'border-white/5 bg-white/[0.03] text-zinc-500'
                 } else if (isSelected) {
                   style = 'border-white bg-white text-black'
@@ -426,31 +645,16 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
                   >
                     <div className="flex items-center gap-3">
                       <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-medium ${
-                        showFeedback && isCorrect
-                            ? 'bg-emerald-400 text-emerald-950'
-                            : isWrongSelection
-                              ? 'bg-red-400 text-red-950'
-                            : isSelected
+                        isSelected
                               ? 'bg-black text-white'
                               : 'bg-white/10 text-white'
                       }`}>
-                        {showFeedback && isCorrect ? (
-                          <CheckCircle2 className="h-4 w-4" />
-                        ) : showFeedback && isWrongSelection ? (
-                          <XCircle className="h-4 w-4" />
-                        ) : (
-                          String.fromCharCode(65 + index)
-                        )}
+                        {showFeedback && isSelected ? <CheckCircle2 className="h-4 w-4" /> : String.fromCharCode(65 + index)}
                       </div>
                       <span className="text-sm">{option.text}</span>
-                      {showFeedback && isCorrect && (
-                        <Badge className="ml-auto border-emerald-300 bg-emerald-400 text-emerald-950">
-                          Correct
-                        </Badge>
-                      )}
-                      {isWrongSelection && (
-                        <Badge className="ml-auto border-red-300 bg-red-400 text-red-950">
-                          Wrong
+                      {showFeedback && isSelected && (
+                        <Badge className="ml-auto border-white/20 bg-black text-white">
+                          Saved
                         </Badge>
                       )}
                     </div>
@@ -458,10 +662,10 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
                 )
               })}
 
-              {showFeedback && currentQuestion?.explanation && (
-                <div className="rounded-[1.5rem] border border-slate-500/30 bg-slate-500/10 p-4">
-                  <p className="mb-1 text-sm font-medium text-slate-100">Reasoning</p>
-                  <p className="text-sm text-slate-300">{currentQuestion.explanation}</p>
+              {showFeedback && (
+                <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
+                  <p className="mb-1 text-sm font-medium text-white">Answer locked</p>
+                  <p className="text-sm text-zinc-400">Correct answers and explanations are shown only after the full quiz is submitted.</p>
                 </div>
               )}
             </CardContent>
@@ -470,6 +674,34 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
 
         <div className="space-y-4">
           {readiness ? <ReadinessMeter readiness={readiness} /> : null}
+
+          <Card className="border-zinc-200 bg-white">
+            <CardContent className="space-y-4 p-5">
+              <div className="flex items-center gap-2 text-sm font-semibold text-black">
+                <Eye className="h-4 w-4" />
+                Proctoring status
+              </div>
+              <div className="relative aspect-video overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-950">
+                <video ref={videoRef} muted playsInline className="h-full w-full object-cover" />
+                <canvas ref={canvasRef} className="hidden" />
+              </div>
+              <SignalRow
+                label="Camera"
+                active={cameraReady}
+                description={cameraReady ? 'Camera stream is active.' : 'Camera must stay enabled.'}
+              />
+              <SignalRow
+                label="Violations"
+                active={violationCount > 0}
+                description={`${violationCount}/${PROCTORING_VIOLATION_LIMIT} before auto-submit.`}
+              />
+              {latestViolation && (
+                <div className="rounded-[1.25rem] border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+                  {latestViolation}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           <Card className="border-zinc-200 bg-white">
             <CardContent className="space-y-4 p-5">

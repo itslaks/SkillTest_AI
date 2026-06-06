@@ -35,7 +35,7 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
 
   const { data: quiz } = await supabase
     .from('quizzes')
-    .select('*')
+    .select('*, questions(*)')
     .eq('id', quizId)
     .single()
 
@@ -52,6 +52,7 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
   const topicAttempts = getTopicAttempts(history || [], quiz?.topic)
   const behavior = analyzeAttemptPattern(attempt.answers || [], quiz?.difficulty, topicAttempts)
   const retentionCheck = buildRetentionChecks(topicAttempts).find((item) => item.topic.toLowerCase() === (quiz?.topic || '').toLowerCase())
+  const questionMap = new Map<string, any>((quiz?.questions || []).map((question: any) => [question.id, question]))
 
   function formatTime(seconds: number) {
     const minutes = Math.floor(seconds / 60)
@@ -157,6 +158,47 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
                 </div>
               </div>
             ))}
+          </CardContent>
+        </Card>
+
+        <Card className="border-zinc-200 bg-white">
+          <CardHeader>
+            <CardTitle className="text-2xl">Answer review</CardTitle>
+            <CardDescription>Correct answers and explanations are available only after submission.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {(attempt.answers || []).map((answer: any, index: number) => {
+              const question = questionMap.get(answer.questionId)
+              const options = Array.isArray(question?.options) ? question.options : []
+              const selected = options[answer.selectedOption]
+              const correctIndex = options.findIndex((option: any) => option.isCorrect)
+              const correct = options[correctIndex]
+
+              return (
+                <div key={`${answer.questionId}-${index}`} className="rounded-[1.5rem] border border-zinc-200 bg-zinc-50 p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <Badge variant="outline" className="rounded-full border-zinc-300">Question {index + 1}</Badge>
+                    <Badge className={answer.isCorrect ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}>
+                      {answer.isCorrect ? 'Correct' : 'Incorrect'}
+                    </Badge>
+                  </div>
+                  <p className="mt-4 font-semibold text-zinc-950">{question?.question_text || 'Question unavailable'}</p>
+                  <div className="mt-4 grid gap-2 text-sm">
+                    <p className="rounded-xl border border-zinc-200 bg-white px-4 py-3">
+                      <span className="font-semibold text-zinc-900">Your answer:</span> {selected?.text || 'Not answered'}
+                    </p>
+                    <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-950">
+                      <span className="font-semibold">Correct answer:</span> {correct?.text || 'Not configured'}
+                    </p>
+                    {question?.explanation && (
+                      <p className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-950">
+                        <span className="font-semibold">Explanation:</span> {question.explanation}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
           </CardContent>
         </Card>
 

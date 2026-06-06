@@ -190,6 +190,33 @@ export const submitQuizSchema = z
       adaptiveDifficulty: difficultyLevelSchema.optional(),
     })),
     time_taken_seconds: z.number().int().min(0).max(86400),
+    proctoring: z.object({
+      enabled: z.boolean(),
+      violationCount: z.number().int().min(0).max(50),
+      autoSubmitted: z.boolean(),
+      events: z.array(z.object({
+        type: z.enum([
+          'camera-denied',
+          'fullscreen-exit',
+          'tab-hidden',
+          'window-blur',
+          'blocked-shortcut',
+          'back-navigation',
+          'context-menu',
+          'camera-lost',
+          'auto-submit',
+        ]),
+        label: sanitizedString(180),
+        occurredAt: z.string().datetime(),
+        questionIndex: z.number().int().min(0).max(1000).optional(),
+        evidenceImage: z
+          .string()
+          .max(1_100_000, 'Evidence image is too large')
+          .refine((value) => /^data:image\/jpe?g;base64,/i.test(value), 'Evidence must be a JPEG data URL')
+          .optional()
+          .nullable(),
+      })).max(50),
+    }).optional(),
   })
   .strict()
 
