@@ -79,8 +79,8 @@ export async function createOrUpdateProctoringSession({
   quizId: string
   precheck: ProctoringPrecheck
 }) {
-  if (!precheck.cameraReady || !precheck.fullscreenReady || !precheck.consentAccepted) {
-    return { error: 'Camera, fullscreen, and consent are required before starting this proctored quiz.' }
+  if (!precheck.cameraReady || !precheck.microphoneReady || !precheck.fullscreenReady || !precheck.consentAccepted) {
+    return { error: 'Camera, microphone, fullscreen, and consent are required before starting this proctored quiz.' }
   }
 
   const { data: session, error } = await admin
@@ -115,9 +115,20 @@ export async function requireActiveProctoringSession(admin: any, sessionId: stri
 
   if (error || !session) return { error: error?.message || 'Proctoring session was not found.' }
   if (session.status !== 'active') return { error: 'Proctoring session is no longer active.' }
-  if (!session.camera_ready || !session.fullscreen_ready || !session.consent_accepted) {
+  if (!session.camera_ready || !session.microphone_ready || !session.fullscreen_ready || !session.consent_accepted) {
     return { error: 'Proctoring pre-checks were not completed.' }
   }
+
+  const { data: attempt, error: attemptError } = await admin
+    .from('quiz_attempts')
+    .select('id, status, quiz_id, user_id')
+    .eq('id', attemptId)
+    .eq('user_id', userId)
+    .eq('quiz_id', session.quiz_id)
+    .maybeSingle()
+
+  if (attemptError || !attempt) return { error: attemptError?.message || 'Quiz attempt was not found.' }
+  if (attempt.status !== 'in_progress') return { error: 'Proctoring events are not accepted after quiz submission.' }
 
   return { data: session as ProctoringSessionRow }
 }

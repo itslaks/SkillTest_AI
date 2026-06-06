@@ -25,11 +25,15 @@ import {
   ChevronRight,
   Clock,
   Eye,
+  Info,
   LockKeyhole,
+  Mic,
+  MonitorCheck,
   ShieldAlert,
   Snowflake,
   Sparkles,
   Trophy,
+  Wifi,
   XCircle,
   Zap,
 } from 'lucide-react'
@@ -96,7 +100,11 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   })
   const [cameraReady, setCameraReady] = useState(false)
   const [microphoneReady, setMicrophoneReady] = useState(false)
+  const [fullscreenReady, setFullscreenReady] = useState(false)
+  const [consentAccepted, setConsentAccepted] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
+  const [microphoneError, setMicrophoneError] = useState<string | null>(null)
+  const [fullscreenError, setFullscreenError] = useState<string | null>(null)
   const [violationCount, setViolationCount] = useState(0)
   const [riskScore, setRiskScore] = useState(0)
   const [latestViolation, setLatestViolation] = useState<string | null>(null)
@@ -116,6 +124,18 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const totalQuestions = questions.length
   const progress = totalQuestions > 0 ? ((currentIndex + (showFeedback ? 1 : 0)) / totalQuestions) * 100 : 0
   const readiness = quiz.insights?.readiness
+  const requiresProctoring = quiz.proctoring_required !== false
+  const browserSupported = typeof navigator !== 'undefined'
+    && Boolean(navigator.mediaDevices?.getUserMedia)
+    && typeof document !== 'undefined'
+    && Boolean(document.documentElement.requestFullscreen)
+  const canStart = !requiresProctoring || (
+    browserSupported
+    && cameraReady
+    && microphoneReady
+    && fullscreenReady
+    && consentAccepted
+  )
 
   const stopCamera = useCallback(() => {
     mediaStreamRef.current?.getTracks().forEach((track) => track.stop())
@@ -142,7 +162,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
         quiz_id: quiz.id,
         answers: finalAnswers,
         time_taken_seconds: totalTimeRef.current,
-        proctoring: proctoring || buildProctoringSubmission(false),
+        proctoring: requiresProctoring ? (proctoring || buildProctoringSubmission(false)) : undefined,
       })
 
       if (result.error) {
@@ -153,7 +173,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
 
       router.push(`/employee/quizzes/${quiz.id}/results`)
     })
-  }, [buildProctoringSubmission, quiz.id, router, startTransition, stopCamera])
+  }, [buildProctoringSubmission, quiz.id, requiresProctoring, router, startTransition, stopCamera])
 
   const captureEvidenceFrame = useCallback(() => {
     const video = videoRef.current
@@ -179,7 +199,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   }, [buildProctoringSubmission, doSubmit])
 
   const recordProctoringViolation = useCallback((type: ProctoringEventType, label: string) => {
-    if (!started || finishedRef.current || submittingRef.current) return
+    if (!requiresProctoring || !started || finishedRef.current || submittingRef.current) return
 
     setLatestViolation(label)
 
@@ -246,7 +266,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       .catch(() => {
         setLatestViolation(`${label} Server sync failed; keep the quiz window stable.`)
       })
-  }, [captureEvidenceFrame, currentIndex, handleAutoSubmit, started])
+  }, [captureEvidenceFrame, currentIndex, handleAutoSubmit, requiresProctoring, started])
 
   useEffect(() => {
     if (!started || finished) return
@@ -266,51 +286,83 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     return () => clearInterval(interval)
   }, [started, finished, quiz.time_limit_minutes, handleAutoSubmit, buildProctoringSubmission])
 
-  async function enableProctoring() {
+  function describeMediaError(error: unknown, device: 'camera' | 'microphone') {
+    const name = error instanceof DOMException ? error.name : ''
+    if (name === 'NotAllowedError' || name === 'PermissionDeniedError') return `${device === 'camera' ? 'Camera' : 'Microphone'} permission was denied. Allow access in your browser settings and try again.`
+    if (name === 'NotFoundError' || name === 'DevicesNotFoundError') return `No ${device} device was found. Connect a working device and try again.`
+    if (name === 'NotReadableError' || name === 'TrackStartError') return `The ${device} is already in use or unavailable. Close other apps using it and try again.`
+    if (name === 'OverconstrainedError') return `The selected ${device} does not support the requested settings. Try another device.`
+    if (!navigator.mediaDevices?.getUserMedia) return 'This browser does not support secure media permission prompts. Use a current desktop browser over HTTPS or localhost.'
+    return `${device === 'camera' ? 'Camera' : 'Microphone'} permission could not be verified. Check browser permissions and device availability.`
+  }
+
+  async function enableCamera() {
     setCameraError(null)
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
-        audio: true,
       })
+      stopCamera()
       mediaStreamRef.current = stream
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         await videoRef.current.play()
       }
       setCameraReady(true)
-      setMicrophoneReady(stream.getAudioTracks().length > 0)
-    } catch {
+    } catch (error) {
       setCameraReady(false)
-      setMicrophoneReady(false)
-      setCameraError('Camera permission is required before starting a proctored quiz.')
+      setCameraError(describeMediaError(error, 'camera'))
     }
+  }
+
+  async function enableMicrophone() {
+    setMicrophoneError(null)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      stream.getTracks().forEach((track) => track.stop())
+      setMicrophoneReady(true)
+    } catch (error) {
+      setMicrophoneReady(false)
+      setMicrophoneError(describeMediaError(error, 'microphone'))
+    }
+  }
+
+  function checkFullscreenReadiness() {
+    setFullscreenError(null)
+    if (!document.documentElement.requestFullscreen) {
+      setFullscreenReady(false)
+      setFullscreenError('Fullscreen is not supported in this browser. Use a current desktop browser.')
+      return
+    }
+    setFullscreenReady(true)
   }
 
   async function handleStart() {
     setStartError(null)
-    if (!cameraReady) {
-      setStartError('Enable camera proctoring before launching the quiz.')
+    if (requiresProctoring && !canStart) {
+      setStartError('Complete camera, microphone, fullscreen, browser, and consent checks before launching the quiz.')
       return
     }
-    try {
-      await document.documentElement.requestFullscreen?.()
-      if (!document.fullscreenElement) {
-        setStartError('Fullscreen is required before launching the proctored quiz. Use the launch button again and allow fullscreen.')
+    if (requiresProctoring) {
+      try {
+        await document.documentElement.requestFullscreen?.()
+        if (!document.fullscreenElement) {
+          setStartError('Fullscreen is required before launching the proctored quiz. Use the launch button again and allow fullscreen.')
+          return
+        }
+      } catch {
+        setStartError('Fullscreen is required before launching the proctored quiz. Your browser blocked the request.')
         return
       }
-    } catch {
-      setStartError('Fullscreen is required before launching the proctored quiz. Your browser blocked the request.')
-      return
     }
     window.history.pushState({ proctoredQuiz: true }, '', window.location.href)
     startTransition(async () => {
-      const result = await startQuizAttempt(quiz.id, {
+      const result = await startQuizAttempt(quiz.id, requiresProctoring ? {
         cameraReady,
         microphoneReady,
         fullscreenReady: Boolean(document.fullscreenElement),
-        consentAccepted: true,
-      })
+        consentAccepted,
+      } : undefined)
       if (result.error) {
         setStartError(result.error)
         return
@@ -327,15 +379,15 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   }, [stopCamera])
 
   useEffect(() => {
-    if (!cameraReady || !videoRef.current || !mediaStreamRef.current) return
+    if (!requiresProctoring || !cameraReady || !videoRef.current || !mediaStreamRef.current) return
     if (videoRef.current.srcObject !== mediaStreamRef.current) {
       videoRef.current.srcObject = mediaStreamRef.current
       videoRef.current.play().catch(() => undefined)
     }
-  }, [cameraReady, started])
+  }, [cameraReady, requiresProctoring, started])
 
   useEffect(() => {
-    if (!started || finished) return
+    if (!requiresProctoring || !started || finished) return
 
     const onVisibilityChange = () => {
       if (document.hidden) recordProctoringViolation('tab-hidden', 'Quiz tab was hidden or another tab/app was opened.')
@@ -411,7 +463,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       tracks.forEach((track) => track.removeEventListener('ended', onCameraEnded))
       window.clearInterval(devtoolsInterval)
     }
-  }, [finished, recordProctoringViolation, started])
+  }, [finished, recordProctoringViolation, requiresProctoring, started])
 
   function handleSelectOption(optionIndex: number) {
     if (showFeedback || finished) return
@@ -526,9 +578,11 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
                   <div className="flex items-start gap-3">
                     <LockKeyhole className="mt-0.5 h-5 w-5 text-white" />
                     <div>
-                      <p className="font-medium text-white">AI camera proctoring required</p>
+                      <p className="font-medium text-white">{requiresProctoring ? 'AI proctoring pre-check required' : 'Standard quiz session'}</p>
                       <p className="mt-1 text-zinc-400">
-                        Keep this tab focused, stay in fullscreen, and keep your camera frame visible. Three verified warnings or critical risk auto-submit the test and notify staff with captured proof.
+                        {requiresProctoring
+                          ? 'Complete camera, microphone, fullscreen, browser, and consent checks before starting. Three verified warnings or critical risk auto-submit the test and notify staff.'
+                          : 'This quiz does not require camera proctoring. Start when you are ready.'}
                       </p>
                     </div>
                   </div>
@@ -563,46 +617,80 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
                 )}
               </div>
 
-              <div className="grid gap-3 rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 sm:grid-cols-[160px_1fr]">
-                <div className="relative aspect-video overflow-hidden rounded-2xl border border-white/10 bg-zinc-950">
-                  <video ref={videoRef} muted playsInline className="h-full w-full object-cover" />
-                  {!cameraReady && (
-                    <div className="absolute inset-0 flex items-center justify-center text-zinc-500">
-                      <Camera className="h-8 w-8" />
-                    </div>
-                  )}
-                  <canvas ref={canvasRef} className="hidden" />
-                </div>
-                <div className="flex flex-col justify-center gap-3">
-                  <div>
-                    <p className="text-sm font-medium text-white">
-                      {cameraReady ? 'Camera and microphone verified' : 'Enable proctoring camera'}
-                    </p>
-                    <p className="mt-1 text-xs text-zinc-500">
-                      The app checks camera, microphone permission, fullscreen, focus, network, clipboard, and browser-lock signals.
-                    </p>
+              {requiresProctoring && (
+                <div className="grid gap-4 rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 lg:grid-cols-[220px_1fr]">
+                  <div className="relative aspect-video overflow-hidden rounded-2xl border border-white/10 bg-zinc-950">
+                    <video ref={videoRef} muted playsInline className="h-full w-full object-cover" />
+                    {!cameraReady && (
+                      <div className="absolute inset-0 flex items-center justify-center text-zinc-500">
+                        <Camera className="h-8 w-8" />
+                      </div>
+                    )}
+                    <canvas ref={canvasRef} className="hidden" />
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-fit rounded-full border-white/20 bg-transparent text-white hover:bg-white hover:text-black"
-                    onClick={enableProctoring}
-                    disabled={cameraReady}
-                  >
-                    <Camera className="mr-2 h-4 w-4" />
-                    {cameraReady ? 'Checks passed' : 'Run pre-checks'}
-                  </Button>
-                  {cameraError && <p className="text-xs font-medium text-red-300">{cameraError}</p>}
+                  <div className="grid gap-3">
+                    <PrecheckRow
+                      icon={Camera}
+                      label="Camera Status"
+                      status={cameraReady ? 'Granted' : 'Not Granted'}
+                      active={cameraReady}
+                      actionLabel={cameraReady ? 'Camera Enabled' : 'Enable Camera'}
+                      onAction={enableCamera}
+                      disabled={cameraReady}
+                      error={cameraError}
+                    />
+                    <PrecheckRow
+                      icon={Mic}
+                      label="Microphone Status"
+                      status={microphoneReady ? 'Granted' : 'Not Granted'}
+                      active={microphoneReady}
+                      actionLabel={microphoneReady ? 'Microphone Enabled' : 'Enable Microphone'}
+                      onAction={enableMicrophone}
+                      disabled={microphoneReady}
+                      error={microphoneError}
+                    />
+                    <PrecheckRow
+                      icon={MonitorCheck}
+                      label="Fullscreen Status"
+                      status={fullscreenReady ? 'Ready' : 'Pending'}
+                      active={fullscreenReady}
+                      actionLabel={fullscreenReady ? 'Fullscreen Ready' : 'Check Fullscreen'}
+                      onAction={checkFullscreenReadiness}
+                      disabled={fullscreenReady}
+                      error={fullscreenError}
+                    />
+                    <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+                      <div className="flex items-start gap-3">
+                        <Wifi className={`mt-0.5 h-4 w-4 ${browserSupported ? 'text-emerald-200' : 'text-red-300'}`} />
+                        <div>
+                          <p className="text-sm font-medium text-white">Internet/Browser Compatibility: {browserSupported ? 'Ready' : 'Unsupported'}</p>
+                          <p className="mt-1 text-xs text-zinc-500">Use a current browser over HTTPS or localhost with media and fullscreen support.</p>
+                        </div>
+                      </div>
+                    </div>
+                    <label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-black/20 p-3 text-sm text-zinc-300">
+                      <input
+                        type="checkbox"
+                        checked={consentAccepted}
+                        onChange={(event) => setConsentAccepted(event.target.checked)}
+                        className="mt-1"
+                      />
+                      <span>
+                        <span className="block font-medium text-white">Proctoring notice and consent</span>
+                        <span className="mt-1 block text-xs text-zinc-500">I consent to camera/microphone checks, fullscreen monitoring, browser integrity signals, and private evidence capture for violations.</span>
+                      </span>
+                    </label>
+                  </div>
                 </div>
-              </div>
+              )}
 
               <Button
                 size="lg"
                 className="h-14 rounded-full bg-white px-8 text-base font-semibold text-black hover:bg-zinc-200"
                 onClick={handleStart}
-                disabled={isPending || !cameraReady}
+                disabled={isPending || !canStart}
               >
-                {isPending ? 'Starting session...' : 'Launch proctored quiz'}
+                {isPending ? 'Starting session...' : requiresProctoring ? 'Launch proctored quiz' : 'Start quiz'}
               </Button>
               {startError && (
                 <p className="text-sm font-medium text-red-300">{startError}</p>
@@ -765,43 +853,45 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
         <div className="space-y-4">
           {readiness ? <ReadinessMeter readiness={readiness} /> : null}
 
-          <Card className="border-zinc-200 bg-white">
-            <CardContent className="space-y-4 p-5">
-              <div className="flex items-center gap-2 text-sm font-semibold text-black">
-                <Eye className="h-4 w-4" />
-                Proctoring status
-              </div>
-              <div className="relative aspect-video overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-950">
-                <video ref={videoRef} muted playsInline className="h-full w-full object-cover" />
-                <canvas ref={canvasRef} className="hidden" />
-              </div>
-              <SignalRow
-                label="Camera"
-                active={cameraReady}
-                description={cameraReady ? 'Camera stream is active.' : 'Camera must stay enabled.'}
-              />
-              <SignalRow
-                label="Microphone"
-                active={microphoneReady}
-                description={microphoneReady ? 'Microphone permission is active.' : 'Microphone permission is required.'}
-              />
-              <SignalRow
-                label="Violations"
-                active={violationCount > 0}
-                description={`${violationCount}/${PROCTORING_VIOLATION_LIMIT} before auto-submit.`}
-              />
-              <SignalRow
-                label="Risk score"
-                active={riskScore >= 31}
-                description={`${riskScore}/${PROCTORING_CRITICAL_RISK_SCORE}+ integrity risk.`}
-              />
-              {latestViolation && (
-                <div className="rounded-[1.25rem] border border-red-200 bg-red-50 p-4 text-sm text-red-900">
-                  {latestViolation}
+          {requiresProctoring && (
+            <Card className="border-zinc-200 bg-white">
+              <CardContent className="space-y-4 p-5">
+                <div className="flex items-center gap-2 text-sm font-semibold text-black">
+                  <Eye className="h-4 w-4" />
+                  Proctoring status
                 </div>
-              )}
-            </CardContent>
-          </Card>
+                <div className="relative aspect-video overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-950">
+                  <video ref={videoRef} muted playsInline className="h-full w-full object-cover" />
+                  <canvas ref={canvasRef} className="hidden" />
+                </div>
+                <SignalRow
+                  label="Camera"
+                  active={cameraReady}
+                  description={cameraReady ? 'Camera stream is active.' : 'Camera must stay enabled.'}
+                />
+                <SignalRow
+                  label="Microphone"
+                  active={microphoneReady}
+                  description={microphoneReady ? 'Microphone permission is active.' : 'Microphone permission is required.'}
+                />
+                <SignalRow
+                  label="Violations"
+                  active={violationCount > 0}
+                  description={`${violationCount}/${PROCTORING_VIOLATION_LIMIT} before auto-submit.`}
+                />
+                <SignalRow
+                  label="Risk score"
+                  active={riskScore >= 31}
+                  description={`${riskScore}/${PROCTORING_CRITICAL_RISK_SCORE}+ integrity risk.`}
+                />
+                {latestViolation && (
+                  <div className="rounded-[1.25rem] border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+                    {latestViolation}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           <Card className="border-zinc-200 bg-white">
             <CardContent className="space-y-4 p-5">
@@ -867,6 +957,50 @@ function MetricCard({ label, value }: { label: string; value: string }) {
     <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
       <p className="text-[10px] uppercase tracking-[0.35em] text-zinc-500">{label}</p>
       <p className="mt-3 text-2xl font-semibold text-white">{value}</p>
+    </div>
+  )
+}
+
+function PrecheckRow({
+  icon: Icon,
+  label,
+  status,
+  active,
+  actionLabel,
+  onAction,
+  disabled,
+  error,
+}: {
+  icon: any
+  label: string
+  status: string
+  active: boolean
+  actionLabel: string
+  onAction: () => void
+  disabled?: boolean
+  error?: string | null
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Icon className={`h-4 w-4 ${active ? 'text-emerald-200' : 'text-zinc-500'}`} />
+          <div>
+            <p className="text-sm font-medium text-white">{label}: {status}</p>
+            {error && <p className="mt-1 max-w-xl text-xs font-medium text-red-300">{error}</p>}
+          </div>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          className="h-9 rounded-full border-white/20 bg-transparent px-4 text-xs text-white hover:bg-white hover:text-black"
+          onClick={onAction}
+          disabled={disabled}
+        >
+          {active ? <CheckCircle2 className="mr-2 h-3.5 w-3.5" /> : <Info className="mr-2 h-3.5 w-3.5" />}
+          {actionLabel}
+        </Button>
+      </div>
     </div>
   )
 }

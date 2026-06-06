@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireTrainingStaffForApi } from '@/lib/rbac'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getAccessibleTrainingBatchIds } from '@/lib/training-access'
-import { callAI } from '@/lib/ai'
+import { callAI, stripCodeFences } from '@/lib/ai'
 import { analyzeAttemptPattern } from '@/lib/insights'
 import { buildAdminGuideSearchIndex, findAdminGuideAnswer } from '@/lib/manager-docs'
 import { createEmployeeWithSetupEmail } from '@/lib/employee-onboarding'
@@ -305,8 +305,9 @@ function parseNaturalCommand(text: string): ParsedCommand | null {
 
   if (/\b(create|add)\s+quiz\b/i.test(text)) {
     mergeKeyValues(args, text)
-    args.title ||= quotedValueAfter(text, 'quiz') || quotedValueAfter(text, 'title') || phraseAfter(text, /\bquiz\s+(?:called|named|title)?\b/i)
-    args.topic ||= valueAfterWord(text, 'topic') || valueAfterWord(text, 'domain')
+    const intent = extractQuizCreationIntent(text)
+    Object.assign(args, { ...intent, ...args })
+    args.title ||= quotedValueAfter(text, 'title') || `${args.topic || 'General'} Assessment`
     return { action: 'create quiz', args, source: 'natural' }
   }
 
@@ -621,14 +622,16 @@ async function createQuizCommand(admin: ReturnType<typeof createAdminClient>, ac
   const title = args.title
   const topic = args.topic || args.domain
   if (!title || !topic) return { error: 'Use: run create quiz title="..." topic="..." difficulty=medium question_count=10 passing_score=70' }
+  const questionCount = clampNumber(Number(args.question_count || args.questions || 10), 1, 50, 10)
+  const difficulty = normalizeDifficultyArg(args.difficulty)
   const payload = {
     title,
     topic,
     description: args.description || null,
-    difficulty: args.difficulty || 'medium',
-    question_count: Number(args.question_count || args.questions || 10),
-    time_limit_minutes: Number(args.time_limit || args.time_limit_minutes || 30),
-    passing_score: Number(args.passing_score || 70),
+    difficulty,
+    question_count: questionCount,
+    time_limit_minutes: clampNumber(Number(args.time_limit || args.time_limit_minutes || args.duration || 30), 1, 480, 30),
+    passing_score: clampNumber(Number(args.passing_score || 70), 0, 100, 70),
     status: args.status || 'active',
     is_active: (args.status || 'active') !== 'draft' && (args.status || 'active') !== 'archived',
     created_by: actorId,
@@ -636,8 +639,31 @@ async function createQuizCommand(admin: ReturnType<typeof createAdminClient>, ac
   }
   const { data, error } = await admin.from('quizzes').insert(payload).select('id, title').single()
   if (error) return { error: error.message }
+
+  const generation = await generateQuestionsForChatbotQuiz(admin, {
+    quizId: data.id,
+    topic,
+    difficulty,
+    count: questionCount,
+    objective: args.objective || args.description || `Assess practical understanding of ${topic}`,
+  })
+
+  let assignmentMessage = ''
+  const assignee = args.assigned_to || args.assigned_employee || args.employee || args.name || args.email
+  const dueDate = normalizeNaturalDueDate(args.due_date)
+  if (assignee) {
+    const assigned = await assignQuizToNaturalAssignee(admin, actorId, data.id, assignee, dueDate)
+    assignmentMessage = assigned.error ? ` Assignment skipped: ${assigned.error}` : ` Assigned to ${assigned.count} employee(s).`
+  } else if (args.department || args.team) {
+    const assigned = await assignQuizToDepartment(admin, actorId, data.id, args.department || args.team, dueDate)
+    assignmentMessage = assigned.error ? ` Assignment skipped: ${assigned.error}` : ` Assigned to ${assigned.count} employee(s).`
+  }
+
   revalidateManagerPaths()
-  return { message: `Quiz "${data.title}" created. Add questions from Quiz Manager or AI generation.`, data }
+  return {
+    message: `Quiz "${data.title}" created with ${generation.count} ${generation.method} question(s).${assignmentMessage}`,
+    data: { ...data, generated_questions: generation.count, generation_method: generation.method },
+  }
 }
 
 async function updateQuizCommand(admin: ReturnType<typeof createAdminClient>, args: Record<string, string>) {
@@ -1092,6 +1118,258 @@ async function deleteBatchCascade(admin: ReturnType<typeof createAdminClient>, b
 
 function splitList(value: string | undefined) {
   return (value || '').split(',').map((item) => item.trim()).filter(Boolean)
+}
+
+function extractQuizCreationIntent(text: string) {
+  const args: Record<string, string> = {}
+  const lower = normalize(text)
+  const difficulty = lower.match(/\b(easy|medium|hard|advanced|hardcore)\b/)?.[1]
+  if (difficulty) args.difficulty = difficulty
+
+  const count = lower.match(/\b(\d{1,3})\s+(?:questions?|mcqs?)\b/)?.[1]
+  if (count) args.question_count = count
+
+  const duration = lower.match(/\b(\d{1,3})\s*(?:minutes?|mins?)\b/)?.[1]
+  if (duration) args.time_limit_minutes = duration
+
+  const passing = lower.match(/\b(?:passing|pass)\s*(?:score|mark)?\s*(?:is|=|:)?\s*(\d{1,3})\b/)?.[1]
+  if (passing) args.passing_score = passing
+
+  const due = text.match(/\bdue\s+(.+?)(?:,|\.|$)/i)?.[1]?.trim()
+  if (due) args.due_date = due
+
+  const department = text.match(/\bfor\s+(.+?)\s+(?:team|department)\b/i)?.[1]?.trim()
+  if (department) args.department = cleanEntity(department)
+
+  const assigned = text.match(/\bassign(?:ed)?\s+(?:it\s+)?to\s+(.+?)(?:\s+due\b|,|\.|$)/i)?.[1]?.trim()
+  if (assigned) args.assigned_to = cleanEntity(assigned)
+
+  const topicPatterns = [
+    /\b(?:create|add)\s+(?:a\s+|an\s+)?(?:easy|medium|hard|advanced|hardcore)?\s*(?:quiz|assessment)\s+on\s+(.+?)(?:\s*,|\s+difficulty\b|\s+and\s+assign\b|\s+for\b|\s+due\b|$)/i,
+    /\b(?:create|add)\s+(?:a\s+|an\s+)?(?:easy|medium|hard|advanced|hardcore)?\s*(.+?)\s+(?:quiz|assessment)\b/i,
+    /\bgenerate\s+(?:\d{1,3}\s+)?questions?\s+on\s+(.+?)(?:\s*,|\s+difficulty\b|\s+and\s+assign\b|\s+for\b|\s+due\b|$)/i,
+  ]
+  for (const pattern of topicPatterns) {
+    const topic = text.match(pattern)?.[1]?.trim()
+    if (topic) {
+      args.topic = cleanTopic(topic)
+      break
+    }
+  }
+
+  if (!args.topic && args.title && !/^create\b/i.test(args.title)) args.topic = cleanTopic(args.title)
+  if (args.topic) {
+    args.title = `${args.topic} Assessment`
+    args.description ||= `AI generated ${args.difficulty || 'medium'} assessment on ${args.topic}.`
+  }
+  return args
+}
+
+function cleanTopic(value: string) {
+  return cleanEntity(value)
+    .replace(/\b(?:difficulty|level)\s+(?:easy|medium|hard|advanced|hardcore)\b/ig, '')
+    .replace(/\b(?:easy|medium|hard|advanced|hardcore)\b/ig, '')
+    .replace(/\b(?:quiz|assessment|questions?|mcqs?)\b/ig, '')
+    .trim()
+    .replace(/\s+/g, ' ')
+}
+
+function cleanEntity(value: string) {
+  return value.replace(/^["']|["']$/g, '').replace(/\b(and|with)\b.*$/i, '').trim()
+}
+
+function normalizeDifficultyArg(value?: string): DifficultyLevel {
+  const normalized = String(value || '').toLowerCase().trim() as DifficultyLevel
+  return ['easy', 'medium', 'hard', 'advanced', 'hardcore'].includes(normalized) ? normalized : 'medium'
+}
+
+function clampNumber(value: number, min: number, max: number, fallback: number) {
+  if (!Number.isFinite(value)) return fallback
+  return Math.min(max, Math.max(min, Math.round(value)))
+}
+
+function normalizeNaturalDueDate(value?: string) {
+  if (!value) return undefined
+  const trimmed = value.trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed
+
+  const lower = normalize(trimmed)
+  const today = new Date()
+  const addDays = (days: number) => {
+    const date = new Date(today)
+    date.setDate(today.getDate() + days)
+    return date.toISOString().slice(0, 10)
+  }
+  if (lower === 'today') return addDays(0)
+  if (lower === 'tomorrow') return addDays(1)
+
+  const weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+  const weekdayIndex = weekdays.indexOf(lower)
+  if (weekdayIndex >= 0) {
+    const current = today.getDay()
+    const delta = (weekdayIndex - current + 7) % 7 || 7
+    return addDays(delta)
+  }
+
+  const parsed = new Date(trimmed)
+  if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10)
+  return undefined
+}
+
+async function generateQuestionsForChatbotQuiz(
+  admin: ReturnType<typeof createAdminClient>,
+  input: { quizId: string; topic: string; difficulty: DifficultyLevel; count: number; objective: string },
+) {
+  const hasAI = Boolean(process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY || process.env.GOOGLE_GEMINI_API_KEY)
+  const questions = hasAI
+    ? await generateChatbotQuestionsWithAI(input).catch(() => generateTemplateChatbotQuestions(input))
+    : generateTemplateChatbotQuestions(input)
+
+  const uniqueQuestions = questions
+    .filter((question, index, collection) => collection.findIndex((item) => item.question_text.toLowerCase() === question.question_text.toLowerCase()) === index)
+    .slice(0, input.count)
+
+  while (uniqueQuestions.length < input.count) {
+    uniqueQuestions.push(...generateTemplateChatbotQuestions({ ...input, count: input.count - uniqueQuestions.length }))
+  }
+
+  const rows = uniqueQuestions.slice(0, input.count).map((question, index) => ({
+    quiz_id: input.quizId,
+    question_text: question.question_text,
+    options: question.options,
+    explanation: question.explanation || null,
+    difficulty: question.difficulty || input.difficulty,
+    is_ai_generated: hasAI,
+    order_index: index,
+  }))
+
+  const { data, error } = await admin.from('questions').insert(rows).select('id')
+  if (error) return { count: 0, method: `failed (${error.message})` }
+  return { count: data?.length || 0, method: hasAI ? 'AI-generated' : 'template-generated' }
+}
+
+async function generateChatbotQuestionsWithAI(input: { topic: string; difficulty: DifficultyLevel; count: number; objective: string }) {
+  const prompt = `Generate ${input.count} unique multiple-choice questions about ${input.topic}.
+Difficulty: ${input.difficulty}
+Assessment objective: ${input.objective}
+Question types: practical understanding, applied scenarios, terminology, troubleshooting, and evaluation.
+Requirements:
+- Exactly 4 options per question
+- Exactly one correct option
+- Include a concise explanation
+- Avoid duplicate questions
+- Return JSON only as an array of {"question_text":string,"options":[{"text":string,"isCorrect":boolean}],"explanation":string,"difficulty":"${input.difficulty}"}`
+
+  const { text } = await callAI(
+    [
+      { role: 'system', content: 'You generate valid quiz JSON only. Do not include markdown.' },
+      { role: 'user', content: prompt },
+    ],
+    { maxTokens: 4000, temperature: 0.5 }
+  )
+  const parsed = JSON.parse(stripCodeFences(text))
+  return normalizeGeneratedQuestions(Array.isArray(parsed) ? parsed : [parsed], input)
+}
+
+function normalizeGeneratedQuestions(raw: any[], input: { topic: string; difficulty: DifficultyLevel; count: number }) {
+  return raw
+    .filter((question) =>
+      question?.question_text
+      && Array.isArray(question.options)
+      && question.options.length === 4
+      && question.options.filter((option: any) => option?.isCorrect === true).length === 1
+    )
+    .map((question) => ({
+      question_text: String(question.question_text).slice(0, 397),
+      options: question.options.map((option: any) => ({ text: String(option.text || '').slice(0, 397), isCorrect: option.isCorrect === true })),
+      explanation: question.explanation ? String(question.explanation).slice(0, 397) : `This answer best fits ${input.topic}.`,
+      difficulty: normalizeDifficultyArg(question.difficulty || input.difficulty),
+    }))
+}
+
+function generateTemplateChatbotQuestions(input: { topic: string; difficulty: DifficultyLevel; count: number }) {
+  return Array.from({ length: input.count }, (_, index) => ({
+    question_text: `${input.topic}: ${templateQuestionStem(index)}`,
+    options: [
+      { text: templateCorrectAnswer(input.topic, index), isCorrect: true },
+      { text: `A loosely related but incorrect ${input.topic} statement`, isCorrect: false },
+      { text: `An outdated or incomplete ${input.topic} approach`, isCorrect: false },
+      { text: `A misconception that ignores ${input.topic} constraints`, isCorrect: false },
+    ].sort(() => Math.random() - 0.5),
+    explanation: `The correct option reflects practical ${input.topic} understanding.`,
+    difficulty: input.difficulty,
+  }))
+}
+
+function templateQuestionStem(index: number) {
+  const stems = [
+    'which option best describes the core concept?',
+    'which scenario shows the most appropriate use?',
+    'what is the safest troubleshooting step?',
+    'which trade-off should a practitioner evaluate first?',
+    'which metric best confirms the expected outcome?',
+  ]
+  return stems[index % stems.length]
+}
+
+function templateCorrectAnswer(topic: string, index: number) {
+  const answers = [
+    `A principle-based explanation grounded in ${topic}`,
+    `Applying ${topic} to a realistic business or engineering scenario`,
+    `Checking assumptions, inputs, and outputs before changing the system`,
+    `Balancing accuracy, reliability, cost, and maintainability`,
+    `Using measurable evidence to validate ${topic} performance`,
+  ]
+  return answers[index % answers.length]
+}
+
+async function assignQuizToNaturalAssignee(
+  admin: ReturnType<typeof createAdminClient>,
+  actorId: string,
+  quizId: string,
+  assignee: string,
+  dueDate?: string,
+) {
+  const emails = splitList(assignee).filter((item) => item.includes('@'))
+  let employees: any[] | null = null
+  if (emails.length) {
+    const { data } = await admin.from('profiles').select('id, email').in('email', emails).eq('role', 'employee')
+    employees = data || []
+  } else {
+    const { data } = await admin.from('profiles').select('id, email').ilike('full_name', `%${assignee}%`).eq('role', 'employee').limit(10)
+    employees = data || []
+  }
+  if (!employees.length) return { error: `No employee matched "${assignee}".`, count: 0 }
+  const { error } = await admin.from('quiz_assignments').upsert(employees.map((employee) => ({
+    quiz_id: quizId,
+    user_id: employee.id,
+    assigned_by: actorId,
+    due_date: dueDate || null,
+  })), { onConflict: 'quiz_id,user_id' })
+  return { error: error?.message, count: error ? 0 : employees.length }
+}
+
+async function assignQuizToDepartment(
+  admin: ReturnType<typeof createAdminClient>,
+  actorId: string,
+  quizId: string,
+  department: string,
+  dueDate?: string,
+) {
+  const { data: employees } = await admin
+    .from('profiles')
+    .select('id')
+    .eq('role', 'employee')
+    .or(`department.ilike.%${department}%,domain.ilike.%${department}%`)
+    .limit(200)
+  if (!employees?.length) return { error: `No employees matched department/team "${department}".`, count: 0 }
+  const { error } = await admin.from('quiz_assignments').upsert(employees.map((employee: any) => ({
+    quiz_id: quizId,
+    user_id: employee.id,
+    assigned_by: actorId,
+    due_date: dueDate || null,
+  })), { onConflict: 'quiz_id,user_id' })
+  return { error: error?.message, count: error ? 0 : employees.length }
 }
 
 function buildQuestionOptions(args: Record<string, string>) {

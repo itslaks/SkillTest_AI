@@ -59,8 +59,8 @@ export async function startQuizAttempt(quizId: string, precheck?: {
 
   if (quizError || !quiz) return { error: 'Quiz not found or not active' }
   const requiresProctoring = isProctoringRequired(quiz)
-  if (requiresProctoring && (!precheck?.cameraReady || !precheck.fullscreenReady || !precheck.consentAccepted)) {
-    return { error: 'Camera, fullscreen, and proctoring consent are required before launching this quiz.' }
+  if (requiresProctoring && (!precheck?.cameraReady || !precheck.microphoneReady || !precheck.fullscreenReady || !precheck.consentAccepted)) {
+    return { error: 'Camera, microphone, fullscreen, and proctoring consent are required before launching this quiz.' }
   }
 
   // Check if there's already an attempt
@@ -599,7 +599,7 @@ export async function getQuizForAttempt(quizId: string) {
   // Shuffle questions for randomness
   const shuffled = questions ? [...questions].sort(() => Math.random() - 0.5) : []
 
-  // Shuffle options for each question; the UI uses the answer flag only after confirmation.
+  // Shuffle options for each question and remove answer/explanation fields from pre-submit props.
   const questionsWithShuffledOptions = shuffled.map(question => {
       if (question.options && Array.isArray(question.options)) {
         const optionsWithIndex = question.options.map((option: any, index: number) => ({
@@ -610,14 +610,18 @@ export async function getQuizForAttempt(quizId: string) {
       const shuffledOptions = [...optionsWithIndex].sort(() => Math.random() - 0.5)
       
       return {
-        ...question,
-        explanation: question.explanation || null,
+        id: question.id,
+        quiz_id: question.quiz_id,
+        question_text: question.question_text,
+        difficulty: question.difficulty,
         options: shuffledOptions
       }
     }
     return {
-      ...question,
-      explanation: question.explanation || null,
+      id: question.id,
+      quiz_id: question.quiz_id,
+      question_text: question.question_text,
+      difficulty: question.difficulty,
       options: [],
     }
   })

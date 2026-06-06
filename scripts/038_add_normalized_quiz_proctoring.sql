@@ -2,7 +2,7 @@
 -- Run after 037_add_proctoring_risk_engine.sql.
 
 ALTER TABLE public.quizzes
-  ADD COLUMN IF NOT EXISTS proctoring_required BOOLEAN NOT NULL DEFAULT TRUE;
+  ADD COLUMN IF NOT EXISTS proctoring_required BOOLEAN NOT NULL DEFAULT FALSE;
 
 ALTER TABLE public.quiz_attempts
   ADD COLUMN IF NOT EXISTS review_status TEXT NOT NULL DEFAULT 'pending'
@@ -96,7 +96,7 @@ CREATE POLICY "Training staff can read scoped proctoring sessions" ON public.pro
     EXISTS (
       SELECT 1 FROM public.profiles p
       WHERE p.id = auth.uid()
-        AND p.role IN ('training_coordinator', 'manager', 'admin')
+        AND p.role IN ('trainer', 'training_coordinator', 'manager', 'admin')
     )
     OR EXISTS (
       SELECT 1 FROM public.quizzes q
@@ -132,7 +132,7 @@ CREATE POLICY "Training staff can read scoped proctoring events" ON public.quiz_
     EXISTS (
       SELECT 1 FROM public.profiles p
       WHERE p.id = auth.uid()
-        AND p.role IN ('training_coordinator', 'manager', 'admin')
+        AND p.role IN ('trainer', 'training_coordinator', 'manager', 'admin')
     )
     OR EXISTS (
       SELECT 1 FROM public.quizzes q
@@ -154,7 +154,7 @@ CREATE POLICY "Training staff can read scoped proctoring evidence" ON public.qui
     EXISTS (
       SELECT 1 FROM public.profiles p
       WHERE p.id = auth.uid()
-        AND p.role IN ('training_coordinator', 'manager', 'admin')
+        AND p.role IN ('trainer', 'training_coordinator', 'manager', 'admin')
     )
     OR EXISTS (
       SELECT 1 FROM public.quizzes q
