@@ -149,6 +149,102 @@ The codebase uses Next.js App Router with server components, server actions, and
 route.ts -> controller -> service -> repository -> database
 ```
 
+### System Architecture Diagram
+
+```mermaid
+flowchart TB
+  subgraph Users["Users"]
+    Admin["Admin / Manager"]
+    Staff["Trainer / Training Coordinator"]
+    Employee["Employee"]
+  end
+
+  subgraph Frontend["Next.js App Router UI"]
+    PublicAuth["Auth + Public Pages"]
+    ManagerUI["Manager Workspace\nQuizzes, Employees, Operations, Reports"]
+    IntegrityUI["Integrity Center\nFlagged Attempts + Evidence Review"]
+    EmployeeUI["Employee Workspace\nQuizzes, Results, Badges, Training"]
+    ChatbotUI["Manager Command Chatbot"]
+  end
+
+  subgraph Server["Server Actions + API Routes"]
+    AuthRBAC["RBAC + Scoped Access\nlib/rbac.ts + training-access.ts"]
+    QuizActions["Quiz + Employee Actions\nlib/actions/*"]
+    ChatbotAPI["/api/manager-chatbot\nIntent Parsing + DB Context"]
+    ProctoringAPI["/api/proctoring/events\nSession + Ownership Validation"]
+    ImportExportAPI["Imports, Reports, Exports APIs"]
+    AIAPI["AI Generation + Insights APIs"]
+  end
+
+  subgraph Domain["Domain Services"]
+    AIService["lib/ai.ts\nOpenAI / Groq / Gemini"]
+    ProctoringService["lib/proctoring*.ts\nRisk Score + Auto-submit"]
+    EmailService["lib/email.ts\nSMTP / Resend"]
+    Validation["lib/security/validation.ts\nZod Validation"]
+  end
+
+  subgraph Supabase["Supabase"]
+    Auth["Supabase Auth"]
+    DB["PostgreSQL + RLS\nProfiles, Quizzes, Attempts, Training Ops"]
+    ProctoringTables["Proctoring Sessions\nEvents + Evidence Rows"]
+    Storage["Private Storage Bucket\nquiz-proctoring-evidence"]
+  end
+
+  subgraph External["External Providers"]
+    AIProviders["AI Providers\nOpenAI / Groq / Gemini"]
+    EmailProviders["Email Providers\nSMTP / Resend"]
+  end
+
+  Admin --> ManagerUI
+  Staff --> ManagerUI
+  Staff --> IntegrityUI
+  Employee --> EmployeeUI
+  Admin --> ChatbotUI
+  PublicAuth --> Auth
+
+  ManagerUI --> AuthRBAC
+  IntegrityUI --> AuthRBAC
+  EmployeeUI --> AuthRBAC
+  ChatbotUI --> ChatbotAPI
+
+  AuthRBAC --> QuizActions
+  QuizActions --> Validation
+  QuizActions --> DB
+  ImportExportAPI --> DB
+  ImportExportAPI --> Storage
+
+  ChatbotAPI --> Validation
+  ChatbotAPI --> DB
+  ChatbotAPI --> AIService
+  ChatbotAPI --> QuizActions
+
+  EmployeeUI --> ProctoringAPI
+  ProctoringAPI --> ProctoringService
+  ProctoringAPI --> ProctoringTables
+  ProctoringAPI --> Storage
+  ProctoringService --> DB
+  ProctoringService --> EmailService
+
+  AIAPI --> AIService
+  AIService --> AIProviders
+  EmailService --> EmailProviders
+
+  DB --> ProctoringTables
+  ProctoringTables --> Storage
+```
+
+### Key Runtime Flows
+
+| Flow | Path |
+|---|---|
+| Quiz creation | Manager UI or chatbot -> validation -> quiz actions -> Supabase quizzes/questions |
+| Chatbot quiz creation | Natural command -> intent extraction -> question generation -> quiz insert -> employee/team assignment |
+| Proctored quiz start | Employee pre-check -> `startQuizAttempt()` -> `proctoring_sessions` |
+| Violation logging | Browser signal -> `/api/proctoring/events` -> risk summary -> normalized event/evidence rows |
+| Auto-submit review | 3-strike/critical risk -> flagged attempt -> email alert -> `/manager/integrity` |
+| Evidence access | Staff dashboard -> short-lived signed URL -> private Supabase storage |
+| Reporting/imports | Manager APIs -> scoped database reads/writes -> Excel/PDF output |
+
 ### 📁 Folder Map
 
 | Path | Purpose |
