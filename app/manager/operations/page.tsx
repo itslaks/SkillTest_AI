@@ -292,6 +292,22 @@ export default async function ManagerOperationsPage() {
     auditRows: attendanceVersions.length + assessmentUploads.length + batchChangeAudit.length + notificationDispatchLogs.length + automationRuns.length,
     comparisonReady: batchComparisonData.length,
   }
+  const missionNav = [
+    { label: 'Overview', href: '#overview', detail: 'KPIs and risks' },
+    { label: 'Setup', href: '#setup', detail: 'Batch, sessions, import' },
+    { label: 'Imports', href: '#import', detail: 'Learner upload' },
+    { label: 'Assessments', href: '#assessment', detail: 'Governance and scores' },
+    { label: 'Score Upload', href: '#assessment-upload', detail: 'Assessment results' },
+    { label: 'Projects', href: '#projects', detail: 'Evaluation evidence' },
+    { label: 'Schedule', href: '#schedule', detail: 'Calendar lanes' },
+    { label: 'Batches', href: '#batches', detail: 'Live batch board' },
+    { label: 'Attendance', href: '#attendance', detail: 'Tracker and import' },
+    { label: 'Feedback', href: '#communication', detail: 'Pulse and reminders' },
+    { label: 'Documents', href: '#documents', detail: 'Evidence library' },
+    { label: 'Analytics', href: '#analytics', detail: 'Batch and trainer signals' },
+    { label: 'Automation', href: '#automation', detail: 'Governed checks' },
+    { label: 'Audit', href: '#audit', detail: 'History and errors' },
+  ]
 
   return (
     <div className="space-y-8">
@@ -326,7 +342,25 @@ export default async function ManagerOperationsPage() {
 
       <CommandProofStrip metrics={proofMetrics} />
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-6 xl:grid-cols-[17rem_1fr]">
+        <aside className="self-start rounded-[1.5rem] border border-zinc-200 bg-white p-3 shadow-sm xl:sticky xl:top-24">
+          <div className="rounded-[1.25rem] border border-zinc-900 bg-black p-4 text-white">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-zinc-500">Mission Control</p>
+            <p className="mt-2 text-sm font-semibold">Training Ops workspace</p>
+            <p className="mt-1 text-xs leading-relaxed text-zinc-400">All existing controls are grouped into focused operating zones.</p>
+          </div>
+          <nav className="mt-3 grid gap-1">
+            {missionNav.map((item) => (
+              <a key={item.href} href={item.href} className="group rounded-2xl px-3 py-2.5 transition hover:bg-zinc-50">
+                <span className="block text-sm font-semibold text-zinc-900 group-hover:text-cyan-700">{item.label}</span>
+                <span className="block text-xs text-zinc-500">{item.detail}</span>
+              </a>
+            ))}
+          </nav>
+        </aside>
+
+        <main className="min-w-0 space-y-8">
+      <section id="overview" className="scroll-mt-32 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <ActionTile
           title="Attendance due"
           value={`${summary.attendanceDueToday}`}
@@ -368,6 +402,7 @@ export default async function ManagerOperationsPage() {
         </div>
       </section>
 
+      <section id="setup" className="scroll-mt-32">
       {canCoordinate ? (
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <Card className="border-zinc-200 shadow-sm spotlight-card">
@@ -608,10 +643,15 @@ export default async function ManagerOperationsPage() {
           </CardContent>
         </Card>
       )}
+      </section>
 
-      {canCoordinate ? <BatchCandidateImporter batches={batches.map((batch: any) => ({ id: batch.id, title: batch.title }))} /> : null}
+      {canCoordinate ? (
+        <section id="import" className="scroll-mt-32">
+          <BatchCandidateImporter batches={batches.map((batch: any) => ({ id: batch.id, title: batch.title }))} />
+        </section>
+      ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+      <section id="assessment" className="scroll-mt-32 grid gap-6 xl:grid-cols-[1fr_1fr]">
         {canCoordinate ? (
         <Card className="border-zinc-200 shadow-sm spotlight-card">
           <CardHeader>
@@ -677,7 +717,7 @@ export default async function ManagerOperationsPage() {
         </Card>
         ) : null}
 
-        <Card className="border-zinc-200 shadow-sm spotlight-card">
+        <Card id="projects" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
           <CardHeader>
             <CardTitle>Project Evaluation Evidence</CardTitle>
             <CardDescription>Trainer-uploaded project scores and evidence filenames are tracked as a first-class TMS artifact.</CardDescription>
@@ -728,10 +768,10 @@ export default async function ManagerOperationsPage() {
             </form>
           </CardContent>
         </Card>
-      </div>
+      </section>
 
       {canCoordinate ? (
-      <Card id="feedback" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
+      <Card id="automation" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
         <CardHeader>
           <CardTitle>Automation Runbook</CardTitle>
           <CardDescription>Each governed check has a business rule, an operator override, and an audit record after execution.</CardDescription>
@@ -774,22 +814,28 @@ export default async function ManagerOperationsPage() {
       </Card>
       ) : null}
 
-      <ScheduleTimeline items={scheduleTimeline} />
+      <section id="schedule" className="scroll-mt-32">
+        <ScheduleTimeline items={scheduleTimeline} />
+      </section>
 
-      <AssessmentDocumentLibrary
-        assessments={assessmentSetups}
-        projectEvaluations={projectEvaluations}
-        batches={batches.map((batch: any) => ({ id: batch.id, title: batch.title }))}
-      />
+      <section id="documents" className="scroll-mt-32">
+        <AssessmentDocumentLibrary
+          assessments={assessmentSetups}
+          projectEvaluations={projectEvaluations}
+          batches={batches.map((batch: any) => ({ id: batch.id, title: batch.title }))}
+        />
+      </section>
 
-      {batchComparisonData.length > 0 && (
-        <BatchComparisonChart data={batchComparisonData} />
-      )}
+      <section id="analytics" className="scroll-mt-32 space-y-6">
+        {batchComparisonData.length > 0 && (
+          <BatchComparisonChart data={batchComparisonData} />
+        )}
 
-      <TrainerScorecardDeck items={trainerScorecards} />
+        <TrainerScorecardDeck items={trainerScorecards} />
+      </section>
 
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <Card className="border-zinc-200 shadow-sm spotlight-card">
+        <Card id="batches" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
           <CardHeader>
             <CardTitle>Live Batch Board</CardTitle>
             <CardDescription>Operational visibility across lifecycle, trainer ownership, enrolled learners, and linked assessments.</CardDescription>
@@ -916,7 +962,7 @@ export default async function ManagerOperationsPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-zinc-200 shadow-sm spotlight-card">
+        <Card id="communication" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
           <CardHeader>
             <CardTitle>Feedback & Reminder Pulse</CardTitle>
             <CardDescription>Recent learner sentiment and communication activity tied to training execution.</CardDescription>
@@ -1121,7 +1167,7 @@ export default async function ManagerOperationsPage() {
         </CardContent>
       </Card>
 
-      <Card id="assessment" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
+      <Card id="assessment-upload" className="scroll-mt-32 border-zinc-200 shadow-sm spotlight-card">
         <CardHeader>
           <CardTitle>Assessment Score Upload</CardTitle>
           <CardDescription>Trainers can upload sprint review, API/coding, and project-linked assessment scores for assigned batches.</CardDescription>
@@ -1139,7 +1185,7 @@ export default async function ManagerOperationsPage() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 xl:grid-cols-4">
+      <section id="audit" className="scroll-mt-32 grid gap-6 xl:grid-cols-4">
         <AuditPanel
           title="Batch Change Audit"
           empty="No batch lifecycle or configuration changes have been audited yet."
@@ -1191,6 +1237,8 @@ export default async function ManagerOperationsPage() {
             meta: new Date(item.created_at).toLocaleString(),
           }))}
         />
+      </section>
+        </main>
       </div>
     </div>
   )
