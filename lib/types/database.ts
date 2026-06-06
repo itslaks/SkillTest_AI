@@ -31,6 +31,7 @@ export interface Quiz {
   question_count: number
   passing_score: number
   feedback_form_url: string | null
+  proctoring_required?: boolean
   is_active: boolean
   status: 'draft' | 'active' | 'archived'
   starts_at: string | null
@@ -72,6 +73,11 @@ export interface QuizAttempt {
   proctoring_events?: ProctoringEvent[] | null
   integrity_report?: Record<string, unknown> | null
   auto_submitted?: boolean | null
+  review_status?: 'pending' | 'under_review' | 'approved' | 'rejected' | 'retest_required' | 'escalated'
+  reviewed_by?: string | null
+  reviewed_at?: string | null
+  review_notes?: string | null
+  review_decision?: string | null
   started_at: string
   completed_at: string | null
   created_at: string
@@ -518,16 +524,20 @@ export interface ProctoringEvent {
   riskScore?: number
   riskLevel?: ProctoringRiskLevel
   evidenceImage?: string | null
+  evidencePath?: string | null
 }
 
 export interface ProctoringSubmission {
   enabled: boolean
+  sessionId?: string
   violationCount: number
   riskScore: number
   riskLevel: ProctoringRiskLevel
   autoSubmitted: boolean
   events: ProctoringEvent[]
 }
+
+export type ProctoringReviewStatus = 'pending' | 'under_review' | 'approved' | 'rejected' | 'retest_required' | 'escalated'
 
 export interface ReadinessInsight {
   score: number

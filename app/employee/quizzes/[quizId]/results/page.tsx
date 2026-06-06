@@ -24,7 +24,7 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
 
   const { data: attempt } = await supabase
     .from('quiz_attempts')
-    .select('*')
+    .select('id, quiz_id, user_id, answers, score, total_questions, correct_answers, time_taken_seconds, points_earned, status, auto_submitted, proctoring_status, proctoring_violations_count, proctoring_risk_level, review_status, completed_at')
     .eq('quiz_id', quizId)
     .eq('user_id', user.id)
     .single()
@@ -80,6 +80,12 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
               <ResultMetric label="Time" value={formatTime(attempt.time_taken_seconds)} />
               <ResultMetric label="Points" value={`+${attempt.points_earned}`} />
             </div>
+            {attempt.proctoring_status === 'flagged' && (
+              <div className="mt-5 rounded-2xl border border-amber-300/30 bg-amber-300/10 p-4 text-sm text-amber-100">
+                Assessment status: {attempt.auto_submitted ? 'Auto submitted' : 'Flagged for review'}.
+                Review state: {String(attempt.review_status || 'pending').replace(/_/g, ' ')}.
+              </div>
+            )}
           </div>
 
           <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6">

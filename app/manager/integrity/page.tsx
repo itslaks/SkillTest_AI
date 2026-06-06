@@ -1,6 +1,8 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireTrainingStaff } from '@/lib/rbac'
 import { calculateProctoringRisk, getProctoringEventRisk } from '@/lib/proctoring'
+import { PROCTORING_EVIDENCE_BUCKET } from '@/lib/proctoring-server'
+import { revalidatePath } from 'next/cache'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -15,6 +17,47 @@ import {
   Siren,
   Users,
 } from 'lucide-react'
+
+const REVIEW_DECISIONS = [
+  { status: 'approved', label: 'Approve attempt' },
+  { status: 'rejected', label: 'Reject attempt' },
+  { status: 'retest_required', label: 'Request retest' },
+  { status: 'escalated', label: 'Escalate' },
+] as const
+
+async function updateIntegrityReviewAction(formData: FormData) {
+  'use server'
+  const { userId, role } = await requireTrainingStaff()
+  const admin = createAdminClient()
+  const attemptId = String(formData.get('attempt_id') || '')
+  const decision = String(formData.get('review_decision') || '')
+  const notes = String(formData.get('review_notes') || '').trim()
+  const allowed = REVIEW_DECISIONS.map((item) => item.status)
+  if (!attemptId || !allowed.includes(decision as any)) return
+
+  const { data: attempt } = await admin
+    .from('quiz_attempts')
+    .select('id, quiz_id')
+    .eq('id', attemptId)
+    .maybeSingle()
+
+  if (!attempt) return
+  const scopedQuizIds = await getScopedQuizIds(admin, userId, role)
+  if (scopedQuizIds && !scopedQuizIds.includes(attempt.quiz_id)) return
+
+  await admin
+    .from('quiz_attempts')
+    .update({
+      review_status: decision,
+      review_decision: decision,
+      review_notes: notes || null,
+      reviewed_by: userId,
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq('id', attemptId)
+
+  revalidatePath('/manager/integrity')
+}
 
 export default async function AssessmentIntegrityPage() {
   const { userId, role } = await requireTrainingStaff()
@@ -38,6 +81,10 @@ export default async function AssessmentIntegrityPage() {
       proctoring_risk_level,
       proctoring_events,
       integrity_report,
+      review_status,
+      review_decision,
+      review_notes,
+      reviewed_at,
       quizzes:quiz_id(id, title, topic, batch_id, created_by),
       profiles:user_id(full_name, email, employee_id, department)
     `)
@@ -47,8 +94,43 @@ export default async function AssessmentIntegrityPage() {
   if (scopedQuizIds) attemptsQuery.in('quiz_id', scopedQuizIds.length ? scopedQuizIds : ['00000000-0000-0000-0000-000000000000'])
 
   const { data: attempts } = await attemptsQuery
+  const attemptIds = (attempts || []).map((attempt: any) => attempt.id)
+  const { data: normalizedEvents } = attemptIds.length
+    ? await admin
+        .from('quiz_proctoring_events')
+        .select('*, evidence:quiz_proctoring_evidence(id, storage_path, evidence_type, mime_type)')
+        .in('attempt_id', attemptIds)
+        .order('occurred_at', { ascending: false })
+    : { data: [] }
+
+  const signedEvidenceByEvent = new Map<string, string>()
+  for (const event of normalizedEvents || []) {
+    const evidence = Array.isArray(event.evidence) ? event.evidence[0] : null
+    const storagePath = evidence?.storage_path as string | undefined
+    if (!storagePath?.startsWith(`${PROCTORING_EVIDENCE_BUCKET}/`)) continue
+    const objectPath = storagePath.split('/').slice(1).join('/')
+    const { data: signed } = await admin.storage.from(PROCTORING_EVIDENCE_BUCKET).createSignedUrl(objectPath, 300)
+    if (signed?.signedUrl) signedEvidenceByEvent.set(event.id, signed.signedUrl)
+  }
+
+  const normalizedEventsByAttempt = new Map<string, any[]>()
+  for (const event of normalizedEvents || []) {
+    const list = normalizedEventsByAttempt.get(event.attempt_id) || []
+    list.push({
+      type: event.violation_type,
+      label: event.metadata?.label || String(event.violation_type).replace(/-/g, ' '),
+      occurredAt: event.occurred_at,
+      questionIndex: typeof event.question_number === 'number' ? Math.max(0, event.question_number - 1) : undefined,
+      riskScore: event.risk_score,
+      riskLevel: event.severity,
+      evidenceUrl: signedEvidenceByEvent.get(event.id) || null,
+      evidencePath: event.metadata?.evidencePath || null,
+    })
+    normalizedEventsByAttempt.set(event.attempt_id, list)
+  }
+
   const proctoredAttempts = (attempts || []).filter((attempt: any) =>
-    attempt.proctoring_status || (attempt.proctoring_events || []).length > 0
+    attempt.proctoring_status || (attempt.proctoring_events || []).length > 0 || normalizedEventsByAttempt.has(attempt.id)
   )
 
   const activeSessions = (attempts || []).filter((attempt: any) => attempt.status === 'in_progress').length
@@ -60,7 +142,11 @@ export default async function AssessmentIntegrityPage() {
     : 100
 
   const eventFeed = proctoredAttempts
-    .flatMap((attempt: any) => (attempt.proctoring_events || []).map((event: any) => ({ event, attempt })))
+    .flatMap((attempt: any) => {
+      const normalized = normalizedEventsByAttempt.get(attempt.id)
+      const events = normalized?.length ? normalized : (attempt.proctoring_events || [])
+      return events.map((event: any) => ({ event, attempt }))
+    })
     .sort((left: any, right: any) => new Date(right.event.occurredAt).getTime() - new Date(left.event.occurredAt).getTime())
     .slice(0, 12)
 
@@ -104,7 +190,7 @@ export default async function AssessmentIntegrityPage() {
               <EmptyPanel text="No proctored attempts have been recorded yet." />
             ) : proctoredAttempts.slice(0, 8).map((attempt: any) => {
               const risk = normalizeRisk(attempt)
-              const latestEvidence = latestEvidenceImage(attempt)
+              const latestEvidence = latestEvidenceImage(attempt, normalizedEventsByAttempt)
 
               return (
                 <div key={attempt.id} className="grid gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 md:grid-cols-[120px_1fr_auto] md:items-center">
@@ -147,7 +233,7 @@ export default async function AssessmentIntegrityPage() {
               <AlertTriangle className="h-5 w-5 text-amber-200" />
               AI violation feed
             </CardTitle>
-            <CardDescription className="text-zinc-400">Timestamped browser, camera, audio, and AI-vision integrity events.</CardDescription>
+            <CardDescription className="text-zinc-400">Timestamped browser, camera, fullscreen, focus, and clipboard integrity events.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {eventFeed.length === 0 ? (
@@ -181,17 +267,17 @@ export default async function AssessmentIntegrityPage() {
             <CardDescription className="text-zinc-400">Latest captured frames and incident context.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2">
-            {eventFeed.filter(({ event }: any) => event.evidenceImage).slice(0, 6).map(({ event, attempt }: any, index: number) => (
+            {eventFeed.filter(({ event }: any) => event.evidenceUrl).slice(0, 6).map(({ event, attempt }: any, index: number) => (
               <div key={`${attempt.id}-evidence-${index}`} className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={event.evidenceImage} alt="" className="aspect-video w-full object-cover" />
+                <img src={event.evidenceUrl} alt="" className="aspect-video w-full object-cover" />
                 <div className="p-3">
                   <p className="truncate text-sm font-semibold">{attempt.profiles?.full_name || 'Employee'}</p>
                   <p className="mt-1 text-xs text-zinc-500">{event.type} - {formatDate(event.occurredAt)}</p>
                 </div>
               </div>
             ))}
-            {eventFeed.filter(({ event }: any) => event.evidenceImage).length === 0 && (
+            {eventFeed.filter(({ event }: any) => event.evidenceUrl).length === 0 && (
               <div className="sm:col-span-2">
                 <EmptyPanel text="Evidence frames will appear here when violations include camera snapshots." />
               </div>
@@ -223,6 +309,29 @@ export default async function AssessmentIntegrityPage() {
                     <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
                       <div className="h-full bg-rose-300" style={{ width: `${Math.min(100, risk.score)}%` }} />
                     </div>
+                    <p className="mt-3 text-xs text-zinc-500">Review status: {String(attempt.review_status || 'pending').replace(/_/g, ' ')}</p>
+                    <form action={updateIntegrityReviewAction} className="mt-4 grid gap-2">
+                      <input type="hidden" name="attempt_id" value={attempt.id} />
+                      <textarea
+                        name="review_notes"
+                        rows={2}
+                        className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-white placeholder:text-zinc-600"
+                        placeholder="Review notes"
+                        defaultValue={attempt.review_notes || ''}
+                      />
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {REVIEW_DECISIONS.map((decision) => (
+                          <button
+                            key={decision.status}
+                            name="review_decision"
+                            value={decision.status}
+                            className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-zinc-200 transition hover:bg-white hover:text-black"
+                          >
+                            {decision.label}
+                          </button>
+                        ))}
+                      </div>
+                    </form>
                   </div>
                 )
               })}
@@ -282,8 +391,10 @@ function normalizeRisk(attempt: any) {
   return calculateProctoringRisk(attempt.proctoring_events || [])
 }
 
-function latestEvidenceImage(attempt: any) {
-  return [...(attempt.proctoring_events || [])].reverse().find((event: any) => event.evidenceImage)?.evidenceImage || null
+function latestEvidenceImage(attempt: any, normalizedEventsByAttempt: Map<string, any[]>) {
+  const normalized = normalizedEventsByAttempt.get(attempt.id)
+  if (normalized?.length) return normalized.find((event: any) => event.evidenceUrl)?.evidenceUrl || null
+  return [...(attempt.proctoring_events || [])].reverse().find((event: any) => event.evidenceUrl)?.evidenceUrl || null
 }
 
 function formatDate(value?: string | null) {

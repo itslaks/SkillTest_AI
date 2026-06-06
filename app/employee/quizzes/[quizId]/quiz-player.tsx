@@ -17,7 +17,6 @@ import {
   getProctoringRiskLevel,
   PROCTORING_CRITICAL_RISK_SCORE,
   PROCTORING_VIOLATION_LIMIT,
-  shouldAutoSubmitForIntegrity,
 } from '@/lib/proctoring'
 import {
   Camera,
@@ -42,7 +41,6 @@ interface QuizPlayerProps {
 type QuizOption = {
   text: string
   optionId: number
-  isCorrect?: boolean
 }
 
 type QuizQuestion = {
@@ -107,6 +105,8 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const proctoringEventsRef = useRef<ProctoringEvent[]>([])
   const violationCountRef = useRef(0)
+  const proctoringSessionIdRef = useRef<string | null>(null)
+  const attemptIdRef = useRef<string | null>(null)
   const submittingRef = useRef(false)
   const activeSignalRef = useRef<Record<string, boolean>>({})
 
@@ -124,6 +124,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
 
   const buildProctoringSubmission = useCallback((autoSubmitted: boolean, extraEvents: ProctoringEvent[] = []): ProctoringSubmission => ({
     enabled: true,
+    sessionId: proctoringSessionIdRef.current || undefined,
     violationCount: Math.max(violationCountRef.current, violationCount),
     riskScore: calculateProctoringRisk([...proctoringEventsRef.current, ...extraEvents]).score,
     riskLevel: calculateProctoringRisk([...proctoringEventsRef.current, ...extraEvents]).level,
@@ -180,9 +181,6 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const recordProctoringViolation = useCallback((type: ProctoringEventType, label: string) => {
     if (!started || finishedRef.current || submittingRef.current) return
 
-    const nextCount = violationCountRef.current + 1
-    violationCountRef.current = nextCount
-    setViolationCount(nextCount)
     setLatestViolation(label)
 
     const event: ProctoringEvent = {
@@ -192,28 +190,63 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       questionIndex: currentIndex,
       riskScore: getProctoringEventRisk(type),
       riskLevel: getProctoringRiskLevel(getProctoringEventRisk(type)),
-      evidenceImage: captureEvidenceFrame(),
     }
     proctoringEventsRef.current = [...proctoringEventsRef.current, event].slice(-50)
-    const risk = calculateProctoringRisk(proctoringEventsRef.current)
-    setRiskScore(risk.score)
 
-    if (shouldAutoSubmitForIntegrity(proctoringEventsRef.current, nextCount)) {
-      const autoSubmitEvent: ProctoringEvent = {
-        type: 'auto-submit',
-        label: risk.score > PROCTORING_CRITICAL_RISK_SCORE
-          ? 'Critical integrity risk reached. Quiz auto-submitted and employee flagged.'
-          : 'Violation limit reached. Quiz auto-submitted and employee flagged.',
-        occurredAt: new Date().toISOString(),
+    const sessionId = proctoringSessionIdRef.current
+    const attemptId = attemptIdRef.current
+    if (!sessionId || !attemptId) return
+
+    void fetch('/api/proctoring/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId,
+        attemptId,
+        type,
+        label,
         questionIndex: currentIndex,
-        riskScore: 0,
-        riskLevel: risk.level,
-        evidenceImage: event.evidenceImage,
-      }
-      const summary = buildProctoringSubmission(true, [autoSubmitEvent])
-      handleAutoSubmit(summary)
-    }
-  }, [buildProctoringSubmission, captureEvidenceFrame, currentIndex, handleAutoSubmit, started])
+        evidenceImage: captureEvidenceFrame(),
+      }),
+    })
+      .then(async (response) => {
+        if (!response.ok) return null
+        return response.json()
+      })
+      .then((summary) => {
+        if (!summary) return
+        violationCountRef.current = summary.violationCount
+        setViolationCount(summary.violationCount)
+        setRiskScore(summary.riskScore)
+
+        if (summary.autoSubmit) {
+          const autoSubmitEvent: ProctoringEvent = {
+            type: 'auto-submit',
+            label: summary.riskScore > PROCTORING_CRITICAL_RISK_SCORE
+              ? 'Critical integrity risk reached. Quiz auto-submitted and employee flagged.'
+              : 'Violation limit reached. Quiz auto-submitted and employee flagged.',
+            occurredAt: new Date().toISOString(),
+            questionIndex: currentIndex,
+            riskScore: 0,
+            riskLevel: summary.riskLevel,
+          }
+          const finalEvents = [...proctoringEventsRef.current, autoSubmitEvent].slice(-50)
+          proctoringEventsRef.current = finalEvents
+          handleAutoSubmit({
+            enabled: true,
+            sessionId,
+            violationCount: summary.violationCount,
+            riskScore: summary.riskScore,
+            riskLevel: summary.riskLevel,
+            autoSubmitted: true,
+            events: finalEvents,
+          })
+        }
+      })
+      .catch(() => {
+        setLatestViolation(`${label} Server sync failed; keep the quiz window stable.`)
+      })
+  }, [captureEvidenceFrame, currentIndex, handleAutoSubmit, started])
 
   useEffect(() => {
     if (!started || finished) return
@@ -262,16 +295,28 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     }
     try {
       await document.documentElement.requestFullscreen?.()
+      if (!document.fullscreenElement) {
+        setStartError('Fullscreen is required before launching the proctored quiz. Use the launch button again and allow fullscreen.')
+        return
+      }
     } catch {
-      setStartError('Fullscreen could not be started. Continue only if your browser allows fullscreen.')
+      setStartError('Fullscreen is required before launching the proctored quiz. Your browser blocked the request.')
+      return
     }
     window.history.pushState({ proctoredQuiz: true }, '', window.location.href)
     startTransition(async () => {
-      const result = await startQuizAttempt(quiz.id)
+      const result = await startQuizAttempt(quiz.id, {
+        cameraReady,
+        microphoneReady,
+        fullscreenReady: Boolean(document.fullscreenElement),
+        consentAccepted: true,
+      })
       if (result.error) {
         setStartError(result.error)
         return
       }
+      attemptIdRef.current = result.data?.id || null
+      proctoringSessionIdRef.current = result.proctoringSession?.id || null
       setStarted(true)
       setQuestionStartTime(Date.now())
     })
@@ -483,7 +528,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
                     <div>
                       <p className="font-medium text-white">AI camera proctoring required</p>
                       <p className="mt-1 text-zinc-400">
-                        Keep this tab focused, stay in fullscreen, and keep your face visible. Three warnings or critical risk auto-submit the test and notify staff with captured proof.
+                        Keep this tab focused, stay in fullscreen, and keep your camera frame visible. Three verified warnings or critical risk auto-submit the test and notify staff with captured proof.
                       </p>
                     </div>
                   </div>
@@ -534,7 +579,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
                       {cameraReady ? 'Camera and microphone verified' : 'Enable proctoring camera'}
                     </p>
                     <p className="mt-1 text-xs text-zinc-500">
-                      The app checks camera, microphone, fullscreen, focus, network, clipboard, and browser-lock signals.
+                      The app checks camera, microphone permission, fullscreen, focus, network, clipboard, and browser-lock signals.
                     </p>
                   </div>
                   <Button
@@ -738,7 +783,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
               <SignalRow
                 label="Microphone"
                 active={microphoneReady}
-                description={microphoneReady ? 'Audio channel is available for anomaly checks.' : 'Microphone permission is required.'}
+                description={microphoneReady ? 'Microphone permission is active.' : 'Microphone permission is required.'}
               />
               <SignalRow
                 label="Violations"

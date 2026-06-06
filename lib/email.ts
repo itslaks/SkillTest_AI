@@ -308,27 +308,30 @@ export function buildQuizCompletedEmail(opts: {
 export function buildQuizProctoringFlagEmail(opts: {
   employeeName?: string | null
   employeeEmail?: string | null
+  employeeId?: string | null
   quizTitle: string
   score: number
   violationCount: number
   riskScore: number
   riskLevel: string
   autoSubmitted: boolean
+  reviewUrl: string
   events: Array<{
     type: string
     label: string
     occurredAt: string
     riskScore?: number
     riskLevel?: string
-    evidenceImage?: string | null
+    evidencePath?: string | null
   }>
 }) {
   const employeeName = escapeHtml(opts.employeeName || 'Learner')
   const employeeEmail = escapeHtml(opts.employeeEmail || 'Unknown email')
+  const employeeId = escapeHtml(opts.employeeId || 'N/A')
   const quizTitle = escapeHtml(opts.quizTitle)
   const rows = opts.events.slice(0, 10).map((event, index) => {
-    const evidence = event.evidenceImage
-      ? `<img src="${event.evidenceImage}" alt="Evidence ${index + 1}" style="display:block;width:180px;max-width:100%;border-radius:10px;border:1px solid #fecaca;margin-top:8px;" />`
+    const evidence = event.evidencePath
+      ? '<span style="color:#991b1b;font-size:12px;">Protected evidence captured. Open the review dashboard to view.</span>'
       : '<span style="color:#991b1b;font-size:12px;">No frame captured</span>'
 
     return `
@@ -351,16 +354,18 @@ export function buildQuizProctoringFlagEmail(opts: {
     <div style="background:#fff;border:1px solid #fecaca;border-top:0;padding:24px;border-radius:0 0 18px 18px;">
       <p><strong>${employeeName}</strong> (${employeeEmail}) was flagged during <strong>${quizTitle}</strong>.</p>
       <table style="width:100%;border-collapse:collapse;margin:18px 0;">
+        <tr><td style="padding:10px;background:#fee2e2;font-weight:700;width:38%;">Candidate ID</td><td style="padding:10px;background:#fff7ed;">${employeeId}</td></tr>
         <tr><td style="padding:10px;background:#fee2e2;font-weight:700;width:38%;">Violations</td><td style="padding:10px;background:#fff7ed;">${opts.violationCount}</td></tr>
         <tr><td style="padding:10px;background:#fee2e2;font-weight:700;">Risk score</td><td style="padding:10px;background:#fff7ed;">${opts.riskScore} (${escapeHtml(opts.riskLevel)})</td></tr>
         <tr><td style="padding:10px;background:#fee2e2;font-weight:700;">Auto submitted</td><td style="padding:10px;background:#fff7ed;">${opts.autoSubmitted ? 'Yes' : 'No'}</td></tr>
         <tr><td style="padding:10px;background:#fee2e2;font-weight:700;">Final score</td><td style="padding:10px;background:#fff7ed;">${opts.score}%</td></tr>
       </table>
-      <h2 style="font-size:16px;margin:18px 0 8px;">Captured trigger proof</h2>
+      <a href="${escapeHtml(opts.reviewUrl)}" style="display:inline-block;background:#991b1b;color:#fff;padding:12px 20px;border-radius:999px;text-decoration:none;font-weight:700;margin-bottom:18px;">Open Secure Review</a>
+      <h2 style="font-size:16px;margin:18px 0 8px;">Violation summary</h2>
       <table style="width:100%;border-collapse:collapse;border:1px solid #fee2e2;">
         ${rows || '<tr><td style="padding:12px;">No event details were submitted.</td></tr>'}
       </table>
-      <p style="color:#7f1d1d;font-size:13px;margin-top:16px;">Review this attempt before accepting the result. Evidence images are browser camera frames captured at trigger time.</p>
+      <p style="color:#7f1d1d;font-size:13px;margin-top:16px;">Review this attempt before accepting the result. Evidence is stored privately and is only available to authorized training staff.</p>
     </div>
   </div>`
 }

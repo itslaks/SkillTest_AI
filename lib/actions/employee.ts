@@ -13,9 +13,22 @@ import {
 import type { SubmitQuizInput, LeaderboardEntry, QuizAnswer, DifficultyLevel } from '@/lib/types/database'
 import { buildCandidateProctoringNoticeEmail, buildQuizCompletedEmail, buildQuizProctoringFlagEmail, sendEmail } from '@/lib/email'
 import { calculateProctoringRisk, shouldAutoSubmitForIntegrity } from '@/lib/proctoring'
+import {
+  buildProctoringSummary,
+  createOrUpdateProctoringSession,
+  eventRowsToSubmissionEvents,
+  isProctoringRequired,
+  requireActiveProctoringSession,
+  sanitizeProctoringEvents,
+} from '@/lib/proctoring-server'
 
 // ─── Start a quiz attempt ─────────────────────────────────────────────
-export async function startQuizAttempt(quizId: string) {
+export async function startQuizAttempt(quizId: string, precheck?: {
+  cameraReady: boolean
+  microphoneReady: boolean
+  fullscreenReady: boolean
+  consentAccepted: boolean
+}) {
   const idResult = uuidSchema.safeParse(quizId)
   if (!idResult.success) return { error: 'Invalid quiz ID' }
 
@@ -37,6 +50,19 @@ export async function startQuizAttempt(quizId: string) {
 
   if (!assignment) return { error: 'This quiz has not been assigned to you' }
 
+  const { data: quiz, error: quizError } = await adminClient
+    .from('quizzes')
+    .select('id, proctoring_required, is_active')
+    .eq('id', idResult.data)
+    .eq('is_active', true)
+    .single()
+
+  if (quizError || !quiz) return { error: 'Quiz not found or not active' }
+  const requiresProctoring = isProctoringRequired(quiz)
+  if (requiresProctoring && (!precheck?.cameraReady || !precheck.fullscreenReady || !precheck.consentAccepted)) {
+    return { error: 'Camera, fullscreen, and proctoring consent are required before launching this quiz.' }
+  }
+
   // Check if there's already an attempt
   const { data: existing } = await supabase
     .from('quiz_attempts')
@@ -50,7 +76,16 @@ export async function startQuizAttempt(quizId: string) {
   }
 
   if (existing?.status === 'in_progress') {
-    return { data: existing }
+    if (!requiresProctoring) return { data: existing }
+    const sessionResult = await createOrUpdateProctoringSession({
+      admin: adminClient,
+      attempt: existing,
+      userId: user.id,
+      quizId: idResult.data,
+      precheck: precheck!,
+    })
+    if (sessionResult.error) return { error: sessionResult.error }
+    return { data: existing, proctoringSession: sessionResult.data }
   }
 
   const { data, error } = await supabase
@@ -67,6 +102,19 @@ export async function startQuizAttempt(quizId: string) {
     .single()
 
   if (error) return { error: error.message }
+
+  if (requiresProctoring) {
+    const sessionResult = await createOrUpdateProctoringSession({
+      admin: adminClient,
+      attempt: data,
+      userId: user.id,
+      quizId: idResult.data,
+      precheck: precheck!,
+    })
+    if (sessionResult.error) return { error: sessionResult.error }
+    return { data, proctoringSession: sessionResult.data }
+  }
+
   return { data }
 }
 
@@ -155,29 +203,64 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
     const correctAnswers = enrichedAnswers.filter((answer) => answer.isCorrect).length
     const score = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0
     const rawInsight = analyzeAttemptPattern(enrichedAnswers, quiz.difficulty, topicAttempts)
-    const proctoringEvents = proctoring?.events || []
-    const proctoringViolationCount = proctoring?.violationCount || 0
-    const proctoringRisk = calculateProctoringRisk(proctoringEvents)
-    const isIntegrityAutoSubmit = shouldAutoSubmitForIntegrity(proctoringEvents, proctoringViolationCount)
-    const isProctoringFlagged = Boolean(proctoring?.enabled && (isIntegrityAutoSubmit || proctoringRisk.level === 'high' || proctoringRisk.level === 'critical'))
-    const integrityReport = proctoring?.enabled
+
+    const { data: activeAttempt } = await adminClient
+      .from('quiz_attempts')
+      .select('id, status')
+      .eq('quiz_id', quiz_id)
+      .eq('user_id', user.id)
+      .eq('status', 'in_progress')
+      .maybeSingle()
+
+    if (!activeAttempt) return { error: 'No active quiz attempt was found.' }
+
+    const requiresProctoring = isProctoringRequired(quiz)
+    let session: any = null
+    let proctoringEvents = proctoring?.events || []
+    let proctoringViolationCount = proctoring?.violationCount || 0
+    let proctoringRisk = calculateProctoringRisk(proctoringEvents)
+    let isIntegrityAutoSubmit = shouldAutoSubmitForIntegrity(proctoringEvents, proctoringViolationCount)
+
+    if (requiresProctoring) {
+      const sessionResult = await requireActiveProctoringSession(adminClient, proctoring?.sessionId, activeAttempt.id, user.id)
+      if (sessionResult.error || !sessionResult.data) {
+        return { error: sessionResult.error || 'A valid proctoring session is required for this quiz.' }
+      }
+      session = sessionResult.data
+      const { data: eventRows } = await adminClient
+        .from('quiz_proctoring_events')
+        .select('*')
+        .eq('session_id', session.id)
+        .order('occurred_at', { ascending: true })
+
+      proctoringEvents = eventRowsToSubmissionEvents(eventRows || [])
+      const summary = buildProctoringSummary(proctoringEvents)
+      proctoringViolationCount = summary.violationCount
+      proctoringRisk = { score: summary.riskScore, level: summary.riskLevel }
+      isIntegrityAutoSubmit = Boolean(proctoring?.autoSubmitted || summary.autoSubmit)
+    }
+
+    const isProctoringFlagged = Boolean(requiresProctoring && (isIntegrityAutoSubmit || proctoringRisk.level === 'high' || proctoringRisk.level === 'critical'))
+    const safeProctoringEvents = sanitizeProctoringEvents(proctoringEvents)
+    const integrityReport = requiresProctoring
       ? {
           generatedAt: new Date().toISOString(),
           quizId: quiz_id,
           userId: user.id,
           quizTitle: quiz.title,
+          sessionId: session?.id || proctoring?.sessionId || null,
           status: isProctoringFlagged ? 'flagged_for_review' : 'clear',
           riskScore: proctoringRisk.score,
           riskLevel: proctoringRisk.level,
           violationCount: proctoringViolationCount,
           autoSubmitted: Boolean(proctoring?.autoSubmitted || isIntegrityAutoSubmit),
-          timeline: proctoringEvents.map((event) => ({
+          timeline: safeProctoringEvents.map((event) => ({
             type: event.type,
             label: event.label,
             occurredAt: event.occurredAt,
             questionIndex: event.questionIndex,
             riskScore: event.riskScore,
-            hasEvidence: Boolean(event.evidenceImage),
+            hasEvidence: Boolean(event.evidencePath),
           })),
         }
       : null
@@ -202,13 +285,14 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
         points_earned: pointsEarned,
         status: 'completed',
         completed_at: new Date().toISOString(),
-        proctoring_status: isProctoringFlagged ? 'flagged' : (proctoring?.enabled ? 'clear' : null),
+        proctoring_status: isProctoringFlagged ? 'flagged' : (requiresProctoring ? 'clear' : null),
         proctoring_violations_count: proctoringViolationCount,
         proctoring_risk_score: proctoringRisk.score,
-        proctoring_risk_level: proctoring?.enabled ? proctoringRisk.level : null,
-        proctoring_events: proctoringEvents,
+        proctoring_risk_level: requiresProctoring ? proctoringRisk.level : null,
+        proctoring_events: safeProctoringEvents,
         integrity_report: integrityReport,
         auto_submitted: Boolean(proctoring?.autoSubmitted || isIntegrityAutoSubmit),
+        ...(isProctoringFlagged ? { review_status: 'pending' } : {}),
       })
       .eq('quiz_id', quiz_id)
       .eq('user_id', user.id)
@@ -219,6 +303,16 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
     if (error) {
       console.error('Quiz submission update error:', error)
       return { error: error.message }
+    }
+
+    if (session) {
+      await adminClient
+        .from('proctoring_sessions')
+        .update({
+          status: Boolean(proctoring?.autoSubmitted || isIntegrityAutoSubmit) ? 'auto_submitted' : 'completed',
+          ended_at: new Date().toISOString(),
+        })
+        .eq('id', session.id)
     }
 
     try {
@@ -249,30 +343,10 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
       try {
         const recipients = await getProctoringAlertRecipients(adminClient, quiz)
         const [{ data: profile }] = await Promise.all([
-          adminClient.from('profiles').select('full_name, email').eq('id', user.id).maybeSingle(),
+          adminClient.from('profiles').select('full_name, email, employee_id').eq('id', user.id).maybeSingle(),
         ])
 
-        if (recipients.length > 0) {
-          const html = buildQuizProctoringFlagEmail({
-            employeeName: profile?.full_name,
-            employeeEmail: profile?.email,
-            quizTitle: quiz.title,
-            score,
-            violationCount: proctoringViolationCount,
-            riskScore: proctoringRisk.score,
-            riskLevel: proctoringRisk.level,
-            autoSubmitted: Boolean(proctoring?.autoSubmitted || isIntegrityAutoSubmit),
-            events: proctoringEvents,
-          })
-
-          await sendEmail({
-            to: recipients,
-            subject: `Proctoring Flag: ${quiz.title} - ${profile?.full_name || profile?.email || 'Employee'}`,
-            html,
-          })
-        }
-
-        await adminClient.from('training_notifications').insert({
+        const { data: notification } = await adminClient.from('training_notifications').insert({
           batch_id: quiz.batch_id || null,
           recipient_user_id: quiz.created_by || null,
           title: 'Quiz proctoring flag',
@@ -282,7 +356,39 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
           delivery_status: recipients.length > 0 ? 'sent' : 'logged',
           sent_at: new Date().toISOString(),
           created_by: quiz.created_by || user.id,
-        })
+        }).select('id').maybeSingle()
+
+        if (recipients.length > 0) {
+          const html = buildQuizProctoringFlagEmail({
+            employeeName: profile?.full_name,
+            employeeEmail: profile?.email,
+            employeeId: profile?.employee_id,
+            quizTitle: quiz.title,
+            score,
+            violationCount: proctoringViolationCount,
+            riskScore: proctoringRisk.score,
+            riskLevel: proctoringRisk.level,
+            autoSubmitted: Boolean(proctoring?.autoSubmitted || isIntegrityAutoSubmit),
+            events: safeProctoringEvents,
+            reviewUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/manager/integrity?attempt=${data.id}`,
+          })
+
+          const mailResult = await sendEmail({
+            to: recipients,
+            subject: `Proctoring Flag: ${quiz.title} - ${profile?.full_name || profile?.email || 'Employee'}`,
+            html,
+          })
+
+          if (notification?.id) {
+            await adminClient.from('training_notification_dispatch_log').insert({
+              notification_id: notification.id,
+              recipient_email: recipients.join(','),
+              channel: 'email',
+              provider_status: mailResult.success ? 'sent' : 'failed',
+              provider_message: mailResult.error || 'Sent via configured email provider',
+            })
+          }
+        }
         if (profile?.email) {
           await sendEmail({
             to: profile.email,
@@ -325,7 +431,7 @@ async function getProctoringAlertRecipients(adminClient: ReturnType<typeof creat
     adminClient
       .from('profiles')
       .select('id, email')
-      .in('role', ['admin'])
+      .in('role', ['admin', 'manager', 'training_coordinator'])
       .not('email', 'is', null),
     quiz.batch_id
       ? adminClient
@@ -495,12 +601,11 @@ export async function getQuizForAttempt(quizId: string) {
 
   // Shuffle options for each question; the UI uses the answer flag only after confirmation.
   const questionsWithShuffledOptions = shuffled.map(question => {
-    if (question.options && Array.isArray(question.options)) {
-      const optionsWithIndex = question.options.map((option: any, index: number) => ({
-        text: option.text,
-        optionId: index,
-        isCorrect: option.isCorrect === true,
-      }))
+      if (question.options && Array.isArray(question.options)) {
+        const optionsWithIndex = question.options.map((option: any, index: number) => ({
+          text: option.text,
+          optionId: index,
+        }))
 
       const shuffledOptions = [...optionsWithIndex].sort(() => Math.random() - 0.5)
       

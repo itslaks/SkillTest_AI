@@ -13,7 +13,7 @@ export default async function TakeQuizPage({ params }: { params: Promise<{ quizI
   // Check if already completed
   const { data: existingAttempt } = await supabase
     .from('quiz_attempts')
-    .select('*')
+    .select('id, status')
     .eq('quiz_id', quizId)
     .eq('user_id', user.id)
     .single()

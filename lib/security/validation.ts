@@ -192,6 +192,7 @@ export const submitQuizSchema = z
     time_taken_seconds: z.number().int().min(0).max(86400),
     proctoring: z.object({
       enabled: z.boolean(),
+      sessionId: z.string().uuid('Invalid proctoring session ID').optional(),
       violationCount: z.number().int().min(0).max(50),
       autoSubmitted: z.boolean(),
       events: z.array(z.object({
