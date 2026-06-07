@@ -25,15 +25,12 @@ import {
   ChevronRight,
   Clock,
   Eye,
-  Info,
   LockKeyhole,
   Mic,
-  MonitorCheck,
   ShieldAlert,
   Snowflake,
   Sparkles,
   Trophy,
-  Wifi,
   XCircle,
   Zap,
 } from 'lucide-react'
@@ -61,6 +58,21 @@ type LiveState = {
   cooldownSuggested: boolean
   adaptiveDifficulty: DifficultyLevel
   message: string
+}
+
+type DeviceKind = 'camera' | 'microphone'
+type DeviceStatus = 'required' | 'checking' | 'granted' | 'denied' | 'missing' | 'busy' | 'unsupported' | 'insecure' | 'error'
+
+type DevicePermission = {
+  status: DeviceStatus
+  message: string | null
+  permissionState: PermissionState | 'unsupported' | null
+}
+
+const initialDevicePermission: DevicePermission = {
+  status: 'required',
+  message: null,
+  permissionState: null,
 }
 
 export function QuizPlayer({ quiz }: QuizPlayerProps) {
@@ -98,13 +110,11 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     adaptiveDifficulty: quiz.insights?.suggestedNextDifficulty || quiz.difficulty || 'medium',
     message: 'System is tracking rhythm, hesitation, and topic pressure in real time.',
   })
-  const [cameraReady, setCameraReady] = useState(false)
-  const [microphoneReady, setMicrophoneReady] = useState(false)
-  const [fullscreenReady, setFullscreenReady] = useState(false)
+  const requiresProctoring = quiz.proctoring_required !== false
+  const microphoneRequired = requiresProctoring && quiz.microphone_required !== false
+  const [cameraPermission, setCameraPermission] = useState<DevicePermission>(initialDevicePermission)
+  const [microphonePermission, setMicrophonePermission] = useState<DevicePermission>(initialDevicePermission)
   const [consentAccepted, setConsentAccepted] = useState(false)
-  const [cameraError, setCameraError] = useState<string | null>(null)
-  const [microphoneError, setMicrophoneError] = useState<string | null>(null)
-  const [fullscreenError, setFullscreenError] = useState<string | null>(null)
   const [violationCount, setViolationCount] = useState(0)
   const [riskScore, setRiskScore] = useState(0)
   const [latestViolation, setLatestViolation] = useState<string | null>(null)
@@ -124,20 +134,36 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const totalQuestions = questions.length
   const progress = totalQuestions > 0 ? ((currentIndex + (showFeedback ? 1 : 0)) / totalQuestions) * 100 : 0
   const readiness = quiz.insights?.readiness
-  const requiresProctoring = quiz.proctoring_required !== false
-  const browserSupported = typeof navigator !== 'undefined'
-    && Boolean(navigator.mediaDevices?.getUserMedia)
-    && typeof document !== 'undefined'
-    && Boolean(document.documentElement.requestFullscreen)
-  const canStart = !requiresProctoring || (
-    browserSupported
-    && cameraReady
-    && microphoneReady
-    && fullscreenReady
-    && consentAccepted
-  )
+  const cameraReady = cameraPermission.status === 'granted'
+  const microphoneReady = microphonePermission.status === 'granted'
+  const browserCompatibilityValid = typeof window === 'undefined'
+    ? true
+    : Boolean(window.isSecureContext && navigator.mediaDevices?.getUserMedia)
+  const browserCompatibilityMessage = typeof window === 'undefined'
+    ? 'Ready'
+    : browserCompatibilityValid
+      ? 'Ready'
+      : !window.isSecureContext
+        ? 'HTTPS or localhost required'
+        : 'Media capture unsupported'
+  const fullscreenReady = !requiresProctoring
+    || (typeof document !== 'undefined' && Boolean(document.documentElement.requestFullscreen))
+  const canStartQuiz = !isPending
+    && (!requiresProctoring || (
+      cameraReady
+      && (!microphoneRequired || microphoneReady)
+      && fullscreenReady
+      && consentAccepted
+      && browserCompatibilityValid
+    ))
 
-  const stopCamera = useCallback(() => {
+  const logPermissionDebug = useCallback((message: string, details?: unknown) => {
+    if (process.env.NODE_ENV !== 'development') return
+    if (details === undefined) console.log(`[proctoring] ${message}`)
+    else console.log(`[proctoring] ${message}`, details)
+  }, [])
+
+  const stopMediaStream = useCallback(() => {
     mediaStreamRef.current?.getTracks().forEach((track) => track.stop())
     mediaStreamRef.current = null
   }, [])
@@ -156,7 +182,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     if (submittingRef.current) return
     submittingRef.current = true
     setSubmitting(true)
-    stopCamera()
+    stopMediaStream()
     startTransition(async () => {
       const result = await submitQuizAttempt({
         quiz_id: quiz.id,
@@ -173,7 +199,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
 
       router.push(`/employee/quizzes/${quiz.id}/results`)
     })
-  }, [buildProctoringSubmission, quiz.id, requiresProctoring, router, startTransition, stopCamera])
+  }, [buildProctoringSubmission, quiz.id, requiresProctoring, router, startTransition, stopMediaStream])
 
   const captureEvidenceFrame = useCallback(() => {
     const video = videoRef.current
@@ -199,7 +225,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   }, [buildProctoringSubmission, doSubmit])
 
   const recordProctoringViolation = useCallback((type: ProctoringEventType, label: string) => {
-    if (!requiresProctoring || !started || finishedRef.current || submittingRef.current) return
+    if (!started || finishedRef.current || submittingRef.current) return
 
     setLatestViolation(label)
 
@@ -266,7 +292,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       .catch(() => {
         setLatestViolation(`${label} Server sync failed; keep the quiz window stable.`)
       })
-  }, [captureEvidenceFrame, currentIndex, handleAutoSubmit, requiresProctoring, started])
+  }, [captureEvidenceFrame, currentIndex, handleAutoSubmit, started])
 
   useEffect(() => {
     if (!started || finished) return
@@ -275,7 +301,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
         setTimeRemaining((previous: number) => {
           if (previous <= 1) {
             clearInterval(interval)
-            handleAutoSubmit(buildProctoringSubmission(false))
+            handleAutoSubmit(requiresProctoring ? buildProctoringSubmission(false) : undefined)
             return 0
           }
           return previous - 1
@@ -284,85 +310,181 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       setTotalTime((previous) => previous + 1)
     }, 1000)
     return () => clearInterval(interval)
-  }, [started, finished, quiz.time_limit_minutes, handleAutoSubmit, buildProctoringSubmission])
+  }, [started, finished, quiz.time_limit_minutes, handleAutoSubmit, buildProctoringSubmission, requiresProctoring])
 
-  function describeMediaError(error: unknown, device: 'camera' | 'microphone') {
-    const name = error instanceof DOMException ? error.name : ''
-    if (name === 'NotAllowedError' || name === 'PermissionDeniedError') return `${device === 'camera' ? 'Camera' : 'Microphone'} permission was denied. Allow access in your browser settings and try again.`
-    if (name === 'NotFoundError' || name === 'DevicesNotFoundError') return `No ${device} device was found. Connect a working device and try again.`
-    if (name === 'NotReadableError' || name === 'TrackStartError') return `The ${device} is already in use or unavailable. Close other apps using it and try again.`
-    if (name === 'OverconstrainedError') return `The selected ${device} does not support the requested settings. Try another device.`
-    if (!navigator.mediaDevices?.getUserMedia) return 'This browser does not support secure media permission prompts. Use a current desktop browser over HTTPS or localhost.'
-    return `${device === 'camera' ? 'Camera' : 'Microphone'} permission could not be verified. Check browser permissions and device availability.`
-  }
+  const attachCameraPreview = useCallback(async () => {
+    if (!videoRef.current || !mediaStreamRef.current) return
+    videoRef.current.srcObject = mediaStreamRef.current
+    await videoRef.current.play().catch(() => undefined)
+  }, [])
 
-  async function enableCamera() {
-    setCameraError(null)
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+  const mergeTrackIntoMediaStream = useCallback((track: MediaStreamTrack) => {
+    const stream = mediaStreamRef.current || new MediaStream()
+    stream.getTracks()
+      .filter((existingTrack) => existingTrack.kind === track.kind)
+      .forEach((existingTrack) => {
+        existingTrack.stop()
+        stream.removeTrack(existingTrack)
       })
-      stopCamera()
-      mediaStreamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        await videoRef.current.play()
-      }
-      setCameraReady(true)
-    } catch (error) {
-      setCameraReady(false)
-      setCameraError(describeMediaError(error, 'camera'))
-    }
-  }
+    stream.addTrack(track)
+    mediaStreamRef.current = stream
+  }, [])
 
-  async function enableMicrophone() {
-    setMicrophoneError(null)
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      stream.getTracks().forEach((track) => track.stop())
-      setMicrophoneReady(true)
-    } catch (error) {
-      setMicrophoneReady(false)
-      setMicrophoneError(describeMediaError(error, 'microphone'))
-    }
-  }
+  const deviceErrorMessage = useCallback((kind: DeviceKind, error: unknown) => {
+    const deviceLabel = kind === 'camera' ? 'Camera' : 'Microphone'
+    const name = error instanceof DOMException ? error.name : ''
+    const message = error instanceof Error ? error.message : String(error || '')
+    logPermissionDebug(`${kind} getUserMedia error`, { name, message })
 
-  function checkFullscreenReadiness() {
-    setFullscreenError(null)
-    if (!document.documentElement.requestFullscreen) {
-      setFullscreenReady(false)
-      setFullscreenError('Fullscreen is not supported in this browser. Use a current desktop browser.')
+    switch (name) {
+      case 'NotAllowedError':
+        return {
+          status: 'denied' as DeviceStatus,
+          message: `${deviceLabel} permission was denied. Use Retry ${deviceLabel} Permission after allowing access in your browser settings.`,
+        }
+      case 'NotFoundError':
+        return {
+          status: 'missing' as DeviceStatus,
+          message: `${deviceLabel === 'Camera' ? 'No camera' : 'No microphone'} was found on this device.`,
+        }
+      case 'NotReadableError':
+        return {
+          status: 'busy' as DeviceStatus,
+          message: `${deviceLabel} is already in use by another app or browser tab.`,
+        }
+      case 'OverconstrainedError':
+        return {
+          status: 'error' as DeviceStatus,
+          message: `${deviceLabel} does not support the requested constraints.`,
+        }
+      case 'SecurityError':
+        return {
+          status: 'insecure' as DeviceStatus,
+          message: `${deviceLabel} access is blocked by browser security settings. Camera access requires HTTPS or localhost.`,
+        }
+      default:
+        return {
+          status: 'error' as DeviceStatus,
+          message: `${deviceLabel} access failed${message ? `: ${message}` : '.'}`,
+        }
+    }
+  }, [logPermissionDebug])
+
+  const requestDevicePermission = useCallback(async (kind: DeviceKind) => {
+    const setPermission = kind === 'camera' ? setCameraPermission : setMicrophonePermission
+    const constraints = kind === 'camera'
+      ? { video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } }
+      : { audio: true }
+
+    if (!window.isSecureContext) {
+      setPermission({
+        status: 'insecure',
+        message: 'Camera access requires HTTPS or localhost.',
+        permissionState: null,
+      })
       return
     }
-    setFullscreenReady(true)
-  }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setPermission({
+        status: 'unsupported',
+        message: kind === 'camera'
+          ? 'This browser does not support camera access.'
+          : 'This browser does not support microphone access.',
+        permissionState: null,
+      })
+      return
+    }
+
+    setPermission((previous) => ({ ...previous, status: 'checking', message: null }))
+    logPermissionDebug(`${kind} getUserMedia requested`, constraints)
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia(constraints)
+      const tracks = kind === 'camera' ? stream.getVideoTracks() : stream.getAudioTracks()
+      const liveTrack = tracks.find((track) => track.readyState === 'live')
+
+      if (!liveTrack) {
+        stream.getTracks().forEach((track) => track.stop())
+        setPermission({
+          status: 'error',
+          message: kind === 'camera' ? 'Camera permission succeeded, but no live video track started.' : 'Microphone permission succeeded, but no live audio track started.',
+          permissionState: null,
+        })
+        return
+      }
+
+      tracks.forEach(mergeTrackIntoMediaStream)
+      if (kind === 'camera') await attachCameraPreview()
+      logPermissionDebug(`${kind} getUserMedia success`, { trackCount: tracks.length })
+      setPermission({
+        status: 'granted',
+        message: kind === 'camera' ? 'Camera stream is active.' : 'Microphone stream is active.',
+        permissionState: 'granted',
+      })
+    } catch (error) {
+      const result = deviceErrorMessage(kind, error)
+      setPermission((previous) => ({
+        status: result.status,
+        message: result.message,
+        permissionState: result.status === 'denied' ? 'denied' : previous.permissionState,
+      }))
+    }
+  }, [attachCameraPreview, deviceErrorMessage, logPermissionDebug, mergeTrackIntoMediaStream])
 
   async function handleStart() {
     setStartError(null)
-    if (requiresProctoring && !canStart) {
-      setStartError('Complete camera, microphone, fullscreen, browser, and consent checks before launching the quiz.')
-      return
-    }
-    if (requiresProctoring) {
-      try {
-        await document.documentElement.requestFullscreen?.()
-        if (!document.fullscreenElement) {
-          setStartError('Fullscreen is required before launching the proctored quiz. Use the launch button again and allow fullscreen.')
+    if (!requiresProctoring) {
+      startTransition(async () => {
+        const result = await startQuizAttempt(quiz.id)
+        if (result.error) {
+          setStartError(result.error)
           return
         }
-      } catch {
-        setStartError('Fullscreen is required before launching the proctored quiz. Your browser blocked the request.')
+        attemptIdRef.current = result.data?.id || null
+        setStarted(true)
+        setQuestionStartTime(Date.now())
+      })
+      return
+    }
+    if (!browserCompatibilityValid) {
+      setStartError(!window.isSecureContext ? 'Camera access requires HTTPS or localhost.' : 'This browser does not support camera access.')
+      return
+    }
+    if (!cameraReady) {
+      setStartError('Enable camera proctoring before launching the quiz.')
+      return
+    }
+    if (microphoneRequired && !microphoneReady) {
+      setStartError('Enable microphone proctoring before launching the quiz.')
+      return
+    }
+    if (!consentAccepted) {
+      setStartError('Accept the proctoring consent before launching the quiz.')
+      return
+    }
+    if (!document.documentElement.requestFullscreen) {
+      setStartError('Fullscreen mode is not supported by this browser.')
+      return
+    }
+    try {
+      await document.documentElement.requestFullscreen()
+      if (!document.fullscreenElement) {
+        setStartError('Fullscreen is required before launching the proctored quiz. Use the launch button again and allow fullscreen.')
         return
       }
+    } catch {
+      setStartError('Fullscreen is required before launching the proctored quiz. Your browser blocked the request.')
+      return
     }
     window.history.pushState({ proctoredQuiz: true }, '', window.location.href)
     startTransition(async () => {
-      const result = await startQuizAttempt(quiz.id, requiresProctoring ? {
+      const result = await startQuizAttempt(quiz.id, {
         cameraReady,
         microphoneReady,
         fullscreenReady: Boolean(document.fullscreenElement),
-        consentAccepted,
-      } : undefined)
+        consentAccepted: true,
+      })
       if (result.error) {
         setStartError(result.error)
         return
@@ -375,16 +497,94 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   }
 
   useEffect(() => {
-    return () => stopCamera()
-  }, [stopCamera])
+    if (!requiresProctoring) return
+    if (typeof window === 'undefined') return
+
+    if (!window.isSecureContext) {
+      const insecureState = {
+        status: 'insecure' as DeviceStatus,
+        message: 'Camera access requires HTTPS or localhost.',
+        permissionState: null,
+      }
+      setCameraPermission(insecureState)
+      setMicrophonePermission(insecureState)
+      return
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraPermission({
+        status: 'unsupported',
+        message: 'This browser does not support camera access.',
+        permissionState: null,
+      })
+      setMicrophonePermission({
+        status: 'unsupported',
+        message: 'This browser does not support microphone access.',
+        permissionState: null,
+      })
+      return
+    }
+
+    if (!navigator.permissions?.query) {
+      setCameraPermission((previous) => ({ ...previous, permissionState: 'unsupported' }))
+      setMicrophonePermission((previous) => ({ ...previous, permissionState: 'unsupported' }))
+      return
+    }
+
+    let cancelled = false
+    const queryPermission = async (kind: DeviceKind, name: PermissionName) => {
+      try {
+        const permission = await navigator.permissions.query({ name })
+        if (cancelled) return
+        const applyState = () => {
+          const state = permission.state
+          logPermissionDebug(`${kind} permission query state`, state)
+          const setPermission = kind === 'camera' ? setCameraPermission : setMicrophonePermission
+          setPermission((previous) => {
+            if (previous.status === 'granted') return { ...previous, permissionState: state }
+            if (state === 'denied') {
+              return {
+                status: 'denied',
+                message: `${kind === 'camera' ? 'Camera' : 'Microphone'} permission is denied in browser settings. Allow access in site settings, then retry.`,
+                permissionState: state,
+              }
+            }
+            return {
+              ...previous,
+              status: previous.status === 'denied' ? 'required' : previous.status,
+              message: previous.status === 'denied' ? null : previous.message,
+              permissionState: state,
+            }
+          })
+        }
+        applyState()
+        permission.onchange = applyState
+      } catch (error) {
+        logPermissionDebug(`${kind} permission query unsupported`, error instanceof Error ? error.message : error)
+        const setPermission = kind === 'camera' ? setCameraPermission : setMicrophonePermission
+        setPermission((previous) => ({ ...previous, permissionState: 'unsupported' }))
+      }
+    }
+
+    void queryPermission('camera', 'camera' as PermissionName)
+    void queryPermission('microphone', 'microphone' as PermissionName)
+
+    return () => {
+      cancelled = true
+    }
+  }, [logPermissionDebug, requiresProctoring])
 
   useEffect(() => {
-    if (!requiresProctoring || !cameraReady || !videoRef.current || !mediaStreamRef.current) return
+    return () => stopMediaStream()
+  }, [stopMediaStream])
+
+  useEffect(() => {
+    if (!cameraReady || !videoRef.current || !mediaStreamRef.current) return
     if (videoRef.current.srcObject !== mediaStreamRef.current) {
       videoRef.current.srcObject = mediaStreamRef.current
       videoRef.current.play().catch(() => undefined)
     }
-  }, [cameraReady, requiresProctoring, started])
+  }, [cameraReady, started])
 
   useEffect(() => {
     if (!requiresProctoring || !started || finished) return
@@ -534,7 +734,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     if (currentIndex + 1 >= totalQuestions) {
       finishedRef.current = true
       setFinished(true)
-      doSubmit([...answersRef.current], buildProctoringSubmission(false))
+      doSubmit([...answersRef.current], requiresProctoring ? buildProctoringSubmission(false) : undefined)
       return
     }
 
@@ -574,19 +774,24 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
               </div>
 
               <div className="grid gap-3">
-                <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 text-sm text-zinc-300">
-                  <div className="flex items-start gap-3">
-                    <LockKeyhole className="mt-0.5 h-5 w-5 text-white" />
-                    <div>
-                      <p className="font-medium text-white">{requiresProctoring ? 'AI proctoring pre-check required' : 'Standard quiz session'}</p>
-                      <p className="mt-1 text-zinc-400">
-                        {requiresProctoring
-                          ? 'Complete camera, microphone, fullscreen, browser, and consent checks before starting. Three verified warnings or critical risk auto-submit the test and notify staff.'
-                          : 'This quiz does not require camera proctoring. Start when you are ready.'}
-                      </p>
+                {requiresProctoring ? (
+                  <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 text-sm text-zinc-300">
+                    <div className="flex items-start gap-3">
+                      <LockKeyhole className="mt-0.5 h-5 w-5 text-white" />
+                      <div>
+                        <p className="font-medium text-white">AI camera proctoring required</p>
+                        <p className="mt-1 text-zinc-400">
+                          Keep this tab focused, stay in fullscreen, and keep your camera frame visible. Three verified warnings or critical risk auto-submit the test and notify staff with captured proof.
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 text-sm text-zinc-300">
+                    <p className="font-medium text-white">Standard quiz mode</p>
+                    <p className="mt-1 text-zinc-400">This quiz does not require camera, microphone, or fullscreen proctoring checks.</p>
+                  </div>
+                )}
 
                 {quiz.insights?.retentionCheck?.daysSinceLastAssessment >= 14 && (
                   <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 text-sm text-zinc-300">
@@ -618,7 +823,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
               </div>
 
               {requiresProctoring && (
-                <div className="grid gap-4 rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 lg:grid-cols-[220px_1fr]">
+                <div className="grid gap-4 rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 sm:grid-cols-[180px_1fr]">
                   <div className="relative aspect-video overflow-hidden rounded-2xl border border-white/10 bg-zinc-950">
                     <video ref={videoRef} muted playsInline className="h-full w-full object-cover" />
                     {!cameraReady && (
@@ -628,58 +833,33 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
                     )}
                     <canvas ref={canvasRef} className="hidden" />
                   </div>
-                  <div className="grid gap-3">
-                    <PrecheckRow
-                      icon={Camera}
-                      label="Camera Status"
-                      status={cameraReady ? 'Granted' : 'Not Granted'}
-                      active={cameraReady}
-                      actionLabel={cameraReady ? 'Camera Enabled' : 'Enable Camera'}
-                      onAction={enableCamera}
-                      disabled={cameraReady}
-                      error={cameraError}
+                  <div className="space-y-4">
+                    <DevicePermissionPanel
+                      kind="camera"
+                      permission={cameraPermission}
+                      ready={cameraReady}
+                      onRequest={() => requestDevicePermission('camera')}
                     />
-                    <PrecheckRow
-                      icon={Mic}
-                      label="Microphone Status"
-                      status={microphoneReady ? 'Granted' : 'Not Granted'}
-                      active={microphoneReady}
-                      actionLabel={microphoneReady ? 'Microphone Enabled' : 'Enable Microphone'}
-                      onAction={enableMicrophone}
-                      disabled={microphoneReady}
-                      error={microphoneError}
+                    <DevicePermissionPanel
+                      kind="microphone"
+                      permission={microphonePermission}
+                      ready={microphoneReady}
+                      required={microphoneRequired}
+                      onRequest={() => requestDevicePermission('microphone')}
                     />
-                    <PrecheckRow
-                      icon={MonitorCheck}
-                      label="Fullscreen Status"
-                      status={fullscreenReady ? 'Ready' : 'Pending'}
-                      active={fullscreenReady}
-                      actionLabel={fullscreenReady ? 'Fullscreen Ready' : 'Check Fullscreen'}
-                      onAction={checkFullscreenReadiness}
-                      disabled={fullscreenReady}
-                      error={fullscreenError}
-                    />
-                    <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-                      <div className="flex items-start gap-3">
-                        <Wifi className={`mt-0.5 h-4 w-4 ${browserSupported ? 'text-emerald-200' : 'text-red-300'}`} />
-                        <div>
-                          <p className="text-sm font-medium text-white">Internet/Browser Compatibility: {browserSupported ? 'Ready' : 'Unsupported'}</p>
-                          <p className="mt-1 text-xs text-zinc-500">Use a current browser over HTTPS or localhost with media and fullscreen support.</p>
-                        </div>
-                      </div>
-                    </div>
-                    <label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-black/20 p-3 text-sm text-zinc-300">
+                    <label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-zinc-300">
                       <input
                         type="checkbox"
                         checked={consentAccepted}
                         onChange={(event) => setConsentAccepted(event.target.checked)}
-                        className="mt-1"
+                        className="mt-1 h-4 w-4 rounded border-white/20 bg-black"
                       />
-                      <span>
-                        <span className="block font-medium text-white">Proctoring notice and consent</span>
-                        <span className="mt-1 block text-xs text-zinc-500">I consent to camera/microphone checks, fullscreen monitoring, browser integrity signals, and private evidence capture for violations.</span>
-                      </span>
+                      <span>I consent to camera, microphone, fullscreen, focus, network, clipboard, and browser-lock proctoring for this quiz.</span>
                     </label>
+                    <div className="grid gap-2 text-xs text-zinc-400 sm:grid-cols-2">
+                      <ReadinessLine label="Browser compatibility" ready={browserCompatibilityValid} detail={browserCompatibilityMessage} />
+                      <ReadinessLine label="Fullscreen readiness" ready={fullscreenReady} detail={fullscreenReady ? 'Requested when Start Quiz is clicked' : 'Fullscreen unsupported'} />
+                    </div>
                   </div>
                 </div>
               )}
@@ -688,9 +868,9 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
                 size="lg"
                 className="h-14 rounded-full bg-white px-8 text-base font-semibold text-black hover:bg-zinc-200"
                 onClick={handleStart}
-                disabled={isPending || !canStart}
+                disabled={!canStartQuiz}
               >
-                {isPending ? 'Starting session...' : requiresProctoring ? 'Launch proctored quiz' : 'Start quiz'}
+                {isPending ? 'Starting session...' : requiresProctoring ? 'Start Quiz' : 'Start Quiz'}
               </Button>
               {startError && (
                 <p className="text-sm font-medium text-red-300">{startError}</p>
@@ -961,46 +1141,95 @@ function MetricCard({ label, value }: { label: string; value: string }) {
   )
 }
 
-function PrecheckRow({
-  icon: Icon,
-  label,
-  status,
-  active,
-  actionLabel,
-  onAction,
-  disabled,
-  error,
+function DevicePermissionPanel({
+  kind,
+  permission,
+  ready,
+  required = true,
+  onRequest,
 }: {
-  icon: any
-  label: string
-  status: string
-  active: boolean
-  actionLabel: string
-  onAction: () => void
-  disabled?: boolean
-  error?: string | null
+  kind: DeviceKind
+  permission: DevicePermission
+  ready: boolean
+  required?: boolean
+  onRequest: () => void
 }) {
+  const label = kind === 'camera' ? 'Camera' : 'Microphone'
+  const Icon = kind === 'camera' ? Camera : Mic
+  const statusLabel = getDeviceStatusLabel(permission.status)
+  const buttonLabel = permission.status === 'denied'
+    ? `Retry ${label} Permission`
+    : permission.status === 'checking'
+      ? `Checking ${label}...`
+      : ready
+        ? `${label} Granted`
+        : `Enable ${label}`
+  const disabled = permission.status === 'checking' || ready || permission.status === 'unsupported' || permission.status === 'insecure'
+
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Icon className={`h-4 w-4 ${active ? 'text-emerald-200' : 'text-zinc-500'}`} />
-          <div>
-            <p className="text-sm font-medium text-white">{label}: {status}</p>
-            {error && <p className="mt-1 max-w-xl text-xs font-medium text-red-300">{error}</p>}
-          </div>
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-white">{label} Status: {statusLabel}</p>
+          <p className="mt-1 text-xs text-zinc-400">{required ? `${label} is required for this proctored quiz.` : `${label} is optional for this quiz.`}</p>
         </div>
         <Button
           type="button"
           variant="outline"
-          className="h-9 rounded-full border-white/20 bg-transparent px-4 text-xs text-white hover:bg-white hover:text-black"
-          onClick={onAction}
+          className="min-h-10 rounded-full border-white/20 bg-transparent text-white hover:bg-white hover:text-black"
+          onClick={onRequest}
           disabled={disabled}
         >
-          {active ? <CheckCircle2 className="mr-2 h-3.5 w-3.5" /> : <Info className="mr-2 h-3.5 w-3.5" />}
-          {actionLabel}
+          <Icon className="mr-2 h-4 w-4" />
+          {buttonLabel}
         </Button>
       </div>
+      {permission.message && (
+        <p className={`mt-3 text-xs font-medium ${ready ? 'text-emerald-300' : 'text-red-300'}`}>
+          {permission.message}
+        </p>
+      )}
+      {permission.status === 'denied' && (
+        <p className="mt-2 text-xs text-zinc-400">
+          Open the browser lock icon or Site settings, allow {kind}, then click Retry {label} Permission.
+        </p>
+      )}
+    </div>
+  )
+}
+
+function getDeviceStatusLabel(status: DeviceStatus) {
+  switch (status) {
+    case 'checking':
+      return 'Checking'
+    case 'granted':
+      return 'Granted'
+    case 'denied':
+      return 'Denied'
+    case 'missing':
+      return 'Device Not Found'
+    case 'busy':
+      return 'Device Busy'
+    case 'unsupported':
+      return 'Unsupported'
+    case 'insecure':
+      return 'Blocked'
+    case 'error':
+      return 'Error'
+    case 'required':
+    default:
+      return 'Permission Required'
+  }
+}
+
+function ReadinessLine({ label, ready, detail }: { label: string; ready: boolean; detail: string }) {
+  return (
+    <div className="rounded-xl border border-white/10 px-3 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-zinc-300">{label}</span>
+        <span className={ready ? 'text-emerald-300' : 'text-red-300'}>{ready ? 'Ready' : 'Blocked'}</span>
+      </div>
+      <p className="mt-1 text-zinc-500">{detail}</p>
     </div>
   )
 }
