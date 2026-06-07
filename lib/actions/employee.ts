@@ -580,7 +580,7 @@ export async function getQuizForAttempt(quizId: string) {
 
   const { data: profile } = await adminClient
     .from('profiles')
-    .select('domain, created_at')
+    .select('domain, created_at, role')
     .eq('id', user.id)
     .single()
 
@@ -640,6 +640,7 @@ export async function getQuizForAttempt(quizId: string) {
   return {
     data: {
       ...quiz,
+      viewerRole: profile?.role || null,
       questions: questionsWithShuffledOptions,
       insights: {
         readiness,
