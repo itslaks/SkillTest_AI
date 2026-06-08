@@ -23,7 +23,6 @@ import {
   Camera,
   Brain,
   CheckCircle2,
-  ChevronRight,
   Clock,
   Eye,
   LockKeyhole,
@@ -33,7 +32,6 @@ import {
   Sparkles,
   Trophy,
   XCircle,
-  Zap,
 } from 'lucide-react'
 
 interface QuizPlayerProps {
@@ -635,6 +633,77 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     void requestDevicePermission('microphone')
   }, [requestDevicePermission])
 
+  const startProctoringMediaStream = useCallback(async () => {
+    stopMediaStream()
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setStartError('This browser does not support camera access.')
+      return false
+    }
+
+    const stream = new MediaStream()
+    let cameraStream: MediaStream | null = null
+    let microphoneStream: MediaStream | null = null
+
+    try {
+      cameraStream = await navigator.mediaDevices.getUserMedia({ video: true })
+      const videoTracks = cameraStream.getVideoTracks()
+      if (!videoTracks.some((track) => track.readyState === 'live')) {
+        throw new Error('Camera permission is granted, but no live video track started.')
+      }
+      videoTracks.forEach((track) => stream.addTrack(track))
+
+      if (microphoneRequired) {
+        microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        const audioTracks = microphoneStream.getAudioTracks()
+        if (!audioTracks.some((track) => track.readyState === 'live')) {
+          throw new Error('Microphone permission is granted, but no live audio track started.')
+        }
+        audioTracks.forEach((track) => stream.addTrack(track))
+      }
+
+      mediaStreamRef.current = stream
+      setCameraPermission({
+        status: 'granted',
+        message: 'Camera stream is active.',
+        permissionState: 'granted',
+      })
+      setMicrophonePermission((previous) => microphoneRequired
+        ? {
+            status: 'granted',
+            message: 'Microphone stream is active.',
+            permissionState: 'granted',
+          }
+        : previous
+      )
+      updatePermissionDebug({
+        cameraPermissionState: 'granted',
+        microphonePermissionState: microphoneRequired ? 'granted' : permissionDebug.microphonePermissionState,
+        activeVideoTrackCount: stream.getVideoTracks().filter((track) => track.readyState === 'live').length,
+        activeAudioTrackCount: stream.getAudioTracks().filter((track) => track.readyState === 'live').length,
+      })
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        await videoRef.current.play().catch(() => undefined)
+      }
+      return true
+    } catch (error) {
+      cameraStream?.getTracks().forEach((track) => track.stop())
+      microphoneStream?.getTracks().forEach((track) => track.stop())
+      stream.getTracks().forEach((track) => track.stop())
+      mediaStreamRef.current = null
+      const message = error instanceof Error ? error.message : 'Unable to start the live proctoring stream.'
+      setStartError(message)
+      updatePermissionDebug({
+        lastGetUserMediaErrorName: error instanceof DOMException ? error.name : error instanceof Error ? error.name : 'UnknownError',
+        lastGetUserMediaErrorMessage: message,
+        activeVideoTrackCount: 0,
+        activeAudioTrackCount: 0,
+      })
+      return false
+    }
+  }, [microphoneRequired, permissionDebug.microphonePermissionState, stopMediaStream, updatePermissionDebug])
+
   async function handleStart() {
     setStartError(null)
     if (!requiresProctoring) {
@@ -683,6 +752,11 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       setStartError('Fullscreen is required before launching the proctored quiz. Your browser blocked the request.')
       return
     }
+    const proctoringStreamReady = await startProctoringMediaStream()
+    if (!proctoringStreamReady) {
+      if (document.fullscreenElement) await document.exitFullscreen().catch(() => undefined)
+      return
+    }
     window.history.pushState({ proctoredQuiz: true }, '', window.location.href)
     startTransition(async () => {
       const result = await startQuizAttempt(quiz.id, {
@@ -692,6 +766,8 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
         consentAccepted: true,
       })
       if (result.error) {
+        stopMediaStream()
+        if (document.fullscreenElement) await document.exitFullscreen().catch(() => undefined)
         setStartError(result.error)
         return
       }
@@ -886,10 +962,23 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       event.preventDefault()
       recordProctoringViolation('paste-attempt', 'Paste action was attempted during the quiz.')
     }
+    const onCut = (event: ClipboardEvent) => {
+      event.preventDefault()
+      recordProctoringViolation('copy-attempt', 'Cut action was attempted during the quiz.')
+    }
+    const onSelectStart = (event: Event) => {
+      event.preventDefault()
+      recordProctoringViolation('copy-attempt', 'Text selection was attempted during the quiz.')
+    }
+    const onDragOrDrop = (event: DragEvent) => {
+      event.preventDefault()
+      recordProctoringViolation('blocked-shortcut', 'Drag or drop activity was attempted during the quiz.')
+    }
+    const onBeforePrint = () => recordProctoringViolation('blocked-shortcut', 'Print was attempted during the quiz.')
     const onOffline = () => recordProctoringViolation('network-offline', 'Network connection went offline during the quiz.')
     const onKeyDown = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase()
-      const blocked = event.metaKey || event.ctrlKey || event.altKey || key === 'f11'
+      const blocked = event.metaKey || event.ctrlKey || event.altKey || key === 'f11' || key === 'printscreen'
       if (!blocked) return
       event.preventDefault()
       recordProctoringViolation('blocked-shortcut', `Blocked restricted keyboard shortcut: ${event.key}.`)
@@ -906,14 +995,19 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     window.addEventListener('popstate', onPopState)
     document.addEventListener('contextmenu', onContextMenu)
     document.addEventListener('copy', onCopy)
+    document.addEventListener('cut', onCut)
     document.addEventListener('paste', onPaste)
+    document.addEventListener('selectstart', onSelectStart)
+    document.addEventListener('dragstart', onDragOrDrop)
+    document.addEventListener('drop', onDragOrDrop)
     window.addEventListener('offline', onOffline)
     window.addEventListener('keydown', onKeyDown, true)
     window.addEventListener('beforeunload', onBeforeUnload)
+    window.addEventListener('beforeprint', onBeforePrint)
 
-    const tracks = mediaStreamRef.current?.getVideoTracks() || []
-    const onCameraEnded = () => recordProctoringViolation('camera-lost', 'Camera stream stopped during the quiz.')
-    tracks.forEach((track) => track.addEventListener('ended', onCameraEnded))
+    const tracks = mediaStreamRef.current?.getTracks() || []
+    const onMediaTrackEnded = () => recordProctoringViolation('camera-lost', 'Proctoring media stream stopped during the quiz.')
+    tracks.forEach((track) => track.addEventListener('ended', onMediaTrackEnded))
     const devtoolsInterval = window.setInterval(() => {
       const likelyOpen = (window.outerWidth - window.innerWidth > 180) || (window.outerHeight - window.innerHeight > 180)
       if (likelyOpen && !activeSignalRef.current.devtoolsOpen) {
@@ -930,19 +1024,19 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       window.removeEventListener('popstate', onPopState)
       document.removeEventListener('contextmenu', onContextMenu)
       document.removeEventListener('copy', onCopy)
+      document.removeEventListener('cut', onCut)
       document.removeEventListener('paste', onPaste)
+      document.removeEventListener('selectstart', onSelectStart)
+      document.removeEventListener('dragstart', onDragOrDrop)
+      document.removeEventListener('drop', onDragOrDrop)
       window.removeEventListener('offline', onOffline)
       window.removeEventListener('keydown', onKeyDown, true)
       window.removeEventListener('beforeunload', onBeforeUnload)
-      tracks.forEach((track) => track.removeEventListener('ended', onCameraEnded))
+      window.removeEventListener('beforeprint', onBeforePrint)
+      tracks.forEach((track) => track.removeEventListener('ended', onMediaTrackEnded))
       window.clearInterval(devtoolsInterval)
     }
   }, [finished, recordProctoringViolation, requiresProctoring, started])
-
-  function handleSelectOption(optionIndex: number) {
-    if (showFeedback || finished) return
-    setSelectedOption(optionIndex)
-  }
 
   function buildAdaptiveOrder(targetDifficulty: DifficultyLevel) {
     const completedIds = new Set(questionOrder.slice(0, currentIndex + 1))
@@ -959,8 +1053,8 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     ])
   }
 
-  function handleConfirmAnswer() {
-    if (selectedOption === null || !currentQuestion) return
+  function handleSelectOption(optionIndex: number) {
+    if (finished || submitting || !currentQuestion) return
 
     const timeSpent = Math.round((Date.now() - questionStartTime) / 1000)
     const questionDifficulty = (currentQuestion.difficulty || quiz.difficulty || 'medium') as DifficultyLevel
@@ -972,7 +1066,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       : cognitiveLoadFlag
         ? shiftDifficulty(questionDifficulty, -1)
         : shiftDifficulty(questionDifficulty, 1)
-    const selectedOriginalOption = currentQuestion.options[selectedOption]?.optionId
+    const selectedOriginalOption = currentQuestion.options[optionIndex]?.optionId
 
     if (selectedOriginalOption === undefined) return
 
@@ -987,9 +1081,12 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     }
 
     const cooldownSuggested = panicMode || cognitiveLoadFlag
+    const nextAnswers = [...answersRef.current, answer]
 
-    setAnswers((previous) => [...previous, answer])
-    setShowFeedback(true)
+    answersRef.current = nextAnswers
+    setAnswers(nextAnswers)
+    setSelectedOption(optionIndex)
+    setShowFeedback(false)
     setLiveState({
       cognitiveLoad: cognitiveLoadFlag,
       panicMode,
@@ -1002,13 +1099,11 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
           : 'Stable rhythm detected. The next question is being tuned upward in real time.',
     })
     buildAdaptiveOrder(adaptiveDifficulty)
-  }
 
-  function handleNext() {
     if (currentIndex + 1 >= totalQuestions) {
       finishedRef.current = true
       setFinished(true)
-      doSubmit(getFinalAnswersForSubmit(), requiresProctoring ? buildProctoringSubmission(false) : undefined)
+      doSubmit(nextAnswers, requiresProctoring ? buildProctoringSubmission(false) : undefined)
       return
     }
 
@@ -1123,12 +1218,12 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
                       required={microphoneRequired}
                       onRequest={requestMicrophonePermission}
                     />
-                    <label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-zinc-300">
+                    <label className="flex cursor-pointer items-start gap-4 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-zinc-300">
                       <input
                         type="checkbox"
                         checked={consentAccepted}
                         onChange={(event) => setConsentAccepted(event.target.checked)}
-                        className="mt-1 h-4 w-4 rounded border-white/20 bg-black"
+                        className="mt-0.5 h-7 w-7 shrink-0 rounded-md border-white/30 bg-black accent-white"
                       />
                       <span>I consent to camera, microphone, fullscreen, focus, network, clipboard, and browser-lock proctoring for this quiz.</span>
                     </label>
@@ -1290,7 +1385,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
                   <button
                     key={index}
                     onClick={() => handleSelectOption(index)}
-                    disabled={showFeedback}
+                    disabled={submitting}
                     className={`w-full rounded-[1.5rem] border p-4 text-left transition-all ${style}`}
                   >
                     <div className="flex items-center gap-3">
@@ -1311,13 +1406,6 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
                   </button>
                 )
               })}
-
-              {showFeedback && (
-                <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
-                  <p className="mb-1 text-sm font-medium text-white">Answer locked</p>
-                  <p className="text-sm text-zinc-400">Correct answers and explanations are shown only after the full quiz is submitted.</p>
-                </div>
-              )}
             </CardContent>
           </Card>
         </div>
@@ -1392,31 +1480,6 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
         </div>
       </div>
 
-      <div className="flex justify-end">
-        {!showFeedback ? (
-          <Button
-            onClick={handleConfirmAnswer}
-            disabled={selectedOption === null || submitting}
-            aria-disabled={selectedOption === null || submitting}
-            size="lg"
-            className="h-12 rounded-full bg-black px-7 text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Confirm answer
-            <Zap className="ml-2 h-4 w-4" />
-          </Button>
-        ) : (
-          <Button
-            onClick={handleNext}
-            disabled={submitting}
-            aria-disabled={submitting}
-            size="lg"
-            className="h-12 rounded-full bg-black px-7 text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {currentIndex + 1 >= totalQuestions ? 'Finish adaptive quiz' : 'Next question'}
-            <ChevronRight className="ml-2 h-4 w-4" />
-          </Button>
-        )}
-      </div>
     </div>
   )
 }
