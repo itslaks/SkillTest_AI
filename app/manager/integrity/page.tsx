@@ -4,6 +4,7 @@ import { calculateProctoringRisk, getProctoringEventRisk } from '@/lib/proctorin
 import { PROCTORING_EVIDENCE_BUCKET } from '@/lib/proctoring-server'
 import { buildQuizCompletedEmail, sendEmail } from '@/lib/email'
 import { revalidatePath } from 'next/cache'
+import { after } from 'next/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { LiveIntegrityFeed, type LiveIntegrityEvent } from '@/components/manager/live-integrity-feed'
@@ -63,7 +64,9 @@ async function updateIntegrityReviewAction(formData: FormData) {
     .eq('id', attemptId)
 
   if (releaseAttempt) {
-    await sendApprovedAttemptEmail(admin, attempt)
+    after(() => {
+      void sendApprovedAttemptEmail(admin, attempt)
+    })
   }
 
   revalidatePath('/manager/integrity')
@@ -112,29 +115,23 @@ export default async function AssessmentIntegrityPage() {
         .select('*, evidence:quiz_proctoring_evidence(id, storage_path, evidence_type, mime_type)')
         .in('attempt_id', attemptIds)
         .order('occurred_at', { ascending: false })
+        .limit(160)
     : { data: [] }
-
-  const signedEvidenceByEvent = new Map<string, string>()
-  for (const event of normalizedEvents || []) {
-    const evidence = Array.isArray(event.evidence) ? event.evidence[0] : null
-    const storagePath = evidence?.storage_path as string | undefined
-    if (!storagePath?.startsWith(`${PROCTORING_EVIDENCE_BUCKET}/`)) continue
-    const objectPath = storagePath.split('/').slice(1).join('/')
-    const { data: signed } = await admin.storage.from(PROCTORING_EVIDENCE_BUCKET).createSignedUrl(objectPath, 300)
-    if (signed?.signedUrl) signedEvidenceByEvent.set(event.id, signed.signedUrl)
-  }
 
   const normalizedEventsByAttempt = new Map<string, any[]>()
   for (const event of normalizedEvents || []) {
     const list = normalizedEventsByAttempt.get(event.attempt_id) || []
+    const evidence = Array.isArray(event.evidence) ? event.evidence[0] : null
     list.push({
+      id: event.id,
       type: event.violation_type,
       label: event.metadata?.label || String(event.violation_type).replace(/-/g, ' '),
       occurredAt: event.occurred_at,
       questionIndex: typeof event.question_number === 'number' ? Math.max(0, event.question_number - 1) : undefined,
       riskScore: event.risk_score,
       riskLevel: event.severity,
-      evidenceUrl: signedEvidenceByEvent.get(event.id) || null,
+      evidenceUrl: null,
+      evidenceStoragePath: evidence?.storage_path || null,
       evidencePath: event.metadata?.evidencePath || null,
     })
     normalizedEventsByAttempt.set(event.attempt_id, list)
@@ -145,8 +142,8 @@ export default async function AssessmentIntegrityPage() {
   )
 
   const activeSessions = (attempts || []).filter((attempt: any) => attempt.status === 'in_progress').length
-  const flagged = proctoredAttempts.filter((attempt: any) => attempt.proctoring_status === 'flagged')
   const suspicious = proctoredAttempts.filter((attempt: any) => attempt.status === 'suspicious' || attempt.proctoring_status === 'suspicious')
+  const flagged = proctoredAttempts.filter((attempt: any) => attempt.proctoring_status === 'flagged' || attempt.status === 'suspicious' || attempt.proctoring_status === 'suspicious')
   const autoSubmitted = proctoredAttempts.filter((attempt: any) => attempt.auto_submitted)
   const criticalAttempts = proctoredAttempts.filter((attempt: any) => normalizeRisk(attempt).level === 'critical')
   const averageIntegrity = proctoredAttempts.length
@@ -161,6 +158,17 @@ export default async function AssessmentIntegrityPage() {
     })
     .sort((left: any, right: any) => new Date(right.event.occurredAt).getTime() - new Date(left.event.occurredAt).getTime())
     .slice(0, 12)
+
+  const visibleEvidenceEvents = [
+    ...proctoredAttempts.slice(0, 8).map((attempt: any) => normalizedEventsByAttempt.get(attempt.id)?.find((event: any) => event.evidenceStoragePath)).filter(Boolean),
+    ...eventFeed.map(({ event }: any) => event).filter((event: any) => event.evidenceStoragePath).slice(0, 6),
+  ]
+  const signedEvidenceByEvent = await signVisibleEvidence(admin, visibleEvidenceEvents)
+  for (const events of normalizedEventsByAttempt.values()) {
+    for (const event of events) {
+      if (signedEvidenceByEvent.has(event.id)) event.evidenceUrl = signedEvidenceByEvent.get(event.id)
+    }
+  }
 
   const notificationCount = await getIntegrityNotificationCount(admin)
   const todayStats = await getTodayIntegrityStats(admin, scopedQuizIds)
@@ -445,6 +453,24 @@ async function getScopedQuizIds(admin: ReturnType<typeof createAdminClient>, use
   return Array.from(new Set([...(ownQuizzes || []), ...(batchQuizzes || [])].map((quiz: any) => quiz.id)))
 }
 
+async function signVisibleEvidence(admin: ReturnType<typeof createAdminClient>, events: any[]) {
+  const uniqueEvents = Array.from(new Map(
+    events
+      .filter((event) => event?.id && typeof event.evidenceStoragePath === 'string')
+      .map((event) => [event.id, event]),
+  ).values())
+
+  const signedEntries = await Promise.all(uniqueEvents.map(async (event: any) => {
+    const storagePath = event.evidenceStoragePath as string
+    if (!storagePath.startsWith(`${PROCTORING_EVIDENCE_BUCKET}/`)) return null
+    const objectPath = storagePath.split('/').slice(1).join('/')
+    const { data: signed } = await admin.storage.from(PROCTORING_EVIDENCE_BUCKET).createSignedUrl(objectPath, 300)
+    return signed?.signedUrl ? [event.id, signed.signedUrl] as const : null
+  }))
+
+  return new Map(signedEntries.filter(Boolean) as Array<readonly [string, string]>)
+}
+
 async function getIntegrityNotificationCount(admin: ReturnType<typeof createAdminClient>) {
   const { count } = await admin
     .from('training_notifications')
@@ -484,9 +510,7 @@ async function sendApprovedAttemptEmail(admin: ReturnType<typeof createAdminClie
 }
 
 async function getTodayIntegrityStats(admin: ReturnType<typeof createAdminClient>, scopedQuizIds: string[] | null) {
-  const start = new Date()
-  start.setHours(0, 0, 0, 0)
-  const startIso = start.toISOString()
+  const startIso = getKolkataDayStartIso()
   const scopedIds = scopedQuizIds ?? undefined
   const emptyScope = Array.isArray(scopedQuizIds) && scopedQuizIds.length === 0
   if (emptyScope) {
@@ -501,7 +525,7 @@ async function getTodayIntegrityStats(admin: ReturnType<typeof createAdminClient
   const flaggedQuery = admin
     .from('quiz_attempts')
     .select('id', { count: 'exact', head: true })
-    .eq('proctoring_status', 'flagged')
+    .or('proctoring_status.eq.flagged,proctoring_status.eq.suspicious,status.eq.suspicious')
     .gte('completed_at', startIso)
   const clearQuery = admin
     .from('quiz_attempts')
@@ -539,6 +563,20 @@ async function getTodayIntegrityStats(admin: ReturnType<typeof createAdminClient
   }
 }
 
+function getKolkataDayStartIso() {
+  const now = new Date()
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now)
+  const year = parts.find((part) => part.type === 'year')?.value || String(now.getUTCFullYear())
+  const month = parts.find((part) => part.type === 'month')?.value || '01'
+  const day = parts.find((part) => part.type === 'day')?.value || '01'
+  return new Date(`${year}-${month}-${day}T00:00:00+05:30`).toISOString()
+}
+
 function normalizeRisk(attempt: any) {
   if (typeof attempt.proctoring_risk_score === 'number' && attempt.proctoring_risk_level) {
     return { score: attempt.proctoring_risk_score, level: attempt.proctoring_risk_level }
@@ -555,8 +593,10 @@ function latestEvidenceImage(attempt: any, normalizedEventsByAttempt: Map<string
 function formatDate(value?: string | null) {
   if (!value) return 'Not completed'
   return new Date(value).toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
     day: '2-digit',
     month: 'short',
+    year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
   })
@@ -564,17 +604,17 @@ function formatDate(value?: string | null) {
 
 function Kpi({ icon: Icon, label, value, tone }: { icon: any; label: string; value: string; tone: 'cyan' | 'emerald' | 'rose' | 'amber' }) {
   const tones = {
-    cyan: 'border-cyan-300/20 bg-cyan-300/10 text-cyan-100',
-    emerald: 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100',
-    rose: 'border-rose-300/20 bg-rose-300/10 text-rose-100',
-    amber: 'border-amber-300/20 bg-amber-300/10 text-amber-100',
+    cyan: 'border-cyan-400/40 bg-zinc-950 text-white shadow-[inset_0_0_0_1px_rgba(34,211,238,0.08)] [&_svg]:text-cyan-200',
+    emerald: 'border-emerald-400/40 bg-zinc-950 text-white shadow-[inset_0_0_0_1px_rgba(52,211,153,0.08)] [&_svg]:text-emerald-200',
+    rose: 'border-rose-400/40 bg-zinc-950 text-white shadow-[inset_0_0_0_1px_rgba(251,113,133,0.08)] [&_svg]:text-rose-200',
+    amber: 'border-amber-400/40 bg-zinc-950 text-white shadow-[inset_0_0_0_1px_rgba(251,191,36,0.08)] [&_svg]:text-amber-200',
   }[tone]
 
   return (
     <div className={`rounded-2xl border p-4 ${tones}`}>
       <Icon className="h-5 w-5" />
       <p className="mt-4 text-3xl font-semibold">{value}</p>
-      <p className="mt-1 text-[10px] uppercase tracking-[0.25em] opacity-70">{label}</p>
+      <p className="mt-1 text-[10px] uppercase tracking-[0.25em] text-zinc-300">{label}</p>
     </div>
   )
 }

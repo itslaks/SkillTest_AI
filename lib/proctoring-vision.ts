@@ -13,6 +13,12 @@ export interface VisionViolation {
   timestamp: number
 }
 
+export type CameraVisibilityCheck = {
+  status: 'visible' | 'covered' | 'no_face' | 'multiple_faces' | 'partial_face' | 'checking' | 'unsupported'
+  message: string
+  confidence: number
+}
+
 type VisionState = {
   intervalId: number | null
   running: boolean
@@ -32,6 +38,7 @@ const COOLDOWN_MS = 15_000
 const NO_FACE_MS = 5_000
 const MAX_BUFFER = 6
 let modelPromise: Promise<ModelBundle | null> | null = null
+let faceDetectorPromise: Promise<any | null> | null = null
 const states = new WeakMap<HTMLVideoElement, VisionState>()
 
 export function startVisionProctoring(config: VisionProctoringConfig) {
@@ -72,6 +79,64 @@ export function stopVisionProctoring(videoElement?: HTMLVideoElement | null) {
   state.running = false
   if (state.intervalId !== null) window.clearInterval(state.intervalId)
   states.delete(videoElement)
+}
+
+export async function validateCameraFrameForProctoring(
+  videoElement: HTMLVideoElement,
+  canvasElement: HTMLCanvasElement,
+): Promise<CameraVisibilityCheck> {
+  if (typeof window === 'undefined') {
+    return { status: 'unsupported', message: 'Camera validation is only available in the browser.', confidence: 0 }
+  }
+  if (videoElement.readyState < 2 || videoElement.videoWidth === 0 || videoElement.videoHeight === 0) {
+    return { status: 'checking', message: 'Waiting for a live camera frame.', confidence: 0.2 }
+  }
+
+  const frame = inspectFramePixels(videoElement, canvasElement)
+  if (frame.isCovered) {
+    return { status: 'covered', message: 'Camera appears covered or too dark. Remove the cover and keep your face visible.', confidence: frame.confidence }
+  }
+
+  const detector = await loadFaceDetector()
+  if (!detector) {
+    return {
+      status: 'unsupported',
+      message: 'Face visibility could not be verified in this browser. Use a supported browser with WebGL enabled.',
+      confidence: 0.2,
+    }
+  }
+
+  try {
+    const faces = await detector.estimateFaces(videoElement, { flipHorizontal: false })
+    if (!faces.length) {
+      return { status: 'no_face', message: 'No face is visible. Sit centered in front of the camera before starting.', confidence: 0.95 }
+    }
+    if (faces.length > 1) {
+      return { status: 'multiple_faces', message: 'Only one person may be visible during the camera test.', confidence: averageFaceScore(faces) }
+    }
+
+    const box = faceBox(faces[0])
+    if (!box) {
+      return { status: 'partial_face', message: 'Face position could not be verified. Sit centered and fully visible.', confidence: 0.55 }
+    }
+
+    const width = videoElement.videoWidth || 1
+    const height = videoElement.videoHeight || 1
+    const faceArea = (box.width * box.height) / (width * height)
+    const marginX = width * 0.04
+    const marginY = height * 0.04
+    const centeredEnough = box.x >= marginX && box.y >= marginY && (box.x + box.width) <= width - marginX && (box.y + box.height) <= height - marginY
+    const sizedEnough = faceArea >= 0.07 && faceArea <= 0.72
+
+    if (!centeredEnough || !sizedEnough) {
+      return { status: 'partial_face', message: 'Your full face must be centered and clearly visible in the camera frame.', confidence: averageFaceScore(faces) }
+    }
+
+    return { status: 'visible', message: 'Face verified. Camera proctoring is ready.', confidence: averageFaceScore(faces) }
+  } catch (error) {
+    console.warn('[proctoring-vision] camera visibility check failed:', error)
+    return { status: 'unsupported', message: 'Face visibility could not be verified. Please retry the camera test.', confidence: 0.2 }
+  }
 }
 
 async function loadModels(): Promise<ModelBundle | null> {
@@ -115,6 +180,31 @@ async function loadModels(): Promise<ModelBundle | null> {
   })()
 
   return modelPromise
+}
+
+async function loadFaceDetector() {
+  if (faceDetectorPromise) return faceDetectorPromise
+
+  faceDetectorPromise = (async () => {
+    try {
+      const canvas = document.createElement('canvas')
+      const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
+      if (!gl) return null
+      const tf = await runtimeImport('@tensorflow/tfjs')
+      await tf.setBackend('webgl')
+      await tf.ready()
+      const faceDetection = await runtimeImport('@tensorflow-models/face-detection')
+      return faceDetection.createDetector(
+        faceDetection.SupportedModels.MediaPipeFaceDetector,
+        { runtime: 'tfjs', modelType: 'short' },
+      )
+    } catch (error) {
+      console.warn('[proctoring-vision] face detector load failed:', error)
+      return null
+    }
+  })()
+
+  return faceDetectorPromise
 }
 
 async function inspectFrame(config: VisionProctoringConfig, state: VisionState, models: ModelBundle) {
@@ -266,6 +356,41 @@ function averageFaceScore(faces: any[]) {
   const scores = faces.map((face) => Number(face.score ?? face.box?.score ?? 0.8)).filter(Number.isFinite)
   if (!scores.length) return 0.8
   return scores.reduce((sum, score) => sum + score, 0) / scores.length
+}
+
+function inspectFramePixels(video: HTMLVideoElement, canvas: HTMLCanvasElement) {
+  const sampleWidth = 96
+  const sampleHeight = Math.max(54, Math.round((video.videoHeight / Math.max(1, video.videoWidth)) * sampleWidth))
+  canvas.width = sampleWidth
+  canvas.height = sampleHeight
+  const context = canvas.getContext('2d')
+  if (!context) return { isCovered: false, confidence: 0 }
+  context.drawImage(video, 0, 0, sampleWidth, sampleHeight)
+  const { data } = context.getImageData(0, 0, sampleWidth, sampleHeight)
+  let sum = 0
+  let sumSquares = 0
+  for (let index = 0; index < data.length; index += 4) {
+    const luminance = (0.299 * data[index] + 0.587 * data[index + 1] + 0.114 * data[index + 2]) / 255
+    sum += luminance
+    sumSquares += luminance * luminance
+  }
+  const count = data.length / 4
+  const mean = sum / count
+  const variance = Math.max(0, sumSquares / count - mean * mean)
+  const contrast = Math.sqrt(variance)
+  const isCovered = mean < 0.08 || (mean < 0.16 && contrast < 0.035)
+  return { isCovered, confidence: isCovered ? Math.min(0.98, 1 - mean + (0.08 - Math.min(0.08, contrast))) : 0.4 }
+}
+
+function faceBox(face: any) {
+  const box = face.box || face.boundingBox
+  if (!box) return null
+  const x = Number(box.xMin ?? box.x ?? box.topLeft?.[0] ?? 0)
+  const y = Number(box.yMin ?? box.y ?? box.topLeft?.[1] ?? 0)
+  const width = Number(box.width ?? ((box.xMax ?? box.bottomRight?.[0] ?? 0) - x))
+  const height = Number(box.height ?? ((box.yMax ?? box.bottomRight?.[1] ?? 0) - y))
+  if (![x, y, width, height].every(Number.isFinite) || width <= 0 || height <= 0) return null
+  return { x, y, width, height }
 }
 
 function runtimeImport(specifier: string): Promise<any> {

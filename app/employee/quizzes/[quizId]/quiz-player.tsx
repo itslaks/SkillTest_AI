@@ -12,6 +12,7 @@ import { ViolationToast, type ViolationToastItem } from '@/components/employee/V
 import { startQuizAttempt, submitQuizAttempt } from '@/lib/actions/employee'
 import { shiftDifficulty } from '@/lib/insights'
 import type { DifficultyLevel, ProctoringEvent, ProctoringEventType, ProctoringSubmission, SubmittedQuizAnswer } from '@/lib/types/database'
+import type { CameraVisibilityCheck } from '@/lib/proctoring-vision'
 import {
   calculateProctoringRisk,
   getProctoringEventRisk,
@@ -94,6 +95,8 @@ type WarningModalState = {
   createdAt: number
 } | null
 
+type CameraVisibilityState = CameraVisibilityCheck
+
 const initialDevicePermission: DevicePermission = {
   status: 'required',
   message: null,
@@ -159,6 +162,11 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const microphoneRequired = requiresProctoring && quiz.microphone_required !== false
   const [cameraPermission, setCameraPermission] = useState<DevicePermission>(initialDevicePermission)
   const [microphonePermission, setMicrophonePermission] = useState<DevicePermission>(initialDevicePermission)
+  const [cameraVisibility, setCameraVisibility] = useState<CameraVisibilityState>({
+    status: 'checking',
+    message: 'Run camera test before starting.',
+    confidence: 0,
+  })
   const [permissionDebug, setPermissionDebug] = useState<PermissionDebugState>(initialPermissionDebugState)
   const [browserCapabilities, setBrowserCapabilities] = useState<BrowserCapabilities>(initialBrowserCapabilities)
   const [consentAccepted, setConsentAccepted] = useState(false)
@@ -196,6 +204,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const isAdminViewer = ['admin', 'manager', 'training_coordinator'].includes(quiz.viewerRole || quiz.currentUserRole || '')
   const showPermissionDebug = process.env.NODE_ENV === 'development' || isAdminViewer
   const cameraReady = cameraPermission.status === 'granted'
+  const cameraFrameReady = !requiresProctoring || cameraVisibility.status === 'visible'
   const microphoneReady = microphonePermission.status === 'granted'
   const browserCompatibilityValid = Boolean(browserCapabilities.secureContext && browserCapabilities.mediaDevicesExists)
   const browserCompatibilityMessage = browserCapabilities.secureContext === null
@@ -210,6 +219,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const canStartQuiz = !isPending
     && (!requiresProctoring || (
       cameraReady
+      && cameraFrameReady
       && (!microphoneRequired || microphoneReady)
       && fullscreenReady
       && consentAccepted
@@ -290,11 +300,50 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const stopMediaStream = useCallback(() => {
     mediaStreamRef.current?.getTracks().forEach((track) => track.stop())
     mediaStreamRef.current = null
+    if (videoRef.current) videoRef.current.srcObject = null
+    setCameraVisibility({
+      status: 'checking',
+      message: 'Run camera test before starting.',
+      confidence: 0,
+    })
     setPermissionDebug((previous) => ({
       ...previous,
       activeVideoTrackCount: 0,
       activeAudioTrackCount: 0,
     }))
+  }, [])
+
+  const verifyCameraVisibility = useCallback(async () => {
+    const video = videoRef.current
+    const canvas = canvasRef.current || hiddenCanvasRef.current
+    if (!video || !canvas) {
+      setCameraVisibility({
+        status: 'checking',
+        message: 'Waiting for camera preview.',
+        confidence: 0.1,
+      })
+      return false
+    }
+
+    setCameraVisibility((previous) => ({
+      ...previous,
+      status: 'checking',
+      message: 'Checking that your face is fully visible...',
+    }))
+
+    try {
+      const { validateCameraFrameForProctoring } = await import('@/lib/proctoring-vision')
+      const result = await validateCameraFrameForProctoring(video, canvas)
+      setCameraVisibility(result)
+      return result.status === 'visible'
+    } catch {
+      setCameraVisibility({
+        status: 'unsupported',
+        message: 'Camera visibility check failed. Retry camera test before starting.',
+        confidence: 0,
+      })
+      return false
+    }
   }, [])
 
   const buildProctoringSubmission = useCallback((autoSubmitted: boolean, extraEvents: ProctoringEvent[] = []): ProctoringSubmission => ({
@@ -547,6 +596,21 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   }, [finished, recordProctoringViolation, requiresProctoring, started])
 
   useEffect(() => {
+    if (!requiresProctoring || started || !cameraReady || !mediaStreamRef.current) return
+    let disposed = false
+    const tick = async () => {
+      if (disposed) return
+      await verifyCameraVisibility()
+    }
+    void tick()
+    const intervalId = window.setInterval(tick, 2500)
+    return () => {
+      disposed = true
+      window.clearInterval(intervalId)
+    }
+  }, [cameraReady, requiresProctoring, started, verifyCameraVisibility])
+
+  useEffect(() => {
     if (!started || finished) return
     const interval = setInterval(() => {
       if (quiz.time_limit_minutes > 0) {
@@ -639,6 +703,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     logPermissionDebug(`${kind} getUserMedia requested`, constraints)
 
     try {
+      if (kind === 'camera') stopMediaStream()
       const stream = kind === 'camera'
         ? await navigator.mediaDevices.getUserMedia({ video: true })
         : await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -657,20 +722,29 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
         return
       }
 
-      stream.getTracks().forEach((track) => track.stop())
+      if (kind === 'camera') {
+        mediaStreamRef.current = stream
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          await videoRef.current.play().catch(() => undefined)
+        }
+      } else {
+        stream.getTracks().forEach((track) => track.stop())
+      }
       logPermissionDebug(`${kind} getUserMedia success`, { trackCount: tracks.length })
       updatePermissionDebug({
         lastGetUserMediaErrorName: null,
         lastGetUserMediaErrorMessage: null,
         [kind === 'camera' ? 'cameraPermissionState' : 'microphonePermissionState']: 'granted',
-        activeVideoTrackCount: 0,
+        activeVideoTrackCount: kind === 'camera' ? tracks.filter((track) => track.readyState === 'live').length : getActiveTrackCounts().activeVideoTrackCount,
         activeAudioTrackCount: 0,
       })
       setPermission({
         status: 'granted',
-        message: kind === 'camera' ? 'Camera permission is granted.' : 'Microphone permission is granted.',
+        message: kind === 'camera' ? 'Camera permission is granted. Keep your full face visible for verification.' : 'Microphone permission is granted.',
         permissionState: 'granted',
       })
+      if (kind === 'camera') void verifyCameraVisibility()
     } catch (error) {
       const result = deviceErrorMessage(kind, error)
       updatePermissionDebug({
@@ -683,7 +757,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
         permissionState: result.status === 'denied' ? 'denied' : previous.permissionState,
       }))
     }
-  }, [deviceErrorMessage, logPermissionDebug, updatePermissionDebug])
+  }, [deviceErrorMessage, getActiveTrackCounts, logPermissionDebug, stopMediaStream, updatePermissionDebug, verifyCameraVisibility])
 
   const requestCameraPermission = useCallback(() => {
     void requestDevicePermission('camera')
@@ -746,6 +820,10 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
         videoRef.current.srcObject = stream
         await videoRef.current.play().catch(() => undefined)
       }
+      const faceVisible = await verifyCameraVisibility()
+      if (!faceVisible) {
+        throw new Error(cameraVisibility.message || 'Your full face must be visible before the proctored quiz can start.')
+      }
       return true
     } catch (error) {
       cameraStream?.getTracks().forEach((track) => track.stop())
@@ -762,7 +840,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       })
       return false
     }
-  }, [microphoneRequired, permissionDebug.microphonePermissionState, stopMediaStream, updatePermissionDebug])
+  }, [cameraVisibility.message, microphoneRequired, permissionDebug.microphonePermissionState, stopMediaStream, updatePermissionDebug, verifyCameraVisibility])
 
   async function handleStart() {
     setStartError(null)
@@ -789,6 +867,13 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     if (!cameraReady) {
       setStartError('Enable camera proctoring before launching the quiz.')
       return
+    }
+    if (!cameraFrameReady) {
+      const faceVisible = await verifyCameraVisibility()
+      if (!faceVisible) {
+        setStartError(cameraVisibility.message || 'Your full face must be visible before launching the quiz.')
+        return
+      }
     }
     if (microphoneRequired && !microphoneReady) {
       setStartError('Enable microphone proctoring before launching the quiz.')
@@ -820,7 +905,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     window.history.pushState({ proctoredQuiz: true }, '', window.location.href)
     startTransition(async () => {
       const result = await startQuizAttempt(quiz.id, {
-        cameraReady,
+        cameraReady: true,
         microphoneReady,
         fullscreenReady: Boolean(document.fullscreenElement),
         consentAccepted: true,
@@ -1302,6 +1387,9 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
                       ready={cameraReady}
                       onRequest={requestCameraPermission}
                     />
+                    {cameraReady && (
+                      <CameraVisibilityPanel visibility={cameraVisibility} onRetry={verifyCameraVisibility} />
+                    )}
                     <DevicePermissionPanel
                       kind="microphone"
                       permission={microphonePermission}
@@ -1798,6 +1886,42 @@ function DevicePermissionPanel({
       {permission.status === 'denied' && (
         <p className="mt-2 text-xs text-zinc-400">
           Open the browser lock icon or Site settings, allow {kind}, then click Retry {label} Permission.
+        </p>
+      )}
+    </div>
+  )
+}
+
+function CameraVisibilityPanel({ visibility, onRetry }: { visibility: CameraVisibilityState; onRetry: () => void }) {
+  const ready = visibility.status === 'visible'
+  const checking = visibility.status === 'checking'
+  const tone = ready
+    ? 'border-emerald-300/30 bg-emerald-400/10 text-emerald-100'
+    : checking
+      ? 'border-cyan-300/30 bg-cyan-400/10 text-cyan-100'
+      : 'border-red-300/40 bg-red-500/15 text-red-100'
+
+  return (
+    <div className={`rounded-2xl border p-4 ${tone}`} aria-live="polite">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold">Face visibility check: {ready ? 'Passed' : checking ? 'Checking' : 'Blocked'}</p>
+          <p className="mt-1 text-xs opacity-85">{visibility.message}</p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          className="min-h-10 rounded-full border-white/25 bg-black/20 text-white hover:bg-white hover:text-black"
+          onClick={() => void onRetry()}
+          disabled={checking}
+        >
+          <Eye className="mr-2 h-4 w-4" />
+          Recheck
+        </Button>
+      </div>
+      {!ready && (
+        <p className="mt-3 rounded-xl bg-black/25 px-3 py-2 text-xs font-medium">
+          Remove camera covers, turn on room light, sit centered, and keep your full face inside the preview.
         </p>
       )}
     </div>

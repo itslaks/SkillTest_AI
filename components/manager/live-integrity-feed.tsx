@@ -64,13 +64,13 @@ export function LiveIntegrityFeed({ initialEvents }: { initialEvents: LiveIntegr
   }, [dismissed, events, filter])
 
   return (
-    <section className="rounded-2xl border border-red-200 bg-red-50/80 p-4">
+    <section className="rounded-2xl border border-red-300 bg-white p-4 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-600" />
           <div>
             <p className="text-sm font-semibold text-red-950">Live violation strip</p>
-            <p className="text-xs text-red-800">Realtime proctoring events from Supabase.</p>
+            <p className="text-xs text-red-700">Realtime proctoring events from Supabase.</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -90,17 +90,17 @@ export function LiveIntegrityFeed({ initialEvents }: { initialEvents: LiveIntegr
       </div>
       <div className="mt-4 grid gap-2">
         {visibleEvents.length === 0 ? (
-          <div className="rounded-xl border border-red-200/70 bg-white/70 p-4 text-sm text-red-800">No live events in this filter.</div>
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-900">No live events in this filter.</div>
         ) : visibleEvents.map((event) => (
-          <div key={event.id} className="animate-in slide-in-from-right-4 rounded-xl border border-red-200 bg-white p-3 shadow-sm">
+          <div key={event.id} className="animate-in slide-in-from-right-4 rounded-xl border border-red-300 bg-white p-3 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="font-semibold text-red-950">{event.label}</p>
                   <Badge className={severityClass(event.severity)}>{event.severity}</Badge>
                 </div>
-                <p className="mt-1 text-xs text-red-800">
-                  {event.employeeName} - {event.quizTitle} - {new Date(event.occurredAt).toLocaleString()}
+                <p className="mt-1 text-xs font-medium text-red-800">
+                  {event.employeeName} - {event.quizTitle} - {formatIntegrityTime(event.occurredAt)}
                 </p>
               </div>
               <button
@@ -116,6 +116,17 @@ export function LiveIntegrityFeed({ initialEvents }: { initialEvents: LiveIntegr
       </div>
     </section>
   )
+}
+
+function formatIntegrityTime(value: string) {
+  return new Date(value).toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 function severityClass(severity: string) {
