@@ -39,37 +39,53 @@ export async function startQuizAttempt(quizId: string, precheck?: {
   // Use admin client to bypass RLS on quiz_assignments (created by manager via admin client)
   let adminClient: any
   try { adminClient = createAdminClient() } catch { adminClient = supabase }
+  const now = new Date().toISOString()
 
   // Verify this quiz is assigned to the employee
-  const { data: assignment } = await adminClient
+  const { data: assignment, error: assignmentError } = await adminClient
     .from('quiz_assignments')
     .select('id')
     .eq('quiz_id', idResult.data)
     .eq('user_id', user.id)
-    .single()
+    .maybeSingle()
 
+  if (assignmentError) return { error: assignmentError.message }
   if (!assignment) return { error: 'This quiz has not been assigned to you' }
 
   const { data: quiz, error: quizError } = await adminClient
     .from('quizzes')
-    .select('id, proctoring_required, is_active')
+    .select('id, proctoring_required, is_active, starts_at, ends_at')
     .eq('id', idResult.data)
     .eq('is_active', true)
-    .single()
+    .or(`starts_at.is.null,starts_at.lte.${now}`)
+    .or(`ends_at.is.null,ends_at.gte.${now}`)
+    .maybeSingle()
 
-  if (quizError || !quiz) return { error: 'Quiz not found or not active' }
+  if (quizError) return { error: quizError.message }
+  if (!quiz) return { error: 'This quiz is not currently available. Please check the scheduled time.' }
   const requiresProctoring = isProctoringRequired(quiz)
   if (requiresProctoring && (!precheck?.cameraReady || !precheck.microphoneReady || !precheck.fullscreenReady || !precheck.consentAccepted)) {
     return { error: 'Camera, microphone, fullscreen, and proctoring consent are required before launching this quiz.' }
   }
 
+  const { data: questions, error: questionsError } = await adminClient
+    .from('questions')
+    .select('id')
+    .eq('quiz_id', idResult.data)
+    .limit(1)
+
+  if (questionsError) return { error: questionsError.message }
+  if (!questions || questions.length === 0) return { error: 'This quiz has no questions yet. Please contact your manager.' }
+
   // Check if there's already an attempt
-  const { data: existing } = await supabase
+  const { data: existing, error: existingError } = await supabase
     .from('quiz_attempts')
     .select('*')
     .eq('quiz_id', idResult.data)
     .eq('user_id', user.id)
-    .single()
+    .maybeSingle()
+
+  if (existingError) return { error: existingError.message }
 
   if (existing?.status === 'completed') {
     return { error: 'You have already completed this quiz' }
@@ -138,14 +154,26 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
 
   try {
     const adminClient = createAdminClient()
-    const { data: assignment } = await adminClient
+    const now = new Date().toISOString()
+    const { data: assignment, error: assignmentError } = await adminClient
       .from('quiz_assignments')
       .select('id')
       .eq('quiz_id', quiz_id)
       .eq('user_id', user.id)
       .maybeSingle()
 
+    if (assignmentError) return { error: assignmentError.message }
     if (!assignment) return { error: 'This quiz has not been assigned to you' }
+
+    const { data: currentAttempt, error: currentAttemptError } = await adminClient
+      .from('quiz_attempts')
+      .select('*')
+      .eq('quiz_id', quiz_id)
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (currentAttemptError) return { error: currentAttemptError.message }
+    if (currentAttempt?.status === 'completed') return { data: currentAttempt }
 
     // Fetch quiz to calculate score
     const { data: quiz, error: quizError } = await adminClient
@@ -153,18 +181,22 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
       .select('*, questions(*)')
       .eq('id', quiz_id)
       .eq('is_active', true)
-      .single()
+      .or(`starts_at.is.null,starts_at.lte.${now}`)
+      .or(`ends_at.is.null,ends_at.gte.${now}`)
+      .maybeSingle()
 
     if (quizError || !quiz) {
       console.error('Quiz fetch error:', quizError)
-      return { error: 'Quiz not found' }
+      return { error: 'This quiz is not currently available. Please check the scheduled time.' }
     }
 
-    const { data: previousAttempts } = await supabase
+    const { data: previousAttempts, error: previousAttemptsError } = await supabase
       .from('quiz_attempts')
       .select('quiz_id, score, answers, completed_at, quizzes:quiz_id(id, topic, difficulty, created_by)')
       .eq('user_id', user.id)
       .eq('status', 'completed')
+
+    if (previousAttemptsError) return { error: previousAttemptsError.message }
 
     const questions = Array.isArray(quiz.questions) ? quiz.questions : []
     const questionById = new Map<string, any>(questions.map((question: any) => [question.id, question]))
@@ -204,7 +236,7 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
     const score = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0
     const rawInsight = analyzeAttemptPattern(enrichedAnswers, quiz.difficulty, topicAttempts)
 
-    const { data: activeAttempt } = await adminClient
+    const { data: activeAttempt, error: activeAttemptError } = await adminClient
       .from('quiz_attempts')
       .select('id, status')
       .eq('quiz_id', quiz_id)
@@ -212,6 +244,7 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
       .eq('status', 'in_progress')
       .maybeSingle()
 
+    if (activeAttemptError) return { error: activeAttemptError.message }
     if (!activeAttempt) return { error: 'No active quiz attempt was found.' }
 
     const requiresProctoring = isProctoringRequired(quiz)
@@ -227,13 +260,20 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
         return { error: sessionResult.error || 'A valid proctoring session is required for this quiz.' }
       }
       session = sessionResult.data
-      const { data: eventRows } = await adminClient
+      const { data: eventRows, error: eventRowsError } = await adminClient
         .from('quiz_proctoring_events')
         .select('*')
         .eq('session_id', session.id)
         .order('occurred_at', { ascending: true })
 
-      proctoringEvents = eventRowsToSubmissionEvents(eventRows || [])
+      if (eventRowsError) return { error: eventRowsError.message }
+      const persistedEvents = eventRowsToSubmissionEvents(eventRows || [])
+      const submittedEvents = proctoring?.events || []
+      const mergedEvents = new Map<string, typeof persistedEvents[number]>()
+      for (const event of [...persistedEvents, ...submittedEvents]) {
+        mergedEvents.set(`${event.type}:${event.occurredAt}:${event.questionIndex ?? ''}:${event.label}`, event)
+      }
+      proctoringEvents = Array.from(mergedEvents.values())
       const summary = buildProctoringSummary(proctoringEvents)
       proctoringViolationCount = summary.violationCount
       proctoringRisk = { score: summary.riskScore, level: summary.riskLevel }
@@ -494,22 +534,28 @@ export async function getAvailableQuizzes() {
   if (error) return { error: error.message, data: [] }
 
   // Get user's attempts
-  const { data: attempts } = await supabase
+  const { data: attempts, error: attemptsError } = await supabase
     .from('quiz_attempts')
     .select('quiz_id, status, score, answers, completed_at, quizzes:quiz_id(id, topic, difficulty, created_by)')
     .eq('user_id', user.id)
 
-  const { data: profile } = await adminClient
+  if (attemptsError) return { error: attemptsError.message, data: [] }
+
+  const { data: profile, error: profileError } = await adminClient
     .from('profiles')
     .select('domain, created_at')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
 
-  const { data: userStats } = await supabase
+  if (profileError) return { error: profileError.message, data: [] }
+
+  const { data: userStats, error: userStatsError } = await supabase
     .from('user_stats')
     .select('current_streak')
     .eq('user_id', user.id)
-    .single()
+    .maybeSingle()
+
+  if (userStatsError) return { error: userStatsError.message, data: [] }
 
   const attemptMap = new Map<string, { quiz_id: string; status: string; score: number }>(
     attempts?.map((a: any) => [a.quiz_id, a]) || []
@@ -549,15 +595,17 @@ export async function getQuizForAttempt(quizId: string) {
   // Use admin client to bypass RLS on quiz_assignments (created by manager via admin client)
   let adminClient: any
   try { adminClient = createAdminClient() } catch { adminClient = supabase }
+  const now = new Date().toISOString()
 
   // Verify this quiz is assigned to the employee
-  const { data: assignment } = await adminClient
+  const { data: assignment, error: assignmentError } = await adminClient
     .from('quiz_assignments')
     .select('id')
     .eq('quiz_id', idResult.data)
     .eq('user_id', user.id)
-    .single()
+    .maybeSingle()
 
+  if (assignmentError) return { error: assignmentError.message }
   if (!assignment) return { error: 'This quiz has not been assigned to you' }
 
   const { data: quiz, error: quizError } = await adminClient
@@ -565,9 +613,12 @@ export async function getQuizForAttempt(quizId: string) {
     .select('*')
     .eq('id', idResult.data)
     .eq('is_active', true)
-    .single()
+    .or(`starts_at.is.null,starts_at.lte.${now}`)
+    .or(`ends_at.is.null,ends_at.gte.${now}`)
+    .maybeSingle()
 
-  if (quizError || !quiz) return { error: 'Quiz not found or not active' }
+  if (quizError) return { error: quizError.message }
+  if (!quiz) return { error: 'This quiz is not currently available. Please check the scheduled time.' }
 
   // Get all questions for the quiz
   const { data: questions, error: questionsError } = await adminClient
@@ -578,23 +629,29 @@ export async function getQuizForAttempt(quizId: string) {
 
   if (questionsError) return { error: questionsError.message }
 
-  const { data: profile } = await adminClient
+  const { data: profile, error: profileError } = await adminClient
     .from('profiles')
     .select('domain, created_at, role')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
 
-  const { data: userStats } = await supabase
+  if (profileError) return { error: profileError.message }
+
+  const { data: userStats, error: userStatsError } = await supabase
     .from('user_stats')
     .select('current_streak')
     .eq('user_id', user.id)
-    .single()
+    .maybeSingle()
 
-  const { data: previousAttempts } = await supabase
+  if (userStatsError) return { error: userStatsError.message }
+
+  const { data: previousAttempts, error: previousAttemptsError } = await supabase
     .from('quiz_attempts')
     .select('quiz_id, score, answers, completed_at, quizzes:quiz_id(id, topic, difficulty, created_by)')
     .eq('user_id', user.id)
     .eq('status', 'completed')
+
+  if (previousAttemptsError) return { error: previousAttemptsError.message }
 
   // Shuffle questions for randomness
   const shuffled = questions ? [...questions].sort(() => Math.random() - 0.5) : []
@@ -702,24 +759,30 @@ export async function getEmployeeStats() {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { error: 'Not authenticated' }
 
-  const { data: stats } = await supabase
+  const { data: stats, error: statsError } = await supabase
     .from('user_stats')
     .select('*')
     .eq('user_id', user.id)
-    .single()
+    .maybeSingle()
 
-  const { data: badges } = await supabase
+  if (statsError) return { error: statsError.message }
+
+  const { data: badges, error: badgesError } = await supabase
     .from('user_badges')
     .select('*, badges(*)')
     .eq('user_id', user.id)
 
-  const { data: recentAttempts } = await supabase
+  if (badgesError) return { error: badgesError.message }
+
+  const { data: recentAttempts, error: recentAttemptsError } = await supabase
     .from('quiz_attempts')
     .select('*, quizzes(title, topic, difficulty, created_by)')
     .eq('user_id', user.id)
     .eq('status', 'completed')
     .order('completed_at', { ascending: false })
     .limit(10)
+
+  if (recentAttemptsError) return { error: recentAttemptsError.message }
 
   const retentionChecks = buildRetentionChecks(recentAttempts || [])
 
@@ -736,26 +799,31 @@ export async function getEmployeeStats() {
 // ─── Get all badges ───────────────────────────────────────────────────
 export async function getAllBadges() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return { error: 'Not authenticated', data: [], certificates: [] }
 
-  const { data: allBadges } = await supabase
+  const { data: allBadges, error: allBadgesError } = await supabase
     .from('badges')
     .select('*')
     .order('points', { ascending: true })
 
-  const { data: earnedBadges } = await supabase
+  if (allBadgesError) return { error: allBadgesError.message, data: [], certificates: [] }
+
+  const { data: earnedBadges, error: earnedBadgesError } = await supabase
     .from('user_badges')
     .select('badge_id')
-    .eq('user_id', user?.id)
+    .eq('user_id', user.id)
+
+  if (earnedBadgesError) return { error: earnedBadgesError.message, data: [], certificates: [] }
 
   const adminClient = createAdminClient()
-  const { data: certificates } = user?.id
-    ? await adminClient
-        .from('certificates')
-        .select('id, title, score, issued_at, quiz:quiz_id(title, topic), rule:rule_id(certificate_name, min_score)')
-        .eq('user_id', user.id)
-        .order('issued_at', { ascending: false })
-    : { data: [] }
+  const { data: certificates, error: certificatesError } = await adminClient
+    .from('certificates')
+    .select('id, title, score, issued_at, quiz:quiz_id(title, topic), rule:rule_id(certificate_name, min_score)')
+    .eq('user_id', user.id)
+    .order('issued_at', { ascending: false })
+
+  if (certificatesError) return { error: certificatesError.message, data: [], certificates: [] }
 
   const earnedIds = new Set(earnedBadges?.map((b: any) => b.badge_id) || [])
 

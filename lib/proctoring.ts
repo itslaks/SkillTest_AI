@@ -1,5 +1,14 @@
 import type { ProctoringEvent, ProctoringEventType, ProctoringRiskLevel } from '@/lib/types/database'
 
+export type ProctoringEventPostPayload = {
+  sessionId: string
+  attemptId: string
+  type: ProctoringEventType
+  label: string
+  questionIndex?: number
+  evidenceImage?: string | null
+}
+
 export const PROCTORING_VIOLATION_LIMIT = 3
 export const PROCTORING_CRITICAL_RISK_SCORE = 100
 

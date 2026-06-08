@@ -15,6 +15,7 @@ import {
   calculateProctoringRisk,
   getProctoringEventRisk,
   getProctoringRiskLevel,
+  type ProctoringEventPostPayload,
   PROCTORING_CRITICAL_RISK_SCORE,
   PROCTORING_VIOLATION_LIMIT,
 } from '@/lib/proctoring'
@@ -125,6 +126,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   useEffect(() => {
     answersRef.current = answers
   }, [answers])
+  const [attemptId, setAttemptId] = useState<string | null>(null)
 
   const [selectedOption, setSelectedOption] = useState<number | null>(null)
   const [showFeedback, setShowFeedback] = useState(false)
@@ -165,6 +167,9 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const attemptIdRef = useRef<string | null>(null)
   const submittingRef = useRef(false)
   const activeSignalRef = useRef<Record<string, boolean>>({})
+  const proctoringEventRetryQueueRef = useRef<ProctoringEventPostPayload[]>([])
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [draftStorageWarning, setDraftStorageWarning] = useState(false)
 
   const questions = (quiz.questions || []) as QuizQuestion[]
   const questionMap = new Map<string, QuizQuestion>(questions.map((question) => [question.id, question]))
@@ -185,6 +190,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
         ? 'HTTPS or localhost required'
         : 'Media capture unsupported'
   const fullscreenReady = !requiresProctoring || browserCapabilities.fullscreenSupported
+  const draftKey = attemptId ? `quiz-draft:${quiz.id}:${attemptId}` : null
   const canStartQuiz = !isPending
     && (!requiresProctoring || (
       cameraReady
@@ -198,6 +204,53 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     if (process.env.NODE_ENV !== 'development') return
     if (details === undefined) console.log(`[proctoring] ${message}`)
     else console.log(`[proctoring] ${message}`, details)
+  }, [])
+
+  const safeGetLocalStorage = useCallback((key: string) => {
+    try {
+      return localStorage.getItem(key)
+    } catch {
+      return null
+    }
+  }, [])
+
+  const safeSetLocalStorage = useCallback((key: string, value: string) => {
+    try {
+      localStorage.setItem(key, value)
+    } catch {
+      setDraftStorageWarning(true)
+    }
+  }, [])
+
+  const safeRemoveLocalStorage = useCallback((key: string) => {
+    try {
+      localStorage.removeItem(key)
+    } catch {
+      setDraftStorageWarning(true)
+    }
+  }, [])
+
+  const cleanupStaleDrafts = useCallback((currentAttemptId: string | null) => {
+    if (!currentAttemptId) return
+    try {
+      const prefix = `quiz-draft:${quiz.id}:`
+      for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+        const key = localStorage.key(index)
+        if (key?.startsWith(prefix) && key !== `${prefix}${currentAttemptId}`) {
+          localStorage.removeItem(key)
+        }
+      }
+    } catch {
+      setDraftStorageWarning(true)
+    }
+  }, [quiz.id])
+
+  const recoverSubmitError = useCallback((message: string) => {
+    submittingRef.current = false
+    finishedRef.current = false
+    setSubmitting(false)
+    setFinished(false)
+    setSubmitError(message)
   }, [])
 
   const getActiveTrackCounts = useCallback(() => {
@@ -238,28 +291,97 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     events: [...proctoringEventsRef.current, ...extraEvents].slice(-50),
   }), [violationCount])
 
+  const flushProctoringEventQueue = useCallback(async () => {
+    if (proctoringEventRetryQueueRef.current.length === 0) return null
+    const queuedEvents = [...proctoringEventRetryQueueRef.current]
+
+    try {
+      const response = await fetch('/api/proctoring/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(queuedEvents),
+      })
+      if (!response.ok) throw new Error('Unable to flush queued proctoring events.')
+      const summary = await response.json()
+      proctoringEventRetryQueueRef.current = []
+      return summary
+    } catch {
+      proctoringEventRetryQueueRef.current = queuedEvents
+      return null
+    }
+  }, [])
+
+  const enqueueProctoringEvent = useCallback((payload: ProctoringEventPostPayload) => {
+    proctoringEventRetryQueueRef.current = [...proctoringEventRetryQueueRef.current, payload].slice(-50)
+  }, [])
+
+  const getFinalAnswersForSubmit = useCallback(() => {
+    if (selectedOption === null || !currentQuestion || showFeedback) return answersRef.current
+    if (answersRef.current.some((answer) => answer.questionId === currentQuestion.id)) return answersRef.current
+
+    const selectedOriginalOption = currentQuestion.options[selectedOption]?.optionId
+    if (selectedOriginalOption === undefined) return answersRef.current
+
+    return [
+      ...answersRef.current,
+      {
+        questionId: currentQuestion.id,
+        selectedOption: selectedOriginalOption,
+        timeSpent: Math.max(0, Math.round((Date.now() - questionStartTime) / 1000)),
+        questionDifficulty: currentQuestion.difficulty,
+      },
+    ]
+  }, [currentQuestion, questionStartTime, selectedOption, showFeedback])
+
   const doSubmit = useCallback((finalAnswers: SubmittedQuizAnswer[], proctoring?: ProctoringSubmission) => {
     if (submittingRef.current) return
     submittingRef.current = true
     setSubmitting(true)
+    setSubmitError(null)
     stopMediaStream()
     startTransition(async () => {
-      const result = await submitQuizAttempt({
-        quiz_id: quiz.id,
-        answers: finalAnswers,
-        time_taken_seconds: totalTimeRef.current,
-        proctoring: requiresProctoring ? (proctoring || buildProctoringSubmission(false)) : undefined,
-      })
+      try {
+        if (requiresProctoring) {
+          await flushProctoringEventQueue()
+        }
 
-      if (result.error) {
-        submittingRef.current = false
-        setSubmitting(false)
-        return
+        const result = await submitQuizAttempt({
+          quiz_id: quiz.id,
+          answers: finalAnswers,
+          time_taken_seconds: totalTimeRef.current,
+          proctoring: requiresProctoring ? (proctoring || buildProctoringSubmission(false)) : undefined,
+        })
+
+        if (result.error) {
+          recoverSubmitError(result.error ?? 'Submission failed. Please try again.')
+          return
+        }
+
+        if (draftKey) safeRemoveLocalStorage(draftKey)
+        router.push(`/employee/quizzes/${quiz.id}/results`)
+      } catch {
+        recoverSubmitError('Network error while submitting. Please check your connection and try again.')
       }
-
-      router.push(`/employee/quizzes/${quiz.id}/results`)
     })
-  }, [buildProctoringSubmission, quiz.id, requiresProctoring, router, startTransition, stopMediaStream])
+  }, [buildProctoringSubmission, draftKey, flushProctoringEventQueue, quiz.id, recoverSubmitError, requiresProctoring, router, safeRemoveLocalStorage, startTransition, stopMediaStream])
+
+  useEffect(() => {
+    if (!draftKey) return
+    const saved = safeGetLocalStorage(draftKey)
+    if (!saved) return
+
+    try {
+      const parsed = JSON.parse(saved)
+      if (Array.isArray(parsed)) setAnswers(parsed)
+    } catch {
+      safeRemoveLocalStorage(draftKey)
+    }
+  }, [draftKey, safeGetLocalStorage, safeRemoveLocalStorage])
+
+  useEffect(() => {
+    if (!draftKey || answers.length === 0) return
+    safeSetLocalStorage(draftKey, JSON.stringify(answers))
+  }, [answers, draftKey, safeSetLocalStorage])
 
   const captureEvidenceFrame = useCallback(() => {
     const video = videoRef.current
@@ -280,9 +402,9 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     if (!finishedRef.current) {
       finishedRef.current = true
       setFinished(true)
-      doSubmit(answersRef.current, proctoring || buildProctoringSubmission(true))
+      doSubmit(getFinalAnswersForSubmit(), proctoring || buildProctoringSubmission(true))
     }
-  }, [buildProctoringSubmission, doSubmit])
+  }, [buildProctoringSubmission, doSubmit, getFinalAnswersForSubmit])
 
   const recordProctoringViolation = useCallback((type: ProctoringEventType, label: string) => {
     if (!requiresProctoring || !started || finishedRef.current || submittingRef.current) return
@@ -303,20 +425,26 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     const attemptId = attemptIdRef.current
     if (!sessionId || !attemptId) return
 
-    void fetch('/api/proctoring/events', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId,
-        attemptId,
-        type,
-        label,
-        questionIndex: currentIndex,
-        evidenceImage: captureEvidenceFrame(),
-      }),
-    })
+    const payload: ProctoringEventPostPayload = {
+      sessionId,
+      attemptId,
+      type,
+      label,
+      questionIndex: currentIndex,
+      evidenceImage: captureEvidenceFrame(),
+    }
+
+    void flushProctoringEventQueue()
+      .then(() => fetch('/api/proctoring/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }))
       .then(async (response) => {
-        if (!response.ok) return null
+        if (!response.ok) {
+          enqueueProctoringEvent(payload)
+          return null
+        }
         return response.json()
       })
       .then((summary) => {
@@ -350,9 +478,10 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
         }
       })
       .catch(() => {
+        enqueueProctoringEvent(payload)
         setLatestViolation(`${label} Server sync failed; keep the quiz window stable.`)
       })
-  }, [captureEvidenceFrame, currentIndex, handleAutoSubmit, requiresProctoring, started])
+  }, [captureEvidenceFrame, currentIndex, enqueueProctoringEvent, flushProctoringEventQueue, handleAutoSubmit, requiresProctoring, started])
 
   useEffect(() => {
     if (!started || finished) return
@@ -512,6 +641,11 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     }
   }, [attachCameraPreview, deviceErrorMessage, logPermissionDebug, mergeTrackIntoMediaStream, updatePermissionDebug])
 
+  const recheckPermissions = useCallback(() => {
+    void requestDevicePermission('camera')
+    if (microphoneRequired) void requestDevicePermission('microphone')
+  }, [microphoneRequired, requestDevicePermission])
+
   async function handleStart() {
     setStartError(null)
     if (!requiresProctoring) {
@@ -521,7 +655,10 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
           setStartError(result.error)
           return
         }
-        attemptIdRef.current = result.data?.id || null
+        const nextAttemptId = result.data?.id || null
+        attemptIdRef.current = nextAttemptId
+        setAttemptId(nextAttemptId)
+        cleanupStaleDrafts(nextAttemptId)
         setStarted(true)
         setQuestionStartTime(Date.now())
       })
@@ -569,7 +706,10 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
         setStartError(result.error)
         return
       }
-      attemptIdRef.current = result.data?.id || null
+      const nextAttemptId = result.data?.id || null
+      attemptIdRef.current = nextAttemptId
+      setAttemptId(nextAttemptId)
+      cleanupStaleDrafts(nextAttemptId)
       proctoringSessionIdRef.current = result.proctoringSession?.id || null
       setStarted(true)
       setQuestionStartTime(Date.now())
@@ -633,6 +773,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     }
 
     let cancelled = false
+    const watchedPermissions: PermissionStatus[] = []
     const applyPermissionState = (kind: DeviceKind, state: PermissionState) => {
       logPermissionDebug(`${kind} permission query state`, state)
       updatePermissionDebug({
@@ -645,13 +786,6 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
           : mediaStreamRef.current?.getAudioTracks().filter((track) => track.readyState === 'live').length || 0
 
         if (previous.status === 'granted' && liveTrackCount > 0) return { ...previous, permissionState: state }
-        if (state === 'denied') {
-          return {
-            status: 'denied',
-            message: `${kind === 'camera' ? 'Camera' : 'Microphone'} permission is denied in browser settings. Allow access in site settings, then retry.`,
-            permissionState: state,
-          }
-        }
         return {
           ...previous,
           status: previous.status === 'denied' ? 'required' : previous.status,
@@ -667,7 +801,13 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
         if (cancelled) return
         const applyState = () => applyPermissionState(kind, permission.state)
         applyState()
-        if (attachListener) permission.onchange = applyState
+        if (attachListener) {
+          permission.onchange = () => {
+            applyState()
+            recheckPermissions()
+          }
+          watchedPermissions.push(permission)
+        }
       } catch (error) {
         logPermissionDebug(`${kind} permission query unsupported`, error instanceof Error ? error.message : error)
         const setPermission = kind === 'camera' ? setCameraPermission : setMicrophonePermission
@@ -683,22 +823,30 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       void queryPermission('microphone', 'microphone' as PermissionName)
     }
     const refreshWhenVisible = () => {
-      if (!document.hidden) refreshPermissionStates()
+      if (document.visibilityState === 'visible') {
+        refreshPermissionStates()
+        if (submittingRef.current) return
+        recheckPermissions()
+      }
     }
 
     void queryPermission('camera', 'camera' as PermissionName, true)
     void queryPermission('microphone', 'microphone' as PermissionName, true)
-    window.addEventListener('focus', refreshPermissionStates)
-    window.addEventListener('pageshow', refreshPermissionStates)
+    recheckPermissions()
+    window.addEventListener('focus', recheckPermissions)
+    window.addEventListener('pageshow', recheckPermissions)
     document.addEventListener('visibilitychange', refreshWhenVisible)
 
     return () => {
       cancelled = true
-      window.removeEventListener('focus', refreshPermissionStates)
-      window.removeEventListener('pageshow', refreshPermissionStates)
+      watchedPermissions.forEach((permission) => {
+        permission.onchange = null
+      })
+      window.removeEventListener('focus', recheckPermissions)
+      window.removeEventListener('pageshow', recheckPermissions)
       document.removeEventListener('visibilitychange', refreshWhenVisible)
     }
-  }, [logPermissionDebug, requiresProctoring, updatePermissionDebug])
+  }, [logPermissionDebug, recheckPermissions, requiresProctoring, updatePermissionDebug])
 
   useEffect(() => {
     return () => stopMediaStream()
@@ -860,7 +1008,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     if (currentIndex + 1 >= totalQuestions) {
       finishedRef.current = true
       setFinished(true)
-      doSubmit([...answersRef.current], requiresProctoring ? buildProctoringSubmission(false) : undefined)
+      doSubmit(getFinalAnswersForSubmit(), requiresProctoring ? buildProctoringSubmission(false) : undefined)
       return
     }
 
@@ -964,14 +1112,14 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
                       kind="camera"
                       permission={cameraPermission}
                       ready={cameraReady}
-                      onRequest={() => requestDevicePermission('camera')}
+                      onRequest={recheckPermissions}
                     />
                     <DevicePermissionPanel
                       kind="microphone"
                       permission={microphonePermission}
                       ready={microphoneReady}
                       required={microphoneRequired}
-                      onRequest={() => requestDevicePermission('microphone')}
+                      onRequest={recheckPermissions}
                     />
                     <label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-zinc-300">
                       <input
@@ -1039,7 +1187,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
 
   if (finished || submitting) {
     return (
-      <div className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center text-center text-white">
+      <div className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center text-center text-white" aria-busy="true">
         <div className="animate-pulse">
           <Trophy className="mx-auto mb-4 h-16 w-16 text-white" />
         </div>
@@ -1081,6 +1229,21 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
           </div>
 
           <Progress value={progress} className="h-2 bg-zinc-200" />
+
+          {submitError && (
+            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              <strong>Submission failed:</strong> {submitError}
+              <button type="button" onClick={() => setSubmitError(null)} className="ml-4 underline">
+                Dismiss
+              </button>
+            </div>
+          )}
+
+          {draftStorageWarning && (
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              Draft saving is unavailable in this browser. Complete the quiz in one session to avoid losing answers.
+            </div>
+          )}
 
           {(liveState.cooldownSuggested || quiz.insights?.antiGamingDetected) && (
             <div className="rounded-[1.75rem] border border-zinc-200 bg-white p-4 shadow-sm">
@@ -1231,15 +1394,22 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
         {!showFeedback ? (
           <Button
             onClick={handleConfirmAnswer}
-            disabled={selectedOption === null}
+            disabled={selectedOption === null || submitting}
+            aria-disabled={selectedOption === null || submitting}
             size="lg"
-            className="h-12 rounded-full bg-black px-7 text-white hover:bg-zinc-800"
+            className="h-12 rounded-full bg-black px-7 text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
             Confirm answer
             <Zap className="ml-2 h-4 w-4" />
           </Button>
         ) : (
-          <Button onClick={handleNext} size="lg" className="h-12 rounded-full bg-black px-7 text-white hover:bg-zinc-800">
+          <Button
+            onClick={handleNext}
+            disabled={submitting}
+            aria-disabled={submitting}
+            size="lg"
+            className="h-12 rounded-full bg-black px-7 text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+          >
             {currentIndex + 1 >= totalQuestions ? 'Finish adaptive quiz' : 'Next question'}
             <ChevronRight className="ml-2 h-4 w-4" />
           </Button>

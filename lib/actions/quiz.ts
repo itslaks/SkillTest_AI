@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import type { CreateQuizInput, CreateQuestionInput } from '@/lib/types/database'
+import { requireManager } from '@/lib/rbac'
 import {
   createQuizSchema,
   updateQuizSchema,
@@ -11,6 +12,18 @@ import {
   bulkCreateQuestionsSchema,
   uuidSchema,
 } from '@/lib/security/validation'
+
+async function verifyQuizOwnership(supabase: Awaited<ReturnType<typeof createClient>>, quizId: string, userId: string) {
+  const { data: quiz, error } = await supabase
+    .from('quizzes')
+    .select('id')
+    .eq('id', quizId)
+    .eq('created_by', userId)
+    .maybeSingle()
+
+  if (error) return false
+  return Boolean(quiz)
+}
 
 export async function createQuiz(input: CreateQuizInput) {
   // Validate input against strict schema
@@ -105,6 +118,20 @@ export async function deleteQuiz(id: string) {
 
   if (authError || !user) {
     return { error: 'Not authenticated' }
+  }
+
+  const { count: activeAttemptCount, error: activeAttemptError } = await supabase
+    .from('quiz_attempts')
+    .select('id', { count: 'exact', head: true })
+    .eq('quiz_id', idResult.data)
+    .eq('status', 'in_progress')
+
+  if (activeAttemptError) {
+    return { error: activeAttemptError.message }
+  }
+
+  if ((activeAttemptCount || 0) > 0) {
+    return { error: `Cannot delete — ${activeAttemptCount} fresher(s) currently have active attempts.` }
   }
 
   const { error } = await supabase
@@ -224,11 +251,12 @@ export async function createQuestion(input: CreateQuestionInput) {
     return { error: `${firstError.path.join('.')}: ${firstError.message}` }
   }
 
+  const { userId } = await requireManager()
   const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
 
-  if (authError || !user) {
-    return { error: 'Not authenticated' }
+  const ownsQuiz = await verifyQuizOwnership(supabase, parsed.data.quiz_id, userId)
+  if (!ownsQuiz) {
+    return { error: 'Not authorized for this quiz' }
   }
 
   const { data, error } = await supabase
@@ -259,7 +287,20 @@ export async function updateQuestion(id: string, input: Partial<CreateQuestionIn
     return { error: `${firstError.path.join('.')}: ${firstError.message}` }
   }
 
+  const { userId } = await requireManager()
   const supabase = await createClient()
+
+  const { data: question, error: questionError } = await supabase
+    .from('questions')
+    .select('quiz_id')
+    .eq('id', idResult.data)
+    .maybeSingle()
+
+  if (questionError) return { error: questionError.message }
+  const ownsQuestionQuiz = question ? await verifyQuizOwnership(supabase, question.quiz_id, userId) : false
+  if (!question || !ownsQuestionQuiz) {
+    return { error: 'Not authorized for this quiz' }
+  }
 
   const { data, error } = await supabase
     .from('questions')
@@ -283,7 +324,20 @@ export async function deleteQuestion(id: string) {
     return { error: 'Invalid question ID' }
   }
 
+  const { userId } = await requireManager()
   const supabase = await createClient()
+
+  const { data: question, error: questionError } = await supabase
+    .from('questions')
+    .select('quiz_id')
+    .eq('id', idResult.data)
+    .maybeSingle()
+
+  if (questionError) return { error: questionError.message }
+  const ownsQuestionQuiz = question ? await verifyQuizOwnership(supabase, question.quiz_id, userId) : false
+  if (!question || !ownsQuestionQuiz) {
+    return { error: 'Not authorized for this quiz' }
+  }
 
   const { error } = await supabase
     .from('questions')
@@ -306,11 +360,15 @@ export async function bulkCreateQuestions(questions: CreateQuestionInput[]) {
     return { error: `${firstError.path.join('.')}: ${firstError.message}` }
   }
 
+  const { userId } = await requireManager()
   const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  const quizIds = Array.from(new Set(parsed.data.map((question) => question.quiz_id)))
 
-  if (authError || !user) {
-    return { error: 'Not authenticated' }
+  for (const quizId of quizIds) {
+    const ownsQuiz = await verifyQuizOwnership(supabase, quizId, userId)
+    if (!ownsQuiz) {
+      return { error: 'Not authorized for this quiz' }
+    }
   }
 
   const { data, error } = await supabase
@@ -335,37 +393,45 @@ export async function getQuizStats() {
   }
 
   // Get all quizzes created by manager
-  const { data: quizzes } = await supabase
+  const { data: quizzes, error: quizzesError } = await supabase
     .from('quizzes')
     .select('id')
     .eq('created_by', user.id)
 
+  if (quizzesError) return { error: quizzesError.message }
+
   const quizIds = quizzes?.map((q: any) => q.id) || []
 
   // Get total attempts
-  const { count: totalAttempts } = await supabase
+  const { count: totalAttempts, error: totalAttemptsError } = await supabase
     .from('quiz_attempts')
     .select('*', { count: 'exact', head: true })
     .in('quiz_id', quizIds)
     .not('completed_at', 'is', null)
 
+  if (totalAttemptsError) return { error: totalAttemptsError.message }
+
   // Get average score
-  const { data: attempts } = await supabase
+  const { data: attempts, error: attemptsError } = await supabase
     .from('quiz_attempts')
     .select('score')
     .in('quiz_id', quizIds)
     .not('completed_at', 'is', null)
+
+  if (attemptsError) return { error: attemptsError.message }
 
   const averageScore = attempts && attempts.length > 0
     ? Math.round(attempts.reduce((sum: number, a: any) => sum + a.score, 0) / attempts.length)
     : 0
 
   // Get unique employees who took quizzes
-  const { data: uniqueEmployees } = await supabase
+  const { data: uniqueEmployees, error: uniqueEmployeesError } = await supabase
     .from('quiz_attempts')
     .select('user_id')
     .in('quiz_id', quizIds)
     .not('completed_at', 'is', null)
+
+  if (uniqueEmployeesError) return { error: uniqueEmployeesError.message }
 
   const uniqueEmployeeCount = new Set(uniqueEmployees?.map((e: any) => e.user_id)).size
 

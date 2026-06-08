@@ -188,18 +188,39 @@ export default function NewQuizPage() {
 
         try {
           if ((questionSource === 'upload' || questionSource === 'both') && parsedQuestions.length > 0) {
-            const questionInputs = parsedQuestions.map(q => ({
-              quiz_id: quizId,
-              question_text: q.question_text,
-              options: [
-                { text: q.option_a, isCorrect: q.correct_answer?.toLowerCase() === 'a' },
-                { text: q.option_b, isCorrect: q.correct_answer?.toLowerCase() === 'b' },
-                { text: q.option_c, isCorrect: q.correct_answer?.toLowerCase() === 'c' },
-                { text: q.option_d, isCorrect: q.correct_answer?.toLowerCase() === 'd' },
-              ],
-              difficulty: (q.difficulty || difficulty) as DifficultyLevel,
-              explanation: q.explanation || undefined,
-            }))
+            const invalidRows: number[] = []
+            const questionInputs = parsedQuestions.flatMap((q, index) => {
+              const options = [q.option_a, q.option_b, q.option_c, q.option_d]
+              const correctIndex = normalizeCorrectAnswer(q.correct_answer || '', options)
+              if (correctIndex === -1) {
+                invalidRows.push(index + 1)
+                return []
+              }
+
+              return [{
+                quiz_id: quizId,
+                question_text: q.question_text,
+                options: options.map((text, optionIndex) => ({
+                  text,
+                  isCorrect: optionIndex === correctIndex,
+                })),
+                difficulty: (q.difficulty || difficulty) as DifficultyLevel,
+                explanation: q.explanation || undefined,
+              }]
+            })
+
+            if (invalidRows.length > 0) {
+              toast({
+                title: 'Invalid correct answers skipped',
+                description: `Rows ${invalidRows.join(', ')} do not match A-D or the exact option text.`,
+                variant: 'destructive',
+              })
+            }
+
+            if (questionInputs.length === 0) {
+              await cleanupQuiz('No uploaded questions had a valid correct answer.')
+              return
+            }
 
             const questionResult = await bulkCreateQuestions(questionInputs)
             if (questionResult.error) {
@@ -756,4 +777,11 @@ function rowCell(row: Record<string, any>, aliases: string[]) {
 function normalizeDifficulty(value: string, fallback: DifficultyLevel): DifficultyLevel {
   const normalized = value.toLowerCase() as DifficultyLevel
   return ALL_DIFFICULTIES.includes(normalized) ? normalized : fallback
+}
+
+function normalizeCorrectAnswer(raw: string, options: string[]) {
+  const value = raw.trim().toLowerCase()
+  const letter = ['a', 'b', 'c', 'd'].indexOf(value)
+  if (letter >= 0) return letter
+  return options.findIndex((option) => option.trim().toLowerCase() === value)
 }

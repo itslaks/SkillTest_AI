@@ -17,10 +17,14 @@ const proctoringEventSchema = z.object({
     .optional()
     .nullable(),
 })
+const proctoringEventsPayloadSchema = z.union([
+  proctoringEventSchema,
+  z.array(proctoringEventSchema).min(1).max(50),
+])
 
 export async function POST(request: NextRequest) {
   const payload = await request.json().catch(() => null)
-  const parsed = proctoringEventSchema.safeParse(payload)
+  const parsed = proctoringEventsPayloadSchema.safeParse(payload)
   if (!parsed.success) {
     const first = parsed.error.issues[0]
     return NextResponse.json({ error: `${first.path.join('.')}: ${first.message}` }, { status: 400 })
@@ -31,26 +35,36 @@ export async function POST(request: NextRequest) {
   if (authError || !user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
   const admin = createAdminClient()
-  const sessionResult = await requireActiveProctoringSession(admin, parsed.data.sessionId, parsed.data.attemptId, user.id)
+  const events = Array.isArray(parsed.data) ? parsed.data : [parsed.data]
+  const firstEvent = events[0]
+  const sessionResult = await requireActiveProctoringSession(admin, firstEvent.sessionId, firstEvent.attemptId, user.id)
   if (sessionResult.error || !sessionResult.data) {
     return NextResponse.json({ error: sessionResult.error || 'Invalid proctoring session.' }, { status: 403 })
   }
 
-  const result = await recordProctoringEvent({
-    admin,
-    session: sessionResult.data,
-    type: parsed.data.type,
-    label: parsed.data.label,
-    questionIndex: parsed.data.questionIndex,
-    evidenceImage: parsed.data.evidenceImage,
-  })
+  let result: Awaited<ReturnType<typeof recordProctoringEvent>> | null = null
+  for (const event of events) {
+    if (event.sessionId !== firstEvent.sessionId || event.attemptId !== firstEvent.attemptId) {
+      return NextResponse.json({ error: 'Batch contains events for different proctoring sessions.' }, { status: 400 })
+    }
 
-  if ('error' in result && result.error) return NextResponse.json({ error: result.error }, { status: 500 })
-  if (!('data' in result) || !result.data) return NextResponse.json({ error: 'Unable to record proctoring event.' }, { status: 500 })
+    result = await recordProctoringEvent({
+      admin,
+      session: sessionResult.data,
+      type: event.type,
+      label: event.label,
+      questionIndex: event.questionIndex,
+      evidenceImage: event.evidenceImage,
+    })
+
+    if ('error' in result && result.error) return NextResponse.json({ error: result.error }, { status: 500 })
+  }
+
+  if (!result || !('data' in result) || !result.data) return NextResponse.json({ error: 'Unable to record proctoring event.' }, { status: 500 })
 
   return NextResponse.json({
     ...result.data,
-    eventRiskScore: getProctoringEventRisk(parsed.data.type),
-    eventRiskLevel: getProctoringRiskLevel(getProctoringEventRisk(parsed.data.type)),
+    eventRiskScore: getProctoringEventRisk(events[events.length - 1].type),
+    eventRiskLevel: getProctoringRiskLevel(getProctoringEventRisk(events[events.length - 1].type)),
   })
 }

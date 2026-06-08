@@ -22,11 +22,17 @@ interface QuizDeleteButtonProps {
 
 export function QuizDeleteButton({ quizId, quizTitle }: QuizDeleteButtonProps) {
   const [open, setOpen] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
   function handleDelete() {
     startTransition(async () => {
-      await deleteQuiz(quizId)
+      setError(null)
+      const result = await deleteQuiz(quizId)
+      if (result.error) {
+        setError(result.error)
+        return
+      }
       setOpen(false)
     })
   }
@@ -52,6 +58,11 @@ export function QuizDeleteButton({ quizId, quizTitle }: QuizDeleteButtonProps) {
               Are you sure you want to delete &quot;{quizTitle}&quot;? This action cannot be undone and will also delete all associated questions and attempt history.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {error && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
             <AlertDialogAction
