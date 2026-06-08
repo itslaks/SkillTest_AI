@@ -167,6 +167,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const submittingRef = useRef(false)
   const activeSignalRef = useRef<Record<string, boolean>>({})
   const proctoringEventRetryQueueRef = useRef<ProctoringEventPostPayload[]>([])
+  const answerAdvanceTimerRef = useRef<number | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [draftStorageWarning, setDraftStorageWarning] = useState(false)
 
@@ -925,7 +926,10 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   }, [logPermissionDebug, requiresProctoring, updatePermissionDebug])
 
   useEffect(() => {
-    return () => stopMediaStream()
+    return () => {
+      if (answerAdvanceTimerRef.current) window.clearTimeout(answerAdvanceTimerRef.current)
+      stopMediaStream()
+    }
   }, [stopMediaStream])
 
   useEffect(() => {
@@ -1008,14 +1012,26 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     const tracks = mediaStreamRef.current?.getTracks() || []
     const onMediaTrackEnded = () => recordProctoringViolation('camera-lost', 'Proctoring media stream stopped during the quiz.')
     tracks.forEach((track) => track.addEventListener('ended', onMediaTrackEnded))
+    const reportSignalOnce = (key: string, type: ProctoringEventType, label: string, active: boolean) => {
+      if (active && !activeSignalRef.current[key]) {
+        activeSignalRef.current[key] = true
+        recordProctoringViolation(type, label)
+      }
+      if (!active) activeSignalRef.current[key] = false
+    }
     const devtoolsInterval = window.setInterval(() => {
       const likelyOpen = (window.outerWidth - window.innerWidth > 180) || (window.outerHeight - window.innerHeight > 180)
-      if (likelyOpen && !activeSignalRef.current.devtoolsOpen) {
-        activeSignalRef.current.devtoolsOpen = true
-        recordProctoringViolation('devtools-open', 'Developer tools or inspection panel may have been opened.')
-      }
-      if (!likelyOpen) activeSignalRef.current.devtoolsOpen = false
+      reportSignalOnce('devtoolsOpen', 'devtools-open', 'Developer tools or inspection panel may have been opened.', likelyOpen)
     }, 8000)
+    const integrityInterval = window.setInterval(() => {
+      reportSignalOnce('hiddenPoll', 'tab-hidden', 'Quiz tab is hidden or another tab/app is active.', document.hidden)
+      reportSignalOnce('focusPoll', 'window-blur', 'Quiz window is not focused.', !document.hasFocus())
+      reportSignalOnce('fullscreenPoll', 'fullscreen-exit', 'Fullscreen proctoring mode is not active.', !document.fullscreenElement)
+      const liveVideo = mediaStreamRef.current?.getVideoTracks().some((track) => track.readyState === 'live') || false
+      reportSignalOnce('cameraLivePoll', 'camera-lost', 'Camera stream is not live during the quiz.', !liveVideo)
+      const liveAudio = !microphoneRequired || Boolean(mediaStreamRef.current?.getAudioTracks().some((track) => track.readyState === 'live'))
+      reportSignalOnce('microphoneLivePoll', 'microphone-denied', 'Microphone stream is not live during the quiz.', !liveAudio)
+    }, 1500)
 
     return () => {
       document.removeEventListener('visibilitychange', onVisibilityChange)
@@ -1035,8 +1051,9 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       window.removeEventListener('beforeprint', onBeforePrint)
       tracks.forEach((track) => track.removeEventListener('ended', onMediaTrackEnded))
       window.clearInterval(devtoolsInterval)
+      window.clearInterval(integrityInterval)
     }
-  }, [finished, recordProctoringViolation, requiresProctoring, started])
+  }, [finished, microphoneRequired, recordProctoringViolation, requiresProctoring, started])
 
   function buildAdaptiveOrder(targetDifficulty: DifficultyLevel) {
     const completedIds = new Set(questionOrder.slice(0, currentIndex + 1))
@@ -1054,7 +1071,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   }
 
   function handleSelectOption(optionIndex: number) {
-    if (finished || submitting || !currentQuestion) return
+    if (showFeedback || finished || submitting || !currentQuestion) return
 
     const timeSpent = Math.round((Date.now() - questionStartTime) / 1000)
     const questionDifficulty = (currentQuestion.difficulty || quiz.difficulty || 'medium') as DifficultyLevel
@@ -1086,7 +1103,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     answersRef.current = nextAnswers
     setAnswers(nextAnswers)
     setSelectedOption(optionIndex)
-    setShowFeedback(false)
+    setShowFeedback(true)
     setLiveState({
       cognitiveLoad: cognitiveLoadFlag,
       panicMode,
@@ -1101,16 +1118,20 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     buildAdaptiveOrder(adaptiveDifficulty)
 
     if (currentIndex + 1 >= totalQuestions) {
-      finishedRef.current = true
-      setFinished(true)
-      doSubmit(nextAnswers, requiresProctoring ? buildProctoringSubmission(false) : undefined)
+      answerAdvanceTimerRef.current = window.setTimeout(() => {
+        finishedRef.current = true
+        setFinished(true)
+        doSubmit(nextAnswers, requiresProctoring ? buildProctoringSubmission(false) : undefined)
+      }, 300)
       return
     }
 
-    setCurrentIndex((previous) => previous + 1)
-    setSelectedOption(null)
-    setShowFeedback(false)
-    setQuestionStartTime(Date.now())
+    answerAdvanceTimerRef.current = window.setTimeout(() => {
+      setCurrentIndex((previous) => previous + 1)
+      setSelectedOption(null)
+      setShowFeedback(false)
+      setQuestionStartTime(Date.now())
+    }, 300)
   }
 
   function formatTime(seconds: number) {

@@ -32,11 +32,6 @@ export async function POST(request: NextRequest) {
     }, { status: result.error ? 400 : 200 })
   }
 
-  const docsAnswer = findAdminGuideAnswer(message)
-  if (docsAnswer) {
-    return NextResponse.json({ message: docsAnswer, provider: 'skilltest_ai_docs' })
-  }
-
   const admin = createAdminClient()
   const batchIds = await getAccessibleTrainingBatchIds(auth.userId, auth.role)
 
@@ -95,6 +90,11 @@ export async function POST(request: NextRequest) {
   const deterministicAnswer = buildDeterministicAnswer(message, data)
   if (deterministicAnswer) {
     return NextResponse.json({ message: deterministicAnswer, provider: 'skilltest_ai_stats' })
+  }
+
+  const docsAnswer = findAdminGuideAnswer(message)
+  if (docsAnswer) {
+    return NextResponse.json({ message: docsAnswer, provider: 'skilltest_ai_docs' })
   }
 
   const context = buildChatbotContext(data)
@@ -1449,6 +1449,8 @@ function buildDeterministicAnswer(message: string, data: Record<string, any[]>) 
   const lower = normalize(message)
   const profile = findProfile(lower, data.profiles)
   const quiz = findQuiz(lower, data.quizzes, data.attempts)
+  const asksForResult = /\b(result|score|marks?|performance|analysis|attempt)\b/.test(lower)
+  const asksForLatest = /\b(latest|last|recent|most recent)\b/.test(lower)
 
   if ((lower.includes('average') || lower.includes('avg')) && lower.includes('score')) {
     const quizAverage = quiz ? summarizeQuiz(quiz, data.attempts, data.certificateRules) : null
@@ -1459,11 +1461,11 @@ function buildDeterministicAnswer(message: string, data: Record<string, any[]>) 
     return summarizeEmployeeQuiz(profile, quiz, data.attempts)
   }
 
-  if (profile && (lower.includes('score') || lower.includes('analysis') || lower.includes('performance'))) {
-    return summarizeEmployee(profile, data.attempts)
+  if (profile && (asksForResult || asksForLatest || lower.includes('quiz'))) {
+    return asksForLatest ? summarizeEmployeeLatestAttempt(profile, data.attempts) : summarizeEmployee(profile, data.attempts)
   }
 
-  if (quiz && (lower.includes('score') || lower.includes('analysis') || lower.includes('performance') || lower.includes('pass'))) {
+  if (quiz && (asksForResult || lower.includes('pass'))) {
     return summarizeQuiz(quiz, data.attempts, data.certificateRules)
   }
 
@@ -1476,6 +1478,20 @@ function buildDeterministicAnswer(message: string, data: Record<string, any[]>) 
   }
 
   return null
+}
+
+function summarizeEmployeeLatestAttempt(profile: any, attempts: any[]) {
+  const latest = attempts
+    .filter((attempt) => attempt.user_id === profile.id)
+    .sort(byLatest)[0]
+  if (!latest) return `No completed quiz attempts found for ${displayName(profile)}.`
+
+  const behavior = analyzeAttemptPattern((latest.answers || []) as QuizAnswer[], latest.quizzes?.difficulty as DifficultyLevel)
+  return [
+    `${displayName(profile)} latest quiz result: ${latest.score}% in ${latest.quizzes?.title || 'quiz'}.`,
+    `Correct: ${latest.correct_answers}/${latest.total_questions}; points: ${latest.points_earned || 0}; time: ${formatDuration(latest.time_taken_seconds)}.`,
+    `Completed: ${formatDateTime(latest.completed_at)}. Behavior: ${behavior.riskLevel} risk, focus ${behavior.focusScore}%.`,
+  ].join('\n')
 }
 
 function summarizeEmployeeQuiz(profile: any, quiz: any, attempts: any[]) {
@@ -1565,7 +1581,7 @@ function findQuiz(query: string, quizzes: any[], attempts: any[]) {
 }
 
 function significantTokens(value: string) {
-  const stop = new Set(['score', 'analysis', 'average', 'avg', 'quiz', 'test', 'of', 'in', 'for', 'the', 'and', 'performance', 'show', 'tell', 'me'])
+  const stop = new Set(['score', 'scores', 'marks', 'result', 'results', 'analysis', 'average', 'avg', 'quiz', 'test', 'latest', 'last', 'recent', 'attempt', 'of', 'in', 'his', 'her', 'for', 'the', 'and', 'performance', 'show', 'tell', 'me', 'what', 'is'])
   return normalize(value).split(/\s+/).filter((token) => token && !stop.has(token))
 }
 
@@ -1584,6 +1600,20 @@ function average(values: number[]) {
 
 function byLatest(left: any, right: any) {
   return new Date(right.completed_at || 0).getTime() - new Date(left.completed_at || 0).getTime()
+}
+
+function formatDuration(seconds?: number | null) {
+  const total = Math.max(0, Number(seconds || 0))
+  const minutes = Math.floor(total / 60)
+  const remainder = total % 60
+  return minutes ? `${minutes}m ${remainder}s` : `${remainder}s`
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return 'unknown'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 function uniqueBy(items: any[], key: string) {
