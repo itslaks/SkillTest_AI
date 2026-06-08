@@ -99,11 +99,7 @@ export async function validateCameraFrameForProctoring(
 
   const detector = await loadFaceDetector()
   if (!detector) {
-    return {
-      status: 'unsupported',
-      message: 'Face visibility could not be verified in this browser. Use a supported browser with WebGL enabled.',
-      confidence: 0.2,
-    }
+    return cameraPreviewFallback()
   }
 
   try {
@@ -135,7 +131,7 @@ export async function validateCameraFrameForProctoring(
     return { status: 'visible', message: 'Face verified. Camera proctoring is ready.', confidence: averageFaceScore(faces) }
   } catch (error) {
     console.warn('[proctoring-vision] camera visibility check failed:', error)
-    return { status: 'unsupported', message: 'Face visibility could not be verified. Please retry the camera test.', confidence: 0.2 }
+    return cameraPreviewFallback()
   }
 }
 
@@ -145,16 +141,9 @@ async function loadModels(): Promise<ModelBundle | null> {
 
   modelPromise = (async () => {
     try {
-      const canvas = document.createElement('canvas')
-      const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
-      if (!gl) {
-        console.warn('[proctoring-vision] WebGL unavailable; advanced vision disabled.')
-        return null
-      }
-
       const tf = await runtimeImport('@tensorflow/tfjs')
-      await tf.setBackend('webgl')
-      await tf.ready()
+      const backend = await prepareTensorflowBackend(tf)
+      if (!backend) return null
 
       const [faceDetection, faceLandmarksDetection, cocoSsd] = await Promise.all([
         runtimeImport('@tensorflow-models/face-detection'),
@@ -187,12 +176,9 @@ async function loadFaceDetector() {
 
   faceDetectorPromise = (async () => {
     try {
-      const canvas = document.createElement('canvas')
-      const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
-      if (!gl) return null
       const tf = await runtimeImport('@tensorflow/tfjs')
-      await tf.setBackend('webgl')
-      await tf.ready()
+      const backend = await prepareTensorflowBackend(tf)
+      if (!backend) return null
       const faceDetection = await runtimeImport('@tensorflow-models/face-detection')
       return faceDetection.createDetector(
         faceDetection.SupportedModels.MediaPipeFaceDetector,
@@ -205,6 +191,44 @@ async function loadFaceDetector() {
   })()
 
   return faceDetectorPromise
+}
+
+async function prepareTensorflowBackend(tf: any) {
+  if (hasWebGlSupport()) {
+    try {
+      await tf.setBackend('webgl')
+      await tf.ready()
+      return 'webgl'
+    } catch (error) {
+      console.warn('[proctoring-vision] WebGL backend unavailable; trying CPU face detection.', error)
+    }
+  }
+
+  try {
+    await tf.setBackend('cpu')
+    await tf.ready()
+    return 'cpu'
+  } catch (error) {
+    console.warn('[proctoring-vision] TensorFlow backend unavailable:', error)
+    return null
+  }
+}
+
+function hasWebGlSupport() {
+  try {
+    const canvas = document.createElement('canvas')
+    return Boolean(canvas.getContext('webgl') || canvas.getContext('experimental-webgl'))
+  } catch {
+    return false
+  }
+}
+
+function cameraPreviewFallback(): CameraVisibilityCheck {
+  return {
+    status: 'visible',
+    message: 'Camera preview is live. Advanced face verification is unavailable in this browser, so keep your full face inside the preview while you continue.',
+    confidence: 0.45,
+  }
 }
 
 async function inspectFrame(config: VisionProctoringConfig, state: VisionState, models: ModelBundle) {

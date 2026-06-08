@@ -332,6 +332,16 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     }))
 
     try {
+      const hasLiveFrame = await waitForLiveVideoFrame(video)
+      if (!hasLiveFrame) {
+        setCameraVisibility({
+          status: 'checking',
+          message: 'Waiting for a live camera frame.',
+          confidence: 0.2,
+        })
+        return false
+      }
+
       const { validateCameraFrameForProctoring } = await import('@/lib/proctoring-vision')
       const result = await validateCameraFrameForProctoring(video, canvas)
       setCameraVisibility(result)
@@ -1926,6 +1936,32 @@ function CameraVisibilityPanel({ visibility, onRetry }: { visibility: CameraVisi
       )}
     </div>
   )
+}
+
+function waitForLiveVideoFrame(video: HTMLVideoElement, timeoutMs = 1500) {
+  if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+    return Promise.resolve(true)
+  }
+
+  return new Promise<boolean>((resolve) => {
+    let settled = false
+    const done = (ready: boolean) => {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timeoutId)
+      video.removeEventListener('loadeddata', onFrame)
+      video.removeEventListener('canplay', onFrame)
+      video.removeEventListener('timeupdate', onFrame)
+      resolve(ready)
+    }
+    const onFrame = () => {
+      done(video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0)
+    }
+    const timeoutId = window.setTimeout(() => done(false), timeoutMs)
+    video.addEventListener('loadeddata', onFrame)
+    video.addEventListener('canplay', onFrame)
+    video.addEventListener('timeupdate', onFrame)
+  })
 }
 
 function getDeviceStatusLabel(status: DeviceStatus) {
