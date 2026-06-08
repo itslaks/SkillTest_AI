@@ -1,6 +1,7 @@
 'use client'
 
-import { Bell, Search, Plus, HelpCircle, FileQuestion, CalendarDays, FileSpreadsheet, BarChart3, ChevronDown } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Bell, Search, Plus, HelpCircle, FileQuestion, CalendarDays, FileSpreadsheet, BarChart3, ChevronDown, ShieldAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -12,6 +13,7 @@ import { getNotificationVerb, type StaffNotification } from '@/lib/notifications
 import { signOut } from '@/lib/actions/auth'
 import { Avatar3D } from '@/components/avatar/avatar-3d'
 import { getAvatar3DId } from '@/lib/avatar-options'
+import { createClient } from '@/lib/supabase/client'
 
 interface ManagerHeaderProps {
   profile: Profile | null
@@ -20,6 +22,45 @@ interface ManagerHeaderProps {
 
 export function ManagerHeader({ profile, notifications = [] }: ManagerHeaderProps) {
   const avatarId = getAvatar3DId((profile as any)?.avatar_url)
+  const [liveNotifications, setLiveNotifications] = useState<StaffNotification[]>(notifications)
+  const unreadCount = useMemo(() => liveNotifications.filter((item) => item.is_read !== true).length, [liveNotifications])
+
+  useEffect(() => {
+    setLiveNotifications(notifications)
+  }, [notifications])
+
+  useEffect(() => {
+    if (!profile || !['admin', 'trainer'].includes(profile.role)) return
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`manager-notification-bell-${profile.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'training_notifications',
+      }, (payload) => {
+        const row = payload.new as any
+        if (row.recipient_user_id && row.recipient_user_id !== profile.id && profile.role !== 'admin') return
+        setLiveNotifications((previous) => [{
+          id: row.id,
+          title: row.title,
+          message: row.message,
+          audience: row.audience,
+          channel: row.channel,
+          delivery_status: row.delivery_status,
+          created_at: row.created_at,
+          sent_at: row.sent_at,
+          scheduled_for: row.scheduled_for,
+          is_read: row.is_read,
+          metadata: row.metadata,
+        }, ...previous].slice(0, 20))
+      })
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [profile])
 
   return (
     <header className="sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-border/50 bg-white/98 backdrop-blur-md px-4 md:px-6">
@@ -59,7 +100,11 @@ export function ManagerHeader({ profile, notifications = [] }: ManagerHeaderProp
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/60">
                 <Bell className="h-4.5 w-4.5" />
-                {notifications.length > 0 && <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-red-500 rounded-full ring-1 ring-white" />}
+                {unreadCount > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white ring-1 ring-white">
+                    {Math.min(99, unreadCount)}
+                  </span>
+                )}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-96 rounded-xl border-border/60 p-2 shadow-xl">
@@ -73,17 +118,27 @@ export function ManagerHeader({ profile, notifications = [] }: ManagerHeaderProp
                 </Button>
               </div>
               <DropdownMenuSeparator className="my-1" />
-              {notifications.length === 0 ? (
+              {liveNotifications.length === 0 ? (
                 <div className="px-3 py-6 text-center text-sm text-muted-foreground">No notification records yet.</div>
-              ) : notifications.slice(0, 5).map((notification) => (
+              ) : liveNotifications.slice(0, 5).map((notification) => (
                 <DropdownMenuItem key={notification.id} className="cursor-default rounded-lg p-3 focus:bg-muted/70">
                   <div className="min-w-0">
                     <div className="mb-1 flex items-center gap-2">
-                      <Badge variant="outline" className="h-5 px-1.5 text-[10px]">{getNotificationVerb(notification)}</Badge>
+                      <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
+                        {notification.metadata?.category === 'proctoring_alert' ? '🚨 Alert' : getNotificationVerb(notification)}
+                      </Badge>
                       <span className="text-[10px] text-muted-foreground">{new Date(notification.created_at).toLocaleString()}</span>
                     </div>
-                    <p className="truncate text-sm font-medium">{notification.title}</p>
+                    <p className="flex items-center gap-1 truncate text-sm font-medium">
+                      {notification.metadata?.category === 'proctoring_alert' && <ShieldAlert className="h-3.5 w-3.5 text-red-600" />}
+                      {notification.title}
+                    </p>
                     <p className="line-clamp-2 text-xs text-muted-foreground">{notification.message}</p>
+                    {notification.metadata?.category === 'proctoring_alert' && (
+                      <Link href="/manager/integrity" className="mt-2 inline-flex text-xs font-semibold text-red-700 hover:underline">
+                        Open Integrity
+                      </Link>
+                    )}
                   </div>
                 </DropdownMenuItem>
               ))}

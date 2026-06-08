@@ -5,6 +5,7 @@ import { PROCTORING_EVIDENCE_BUCKET } from '@/lib/proctoring-server'
 import { revalidatePath } from 'next/cache'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { LiveIntegrityFeed, type LiveIntegrityEvent } from '@/components/manager/live-integrity-feed'
 import {
   AlertTriangle,
   Camera,
@@ -151,6 +152,18 @@ export default async function AssessmentIntegrityPage() {
     .slice(0, 12)
 
   const notificationCount = await getIntegrityNotificationCount(admin)
+  const todayStats = await getTodayIntegrityStats(admin, scopedQuizIds)
+  const liveInitialEvents: LiveIntegrityEvent[] = eventFeed.map(({ event, attempt }: any, index: number) => ({
+    id: `${attempt.id}-${event.occurredAt}-${index}`,
+    attemptId: attempt.id,
+    employeeName: attempt.profiles?.full_name || attempt.profiles?.email || 'Employee',
+    quizTitle: attempt.quizzes?.title || 'Assessment',
+    type: event.type,
+    label: event.label,
+    severity: event.riskLevel || normalizeRisk(attempt).level,
+    riskScore: event.riskScore ?? getProctoringEventRisk(event.type),
+    occurredAt: event.occurredAt,
+  }))
 
   return (
     <div className="space-y-6">
@@ -175,6 +188,15 @@ export default async function AssessmentIntegrityPage() {
           </div>
         </div>
       </section>
+
+      <div className="grid gap-3 md:grid-cols-4">
+        <Kpi icon={Siren} label="Flagged Attempts Today" value={`${todayStats.flaggedAttemptsToday}`} tone="rose" />
+        <Kpi icon={AlertTriangle} label="Violations Today" value={`${todayStats.violationsToday}`} tone="amber" />
+        <Kpi icon={Radio} label="Active Sessions" value={`${todayStats.activeSessions}`} tone="cyan" />
+        <Kpi icon={ShieldCheck} label="Cleared Attempts Today" value={`${todayStats.clearedAttemptsToday}`} tone="emerald" />
+      </div>
+
+      <LiveIntegrityFeed initialEvents={liveInitialEvents} />
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <Card className="border-zinc-800 bg-zinc-950 text-white">
@@ -382,6 +404,62 @@ async function getIntegrityNotificationCount(admin: ReturnType<typeof createAdmi
     .eq('title', 'Quiz proctoring flag')
 
   return count || 0
+}
+
+async function getTodayIntegrityStats(admin: ReturnType<typeof createAdminClient>, scopedQuizIds: string[] | null) {
+  const start = new Date()
+  start.setHours(0, 0, 0, 0)
+  const startIso = start.toISOString()
+  const scopedIds = scopedQuizIds ?? undefined
+  const emptyScope = Array.isArray(scopedQuizIds) && scopedQuizIds.length === 0
+  if (emptyScope) {
+    return {
+      flaggedAttemptsToday: 0,
+      violationsToday: 0,
+      activeSessions: 0,
+      clearedAttemptsToday: 0,
+    }
+  }
+
+  const flaggedQuery = admin
+    .from('quiz_attempts')
+    .select('id', { count: 'exact', head: true })
+    .eq('proctoring_status', 'flagged')
+    .gte('completed_at', startIso)
+  const clearQuery = admin
+    .from('quiz_attempts')
+    .select('id', { count: 'exact', head: true })
+    .eq('proctoring_status', 'clear')
+    .gte('completed_at', startIso)
+  const eventQuery = admin
+    .from('quiz_proctoring_events')
+    .select('id', { count: 'exact', head: true })
+    .gte('occurred_at', startIso)
+  const sessionQuery = admin
+    .from('proctoring_sessions')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'active')
+
+  if (scopedIds) {
+    flaggedQuery.in('quiz_id', scopedIds)
+    clearQuery.in('quiz_id', scopedIds)
+    eventQuery.in('quiz_id', scopedIds)
+    sessionQuery.in('quiz_id', scopedIds)
+  }
+
+  const [flagged, violations, sessions, cleared] = await Promise.all([
+    flaggedQuery,
+    eventQuery,
+    sessionQuery,
+    clearQuery,
+  ])
+
+  return {
+    flaggedAttemptsToday: flagged.count || 0,
+    violationsToday: violations.count || 0,
+    activeSessions: sessions.count || 0,
+    clearedAttemptsToday: cleared.count || 0,
+  }
 }
 
 function normalizeRisk(attempt: any) {

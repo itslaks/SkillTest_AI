@@ -8,6 +8,8 @@ export type StaffNotification = {
   channel: string | null
   delivery_status: string | null
   created_at: string
+  is_read?: boolean | null
+  metadata?: Record<string, any> | null
   sent_at?: string | null
   scheduled_for?: string | null
   batch?: { id: string; title: string; domain?: string | null } | null
@@ -103,6 +105,8 @@ function baseNotificationQuery(admin: AdminClient) {
       scheduled_for,
       sent_at,
       created_at,
+      is_read,
+      metadata,
       batch:batch_id(id,title,domain),
       session:session_id(id,title,session_date),
       recipient:recipient_user_id(id,full_name,email),

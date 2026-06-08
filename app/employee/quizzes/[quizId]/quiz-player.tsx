@@ -8,6 +8,7 @@ import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { MonochromeOrb } from '@/components/insights/monochrome-orb'
 import { ReadinessMeter } from '@/components/insights/readiness-meter'
+import { ViolationToast, type ViolationToastItem } from '@/components/employee/ViolationToast'
 import { startQuizAttempt, submitQuizAttempt } from '@/lib/actions/employee'
 import { shiftDifficulty } from '@/lib/insights'
 import type { DifficultyLevel, ProctoringEvent, ProctoringEventType, ProctoringSubmission, SubmittedQuizAnswer } from '@/lib/types/database'
@@ -159,6 +160,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const [latestViolation, setLatestViolation] = useState<string | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const hiddenCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const proctoringEventsRef = useRef<ProctoringEvent[]>([])
   const violationCountRef = useRef(0)
@@ -170,6 +172,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const answerAdvanceTimerRef = useRef<number | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [draftStorageWarning, setDraftStorageWarning] = useState(false)
+  const [violationToasts, setViolationToasts] = useState<ViolationToastItem[]>([])
 
   useEffect(() => {
     setMounted(true)
@@ -389,17 +392,26 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
 
   const captureEvidenceFrame = useCallback(() => {
     const video = videoRef.current
-    const canvas = canvasRef.current
+    const canvas = hiddenCanvasRef.current || canvasRef.current
     if (!video || !canvas || video.readyState < 2) return null
 
     const width = video.videoWidth || 320
     const height = video.videoHeight || 240
-    canvas.width = width
-    canvas.height = height
+    const scale = Math.min(800 / width, 600 / height, 1)
+    const targetWidth = Math.max(1, Math.round(width * scale))
+    const targetHeight = Math.max(1, Math.round(height * scale))
+    canvas.width = targetWidth
+    canvas.height = targetHeight
     const context = canvas.getContext('2d')
     if (!context) return null
-    context.drawImage(video, 0, 0, width, height)
-    return canvas.toDataURL('image/jpeg', 0.58)
+    context.drawImage(video, 0, 0, targetWidth, targetHeight)
+    let quality = 0.7
+    let dataUrl = canvas.toDataURL('image/jpeg', quality)
+    while (dataUrl.length > 1_100_000 && quality > 0.35) {
+      quality -= 0.08
+      dataUrl = canvas.toDataURL('image/jpeg', quality)
+    }
+    return dataUrl
   }, [])
 
   const handleAutoSubmit = useCallback((proctoring?: ProctoringSubmission) => {
@@ -410,10 +422,15 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     }
   }, [buildProctoringSubmission, doSubmit, getFinalAnswersForSubmit])
 
-  const recordProctoringViolation = useCallback((type: ProctoringEventType, label: string) => {
+  const recordProctoringViolation = useCallback((type: ProctoringEventType, label: string, evidenceImage?: string | null) => {
     if (!requiresProctoring || !started || finishedRef.current || submittingRef.current) return
 
     setLatestViolation(label)
+    const toastId = `${type}-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    setViolationToasts((previous) => [
+      { id: toastId, type, label },
+      ...previous.filter((item) => item.id !== toastId),
+    ].slice(0, 3))
 
     const event: ProctoringEvent = {
       type,
@@ -435,7 +452,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       type,
       label,
       questionIndex: currentIndex,
-      evidenceImage: captureEvidenceFrame(),
+      evidenceImage: evidenceImage || captureEvidenceFrame(),
     }
 
     void flushProctoringEventQueue()
@@ -486,6 +503,37 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
         setLatestViolation(`${label} Server sync failed; keep the quiz window stable.`)
       })
   }, [captureEvidenceFrame, currentIndex, enqueueProctoringEvent, flushProctoringEventQueue, handleAutoSubmit, requiresProctoring, started])
+
+  useEffect(() => {
+    if (!requiresProctoring || !started || finished || !videoRef.current || !hiddenCanvasRef.current) return
+    let disposed = false
+    let stopVision: ((videoElement?: HTMLVideoElement | null) => void) | null = null
+    const videoElement = videoRef.current
+    const canvasElement = hiddenCanvasRef.current
+
+    void import('@/lib/proctoring-vision')
+      .then((vision) => {
+        if (disposed) return
+        stopVision = vision.stopVisionProctoring
+        vision.startVisionProctoring({
+          videoElement,
+          canvasElement,
+          intervalMs: 1500,
+          onViolation: (violation) => {
+            const type = visionViolationTypeToEventType(violation.type)
+            recordProctoringViolation(type, violation.label, violation.evidenceDataUrl)
+          },
+        })
+      })
+      .catch((error) => {
+        console.warn('[proctoring] advanced vision failed open:', error)
+      })
+
+    return () => {
+      disposed = true
+      stopVision?.(videoElement)
+    }
+  }, [finished, recordProctoringViolation, requiresProctoring, started])
 
   useEffect(() => {
     if (!started || finished) return
@@ -1327,6 +1375,24 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
+      <canvas
+        ref={hiddenCanvasRef}
+        width={800}
+        height={600}
+        style={{ display: 'none' }}
+      />
+      {requiresProctoring && (
+        <ProctoringStatusBar
+          cameraReady={cameraReady}
+          microphoneReady={microphoneRequired ? microphoneReady : true}
+          screenReady={Boolean(document.fullscreenElement)}
+          warningCount={violationCount}
+        />
+      )}
+      <ViolationToast
+        items={violationToasts}
+        onDismiss={(id) => setViolationToasts((previous) => previous.filter((item) => item.id !== id))}
+      />
       <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-[2rem] border border-zinc-800 bg-black px-5 py-4 text-white shadow-[0_30px_80px_rgba(0,0,0,0.35)]">
@@ -1502,6 +1568,55 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       </div>
 
     </div>
+  )
+}
+
+function visionViolationTypeToEventType(type: string): ProctoringEventType {
+  const map: Record<string, ProctoringEventType> = {
+    multiple_faces: 'multiple_faces',
+    no_face: 'no_face',
+    gaze_down: 'gaze_down',
+    gaze_away: 'gaze_away',
+    phone_detected: 'phone_detected',
+    electronic_device: 'electronic_device',
+    book_detected: 'book_detected',
+  }
+  return map[type] || 'face-covered'
+}
+
+function ProctoringStatusBar({
+  cameraReady,
+  microphoneReady,
+  screenReady,
+  warningCount,
+}: {
+  cameraReady: boolean
+  microphoneReady: boolean
+  screenReady: boolean
+  warningCount: number
+}) {
+  return (
+    <div className="fixed inset-x-0 top-0 z-50 border-b border-zinc-900/10 bg-white/95 px-4 py-2 text-xs font-semibold text-zinc-900 shadow-sm backdrop-blur">
+      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <StatusPill label="Camera" active={cameraReady} />
+          <StatusPill label="Mic" active={microphoneReady} />
+          <StatusPill label="Screen" active={screenReady} />
+        </div>
+        <div className="rounded-full bg-amber-50 px-3 py-1 text-amber-800">
+          Warning Count: {warningCount}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function StatusPill({ label, active }: { label: string; active: boolean }) {
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 ${active ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'}`}>
+      <span className={`h-2 w-2 rounded-full ${active ? 'bg-emerald-500' : 'bg-red-500'}`} />
+      {label}
+    </span>
   )
 }
 

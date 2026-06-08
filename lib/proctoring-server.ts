@@ -4,7 +4,10 @@ import {
   getProctoringEventRisk,
   getProctoringRiskLevel,
   shouldAutoSubmitForIntegrity,
+  VIOLATION_SEVERITY,
 } from '@/lib/proctoring'
+import { sendEmail } from '@/lib/email'
+import { getSiteUrl } from '@/lib/security/env'
 
 export const PROCTORING_EVIDENCE_BUCKET = 'quiz-proctoring-evidence'
 const DUPLICATE_EVENT_COOLDOWN_MS = 12_000
@@ -196,6 +199,16 @@ export async function recordProctoringEvent({
       .eq('id', event.id)
   }
 
+  void notifyProctoringViolation(admin, session, {
+    eventId: event.id,
+    type,
+    label,
+    severity: VIOLATION_SEVERITY[type] || riskLevel,
+    riskScore,
+    occurredAt: now.toISOString(),
+    evidencePath,
+  })
+
   return refreshAttemptProctoringSummary(admin, session, false)
 }
 
@@ -295,4 +308,129 @@ async function storeEvidenceImage(admin: any, {
 
 function humanizeViolation(type: string) {
   return type.replace(/-/g, ' ')
+}
+
+async function notifyProctoringViolation(admin: any, session: ProctoringSessionRow, event: {
+  eventId: string
+  type: ProctoringEventType
+  label: string
+  severity: string
+  riskScore: number
+  occurredAt: string
+  evidencePath: string | null
+}) {
+  try {
+    if (!['critical', 'high'].includes(event.severity)) return
+
+    const [{ data: employee }, { data: quiz }] = await Promise.all([
+      admin.from('profiles').select('id, full_name, email, employee_id, role').eq('id', session.employee_id).maybeSingle(),
+      admin.from('quizzes').select('id, title, topic, created_by, batch_id').eq('id', session.quiz_id).maybeSingle(),
+    ])
+
+    const recipientIds = new Set<string>()
+    const { data: admins } = await admin
+      .from('profiles')
+      .select('id')
+      .in('role', ['admin'])
+    for (const profile of admins || []) recipientIds.add(profile.id)
+
+    if (quiz?.created_by) recipientIds.add(quiz.created_by)
+    if (quiz?.batch_id) {
+      const { data: batchTrainers } = await admin
+        .from('training_batch_trainers')
+        .select('trainer_id')
+        .eq('batch_id', quiz.batch_id)
+      for (const trainer of batchTrainers || []) {
+        if (trainer.trainer_id) recipientIds.add(trainer.trainer_id)
+      }
+    }
+
+    const recipients = [...recipientIds]
+    if (recipients.length === 0) return
+
+    const dashboardLink = `${getSiteUrl()}/manager/integrity`
+    const employeeName = employee?.full_name || employee?.email || 'Employee'
+    const quizTitle = quiz?.title || 'Assessment'
+    const message = `${employeeName} triggered ${event.severity} proctoring violation "${event.label}" during ${quizTitle}. Attempt ${session.attempt_id}.`
+    const notificationRows = recipients.map((recipientId) => ({
+      batch_id: quiz?.batch_id || null,
+      recipient_user_id: recipientId,
+      title: `Proctoring Alert - ${event.label}`,
+      message,
+      audience: 'individual',
+      channel: 'in_app',
+      delivery_status: 'sent',
+      sent_at: new Date().toISOString(),
+      created_by: quiz?.created_by || recipientId,
+      metadata: {
+        category: 'proctoring_alert',
+        employeeId: session.employee_id,
+        employeeName,
+        quizId: session.quiz_id,
+        quizTitle,
+        attemptId: session.attempt_id,
+        sessionId: session.id,
+        eventId: event.eventId,
+        violationType: event.type,
+        violationLabel: event.label,
+        severity: event.severity,
+        riskScore: event.riskScore,
+        occurredAt: event.occurredAt,
+        evidenceCaptured: Boolean(event.evidencePath),
+        dashboardLink,
+      },
+    }))
+
+    const { error: notificationError } = await admin.from('training_notifications').insert(notificationRows)
+    if (notificationError && /metadata/i.test(notificationError.message || '')) {
+      await admin.from('training_notifications').insert(notificationRows.map((row) => {
+        const compatibleRow = { ...row }
+        delete (compatibleRow as any).metadata
+        return compatibleRow
+      }))
+    } else if (notificationError) {
+      console.warn('Proctoring notification insert failed:', notificationError.message)
+    }
+
+    const { data: recipientProfiles } = await admin
+      .from('profiles')
+      .select('email, full_name')
+      .in('id', recipients)
+    const emailRecipients = (recipientProfiles || []).map((profile: any) => profile.email).filter(Boolean)
+    if (emailRecipients.length === 0) return
+
+    const evidenceCopy = event.evidencePath ? '<p><strong>Evidence captured and stored</strong></p>' : ''
+    const html = `
+      <div style="font-family:system-ui,sans-serif;max-width:640px;margin:0 auto;padding:24px;background:#fff7ed;">
+        <div style="background:#991b1b;color:#fff;padding:20px;border-radius:14px 14px 0 0;">
+          <h1 style="margin:0;font-size:22px;">Proctoring Alert - ${escapeHtml(event.label)}</h1>
+        </div>
+        <div style="background:#fff;border:1px solid #fecaca;border-top:0;padding:22px;border-radius:0 0 14px 14px;">
+          <p><strong>Employee:</strong> ${escapeHtml(employeeName)} (${escapeHtml(employee?.employee_id || employee?.email || 'N/A')})</p>
+          <p><strong>Quiz:</strong> ${escapeHtml(quizTitle)}</p>
+          <p><strong>Severity:</strong> ${escapeHtml(event.severity)}</p>
+          <p><strong>Timestamp:</strong> ${escapeHtml(new Date(event.occurredAt).toLocaleString('en-IN'))}</p>
+          <p><strong>Attempt:</strong> ${escapeHtml(session.attempt_id)}</p>
+          ${evidenceCopy}
+          <a href="${dashboardLink}" style="display:inline-block;background:#991b1b;color:#fff;padding:12px 18px;border-radius:999px;text-decoration:none;font-weight:700;">Open Integrity Dashboard</a>
+        </div>
+      </div>`
+    const emailResult = await sendEmail({
+      to: emailRecipients,
+      subject: `Proctoring Alert - ${event.label}`,
+      html,
+    })
+    if (!emailResult.success) console.warn('Proctoring alert email failed:', emailResult.error)
+  } catch (error) {
+    console.warn('Proctoring notification failed open:', error)
+  }
+}
+
+function escapeHtml(value: string | null | undefined) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }
