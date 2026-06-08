@@ -27,8 +27,10 @@
 
 ## 2. Supabase Migration Checklist
 
-- Exact migration file to run:
+- Exact migration files to run:
   - `scripts/038_add_normalized_quiz_proctoring.sql`
+  - `scripts/039_proctoring_notifications_realtime.sql`
+  - `scripts/040_suspicious_attempt_review_gate.sql`
 - SQL verification queries:
 
 ```sql
@@ -59,6 +61,11 @@ from pg_policies
 where schemaname = 'storage'
   and tablename = 'objects'
   and policyname ilike '%quiz proctoring%';
+
+select status, proctoring_status, review_status
+from quiz_attempts
+where status = 'suspicious'
+limit 5;
 ```
 
 - Expected results:
@@ -68,6 +75,7 @@ where schemaname = 'storage'
   - Public RLS policies exist for sessions/events/evidence.
   - No employee SELECT policy exists on `quiz_proctoring_evidence`.
   - Staff roles include `trainer`, `training_staff`, `training_coordinator`, `manager`, and `admin` where applicable.
+  - `quiz_attempts.status` and `quiz_attempts.proctoring_status` accept `suspicious` for review-gated attempts.
 - Rollback notes if migration fails:
   - If the migration fails before table creation, fix the SQL error and rerun the full script.
   - If it fails after partial table creation, the script is intended to be rerunnable because it uses `IF NOT EXISTS` and policy replacement.
@@ -153,16 +161,18 @@ where schemaname = 'storage'
 8. 3-strike auto-submit:
    - Trigger three valid violations separated enough to bypass duplicate cooldown.
    - Verify API returns auto-submit behavior.
-   - Verify attempt is completed, `auto_submitted = true`, and `proctoring_status = 'flagged'`.
+   - Verify attempt is `suspicious`, `auto_submitted = true`, and `proctoring_status = 'suspicious'`.
+   - Verify the employee result page shows under-review status without score, certificate, badge, or completion email release.
 
 9. Integrity dashboard review:
    - Login as trainer/admin.
    - Open `/manager/integrity`.
-   - Verify flagged attempt appears.
+   - Verify suspicious attempt appears.
    - Verify timeline is visible.
    - Verify signed evidence preview appears if evidence exists.
    - Apply approve, reject, retest, and escalate on test attempts.
    - Verify notes and status persist.
+   - Verify approve releases score, certificate eligibility, badges, completion email, and employee result access.
 
 10. Email alert verification:
    - Trigger server-side auto-submit.
@@ -255,12 +265,14 @@ where schemaname = 'storage'
 
 - Implemented:
   - Normalized proctoring migration with private evidence storage.
+  - Realtime notification compatibility and suspicious-attempt review gate migrations.
   - Safe default `proctoring_required = false`.
   - Admin create/edit toggle for AI proctoring.
   - Employee pre-check for camera, microphone, fullscreen, browser support, and consent.
   - Server-side active session and attempt status validation.
   - Evidence references kept out of employee result pages.
-  - Integrity dashboard review workflow for flagged attempts.
+  - Integrity dashboard review workflow for suspicious attempts.
+  - Employee under-review result state that blocks scores, certificates, badges, and completion emails until approval.
   - Chatbot natural-language quiz intent parsing.
   - Chatbot question generation with AI when configured and template fallback otherwise.
 
@@ -278,7 +290,7 @@ where schemaname = 'storage'
   - Full 3-strike auto-submit flow with real attempts.
 
 - Admin action before enabling for real employees:
-  - Run migration `038`.
+  - Run migrations `038`, `039`, and `040`.
   - Configure Supabase, email, and AI provider keys.
   - Create staging test users and run the full script above.
   - Enable AI Proctoring only on quizzes where camera/fullscreen enforcement is intended.

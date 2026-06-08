@@ -51,7 +51,7 @@ The application is designed for **admins, managers, training coordinators, train
 | Learner engagement | Gamified dashboard, points, streaks, badges, leaderboards |
 | Reporting | Download Excel/PDF reports for attendance, assessment, feedback, toppers, and BRD evidence |
 | AI coaching | Generate questions, manager insights, employee learning tips, and assessment chat |
-| AI proctoring | Enable per-quiz camera/fullscreen integrity checks with private evidence and staff review |
+| AI proctoring | Enable per-quiz camera/fullscreen/vision integrity checks with private evidence, employee warnings, suspicious gating, and staff review |
 
 ---
 
@@ -60,16 +60,16 @@ The application is designed for **admins, managers, training coordinators, train
 | Feature | Description |
 |---|---|
 | 🤖 AI Quiz Generation | Generate MCQs from a topic or extracted CSV/XLSX/DOCX/PDF/XML/JSON content |
-| 🛡️ AI Proctoring | Optional per-quiz camera/microphone pre-checks, fullscreen enforcement, live violation events, auto-submit, private evidence storage, and staff review |
+| 🛡️ AI Proctoring | Optional per-quiz camera/microphone pre-checks, fullscreen enforcement, browser vision checks, large employee warnings, live violation events, auto-submit, private evidence storage, suspicious attempt gating, and staff review |
 | 🧠 AI Manager Insights | Short coaching recommendations for batch health, attendance, trainer performance, and quiz outcomes |
 | 🎓 AI Learner Coach | Personalized recommendations based on streaks, quiz history, readiness, and retention signals |
 | 📊 Assessment Analyzer | Upload assessment results and chat with AI about scores, weak areas, and remediation |
 | 🧑‍💼 Profile Dashboards | Search anyone by name, email, employee ID, domain, or role and view quiz, badge, certificate, attendance, and training history |
 | 🖼️ Profile Photos | Users can upload a small profile photo or choose from 15 built-in Three.js 3D emoji-style avatar presets |
 | 🧭 Smart Domain Assignment | Filter large employee lists by vertical/domain with color-coded chips before assigning quizzes |
-| 🏅 Certificates | Admin-only certificate automation with flexible score thresholds, uploaded image templates, personalized employee/course names, stronger visual preview, and automatic issuing |
+| 🏅 Certificates | Quiz create/edit certificate controls with flexible score thresholds, uploaded image templates, personalized employee/course names, stronger visual preview, and review-gated issuing |
 | 🎖️ Badge Universe | 250+ styled badges across 12+ categories with color, rarity, and shape metadata |
-| ✉️ Email Automation | Assignment and completion emails through SMTP or Resend, including score, badge, and certificate updates |
+| ✉️ Email Automation | Assignment, approved-completion, and proctoring alert emails through SMTP or Resend, including score, badge, certificate, and working result links |
 | 🤖 Manager Command Chatbot | DB-aware command chatbot that answers true stats and creates structured quizzes from natural-language commands instead of saving raw prompts as titles |
 | 🧑‍🏫 Training Operations | Simplified batch creation, trainer assignment, sessions, attendance, assessments, feedback, reports |
 | ✅ Attendance Governance | Cutoff enforcement, late reason capture, version history, bulk import |
@@ -240,8 +240,9 @@ flowchart TB
 | Quiz creation | Manager UI or chatbot -> validation -> quiz actions -> Supabase quizzes/questions |
 | Chatbot quiz creation | Natural command -> intent extraction -> question generation -> quiz insert -> employee/team assignment |
 | Proctored quiz start | Employee pre-check -> `startQuizAttempt()` -> `proctoring_sessions` |
-| Violation logging | Browser signal -> `/api/proctoring/events` -> risk summary -> normalized event/evidence rows |
-| Auto-submit review | 3-strike/critical risk -> flagged attempt -> email alert -> `/manager/integrity` |
+| Violation logging | Browser status/vision signal -> `/api/proctoring/events` -> risk summary -> normalized event/evidence rows |
+| Auto-submit review | 3-strike/critical risk -> suspicious attempt -> employee under-review result state -> email alert -> `/manager/integrity` |
+| Review release | Staff approval -> attempt completed -> score, certificate, badge, completion email, and result page release |
 | Evidence access | Staff dashboard -> short-lived signed URL -> private Supabase storage |
 | Reporting/imports | Manager APIs -> scoped database reads/writes -> Excel/PDF output |
 
@@ -410,9 +411,9 @@ Run the SQL scripts in `scripts/` in numeric order.
 
 | Scenario | What To Run |
 |---|---|
-| Fresh Supabase project | Run `001` through `038` |
-| Existing DB already at `030` | Run `031_backfill_old_certificates.sql` through `038_add_normalized_quiz_proctoring.sql` in order |
-| Current project state | Migration `038` is the latest AI proctoring normalization step and should be applied after `037` |
+| Fresh Supabase project | Run `001` through `040` |
+| Existing DB already at `030` | Run `031_backfill_old_certificates.sql` through `040_suspicious_attempt_review_gate.sql` in order |
+| Current project state | Migration `040` is the latest suspicious-attempt review gate step and should be applied after `039` |
 
 ### 🧾 Latest Migration
 
@@ -428,6 +429,8 @@ Run the SQL scripts in `scripts/` in numeric order.
 | `036_add_quiz_proctoring.sql` | Adds attempt-level proctoring status, violation count, event summary, and auto-submit fields |
 | `037_add_proctoring_risk_engine.sql` | Adds weighted proctoring risk score, risk level, and integrity report fields |
 | `038_add_normalized_quiz_proctoring.sql` | Adds optional per-quiz proctoring flag, normalized sessions/events/evidence tables, private evidence bucket, RLS policies, and safe inline-evidence cleanup |
+| `039_proctoring_notifications_realtime.sql` | Adds notification metadata compatibility, realtime publication safety, and unread notification indexing |
+| `040_suspicious_attempt_review_gate.sql` | Adds suspicious attempt/proctoring statuses and indexes for integrity review gating |
 
 ### ⚠️ Important Database Notes
 
@@ -438,14 +441,15 @@ Run the SQL scripts in `scripts/` in numeric order.
 | Trainer Approval | Migration `025` adds `approval_status` and `rejection_reason` |
 | Notifications | Migration `028` expands notification delivery statuses |
 | Training Governance | Migrations `020` through `028` add training operations, audit, feedback, and notification controls |
-| Certificates | Migration `030` creates `certificate_rules` and `certificates`; admin certificate controls require this migration |
-| Old Quiz Certificates | Enable certificate rules in `/manager/admin`, set threshold/template, then run migration `031` to backfill old attempts |
+| Certificates | Migration `030` creates `certificate_rules` and `certificates`; quiz create/edit certificate controls require this migration |
+| Old Quiz Certificates | Enable certificate rules in quiz create/edit or `/manager/admin`, set threshold/template, then run migration `031` to backfill old attempts |
 | Badge Awards | Migration `032` should be applied after the badge expansion so employee badges are harder to unlock and reflect sustained achievement |
 | Attempt And Certificate Privacy | Migration `033` should be applied after `032` to prevent broad direct reads of answer JSON, certificate identity, and score data |
 | Badge Reset | Migration `034` starts employee badges from scratch with a smaller useful catalog; it does not delete quiz attempts or training records |
 | Training Ops Repair | Migration `035` should be run after `034` so post-batch workflows have the required columns and CHECK values |
-| AI Proctoring | Migrations `036` through `038` enable optional proctoring; existing and new quizzes default to `proctoring_required = false` until an admin enables it |
+| AI Proctoring | Migrations `036` through `040` enable optional proctoring, realtime notification compatibility, and suspicious-attempt review gating; existing and new quizzes default to `proctoring_required = false` until an admin enables it |
 | Evidence Privacy | Migration `038` stores new evidence in the private `quiz-proctoring-evidence` bucket and gives evidence read access only to authorized training staff/admin roles |
+| Suspicious Attempts | Migration `040` allows high-risk or auto-submitted attempts to stay under review without releasing scores, certificates, badges, or completion emails |
 
 ---
 
@@ -498,13 +502,13 @@ ALLOW_DEMO_SEED_CREDENTIALS=1 node scripts/seed_admin.js
 | `/certificates/[id]` | Authenticated users | Professional certificate view with uploaded template, employee name, course name, score, and print/download |
 | `/manager/analytics` | Manager | Assessment analyzer and AI chat |
 | `/manager/employees` | Manager | Employee import, export, edit, delete, quiz assignment |
-| `/manager/integrity` | Training staff/admin | AI proctoring command center with flagged attempts, violation timeline, signed evidence previews, and review actions |
+| `/manager/integrity` | Training staff/admin | AI proctoring command center with suspicious attempts, live violations, violation timeline, signed evidence previews, and review actions |
 | `/manager/leaderboard` | Manager | Quiz and cumulative leaderboard |
 | `/manager/operations` | Manager/trainer | Batches, sessions, attendance, scores, feedback |
 | `/manager/quizzes` | Manager | Quiz list and management |
-| `/manager/quizzes/new` | Manager | Create quiz manually, from upload, or AI; optional AI proctoring toggle defaults off |
+| `/manager/quizzes/new` | Manager | Create quiz manually, from upload, or AI; optional AI proctoring and certificate controls default off |
 | `/manager/quizzes/[id]` | Manager | Quiz details |
-| `/manager/quizzes/[id]/edit` | Manager | Edit quiz/questions and enable or disable AI proctoring |
+| `/manager/quizzes/[id]/edit` | Manager | Edit quiz/questions, AI proctoring, and certificate rule settings |
 | `/manager/reports` | Manager | Reports, trainer performance, exports |
 | `/manager/settings` | Manager | Profile/settings |
 | `/manager/compliance` | Manager | BRD proof matrix |
@@ -517,7 +521,7 @@ ALLOW_DEMO_SEED_CREDENTIALS=1 node scripts/seed_admin.js
 | `/employee/training` | Training schedule, attendance, feedback |
 | `/employee/quizzes` | Assigned quizzes |
 | `/employee/quizzes/[quizId]` | Take quiz; proctored quizzes require camera, microphone, fullscreen, and consent pre-checks |
-| `/employee/quizzes/[quizId]/results` | Quiz result |
+| `/employee/quizzes/[quizId]/results` | Quiz result or under-review status for suspicious attempts |
 | `/employee/quizzes/[quizId]/leaderboard` | Quiz leaderboard |
 | `/employee/leaderboard` | Cumulative leaderboard |
 | `/employee/badges` | Accomplishments page with separate Badges and Certificates sections, including certificate download links |
@@ -622,10 +626,13 @@ AI proctoring is optional per quiz and defaults off for both existing and new qu
 |---|---|
 | Admin setup | Managers/admins use `Enable AI Proctoring` in quiz create/edit screens |
 | Employee pre-check | Camera, microphone, browser support, fullscreen readiness, and consent are checked before a proctored quiz can start |
+| Vision checks | Browser-only TensorFlow models detect missing/multiple faces, gaze issues, phones, laptops, and books with fail-open behavior |
+| Employee warnings | Violations show a fixed status bar, warning counter, violation history, and large accessible warning popup |
 | Event logging | `/api/proctoring/events` validates the authenticated employee, attempt ownership, active session, and in-progress attempt status |
 | Evidence | Camera frames are uploaded to the private `quiz-proctoring-evidence` bucket and referenced by normalized evidence rows |
-| Auto-submit | Three valid violations or critical risk can auto-submit and flag the attempt for review |
-| Staff review | `/manager/integrity` shows flagged attempts, timeline, signed evidence previews, and approve/reject/retest/escalate actions |
+| Auto-submit | Three valid violations or critical risk can auto-submit and mark the attempt suspicious |
+| Review gate | Suspicious attempts do not release final score, certificate, badges, completion email, or completion status until approved |
+| Staff review | `/manager/integrity` shows suspicious attempts, timeline, signed evidence previews, and approve/dismiss/reject/retest/escalate actions |
 | Employee privacy | Employee result pages show safe review status only and do not fetch evidence paths, signed URLs, or blobs |
 
 ### 🧑‍🏫 Batch Lifecycle Management
@@ -702,7 +709,7 @@ npx playwright install chromium
 
 | Item | Required |
 |---|---:|
-| Supabase migrations through `038` applied | Required |
+| Supabase migrations through `040` applied | Required |
 | Real Supabase URL/anon/service keys configured | ✅ |
 | `CRON_SECRET` configured | Recommended |
 | AI provider key configured for AI-generated questions | Recommended |

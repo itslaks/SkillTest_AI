@@ -105,7 +105,7 @@ export async function getProfileDashboard(profileId: string) {
       .limit(50),
     admin
       .from('certificates')
-      .select('*, quiz:quiz_id(title, topic), rule:rule_id(certificate_name, template_image_url, template_accent_color, template_notes)')
+      .select('*, attempt:attempt_id(status), quiz:quiz_id(title, topic), rule:rule_id(certificate_name, template_image_url, template_accent_color, template_notes)')
       .eq('user_id', profileId)
       .order('issued_at', { ascending: false })
       .limit(20),
@@ -122,7 +122,7 @@ export async function getProfileDashboard(profileId: string) {
       assignments: assignmentsRes.data || [],
       memberships: membershipsRes.data || [],
       attendance: attendanceRes.data || [],
-      certificates: certificatesRes.data || [],
+      certificates: (certificatesRes.data || []).filter((certificate: any) => !certificate.attempt?.status || certificate.attempt.status === 'completed'),
     },
   }
 }

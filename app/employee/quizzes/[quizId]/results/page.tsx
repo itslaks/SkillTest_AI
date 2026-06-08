@@ -11,6 +11,7 @@ import {
   Crown,
   Gauge,
   Radar,
+  ShieldAlert,
   Snowflake,
   Target,
 } from 'lucide-react'
@@ -29,7 +30,7 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
     .eq('user_id', user.id)
     .single()
 
-  if (!attempt || attempt.status !== 'completed') {
+  if (!attempt || !['completed', 'suspicious'].includes(attempt.status)) {
     redirect(`/employee/quizzes/${quizId}`)
   }
 
@@ -53,11 +54,37 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
   const behavior = analyzeAttemptPattern(attempt.answers || [], quiz?.difficulty, topicAttempts)
   const retentionCheck = buildRetentionChecks(topicAttempts).find((item) => item.topic.toLowerCase() === (quiz?.topic || '').toLowerCase())
   const questionMap = new Map<string, any>((quiz?.questions || []).map((question: any) => [question.id, question]))
+  const isUnderReview = attempt.status === 'suspicious' || attempt.proctoring_status === 'suspicious'
 
   function formatTime(seconds: number) {
     const minutes = Math.floor(seconds / 60)
     const remainder = seconds % 60
     return `${minutes}m ${remainder}s`
+  }
+
+  if (isUnderReview) {
+    return (
+      <div className="mx-auto flex min-h-[70vh] max-w-3xl items-center justify-center px-4 py-10">
+        <Card className="overflow-hidden border-amber-200 bg-amber-50 shadow-[0_30px_90px_rgba(146,64,14,0.18)]">
+          <CardContent className="p-8 text-center md:p-10">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-600 text-white">
+              <ShieldAlert className="h-8 w-8" />
+            </div>
+            <h1 className="mt-6 text-3xl font-semibold text-amber-950">Your assessment is under review.</h1>
+            <p className="mt-4 text-sm leading-6 text-amber-800">
+              This attempt was flagged by integrity monitoring. Your final score, certificate, badges, and completion email are paused until an authorized reviewer clears the attempt.
+            </p>
+            <div className="mt-6 rounded-2xl border border-amber-200 bg-white/70 p-4 text-left text-sm text-amber-900">
+              <p><strong>Quiz:</strong> {quiz?.title || 'Assessment'}</p>
+              <p><strong>Warnings:</strong> {attempt.proctoring_violations_count || 0}</p>
+              <p><strong>Risk:</strong> {String(attempt.proctoring_risk_level || 'pending review')}</p>
+              <p><strong>Review status:</strong> {String(attempt.review_status || 'pending').replace(/_/g, ' ')}</p>
+            </div>
+            <FeedbackRequiredExit feedbackUrl={quiz?.feedback_form_url} backHref="/employee/quizzes" />
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (

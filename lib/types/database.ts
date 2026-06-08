@@ -2,7 +2,7 @@ export type UserRole = 'employee' | 'trainer' | 'training_coordinator' | 'manage
 
 export type DifficultyLevel = 'easy' | 'medium' | 'hard' | 'advanced' | 'hardcore'
 
-export type AttemptStatus = 'in_progress' | 'completed' | 'abandoned'
+export type AttemptStatus = 'in_progress' | 'completed' | 'abandoned' | 'suspicious'
 
 export interface Profile {
   id: string
@@ -66,7 +66,7 @@ export interface QuizAttempt {
   time_taken_seconds: number
   points_earned: number
   status: AttemptStatus
-  proctoring_status?: 'clear' | 'flagged' | null
+  proctoring_status?: 'clear' | 'flagged' | 'suspicious' | null
   proctoring_violations_count?: number | null
   proctoring_risk_score?: number | null
   proctoring_risk_level?: ProctoringRiskLevel | null

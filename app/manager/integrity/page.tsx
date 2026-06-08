@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { requireTrainingStaff } from '@/lib/rbac'
 import { calculateProctoringRisk, getProctoringEventRisk } from '@/lib/proctoring'
 import { PROCTORING_EVIDENCE_BUCKET } from '@/lib/proctoring-server'
+import { buildQuizCompletedEmail, sendEmail } from '@/lib/email'
 import { revalidatePath } from 'next/cache'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -13,6 +14,7 @@ import {
   Gauge,
   MailCheck,
   Radio,
+  ShieldAlert,
   ShieldCheck,
   ShieldX,
   Siren,
@@ -20,11 +22,12 @@ import {
 } from 'lucide-react'
 
 const REVIEW_DECISIONS = [
-  { status: 'approved', label: 'Approve attempt' },
-  { status: 'rejected', label: 'Reject attempt' },
+  { status: 'approved', label: 'Approve / clear attempt' },
+  { status: 'approved', label: 'Dismiss violations' },
+  { status: 'rejected', label: 'Confirm suspicious' },
   { status: 'retest_required', label: 'Request retest' },
   { status: 'escalated', label: 'Escalate' },
-] as const
+] as Array<{ status: 'approved' | 'rejected' | 'retest_required' | 'escalated'; label: string }>
 
 async function updateIntegrityReviewAction(formData: FormData) {
   'use server'
@@ -38,7 +41,7 @@ async function updateIntegrityReviewAction(formData: FormData) {
 
   const { data: attempt } = await admin
     .from('quiz_attempts')
-    .select('id, quiz_id')
+    .select('id, quiz_id, user_id, score, points_earned, status, proctoring_status, quizzes:quiz_id(title), profiles:user_id(full_name,email)')
     .eq('id', attemptId)
     .maybeSingle()
 
@@ -46,9 +49,11 @@ async function updateIntegrityReviewAction(formData: FormData) {
   const scopedQuizIds = await getScopedQuizIds(admin, userId, role)
   if (scopedQuizIds && !scopedQuizIds.includes(attempt.quiz_id)) return
 
+  const releaseAttempt = decision === 'approved'
   await admin
     .from('quiz_attempts')
     .update({
+      ...(releaseAttempt ? { status: 'completed', proctoring_status: 'clear' } : { status: 'suspicious', proctoring_status: 'suspicious' }),
       review_status: decision,
       review_decision: decision,
       review_notes: notes || null,
@@ -57,7 +62,12 @@ async function updateIntegrityReviewAction(formData: FormData) {
     })
     .eq('id', attemptId)
 
+  if (releaseAttempt) {
+    await sendApprovedAttemptEmail(admin, attempt)
+  }
+
   revalidatePath('/manager/integrity')
+  revalidatePath(`/employee/quizzes/${attempt.quiz_id}/results`)
 }
 
 export default async function AssessmentIntegrityPage() {
@@ -136,6 +146,7 @@ export default async function AssessmentIntegrityPage() {
 
   const activeSessions = (attempts || []).filter((attempt: any) => attempt.status === 'in_progress').length
   const flagged = proctoredAttempts.filter((attempt: any) => attempt.proctoring_status === 'flagged')
+  const suspicious = proctoredAttempts.filter((attempt: any) => attempt.status === 'suspicious' || attempt.proctoring_status === 'suspicious')
   const autoSubmitted = proctoredAttempts.filter((attempt: any) => attempt.auto_submitted)
   const criticalAttempts = proctoredAttempts.filter((attempt: any) => normalizeRisk(attempt).level === 'critical')
   const averageIntegrity = proctoredAttempts.length
@@ -197,6 +208,43 @@ export default async function AssessmentIntegrityPage() {
       </div>
 
       <LiveIntegrityFeed initialEvents={liveInitialEvents} />
+
+      <Card className="border-amber-200 bg-amber-50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-amber-950">
+            <ShieldAlert className="h-5 w-5" />
+            Suspicious Attempts
+          </CardTitle>
+          <CardDescription className="text-amber-800">Scores, certificates, badges, and completion emails stay blocked until these attempts are cleared.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3">
+          {suspicious.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-amber-200 bg-white/60 p-5 text-center text-sm text-amber-800">No suspicious attempts are waiting for review.</div>
+          ) : suspicious.slice(0, 8).map((attempt: any) => {
+            const risk = normalizeRisk(attempt)
+            return (
+              <div key={`suspicious-${attempt.id}`} className="grid gap-3 rounded-2xl border border-amber-200 bg-white p-4 md:grid-cols-[1fr_auto] md:items-center">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-semibold text-amber-950">{attempt.profiles?.full_name || attempt.profiles?.email || 'Employee'}</p>
+                    <RiskBadge level={risk.level} />
+                    <Badge className="bg-amber-200 text-amber-950">{String(attempt.review_status || 'pending').replace(/_/g, ' ')}</Badge>
+                  </div>
+                  <p className="mt-1 text-sm text-amber-800">{attempt.quizzes?.title || 'Assessment'}</p>
+                  <p className="mt-2 text-xs text-amber-700">Risk {risk.score} - Violations {attempt.proctoring_violations_count ?? 0} - Status {attempt.status}</p>
+                </div>
+                <form action={updateIntegrityReviewAction} className="flex flex-wrap gap-2">
+                  <input type="hidden" name="attempt_id" value={attempt.id} />
+                  <button name="review_decision" value="approved" className="rounded-full bg-emerald-700 px-3 py-2 text-xs font-semibold text-white">Approve</button>
+                  <button name="review_decision" value="approved" className="rounded-full bg-white px-3 py-2 text-xs font-semibold text-emerald-800 ring-1 ring-emerald-200">Dismiss</button>
+                  <button name="review_decision" value="rejected" className="rounded-full bg-red-700 px-3 py-2 text-xs font-semibold text-white">Reject</button>
+                  <button name="review_decision" value="retest_required" className="rounded-full bg-amber-700 px-3 py-2 text-xs font-semibold text-white">Require retest</button>
+                </form>
+              </div>
+            )
+          })}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <Card className="border-zinc-800 bg-zinc-950 text-white">
@@ -344,7 +392,7 @@ export default async function AssessmentIntegrityPage() {
                       <div className="grid gap-2 sm:grid-cols-2">
                         {REVIEW_DECISIONS.map((decision) => (
                           <button
-                            key={decision.status}
+                            key={`${decision.status}-${decision.label}`}
                             name="review_decision"
                             value={decision.status}
                             className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-zinc-200 transition hover:bg-white hover:text-black"
@@ -404,6 +452,35 @@ async function getIntegrityNotificationCount(admin: ReturnType<typeof createAdmi
     .eq('title', 'Quiz proctoring flag')
 
   return count || 0
+}
+
+async function sendApprovedAttemptEmail(admin: ReturnType<typeof createAdminClient>, attempt: any) {
+  try {
+    const profile = Array.isArray(attempt.profiles) ? attempt.profiles[0] : attempt.profiles
+    const quiz = Array.isArray(attempt.quizzes) ? attempt.quizzes[0] : attempt.quizzes
+    if (!profile?.email) return
+
+    const [{ data: earnedBadges }, { data: certificate }] = await Promise.all([
+      admin.from('user_badges').select('id').eq('user_id', attempt.user_id),
+      admin.from('certificates').select('id').eq('quiz_id', attempt.quiz_id).eq('user_id', attempt.user_id).maybeSingle(),
+    ])
+
+    await sendEmail({
+      to: profile.email,
+      subject: `Quiz Results Released: ${quiz?.title || 'Assessment'} - ${attempt.score}%`,
+      html: buildQuizCompletedEmail({
+        employeeName: profile.full_name,
+        quizTitle: quiz?.title || 'Assessment',
+        score: attempt.score || 0,
+        points: attempt.points_earned || 0,
+        badgesEarned: earnedBadges?.length || 0,
+        certificateIssued: Boolean(certificate),
+        resultUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/employee/quizzes/${attempt.quiz_id}/results`,
+      }),
+    })
+  } catch (error) {
+    console.warn('Approved attempt completion email failed:', error)
+  }
 }
 
 async function getTodayIntegrityStats(admin: ReturnType<typeof createAdminClient>, scopedQuizIds: string[] | null) {

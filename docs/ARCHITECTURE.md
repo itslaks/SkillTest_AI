@@ -16,6 +16,7 @@ The application keeps UI and backend responsibilities separated by folder:
 - `lib/email.ts`: SMTP, Resend, and development email fallback.
 - `lib/proctoring.ts`: proctoring risk weights, severity levels, and auto-submit thresholds.
 - `lib/proctoring-server.ts`: server-side proctoring sessions, active-attempt validation, event recording, summaries, and private evidence upload.
+- `lib/proctoring-vision.ts`: browser-only TensorFlow face, gaze, and object detection with fail-open model loading.
 - `lib/domain-options.ts`: canonical signup/assignment domain options.
 - `lib/avatar-options.ts`: built-in Three.js 3D avatar preset IDs and helpers.
 - `components/avatar/`: reusable Three.js avatar renderer, preset picker, and profile avatar view.
@@ -42,13 +43,14 @@ When changing these files, keep business rules small and extracted into shared h
 ## Certificate Architecture
 
 ```text
-admin form -> updateCertificateRule() -> certificate_rules
-completed attempt -> database trigger -> certificates
+quiz create/edit/admin form -> certificate rule action -> certificate_rules
+clean completed attempt -> database trigger -> certificates
+suspicious attempt -> /manager/integrity -> staff approval -> completed attempt
 old attempts -> 031_backfill_old_certificates.sql -> certificates
 certificate page -> /certificates/[id]
 ```
 
-Admin-controlled certificate fields include enabled status, minimum score, certificate name, title, message, template image, accent color, and notes.
+Certificate fields include enabled status, minimum score, certificate name, title, message, template image, accent color, and notes. Suspicious attempts are blocked from certificate access until staff approve the attempt and its status becomes `completed`.
 
 ## Chatbot Architecture
 
@@ -68,9 +70,11 @@ This avoids fake scores while keeping broad natural-language coverage.
 ```text
 manager quiz form -> quizzes.proctoring_required
 employee pre-check -> startQuizAttempt() -> proctoring_sessions
-browser signal -> /api/proctoring/events -> recordProctoringEvent()
+browser status/vision/integrity signal -> /api/proctoring/events -> recordProctoringEvent()
 evidence frame -> private Supabase storage -> quiz_proctoring_evidence
-flagged attempt -> /manager/integrity -> review_status / review_notes
+high-risk or auto-submit -> quiz_attempts.status = suspicious
+suspicious attempt -> /manager/integrity -> approve / reject / retest / dismiss
+approved attempt -> score, certificate, badges, completion email, and result page release
 ```
 
 Proctoring is intentionally opt-in per quiz. Existing and new quizzes default to non-proctored unless an admin/manager enables `Enable AI Proctoring`.
@@ -82,6 +86,7 @@ Security boundaries:
 - Evidence files are stored in the private `quiz-proctoring-evidence` bucket.
 - Staff evidence previews use short-lived signed URLs.
 - `/api/proctoring/events` validates authenticated user, attempt ownership, active session, and in-progress attempt state before writing events.
+- Notification and email failures are isolated from event recording so violation logging remains durable.
 
 ## Training Operations Architecture
 

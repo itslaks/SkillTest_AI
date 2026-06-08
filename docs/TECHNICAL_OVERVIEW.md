@@ -10,9 +10,9 @@ SkillTest_AI: Mavericks Execution Platform is a Next.js training management and 
 | Profiles | Searchable profile dashboards with employee ID, domain, quiz history, badges, certificates, attendance, uploaded photos, and 15 Three.js 3D avatar presets |
 | Domains | Employee signup and assignment workflows use domain/vertical values such as Data Engineering, Java, C Sharp, Dotnet, Mainframe, Python, Cloud, DevOps, Testing, BA, UI/UX, and General |
 | Quizzes | Create, import, generate, publish/draft, assign, attempt, score, and analyze quizzes |
-| AI Proctoring | Optional per-quiz camera/microphone/fullscreen pre-checks, live violation events, private evidence, auto-submit, and staff integrity review |
+| AI Proctoring | Optional per-quiz camera/microphone/fullscreen pre-checks, browser vision signals, live warning UI, private evidence, suspicious attempt gating, and staff integrity review |
 | Assignment | Domain/vertical search and color-coded filters for large employee groups |
-| Certificates | Admin-configured thresholds, uploaded certificate format images, personalized certificate/course names, auto-issue triggers, and old-attempt backfill |
+| Certificates | Quiz create/edit certificate controls, admin-configured defaults, uploaded certificate format images, personalized certificate/course names, review-gated issuing, and old-attempt backfill |
 | Badges | Practical milestone catalog with quality, speed, streak, consistency, readiness, and domain award criteria |
 | Email | SMTP via Nodemailer first, Resend fallback, console fallback in development |
 | AI | OpenAI primary, Groq fallback, Gemini fallback, plus local deterministic stats where possible |
@@ -49,6 +49,7 @@ SkillTest_AI: Mavericks Execution Platform is a Next.js training management and 
 | `app/api/proctoring/events/` | Employee proctoring event endpoint with active-session and attempt ownership validation |
 | `components/manager/` | Manager workspace UI, assignment manager, command chatbot |
 | `app/manager/integrity/` | Staff integrity center for flagged proctored attempts, timelines, evidence previews, and review actions |
+| `lib/proctoring-vision.ts` | Browser-only TensorFlow model orchestration for face, gaze, and object detection |
 | `components/profile/` | Profile search UI |
 | `components/certificates/` | Certificate print/download controls |
 | `lib/actions/` | Server actions for auth, employee, manager, quiz, profile, training |
@@ -108,10 +109,12 @@ admin quiz toggle -> quizzes.proctoring_required
 employee pre-check -> startQuizAttempt() -> proctoring_sessions
 browser integrity signal -> /api/proctoring/events -> quiz_proctoring_events
 camera frame -> private storage bucket -> quiz_proctoring_evidence
-flagged attempt -> /manager/integrity -> staff review decision
+high-risk/auto-submit -> quiz_attempts.status = suspicious
+suspicious attempt -> /manager/integrity -> staff review decision
+approved attempt -> status = completed -> score/certificate/badge/email release
 ```
 
-Proctoring is off by default. Managers/admins enable it per quiz. Employee quiz payloads do not include correct-answer flags before submission, and employee result routes do not expose evidence paths, signed URLs, or blobs.
+Proctoring is off by default. Managers/admins enable it per quiz. Employee quiz payloads do not include correct-answer flags before submission, and employee result routes do not expose evidence paths, signed URLs, or blobs. Suspicious attempts show an under-review result state until staff approve or resolve the case.
 
 Staff evidence previews use short-lived signed URLs from the private `quiz-proctoring-evidence` bucket. Employees can read their own proctoring sessions but cannot read normalized evidence rows.
 
@@ -121,8 +124,10 @@ Staff evidence previews use short-lived signed URLs from the private `quiz-proct
 | --- | --- |
 | Migration `030` | Creates `certificate_rules`, `certificates`, trigger, badge style columns, and badge seed data |
 | Migration `031` | Adds template/personalization columns and backfills old eligible attempts |
-| Admin settings | `/manager/admin` lets admins enable certificates, set any threshold such as 90%, set title/name/message/color, upload a template image, and preview a polished credential frame |
-| Auto issue | New completed attempts create/update certificates when score meets enabled rule |
+| Quiz create/edit | `/manager/quizzes/new` and `/manager/quizzes/[id]/edit` let managers enable certificates, set thresholds, title/name/message/color/notes, and upload a template image |
+| Admin settings | `/manager/admin` remains available for administrative certificate rule maintenance |
+| Auto issue | Completed and staff-approved attempts create/update certificates when score meets enabled rule |
+| Review gate | Suspicious attempts do not expose score, completion status, badges, certificates, or completion emails until approved in `/manager/integrity` |
 | Backfill | Run `031` after saving rules to issue missing certificates for old attempts |
 | Certificate page | `/certificates/[id]` renders uploaded background with employee/course/score/date details |
 
@@ -163,8 +168,10 @@ Run SQL scripts in `scripts/` in numeric order. Current latest migration is:
 | `036_add_quiz_proctoring.sql` | Adds attempt-level proctoring status, violation count, event summary, and auto-submit fields |
 | `037_add_proctoring_risk_engine.sql` | Adds weighted proctoring risk score, risk level, and integrity report fields |
 | `038_add_normalized_quiz_proctoring.sql` | Adds optional per-quiz proctoring flag, normalized sessions/events/evidence tables, private evidence bucket, RLS policies, and legacy inline-evidence cleanup |
+| `039_proctoring_notifications_realtime.sql` | Adds notification metadata compatibility, realtime publication safety, and unread notification indexing |
+| `040_suspicious_attempt_review_gate.sql` | Adds suspicious attempt/proctoring states and review indexes for score and certificate gating |
 
-If `030` is already executed, run `031` after saving certificate rules in `/manager/admin`, then run `032` to harden badge awards, `033` to harden quiz-attempt and certificate RLS, `034` to reset badges from scratch, `035` to repair Training Ops schema compatibility, and `036` through `038` to enable optional AI proctoring. It is safe to run `031` again because it uses conflict update, and `038` is designed to be rerunnable for staging validation.
+If `030` is already executed, run `031` after saving certificate rules, then run `032` to harden badge awards, `033` to harden quiz-attempt and certificate RLS, `034` to reset badges from scratch, `035` to repair Training Ops schema compatibility, `036` through `038` to enable optional AI proctoring, `039` for realtime notification compatibility, and `040` for suspicious-attempt review gating. It is safe to run `031` again because it uses conflict update, and the proctoring migrations are designed to be rerunnable for staging validation.
 
 ## Verification
 

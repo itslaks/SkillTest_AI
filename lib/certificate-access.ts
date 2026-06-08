@@ -16,6 +16,7 @@ export async function getCertificateForViewer(certificateId: string): Promise<Ce
       *,
       profile:user_id(id, full_name, email, employee_id, domain, department),
       quiz:quiz_id(id, title, topic, difficulty),
+      attempt:attempt_id(id, status, review_status),
       rule:rule_id(certificate_name, template_image_url, template_accent_color, template_notes, min_score)
     `)
     .eq('id', certificateId)
@@ -26,6 +27,9 @@ export async function getCertificateForViewer(certificateId: string): Promise<Ce
 
   const canAccess = certificate.user_id === viewer.userId || isTrainingStaff(viewer.role)
   if (!canAccess) return { ok: false, status: 403, message: 'You do not have access to this certificate' }
+  if (certificate.attempt?.status && certificate.attempt.status !== 'completed') {
+    return { ok: false, status: 403, message: 'This certificate is pending assessment review.' }
+  }
 
   return { ok: true, certificate, viewerId: viewer.userId }
 }

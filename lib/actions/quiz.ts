@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import type { CreateQuizInput, CreateQuestionInput } from '@/lib/types/database'
 import { requireManager } from '@/lib/rbac'
@@ -240,7 +240,71 @@ export async function getQuizWithQuestions(quizId: string) {
     return { error: questionsError.message }
   }
 
-  return { data: { ...quiz, questions } }
+  const admin = createAdminClient()
+  const { data: certificateRule } = await admin
+    .from('certificate_rules')
+    .select('*')
+    .eq('quiz_id', idResult.data)
+    .maybeSingle()
+
+  return { data: { ...quiz, certificate_rule: certificateRule || null, questions } }
+}
+
+export async function saveQuizCertificateRule(formData: FormData) {
+  const { userId, role } = await requireManager()
+  const admin = createAdminClient()
+  const quizId = String(formData.get('quiz_id') || '')
+  const enabled = String(formData.get('enabled') || '') === 'on'
+  const minScore = Math.min(100, Math.max(0, Number(formData.get('min_score') || 70)))
+  const title = String(formData.get('title') || 'Certificate of Achievement').trim()
+  const certificateName = String(formData.get('certificate_name') || title || 'Course Completion Certificate').trim()
+  const message = String(formData.get('message') || '').trim()
+  const templateAccentColor = String(formData.get('template_accent_color') || '#d97706').trim()
+  const templateNotes = String(formData.get('template_notes') || '').trim()
+  const existingTemplate = String(formData.get('existing_template_image_url') || '').trim()
+  const templateFile = formData.get('template_file')
+
+  if (!uuidSchema.safeParse(quizId).success) return { error: 'Quiz is required.' }
+  if (!title) return { error: 'Certificate title is required.' }
+  if (!certificateName) return { error: 'Certificate name is required.' }
+
+  const { data: quiz, error: quizError } = await admin
+    .from('quizzes')
+    .select('id, created_by')
+    .eq('id', quizId)
+    .maybeSingle()
+  if (quizError) return { error: quizError.message }
+  if (!quiz) return { error: 'Quiz was not found.' }
+  if (role !== 'admin' && quiz.created_by !== userId) return { error: 'Not authorized for this quiz.' }
+
+  let templateImageUrl = existingTemplate || null
+  if (templateFile instanceof File && templateFile.size > 0) {
+    if (!templateFile.type.startsWith('image/')) return { error: 'Certificate template must be an image file.' }
+    if (templateFile.size > 1_500_000) return { error: 'Certificate template image must be below 1.5 MB.' }
+    const bytes = Buffer.from(await templateFile.arrayBuffer())
+    templateImageUrl = `data:${templateFile.type};base64,${bytes.toString('base64')}`
+  }
+
+  const { error } = await admin
+    .from('certificate_rules')
+    .upsert({
+      quiz_id: quizId,
+      enabled,
+      min_score: minScore,
+      title,
+      certificate_name: certificateName,
+      message: message || null,
+      template_image_url: templateImageUrl,
+      template_accent_color: templateAccentColor || '#d97706',
+      template_notes: templateNotes || null,
+      created_by: userId,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'quiz_id' })
+
+  if (error) return { error: error.message }
+  revalidatePath('/manager/quizzes', 'layout')
+  revalidatePath(`/manager/quizzes/${quizId}`)
+  return { data: true }
 }
 
 export async function createQuestion(input: CreateQuestionInput) {

@@ -87,6 +87,13 @@ type BrowserCapabilities = {
   fullscreenSupported: boolean
 }
 
+type WarningModalState = {
+  id: string
+  type: ProctoringEventType
+  label: string
+  createdAt: number
+} | null
+
 const initialDevicePermission: DevicePermission = {
   status: 'required',
   message: null,
@@ -173,6 +180,8 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [draftStorageWarning, setDraftStorageWarning] = useState(false)
   const [violationToasts, setViolationToasts] = useState<ViolationToastItem[]>([])
+  const [warningModal, setWarningModal] = useState<WarningModalState>(null)
+  const [recentViolations, setRecentViolations] = useState<ProctoringEvent[]>([])
 
   useEffect(() => {
     setMounted(true)
@@ -427,6 +436,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
 
     setLatestViolation(label)
     const toastId = `${type}-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    setWarningModal({ id: toastId, type, label, createdAt: Date.now() })
     setViolationToasts((previous) => [
       { id: toastId, type, label },
       ...previous.filter((item) => item.id !== toastId),
@@ -441,6 +451,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       riskLevel: getProctoringRiskLevel(getProctoringEventRisk(type)),
     }
     proctoringEventsRef.current = [...proctoringEventsRef.current, event].slice(-50)
+    setRecentViolations((previous) => [event, ...previous].slice(0, 8))
 
     const sessionId = proctoringSessionIdRef.current
     const attemptId = attemptIdRef.current
@@ -1028,6 +1039,10 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     }
     const onBeforePrint = () => recordProctoringViolation('blocked-shortcut', 'Print was attempted during the quiz.')
     const onOffline = () => recordProctoringViolation('network-offline', 'Network connection went offline during the quiz.')
+    let lastActivityAt = Date.now()
+    const onActivity = () => {
+      lastActivityAt = Date.now()
+    }
     const onKeyDown = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase()
       const blocked = event.metaKey || event.ctrlKey || event.altKey || key === 'f11' || key === 'printscreen'
@@ -1052,6 +1067,9 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     document.addEventListener('selectstart', onSelectStart)
     document.addEventListener('dragstart', onDragOrDrop)
     document.addEventListener('drop', onDragOrDrop)
+    document.addEventListener('mousemove', onActivity)
+    document.addEventListener('keydown', onActivity)
+    document.addEventListener('click', onActivity)
     window.addEventListener('offline', onOffline)
     window.addEventListener('keydown', onKeyDown, true)
     window.addEventListener('beforeunload', onBeforeUnload)
@@ -1079,6 +1097,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       reportSignalOnce('cameraLivePoll', 'camera-lost', 'Camera stream is not live during the quiz.', !liveVideo)
       const liveAudio = !microphoneRequired || Boolean(mediaStreamRef.current?.getAudioTracks().some((track) => track.readyState === 'live'))
       reportSignalOnce('microphoneLivePoll', 'microphone-denied', 'Microphone stream is not live during the quiz.', !liveAudio)
+      reportSignalOnce('longInactivity', 'blocked-shortcut', 'No exam activity detected for an extended period.', Date.now() - lastActivityAt > 45_000)
     }, 1500)
 
     return () => {
@@ -1093,6 +1112,9 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       document.removeEventListener('selectstart', onSelectStart)
       document.removeEventListener('dragstart', onDragOrDrop)
       document.removeEventListener('drop', onDragOrDrop)
+      document.removeEventListener('mousemove', onActivity)
+      document.removeEventListener('keydown', onActivity)
+      document.removeEventListener('click', onActivity)
       window.removeEventListener('offline', onOffline)
       window.removeEventListener('keydown', onKeyDown, true)
       window.removeEventListener('beforeunload', onBeforeUnload)
@@ -1393,6 +1415,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
         items={violationToasts}
         onDismiss={(id) => setViolationToasts((previous) => previous.filter((item) => item.id !== id))}
       />
+      <WarningModal warning={warningModal} onDismiss={() => setWarningModal(null)} />
       <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-[2rem] border border-zinc-800 bg-black px-5 py-4 text-white shadow-[0_30px_80px_rgba(0,0,0,0.35)]">
@@ -1536,6 +1559,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
                     {latestViolation}
                   </div>
                 )}
+                <ViolationHistoryPanel events={recentViolations} />
                 {showPermissionDebug && <PermissionDebugPanel debug={permissionDebug} dark={false} />}
               </CardContent>
             </Card>
@@ -1618,6 +1642,89 @@ function StatusPill({ label, active }: { label: string; active: boolean }) {
       {label}
     </span>
   )
+}
+
+function WarningModal({ warning, onDismiss }: { warning: WarningModalState; onDismiss: () => void }) {
+  const [secondsLeft, setSecondsLeft] = useState(5)
+
+  useEffect(() => {
+    if (!warning) return
+    setSecondsLeft(5)
+    const interval = window.setInterval(() => {
+      setSecondsLeft((previous) => {
+        if (previous <= 1) {
+          window.clearInterval(interval)
+          onDismiss()
+          return 0
+        }
+        return previous - 1
+      })
+    }, 1000)
+    return () => window.clearInterval(interval)
+  }, [onDismiss, warning])
+
+  if (!warning) return null
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/65 px-4" role="alertdialog" aria-modal="true" aria-labelledby="proctoring-warning-title">
+      <div className="w-full max-w-lg animate-in zoom-in-95 rounded-2xl border border-red-300 bg-gradient-to-br from-red-700 via-rose-700 to-red-950 p-8 text-center text-white shadow-2xl">
+        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-white text-5xl text-red-700">⚠</div>
+        <h2 id="proctoring-warning-title" className="mt-6 text-4xl font-black tracking-tight">WARNING</h2>
+        <p className="mt-4 text-xl font-semibold">{warning.label}</p>
+        <p className="mt-3 text-sm text-red-100">This incident has been recorded.</p>
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="mt-6 rounded-full bg-white px-6 py-3 text-sm font-bold text-red-800 hover:bg-red-50"
+        >
+          Dismiss ({secondsLeft})
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function ViolationHistoryPanel({ events }: { events: ProctoringEvent[] }) {
+  return (
+    <div className="rounded-[1.25rem] border border-zinc-200 bg-zinc-50 p-4">
+      <p className="text-sm font-semibold text-black">Recent violations</p>
+      {events.length === 0 ? (
+        <p className="mt-2 text-xs text-zinc-500">No violations recorded in this session.</p>
+      ) : (
+        <div className="mt-3 space-y-2">
+          {events.map((event, index) => (
+            <div key={`${event.type}-${event.occurredAt}-${index}`} className="rounded-xl border border-red-100 bg-white px-3 py-2">
+              <p className="text-xs font-semibold text-red-900">{humanViolationLabel(event.type, event.label)}</p>
+              <p className="mt-1 text-[11px] text-zinc-500">{new Date(event.occurredAt).toLocaleTimeString()}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function humanViolationLabel(type: ProctoringEventType, fallback: string) {
+  const labels: Partial<Record<ProctoringEventType, string>> = {
+    'tab-hidden': 'Tab Switch',
+    tab_switch: 'Tab Switch',
+    'no-face': 'Face Missing',
+    no_face: 'Face Missing',
+    'multiple-faces': 'Multiple Faces',
+    multiple_faces: 'Multiple Faces',
+    'gaze-away': 'Looking Away',
+    gaze_away: 'Looking Away',
+    gaze_down: 'Looking Down',
+    'phone-detected': 'Phone Detected',
+    phone_detected: 'Phone Detected',
+    electronic_device: 'Device Detected',
+    'copy-attempt': 'Copy/Paste',
+    'paste-attempt': 'Copy/Paste',
+    'fullscreen-exit': 'Screen Exit',
+    fullscreen_exit: 'Screen Exit',
+    'window-blur': 'Window Blur',
+  }
+  return labels[type] || fallback
 }
 
 function difficultyValue(level?: string | null) {

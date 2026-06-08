@@ -9,9 +9,9 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
-import { updateQuiz, updateQuestion, deleteQuestion, createQuestion } from '@/lib/actions/quiz'
+import { updateQuiz, updateQuestion, deleteQuestion, createQuestion, saveQuizCertificateRule } from '@/lib/actions/quiz'
 import type { Quiz, Question, DifficultyLevel, CreateQuestionInput } from '@/lib/types/database'
-import { Save, Trash2, Plus, CheckCircle2, XCircle, ChevronDown, ChevronUp, Clock, ShieldAlert } from 'lucide-react'
+import { Award, Save, Trash2, Plus, CheckCircle2, XCircle, ChevronDown, ChevronUp, Clock, ShieldAlert } from 'lucide-react'
 import { UnifiedQuizImporter } from './unified-quiz-importer'
 
 const DIFFICULTIES: DifficultyLevel[] = ['easy', 'medium', 'hard', 'advanced', 'hardcore']
@@ -29,6 +29,14 @@ export function QuizEditor({ quiz: initialQuiz, questions: initialQuestions }: Q
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const initialRule = (initialQuiz as any).certificate_rule || null
+  const [certificateEnabled, setCertificateEnabled] = useState(Boolean(initialRule?.enabled))
+  const [certificateTitle, setCertificateTitle] = useState(initialRule?.title || 'Certificate of Achievement')
+  const [certificateName, setCertificateName] = useState(initialRule?.certificate_name || 'Course Completion Certificate')
+  const [certificateMessage, setCertificateMessage] = useState(initialRule?.message || 'Awarded for successful course completion.')
+  const [certificateAccent, setCertificateAccent] = useState(initialRule?.template_accent_color || '#d97706')
+  const [certificateNotes, setCertificateNotes] = useState(initialRule?.template_notes || 'Employee name, course name, score, and issue date are rendered automatically.')
+  const [certificateTemplateFile, setCertificateTemplateFile] = useState<File | null>(null)
 
   function handleQuizChange(field: string, value: any) {
     setQuiz((prev: any) => ({ ...prev, [field]: value }))
@@ -54,6 +62,22 @@ export function QuizEditor({ quiz: initialQuiz, questions: initialQuestions }: Q
       if (res.error) {
         setError(res.error)
       } else {
+        const certificateForm = new FormData()
+        certificateForm.set('quiz_id', quiz.id)
+        certificateForm.set('existing_template_image_url', initialRule?.template_image_url || '')
+        if (certificateEnabled) certificateForm.set('enabled', 'on')
+        certificateForm.set('min_score', String(quiz.passing_score))
+        certificateForm.set('title', certificateTitle)
+        certificateForm.set('certificate_name', certificateName)
+        certificateForm.set('message', certificateMessage)
+        certificateForm.set('template_accent_color', certificateAccent)
+        certificateForm.set('template_notes', certificateNotes)
+        if (certificateTemplateFile) certificateForm.set('template_file', certificateTemplateFile)
+        const certificateResult = await saveQuizCertificateRule(certificateForm)
+        if (certificateResult.error) {
+          setError(certificateResult.error)
+          return
+        }
         setSuccess('Quiz updated successfully')
         setTimeout(() => setSuccess(null), 3000)
       }
@@ -255,6 +279,56 @@ export function QuizEditor({ quiz: initialQuiz, questions: initialQuestions }: Q
               <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all ${quiz.proctoring_required ? 'left-4' : 'left-0.5'}`} />
             </div>
           </button>
+
+          <div className="space-y-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <button
+              type="button"
+              onClick={() => setCertificateEnabled(!certificateEnabled)}
+              className="flex w-full items-center gap-3 text-left"
+            >
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${certificateEnabled ? 'bg-amber-600 text-white' : 'bg-white text-amber-700'}`}>
+                <Award className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-amber-950">Enable Certificate</p>
+                <p className="text-xs text-amber-800">Certificates use this quiz passing score and are blocked until suspicious attempts are cleared.</p>
+              </div>
+              <div className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${certificateEnabled ? 'bg-amber-600' : 'bg-amber-200'}`}>
+                <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all ${certificateEnabled ? 'left-4' : 'left-0.5'}`} />
+              </div>
+            </button>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-amber-950">Certificate Title</Label>
+                <Input value={certificateTitle} onChange={(event) => setCertificateTitle(event.target.value)} className="h-10 rounded-xl bg-white" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-amber-950">Template Name</Label>
+                <Input value={certificateName} onChange={(event) => setCertificateName(event.target.value)} className="h-10 rounded-xl bg-white" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-amber-950">Certificate Threshold</Label>
+                <Input type="number" min={0} max={100} value={quiz.passing_score} onChange={(event) => handleQuizChange('passing_score', Number(event.target.value) || 0)} className="h-10 rounded-xl bg-white" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-amber-950">Accent Color</Label>
+                <Input type="color" value={certificateAccent} onChange={(event) => setCertificateAccent(event.target.value)} className="h-10 rounded-xl bg-white p-1" />
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <Label className="text-xs text-amber-950">Message</Label>
+                <Input value={certificateMessage} onChange={(event) => setCertificateMessage(event.target.value)} className="h-10 rounded-xl bg-white" />
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <Label className="text-xs text-amber-950">Validity / Template Notes</Label>
+                <Input value={certificateNotes} onChange={(event) => setCertificateNotes(event.target.value)} className="h-10 rounded-xl bg-white" />
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <Label className="text-xs text-amber-950">Certificate Template Image</Label>
+                <Input type="file" accept="image/*" onChange={(event) => setCertificateTemplateFile(event.target.files?.[0] || null)} className="h-10 rounded-xl bg-white" />
+                {initialRule?.template_image_url && <p className="text-xs text-amber-800">Existing template is saved. Uploading a new image replaces it.</p>}
+              </div>
+            </div>
+          </div>
 
           {/* Quiz Scheduling */}
           <div className="space-y-3 p-4 bg-blue-500/5 rounded-2xl border border-blue-500/10">

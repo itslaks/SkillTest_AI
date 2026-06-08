@@ -284,7 +284,9 @@ export function buildQuizCompletedEmail(opts: {
   points: number
   badgesEarned?: number
   certificateIssued?: boolean
+  resultUrl?: string
 }) {
+  const resultUrl = escapeHtml(opts.resultUrl || `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/employee/quizzes`)
   return `
   <div style="font-family:system-ui,sans-serif;max-width:620px;margin:0 auto;padding:24px;background:#f8fafc;">
     <div style="background:#111827;color:#fff;padding:24px;border-radius:18px 18px 0 0;">
@@ -300,7 +302,7 @@ export function buildQuizCompletedEmail(opts: {
       </div>
       <p>${opts.badgesEarned ? `You unlocked ${opts.badgesEarned} badge(s).` : 'Keep going to unlock more badges.'}</p>
       ${opts.certificateIssued ? '<p style="color:#b45309;font-weight:700;">A certificate has been issued for this result.</p>' : ''}
-      <a href="${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/employee/quizzes" style="display:inline-block;background:#000;color:#fff;padding:12px 20px;border-radius:999px;text-decoration:none;font-weight:700;">View Result</a>
+      <a href="${resultUrl}" style="display:inline-block;background:#000;color:#fff;padding:12px 20px;border-radius:999px;text-decoration:none;font-weight:700;">View Results</a>
     </div>
   </div>`
 }

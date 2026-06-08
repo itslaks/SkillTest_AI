@@ -18,7 +18,7 @@ export default async function TakeQuizPage({ params }: { params: Promise<{ quizI
     .eq('user_id', user.id)
     .single()
 
-  if (existingAttempt?.status === 'completed') {
+  if (existingAttempt?.status === 'completed' || existingAttempt?.status === 'suspicious') {
     redirect(`/employee/quizzes/${quizId}/results`)
   }
 

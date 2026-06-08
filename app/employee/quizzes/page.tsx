@@ -9,6 +9,7 @@ export default async function EmployeeQuizzesPage() {
 
   const available = quizzes?.filter((quiz: any) => !quiz.attemptStatus) || []
   const inProgress = quizzes?.filter((quiz: any) => quiz.attemptStatus === 'in_progress') || []
+  const underReview = quizzes?.filter((quiz: any) => quiz.attemptStatus === 'suspicious') || []
   const completed = quizzes?.filter((quiz: any) => quiz.attemptStatus === 'completed') || []
 
   return (
@@ -39,6 +40,18 @@ export default async function EmployeeQuizzesPage() {
           </div>
           <div className="grid gap-5 xl:grid-cols-2">
             {inProgress.map((quiz: any) => <QuizCard key={quiz.id} quiz={quiz} status="in_progress" />)}
+          </div>
+        </section>
+      )}
+
+      {underReview.length > 0 && (
+        <section>
+          <div className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.25em] text-amber-700">
+            <span className="h-2 w-2 rounded-full bg-amber-500" />
+            Under review
+          </div>
+          <div className="grid gap-5 xl:grid-cols-2">
+            {underReview.map((quiz: any) => <QuizCard key={quiz.id} quiz={quiz} status="suspicious" />)}
           </div>
         </section>
       )}
@@ -77,14 +90,14 @@ export default async function EmployeeQuizzesPage() {
 }
 
 function QuizCard({ quiz, status }: { quiz: any; status: string }) {
-  const ctaHref = status === 'completed' ? `/employee/quizzes/${quiz.id}/results` : `/employee/quizzes/${quiz.id}`
+  const ctaHref = status === 'completed' || status === 'suspicious' ? `/employee/quizzes/${quiz.id}/results` : `/employee/quizzes/${quiz.id}`
 
   return (
     <div className="grid gap-4 rounded-[2rem] border border-zinc-200 bg-white p-5 shadow-sm md:grid-cols-[1.15fr_0.85fr]">
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-full bg-black px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-white">
-            {status === 'in_progress' ? 'Live' : status === 'completed' ? 'Closed' : 'Queued'}
+            {status === 'in_progress' ? 'Live' : status === 'completed' ? 'Closed' : status === 'suspicious' ? 'Review' : 'Queued'}
           </span>
           <span className="rounded-full bg-zinc-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-zinc-600">
             {quiz.difficulty}
@@ -126,7 +139,7 @@ function QuizCard({ quiz, status }: { quiz: any; status: string }) {
           <Button className="rounded-full bg-black px-5 text-white hover:bg-zinc-800" asChild>
             <Link href={ctaHref}>
               <Play className="mr-2 h-4 w-4" />
-              {status === 'completed' ? 'Open results' : status === 'in_progress' ? 'Continue quiz' : 'Start quiz'}
+              {status === 'completed' ? 'Open results' : status === 'suspicious' ? 'Review status' : status === 'in_progress' ? 'Continue quiz' : 'Start quiz'}
             </Link>
           </Button>
           <Button variant="outline" className="rounded-full" asChild>

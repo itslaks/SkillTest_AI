@@ -8,12 +8,12 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/hooks/use-toast'
-import { createQuiz, bulkCreateQuestions, deleteQuiz } from '@/lib/actions/quiz'
+import { createQuiz, bulkCreateQuestions, deleteQuiz, saveQuizCertificateRule } from '@/lib/actions/quiz'
 import {
   ArrowLeft, Sparkles, Wand2, Upload, FileSpreadsheet, Download,
   CheckCircle2, Clock, Target, AlarmClock,
   Eye, Hash, BookOpen, Zap, ChevronRight,
-  Info, XCircle, Settings2, FileUp, ShieldAlert,
+  Award, Info, XCircle, Settings2, FileUp, ShieldAlert,
 } from 'lucide-react'
 import type { DifficultyLevel, ParsedQuestion } from '@/lib/types/database'
 import { cn } from '@/lib/utils'
@@ -83,6 +83,13 @@ export default function NewQuizPage() {
   const [showExplanations, setShowExplanations] = useState(true)
   const [feedbackFormUrl, setFeedbackFormUrl] = useState('')
   const [proctoringRequired, setProctoringRequired] = useState(false)
+  const [certificateEnabled, setCertificateEnabled] = useState(false)
+  const [certificateTitle, setCertificateTitle] = useState('Certificate of Achievement')
+  const [certificateName, setCertificateName] = useState('Course Completion Certificate')
+  const [certificateMessage, setCertificateMessage] = useState('Awarded for successful course completion.')
+  const [certificateAccent, setCertificateAccent] = useState('#d97706')
+  const [certificateNotes, setCertificateNotes] = useState('Employee name, course name, score, and issue date are rendered automatically.')
+  const [certificateTemplateFile, setCertificateTemplateFile] = useState<File | null>(null)
 
   // Questions
   const [questionSource, setQuestionSource] = useState<'ai' | 'upload' | 'both'>('ai')
@@ -187,6 +194,22 @@ export default function NewQuizPage() {
         }
 
         try {
+          const certificateForm = new FormData()
+          certificateForm.set('quiz_id', quizId)
+          if (certificateEnabled) certificateForm.set('enabled', 'on')
+          certificateForm.set('min_score', String(passingScore))
+          certificateForm.set('title', certificateTitle)
+          certificateForm.set('certificate_name', certificateName)
+          certificateForm.set('message', certificateMessage)
+          certificateForm.set('template_accent_color', certificateAccent)
+          certificateForm.set('template_notes', certificateNotes)
+          if (certificateTemplateFile) certificateForm.set('template_file', certificateTemplateFile)
+          const certificateResult = await saveQuizCertificateRule(certificateForm)
+          if (certificateResult.error) {
+            await cleanupQuiz(certificateResult.error)
+            return
+          }
+
           if ((questionSource === 'upload' || questionSource === 'both') && parsedQuestions.length > 0) {
             const invalidRows: number[] = []
             const questionInputs = parsedQuestions.flatMap((q, index) => {
@@ -551,6 +574,55 @@ export default function NewQuizPage() {
                       <div className={cn('absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all', proctoringRequired ? 'left-4' : 'left-0.5')} />
                     </div>
                   </button>
+
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <button
+                      type="button"
+                      onClick={() => setCertificateEnabled(!certificateEnabled)}
+                      className="flex w-full items-center gap-3 text-left"
+                    >
+                      <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', certificateEnabled ? 'bg-amber-600 text-white' : 'bg-white text-amber-700')}>
+                        <Award className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-amber-950">Enable Certificate</p>
+                        <p className="text-xs text-amber-800">Certificates are issued only after the attempt is clear or approved.</p>
+                      </div>
+                      <div className={cn('relative h-5 w-9 shrink-0 rounded-full transition-colors', certificateEnabled ? 'bg-amber-600' : 'bg-amber-200')}>
+                        <div className={cn('absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all', certificateEnabled ? 'left-4' : 'left-0.5')} />
+                      </div>
+                    </button>
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-amber-950">Certificate Title</label>
+                        <Input value={certificateTitle} onChange={(event) => setCertificateTitle(event.target.value)} className="h-10 rounded-xl bg-white" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-amber-950">Template Name</label>
+                        <Input value={certificateName} onChange={(event) => setCertificateName(event.target.value)} className="h-10 rounded-xl bg-white" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-amber-950">Certificate Threshold</label>
+                        <Input type="number" min={0} max={100} value={passingScore} onChange={(event) => setPassingScore(Number(event.target.value) || 0)} className="h-10 rounded-xl bg-white" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-amber-950">Accent Color</label>
+                        <Input type="color" value={certificateAccent} onChange={(event) => setCertificateAccent(event.target.value)} className="h-10 rounded-xl bg-white p-1" />
+                      </div>
+                      <div className="space-y-1.5 md:col-span-2">
+                        <label className="text-xs font-semibold text-amber-950">Message</label>
+                        <Input value={certificateMessage} onChange={(event) => setCertificateMessage(event.target.value)} className="h-10 rounded-xl bg-white" />
+                      </div>
+                      <div className="space-y-1.5 md:col-span-2">
+                        <label className="text-xs font-semibold text-amber-950">Validity / Template Notes</label>
+                        <Input value={certificateNotes} onChange={(event) => setCertificateNotes(event.target.value)} className="h-10 rounded-xl bg-white" />
+                      </div>
+                      <div className="space-y-1.5 md:col-span-2">
+                        <label className="text-xs font-semibold text-amber-950">Certificate Template Image</label>
+                        <Input type="file" accept="image/*" onChange={(event) => setCertificateTemplateFile(event.target.files?.[0] || null)} className="h-10 rounded-xl bg-white" />
+                      </div>
+                    </div>
+                  </div>
 
                   {allowRetakes && (
                     <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-100">

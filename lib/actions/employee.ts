@@ -91,6 +91,10 @@ export async function startQuizAttempt(quizId: string, precheck?: {
     return { error: 'You have already completed this quiz' }
   }
 
+  if (existing?.status === 'suspicious') {
+    return { error: 'Your assessment is under review.' }
+  }
+
   if (existing?.status === 'in_progress') {
     if (!requiresProctoring) return { data: existing }
     const sessionResult = await createOrUpdateProctoringSession({
@@ -173,7 +177,7 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
       .maybeSingle()
 
     if (currentAttemptError) return { error: currentAttemptError.message }
-    if (currentAttempt?.status === 'completed') return { data: currentAttempt }
+    if (currentAttempt?.status === 'completed' || currentAttempt?.status === 'suspicious') return { data: currentAttempt }
 
     // Fetch quiz to calculate score
     const { data: quiz, error: quizError } = await adminClient
@@ -323,9 +327,9 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
         correct_answers: correctAnswers,
         time_taken_seconds,
         points_earned: pointsEarned,
-        status: 'completed',
+        status: isProctoringFlagged ? 'suspicious' : 'completed',
         completed_at: new Date().toISOString(),
-        proctoring_status: isProctoringFlagged ? 'flagged' : (requiresProctoring ? 'clear' : null),
+        proctoring_status: isProctoringFlagged ? 'suspicious' : (requiresProctoring ? 'clear' : null),
         proctoring_violations_count: proctoringViolationCount,
         proctoring_risk_score: proctoringRisk.score,
         proctoring_risk_level: requiresProctoring ? proctoringRisk.level : null,
@@ -355,28 +359,31 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
         .eq('id', session.id)
     }
 
-    try {
-      const [{ data: profile }, { data: earnedBadges }, { data: certificate }] = await Promise.all([
-        adminClient.from('profiles').select('full_name, email').eq('id', user.id).maybeSingle(),
-        adminClient.from('user_badges').select('id').eq('user_id', user.id),
-        adminClient.from('certificates').select('id').eq('quiz_id', quiz_id).eq('user_id', user.id).maybeSingle(),
-      ])
-      if (profile?.email) {
-        await sendEmail({
-          to: profile.email,
-          subject: `Quiz Completed: ${quiz.title} - ${score}%`,
-          html: buildQuizCompletedEmail({
-            employeeName: profile.full_name,
-            quizTitle: quiz.title,
-            score,
-            points: pointsEarned,
-            badgesEarned: earnedBadges?.length || 0,
-            certificateIssued: Boolean(certificate),
-          }),
-        })
+    if (!isProctoringFlagged) {
+      try {
+        const [{ data: profile }, { data: earnedBadges }, { data: certificate }] = await Promise.all([
+          adminClient.from('profiles').select('full_name, email').eq('id', user.id).maybeSingle(),
+          adminClient.from('user_badges').select('id').eq('user_id', user.id),
+          adminClient.from('certificates').select('id').eq('quiz_id', quiz_id).eq('user_id', user.id).maybeSingle(),
+        ])
+        if (profile?.email) {
+          await sendEmail({
+            to: profile.email,
+            subject: `Quiz Completed: ${quiz.title} - ${score}%`,
+            html: buildQuizCompletedEmail({
+              employeeName: profile.full_name,
+              quizTitle: quiz.title,
+              score,
+              points: pointsEarned,
+              badgesEarned: earnedBadges?.length || 0,
+              certificateIssued: Boolean(certificate),
+              resultUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/employee/quizzes/${quiz_id}/results`,
+            }),
+          })
+        }
+      } catch (mailError) {
+        console.warn('Quiz completion email failed (non-fatal):', mailError)
       }
-    } catch (mailError) {
-      console.warn('Quiz completion email failed (non-fatal):', mailError)
     }
 
     if (isProctoringFlagged) {
@@ -819,7 +826,7 @@ export async function getAllBadges() {
   const adminClient = createAdminClient()
   const { data: certificates, error: certificatesError } = await adminClient
     .from('certificates')
-    .select('id, title, score, issued_at, quiz:quiz_id(title, topic), rule:rule_id(certificate_name, min_score)')
+    .select('id, title, score, issued_at, attempt:attempt_id(status), quiz:quiz_id(title, topic), rule:rule_id(certificate_name, min_score)')
     .eq('user_id', user.id)
     .order('issued_at', { ascending: false })
 
@@ -832,6 +839,6 @@ export async function getAllBadges() {
       ...b,
       earned: earnedIds.has(b.id),
     })),
-    certificates: certificates || [],
+    certificates: (certificates || []).filter((certificate: any) => !certificate.attempt?.status || certificate.attempt.status === 'completed'),
   }
 }
