@@ -61,7 +61,9 @@ SkillTest_AI: Mavericks Execution Platform is a Next.js training management and 
 | `lib/domain-options.ts` | Shared domain/vertical list |
 | `lib/avatar-options.ts` | 15 built-in Three.js 3D avatar preset IDs |
 | `components/avatar/` | Three.js avatar renderer, preset picker, and avatar view wrapper |
-| `scripts/` | Supabase migrations, seed scripts, fixtures, smoke test |
+| `database/migrations/` | Supabase SQL migrations 001–040 (run in order) |
+| `database/seeds/` | Seed data and fixture generators |
+| `database/fixes/` | One-off SQL patches (already applied) |
 
 ## Important Routes
 

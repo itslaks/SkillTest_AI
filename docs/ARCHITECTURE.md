@@ -1,105 +1,323 @@
-# SkillTest_AI: Mavericks Execution Platform Architecture
+# Architecture
 
-The application keeps UI and backend responsibilities separated by folder:
+SkillTest_AI is a **Next.js 16 App Router** application backed by **Supabase PostgreSQL**. This document explains every layer — from browser to database — so any developer can navigate the codebase immediately.
 
-- `app` and `components`: frontend pages, layouts, and reusable UI components.
-- `app/api`: thin Next.js route adapters only.
-- `lib/backend/controllers`: request/response orchestration for backend endpoints.
-- `lib/backend/services`: business logic, report generation, calculations, and workflow rules.
-- `lib/backend/repositories`: database queries and persistence logic.
-- `lib/backend/database`: Supabase client factories and database connection helpers.
-- `lib/backend/entities`: backend entity/type definitions.
-- `lib/types`: generated/shared database types kept for compatibility with existing imports.
-- `lib/actions`: server actions for authenticated form workflows and app mutations.
-- `lib/insights.ts`: shared behavioral analysis, readiness, retention, and impact calculations.
-- `lib/ai.ts`: shared OpenAI, Groq, and Gemini provider selection.
-- `lib/email.ts`: SMTP, Resend, and development email fallback.
-- `lib/proctoring.ts`: proctoring risk weights, severity levels, and auto-submit thresholds.
-- `lib/proctoring-server.ts`: server-side proctoring sessions, active-attempt validation, event recording, summaries, and private evidence upload.
-- `lib/proctoring-vision.ts`: browser-only TensorFlow face, gaze, and object detection with fail-open model loading. Uses type-specific violation cooldowns (4 s for `multiple_faces`, 5 s for `no_face`, 15 s default) to prevent alert flooding.
-- `components/manager/integrity-review-buttons.tsx`: client component exposing `SuspiciousReviewButtons` and `CandidateReviewButtons` with `useFormStatus`-powered loading states; keeps `useFormStatus` inside a child `ReviewButton` component as required by React DOM.
-- `lib/domain-options.ts`: canonical signup/assignment domain options.
-- `lib/avatar-options.ts`: built-in Three.js 3D avatar preset IDs and helpers.
-- `components/avatar/`: reusable Three.js avatar renderer, preset picker, and profile avatar view.
+---
 
-New backend work should follow this flow:
+## Conceptual Layers
 
-`route.ts -> controller -> service -> repository -> database`
-
-Routes should not contain direct database queries or large business rules. If an endpoint needs data, place the query in a repository. If it needs calculations, exports, validations, or workflow decisions, place them in a service.
-
-## Current Practical Exceptions
-
-Some older and fast-moving modules still use server actions or route handlers directly:
-
-| Module | Reason |
-| --- | --- |
-| `lib/actions/manager.ts` | Form-driven manager/admin mutations such as employee import, assignment, certificate rules |
-| `lib/actions/profile.ts` | Authenticated profile dashboard reads |
-| `app/api/manager-chatbot/route.ts` | Deterministic command chatbot stats and compact DB context for AI fallback |
-| `app/api/proctoring/events/route.ts` | Live proctoring events endpoint kept in-route while the proctoring helper module absorbs session, risk, and evidence logic |
-
-When changing these files, keep business rules small and extracted into shared helpers where possible.
-
-## Certificate Architecture
-
-```text
-quiz create/edit/admin form -> certificate rule action -> certificate_rules
-clean completed attempt -> database trigger -> certificates
-suspicious attempt -> /manager/integrity -> staff approval -> completed attempt
-old attempts -> 031_backfill_old_certificates.sql -> certificates
-certificate page -> /certificates/[id]
+```
+┌─────────────────────────────────────────────────────────┐
+│  🖥️  FRONTEND  (browser)                                │
+│  app/**  ·  components/**  ·  hooks/**  ·  styles/**   │
+├─────────────────────────────────────────────────────────┤
+│  ⚙️  BACKEND  (Node.js / Vercel Edge)                   │
+│  app/api/**  ·  lib/actions/**  ·  lib/backend/**       │
+├─────────────────────────────────────────────────────────┤
+│  🗄️  DATABASE  (Supabase PostgreSQL)                    │
+│  database/migrations/**  ·  RLS policies  ·  Triggers  │
+└─────────────────────────────────────────────────────────┘
 ```
 
-Certificate fields include enabled status, minimum score, certificate name, title, message, template image, accent color, and notes. Suspicious attempts are blocked from certificate access until staff approve the attempt and its status becomes `completed`.
+---
 
-## Chatbot Architecture
+## Folder Map
 
-The manager chatbot follows this order:
+```
+SkillTest_AI/
+│
+├── 📂 app/                        ← Next.js App Router
+│   ├── 📂 api/                    ← REST API route handlers
+│   │   ├── ai-chat/               ← AI coaching chat
+│   │   ├── ai-insight/            ← Manager insights
+│   │   ├── ai-recommend/          ← Learner recommendations
+│   │   ├── ai-status/             ← AI provider health
+│   │   ├── assessment-import/     ← Score import endpoint
+│   │   ├── certificates/          ← Certificate generation
+│   │   ├── cron/training-governance/ ← Scheduled governance
+│   │   ├── employees/             ← Employee data API
+│   │   ├── export/                ← Excel/PDF export endpoints
+│   │   ├── leaderboard/           ← Leaderboard data
+│   │   ├── manager-chatbot/       ← Command chatbot
+│   │   ├── proctoring/events/     ← Live proctoring event sink
+│   │   └── training/              ← Training operations API
+│   │
+│   ├── 📂 auth/                   ← Login, sign-up, reset, callback
+│   ├── 📂 employee/               ← Employee workspace pages
+│   │   ├── badges/
+│   │   ├── leaderboard/
+│   │   ├── quizzes/[quizId]/      ← Quiz player + results
+│   │   ├── training/
+│   │   └── profile/
+│   │
+│   ├── 📂 manager/                ← Manager / Admin workspace
+│   │   ├── admin/                 ← Admin console
+│   │   ├── analytics/             ← AI-powered dashboards
+│   │   ├── compliance/            ← BRD evidence pack
+│   │   ├── employees/             ← Employee management
+│   │   ├── integrity/             ← Proctoring review center
+│   │   ├── operations/            ← Training batch management
+│   │   ├── quizzes/               ← Quiz CRUD
+│   │   ├── reports/               ← Report downloads
+│   │   └── settings/
+│   │
+│   ├── 📂 certificates/           ← Public certificate viewer
+│   ├── 📂 profiles/               ← Public profile pages
+│   └── 📂 demo/                   ← Demo / preview routes
+│
+├── 📂 components/                 ← Reusable React components
+│   ├── 📂 ui/                     ← Base shadcn/Radix components
+│   ├── 📂 manager/                ← Manager-specific widgets
+│   ├── 📂 employee/               ← Employee-specific widgets
+│   ├── 📂 avatar/                 ← 3D avatar renderer & picker
+│   ├── 📂 certificates/           ← Certificate card & viewer
+│   ├── 📂 insights/               ← Readiness meter, orb
+│   ├── 📂 landing/                ← Public landing page sections
+│   ├── 📂 navigation/             ← Nav bars and sidebars
+│   ├── 📂 profile/                ← Profile dashboard widgets
+│   └── 📂 quiz/                   ← Quiz display components
+│
+├── 📂 lib/                        ← Business logic & utilities
+│   ├── 📂 actions/                ← Next.js server actions
+│   │   ├── auth.ts                ← Sign-in, sign-up, reset
+│   │   ├── employee.ts            ← Quiz attempt, submission
+│   │   ├── manager.ts             ← Employee import, assignment
+│   │   ├── profile.ts             ← Profile reads/updates
+│   │   ├── quiz.ts                ← Quiz CRUD actions
+│   │   └── training.ts            ← Batch/session actions
+│   │
+│   ├── 📂 backend/                ← Layered backend services
+│   │   ├── 📂 controllers/        ← Route orchestration
+│   │   ├── 📂 services/           ← Business rules, calculations
+│   │   ├── 📂 repositories/       ← Database query functions
+│   │   ├── 📂 database/           ← Supabase client factory
+│   │   └── 📂 entities/           ← Backend type definitions
+│   │
+│   ├── 📂 security/               ← Zod validation, rate limiting
+│   ├── 📂 supabase/               ← Client/server Supabase helpers
+│   ├── 📂 types/                  ← Shared TypeScript types
+│   ├── ai.ts                      ← OpenAI / Groq / Gemini selector
+│   ├── email.ts                   ← SMTP / Resend email builder
+│   ├── proctoring.ts              ← Risk weights, severity levels
+│   ├── proctoring-server.ts       ← Server-side session & evidence
+│   ├── proctoring-vision.ts       ← Browser TensorFlow vision
+│   ├── rbac.ts                    ← Role access checks
+│   ├── insights.ts                ← Readiness / retention logic
+│   └── utils.ts                   ← Shared helpers
+│
+├── 📂 database/                   ← All database files
+│   ├── 📂 migrations/             ← 001–040 SQL schema files
+│   ├── 📂 seeds/                  ← Seed data & fixture generators
+│   └── 📂 fixes/                  ← One-off applied patches
+│
+├── 📂 docs/                       ← Developer documentation
+│   ├── ARCHITECTURE.md            ← This file
+│   ├── SETUP.md                   ← Local setup guide
+│   ├── TECHNICAL_OVERVIEW.md      ← Full technical reference
+│   ├── PROCTORING.md              ← AI proctoring deep-dive
+│   └── PRESENTATION.md            ← Presentation notes
+│
+├── 📂 hooks/                      ← Custom React hooks
+├── 📂 public/                     ← Static assets & import templates
+│   └── 📂 templates/              ← CSV/XLSX import templates
+├── 📂 styles/                     ← Global CSS
+└── README.md                      ← Project overview
+```
 
-1. Load scoped quizzes, completed attempts, profiles, badges, certificates, certificate rules, and attendance.
-2. Try deterministic handlers for exact stats such as employee quiz score, quiz average, weak areas, and certificate eligibility.
-3. Parse natural-language quiz creation commands such as `Create quiz on LLM, difficulty medium and assign it to Ram` and create structured quizzes with generated questions.
-4. If no deterministic handler or command matches, send compact context to AI.
-5. AI must answer only from supplied context and keep responses short.
-6. The client renders only polished admin-facing answers and hides internal scope, provider, answer-mode, and fallback labels.
+---
 
-This avoids fake scores while keeping broad natural-language coverage.
+## Backend Request Flow
+
+Every request follows this path:
+
+```mermaid
+flowchart LR
+    Browser -->|HTTP request| Route
+    Route["app/api/route.ts\n🔵 Thin adapter"]
+    Route --> Controller["lib/backend/controllers/\n🟢 Orchestration"]
+    Controller --> Service["lib/backend/services/\n🟡 Business logic"]
+    Service --> Repo["lib/backend/repositories/\n🟠 DB queries"]
+    Repo --> DB["Supabase PostgreSQL\n🔴 Data"]
+    DB --> Repo --> Service --> Controller --> Route --> Browser
+```
+
+**Rule:** Routes contain no business logic. Services contain no direct DB calls. Keep each layer thin.
+
+### Current Exceptions (fast-moving modules)
+
+| Module | Why it skips layers |
+|--------|-------------------|
+| `lib/actions/manager.ts` | Form-driven mutations with Next.js server actions |
+| `lib/actions/profile.ts` | Authenticated profile reads |
+| `app/api/manager-chatbot/route.ts` | Compact DB context for AI fallback |
+| `app/api/proctoring/events/route.ts` | Latency-sensitive live event sink |
+
+---
+
+## Authentication & RBAC Flow
+
+```mermaid
+flowchart TD
+    Request["Incoming request"] --> MW["middleware.ts\nSupabase session check"]
+    MW -->|No session| Login["Redirect → /auth/login"]
+    MW -->|Has session| RBAC["lib/rbac.ts\nrequireRole() check"]
+    RBAC -->|Wrong role| Denied["403 / redirect"]
+    RBAC -->|Correct role| Page["Render page / execute action"]
+
+    style MW fill:#3b82f6,color:#fff
+    style RBAC fill:#8b5cf6,color:#fff
+    style Login fill:#ef4444,color:#fff
+    style Denied fill:#ef4444,color:#fff
+    style Page fill:#22c55e,color:#fff
+```
+
+### Roles
+
+| 🔴 Admin | 🟠 Manager | 🟡 Training Coordinator | 🟢 Trainer | 🔵 Employee |
+|----------|-----------|------------------------|-----------|------------|
+| Full platform | Manager workspace | Training operations | Assigned batches | Learner workspace |
+
+---
+
+## Quiz Attempt Flow
+
+```mermaid
+flowchart TD
+    A["Employee selects quiz"] --> B{"Proctoring\nrequired?"}
+
+    B -->|No| C["startQuizAttempt()\nCreate attempt row"]
+    B -->|Yes| D["Pre-check screen\nCamera · Mic · Fullscreen · Consent"]
+
+    D --> E{"All checks\npassed?"}
+    E -->|No| D
+    E -->|Yes| F["startProctoringMediaStream()\ngetUserMedia()"]
+    F --> G["startQuizAttempt()\nCreate proctoring_session row"]
+
+    G --> H["Quiz player renders\n🎥 Vision proctoring starts"]
+    C --> H
+
+    H --> I{"Violation\ndetected?"}
+    I -->|Yes| J["POST /api/proctoring/events\nRecord + calculate risk"]
+    J --> K{"Auto-submit\nthreshold?"}
+    K -->|Yes| L["Auto-submit\nattempt = suspicious"]
+    K -->|No| H
+
+    H --> M{"Time up or\nlast question?"}
+    M -->|Yes| N["submitQuizAttempt()\nScore + badges + cert"]
+    N --> O["Email sent\nResult page"]
+
+    style D fill:#f59e0b,color:#000
+    style F fill:#3b82f6,color:#fff
+    style H fill:#8b5cf6,color:#fff
+    style L fill:#ef4444,color:#fff
+    style O fill:#22c55e,color:#fff
+```
+
+---
 
 ## AI Proctoring Architecture
 
-```text
-manager quiz form -> quizzes.proctoring_required
-employee pre-check -> startQuizAttempt() -> proctoring_sessions
-browser status/vision/integrity signal -> /api/proctoring/events -> recordProctoringEvent()
-evidence frame -> private Supabase storage -> quiz_proctoring_evidence
-high-risk or auto-submit -> quiz_attempts.status = suspicious
-suspicious attempt -> /manager/integrity -> approve / reject / retest / dismiss
-approved attempt -> score, certificate, badges, completion email, and result page release
+```mermaid
+flowchart LR
+    subgraph Browser["🖥️ Browser"]
+        Vision["lib/proctoring-vision.ts\nTensorFlow.js\nFace · Gaze · Objects"]
+        Player["quiz-player.tsx\nRecords violations\nShows banners/modals"]
+    end
+
+    subgraph Server["⚙️ Server"]
+        API["POST /api/proctoring/events\nValidates session + ownership"]
+        ProcServer["lib/proctoring-server.ts\nRisk score · Evidence upload"]
+        Risk["lib/proctoring.ts\nRisk weights · Auto-submit rules"]
+    end
+
+    subgraph Storage["🗄️ Supabase"]
+        Sessions["proctoring_sessions"]
+        Events["proctoring_events"]
+        Evidence["quiz-proctoring-evidence\n(private bucket)"]
+        Attempts["quiz_attempts\nstatus = suspicious"]
+    end
+
+    Vision -->|violation + frame| Player
+    Player -->|POST event| API
+    API --> ProcServer
+    ProcServer --> Risk
+    ProcServer --> Sessions
+    ProcServer --> Events
+    ProcServer --> Evidence
+    Risk -->|threshold reached| Attempts
+
+    style Vision fill:#8b5cf6,color:#fff
+    style API fill:#3b82f6,color:#fff
+    style Evidence fill:#ef4444,color:#fff
+    style Attempts fill:#f59e0b,color:#000
 ```
 
-Proctoring is intentionally opt-in per quiz. Existing and new quizzes default to non-proctored unless an admin/manager enables `Enable AI Proctoring`.
+**Violation cooldowns** (prevent alert flooding):
 
-Multiple-face violations surface as a persistent red banner in the quiz player (auto-dismissed after 30 s or on user click). The face count is included in the violation label so staff can assess the severity from proctoring logs. Warning modals auto-close after 10 s for multi-face events (5 s otherwise) so employees cannot become stuck behind an unresponsive overlay.
+| Violation | Cooldown |
+|-----------|---------|
+| `multiple_faces` | 4 s |
+| `no_face` | 5 s |
+| `gaze_down` / `gaze_away` | 10 s |
+| `phone_detected` / `electronic_device` | 8 s |
+| Default | 12 s |
 
-Security boundaries:
+---
 
-- Employee quiz payloads omit correct-answer flags before submission.
-- Employees can create/read their own session metadata but cannot read normalized evidence.
-- Evidence files are stored in the private `quiz-proctoring-evidence` bucket.
-- Staff evidence previews use short-lived signed URLs.
-- `/api/proctoring/events` validates authenticated user, attempt ownership, active session, and in-progress attempt state before writing events.
-- Notification and email failures are isolated from event recording so violation logging remains durable.
+## Email Flow
 
-## Training Operations Architecture
+```mermaid
+flowchart LR
+    Trigger["Trigger:\nAttempt completed\nor staff approves"] --> Builder["lib/email.ts\nbuildQuizCompletedEmail()"]
+    Builder --> Provider{"Email\nprovider"}
+    Provider -->|SMTP_HOST set| SMTP["Nodemailer\nSMTP"]
+    Provider -->|RESEND_API_KEY set| Resend["Resend API"]
+    Provider -->|Neither| Console["console.log\n(dev only)"]
 
-Batch creation is kept intentionally compact in the manager operations page:
-
-```text
-manager form -> createTrainingBatch() -> training_batches
-             -> batch_learners
-             -> batch_trainers
-             -> quizzes.batch_id
+    style Builder fill:#3b82f6,color:#fff
+    style SMTP fill:#22c55e,color:#fff
+    style Resend fill:#22c55e,color:#fff
+    style Console fill:#6b7280,color:#fff
 ```
 
-The form collects only the required setup fields, one lead trainer, selected learners, and optional linked assessments. The server action returns a specific error if learner enrollment, trainer assignment, or assessment linking fails, so admins do not lose failures behind a successful batch insert.
+---
+
+## Certificate Architecture
+
+```mermaid
+flowchart TD
+    Form["Quiz create/edit form\nEnable certificate toggle"] --> Rules["certificate_rules table\nmin_score · title · message · template"]
+    Rules --> Trigger["PostgreSQL trigger\n(on attempt completed)"]
+    Trigger --> Cert["certificates table\ncert_number · issued_at"]
+
+    SuspAttempt["suspicious attempt"] --> Review["/manager/integrity\nStaff approve/reject"]
+    Review -->|approved| Complete["attempt → completed"]
+    Complete --> Trigger
+
+    Cert --> Page["/certificates/[id]\nPublic certificate viewer"]
+    Cert --> Email["Completion email\nCertificate download link"]
+
+    style Form fill:#3b82f6,color:#fff
+    style Trigger fill:#f59e0b,color:#000
+    style Review fill:#8b5cf6,color:#fff
+    style Page fill:#22c55e,color:#fff
+```
+
+---
+
+## Data Model (Key Tables)
+
+```
+profiles          → id, email, full_name, role, domain
+quizzes           → id, title, topic, difficulty, passing_score, proctoring_required
+quiz_questions    → id, quiz_id, question_text, options[], correct_option
+quiz_assignments  → id, quiz_id, user_id, assigned_at
+quiz_attempts     → id, quiz_id, user_id, score, status, proctoring_data
+certificates      → id, quiz_id, user_id, cert_number, issued_at
+certificate_rules → id, quiz_id, min_score, title, message, template_url
+user_badges       → id, user_id, badge_id, earned_at
+training_batches  → id, name, domain, start_date, lead_trainer_id
+batch_learners    → id, batch_id, user_id
+proctoring_sessions → id, attempt_id, started_at, risk_score
+proctoring_events → id, session_id, type, label, occurred_at, evidence_url
+```
