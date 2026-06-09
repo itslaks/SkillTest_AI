@@ -26,6 +26,7 @@ import {
 } from '@/lib/actions/training'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { OpsNotepad } from '@/components/manager/ops-notepad'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -481,41 +482,49 @@ export default async function ManagerOperationsPage({
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[15rem_1fr] 2xl:grid-cols-[17rem_1fr]">
-        <aside className="self-start rounded-[1.5rem] border border-slate-100 bg-white p-3 shadow-[0_4px_24px_rgba(15,23,42,0.08)] xl:sticky xl:top-24">
-          <div className="relative overflow-hidden rounded-[1.1rem] bg-[#0B1220] p-4 text-white">
+      {/* Command Rail + Notepad row */}
+      <div className="grid gap-4 lg:grid-cols-[1fr_22rem]">
+        {/* Command Rail — horizontal nav */}
+        <div className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm">
+          <div className="relative overflow-hidden rounded-[1.1rem] bg-[#0B1220] px-5 py-3.5 text-white">
             <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sky-400/60 to-transparent" />
-            <div className="flex items-center gap-2">
-              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-sky-400/15">
-                <RadioTower className="h-3.5 w-3.5 text-sky-300" />
-              </span>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-sky-300">Command Rail</p>
-            </div>
-            <p className="mt-3 text-sm font-semibold text-white">Mission Control</p>
-            <div className="mt-2 flex items-center gap-2">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-              <p className="text-xs text-slate-400">{automationHealth} automation · {openRisks} risk{openRisks !== 1 ? 's' : ''}</p>
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-sky-400/15">
+                  <RadioTower className="h-3.5 w-3.5 text-sky-300" />
+                </span>
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-sky-300">Command Rail</p>
+                  <p className="text-xs font-semibold text-white">Mission Control</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                <p className="text-xs text-slate-400">{automationHealth} automation · {openRisks} risk{openRisks !== 1 ? 's' : ''}</p>
+              </div>
             </div>
           </div>
-          <nav className="mt-2 grid gap-0.5">
+          <nav className="mt-3 flex flex-wrap gap-2">
             {missionNav.map((item) => {
               const NavIcon = item.icon
               return (
-                <a key={item.href} href={item.href} className="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition hover:bg-sky-50">
-                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-slate-200 bg-slate-50 text-slate-500 transition group-hover:border-blue-200 group-hover:bg-blue-50 group-hover:text-blue-600">
-                    <NavIcon className="h-3.5 w-3.5" />
-                  </span>
-                  <div className="min-w-0">
-                    <span className="block text-sm font-semibold text-slate-900 group-hover:text-blue-700">{item.label}</span>
-                    <span className="block text-xs text-slate-400">{item.detail}</span>
+                <a key={item.href} href={item.href} className="group flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 transition hover:border-blue-200 hover:bg-blue-50">
+                  <NavIcon className="h-3.5 w-3.5 text-slate-400 transition group-hover:text-blue-600" />
+                  <div>
+                    <span className="block text-sm font-semibold text-slate-800 group-hover:text-blue-700">{item.label}</span>
+                    <span className="block text-[10px] text-slate-400">{item.detail}</span>
                   </div>
                 </a>
               )
             })}
           </nav>
-        </aside>
+        </div>
 
-        <main className="min-w-0 space-y-8">
+        {/* Notepad */}
+        <OpsNotepad />
+      </div>
+
+      <div className="space-y-8">
       <section id="overview" className="scroll-mt-32 grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(20rem,0.75fr)]">
         <div className="grid gap-4 md:grid-cols-2">
           <ActionTile
@@ -1652,7 +1661,6 @@ export default async function ManagerOperationsPage({
         />
       </div>
       </section>
-        </main>
       </div>
     </div>
   )
