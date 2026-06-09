@@ -429,11 +429,11 @@ export default async function ManagerOperationsPage({
   const automationHealth = dispatchHealth.failed > 0 ? 'Needs review' : automationRuns.length ? 'Healthy' : 'Ready'
   const nextScheduleItems = scheduleTimeline.slice(0, 4)
   const missionNav = [
-    { label: 'Live Ops', href: '#live-operations', detail: 'Daily workflow' },
-    { label: 'Governance', href: '#governance-zone', detail: 'Quality controls' },
-    { label: 'Automation', href: '#automation-zone', detail: 'Proactive checks' },
-    { label: 'Resources', href: '#resources-zone', detail: 'Setup tools' },
-    { label: 'Intelligence', href: '#intelligence-hub', detail: 'Signals and audit' },
+    { label: 'Live Ops', href: '#live-operations', detail: 'Daily workflow', icon: Activity },
+    { label: 'Governance', href: '#governance-zone', detail: 'Quality controls', icon: ShieldAlert },
+    { label: 'Automation', href: '#automation-zone', detail: 'Proactive checks', icon: Zap },
+    { label: 'Resources', href: '#resources-zone', detail: 'Setup tools', icon: Database },
+    { label: 'Intelligence', href: '#intelligence-hub', detail: 'Signals and audit', icon: BarChart3 },
   ]
 
   return (
@@ -482,19 +482,36 @@ export default async function ManagerOperationsPage({
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[15rem_1fr] 2xl:grid-cols-[17rem_1fr]">
-        <aside className="self-start rounded-[1.5rem] border border-slate-200 bg-white p-3 shadow-sm xl:sticky xl:top-24">
-          <div className="rounded-[1.25rem] border border-slate-900 bg-[#0B1220] p-4 text-white">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-sky-300">Command Rail</p>
-            <p className="mt-2 text-sm font-semibold">Mission Control</p>
-            <p className="mt-1 text-xs leading-relaxed text-slate-400">{automationHealth} automation, {openRisks} open risk signal(s).</p>
+        <aside className="self-start rounded-[1.5rem] border border-slate-100 bg-white p-3 shadow-[0_4px_24px_rgba(15,23,42,0.08)] xl:sticky xl:top-24">
+          <div className="relative overflow-hidden rounded-[1.1rem] bg-[#0B1220] p-4 text-white">
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sky-400/60 to-transparent" />
+            <div className="flex items-center gap-2">
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-sky-400/15">
+                <RadioTower className="h-3.5 w-3.5 text-sky-300" />
+              </span>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-sky-300">Command Rail</p>
+            </div>
+            <p className="mt-3 text-sm font-semibold text-white">Mission Control</p>
+            <div className="mt-2 flex items-center gap-2">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+              <p className="text-xs text-slate-400">{automationHealth} automation · {openRisks} risk{openRisks !== 1 ? 's' : ''}</p>
+            </div>
           </div>
-          <nav className="mt-3 grid gap-1">
-            {missionNav.map((item) => (
-              <a key={item.href} href={item.href} className="group rounded-2xl px-3 py-2.5 transition hover:-translate-y-0.5 hover:bg-sky-50">
-                <span className="block text-sm font-semibold text-slate-950 group-hover:text-blue-700">{item.label}</span>
-                <span className="block text-xs text-slate-500">{item.detail}</span>
-              </a>
-            ))}
+          <nav className="mt-2 grid gap-0.5">
+            {missionNav.map((item) => {
+              const NavIcon = item.icon
+              return (
+                <a key={item.href} href={item.href} className="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition hover:bg-sky-50">
+                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-slate-200 bg-slate-50 text-slate-500 transition group-hover:border-blue-200 group-hover:bg-blue-50 group-hover:text-blue-600">
+                    <NavIcon className="h-3.5 w-3.5" />
+                  </span>
+                  <div className="min-w-0">
+                    <span className="block text-sm font-semibold text-slate-900 group-hover:text-blue-700">{item.label}</span>
+                    <span className="block text-xs text-slate-400">{item.detail}</span>
+                  </div>
+                </a>
+              )
+            })}
           </nav>
         </aside>
 
@@ -1689,14 +1706,20 @@ function MissionKpiCard({
 
 function SectionIntro({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
   return (
-    <div className="flex flex-col gap-3 rounded-[1.5rem] border border-white/10 bg-white/[0.96] p-5 shadow-[0_18px_60px_rgba(2,6,23,0.12)] sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-blue-700">{eyebrow}</p>
-        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 md:text-3xl">{title}</h2>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">{description}</p>
+    <div className="flex flex-col gap-4 rounded-[1.5rem] border border-slate-100 bg-white p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex gap-5">
+        <div className="mt-0.5 w-1 shrink-0 self-stretch rounded-full bg-gradient-to-b from-blue-500 via-blue-400 to-blue-200" />
+        <div>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.24em] text-blue-700 ring-1 ring-inset ring-blue-100">
+            <span className="h-1 w-1 rounded-full bg-blue-500" />
+            {eyebrow}
+          </span>
+          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950 md:text-3xl">{title}</h2>
+          <p className="mt-1.5 max-w-3xl text-sm leading-6 text-slate-500">{description}</p>
+        </div>
       </div>
-      <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
-        <Activity className="h-3.5 w-3.5 text-blue-600" />
+      <div className="flex shrink-0 items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-600 shadow-sm">
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
         Live signals
       </div>
     </div>
@@ -1716,23 +1739,42 @@ function MissionSignalCard({
   detail: string
   tone: 'blue' | 'emerald' | 'amber' | 'red'
 }) {
-  const toneClass = {
-    blue: 'border-blue-100 bg-blue-50 text-blue-700',
-    emerald: 'border-emerald-100 bg-emerald-50 text-emerald-700',
-    amber: 'border-amber-100 bg-amber-50 text-amber-700',
-    red: 'border-rose-100 bg-rose-50 text-rose-700',
+  const iconClass = {
+    blue: 'border-blue-100 bg-blue-50 text-blue-600',
+    emerald: 'border-emerald-100 bg-emerald-50 text-emerald-600',
+    amber: 'border-amber-100 bg-amber-50 text-amber-600',
+    red: 'border-rose-100 bg-rose-50 text-rose-600',
+  }[tone]
+  const cardGradient = {
+    blue: 'bg-gradient-to-br from-blue-50/60 via-white to-white border-blue-100/80',
+    emerald: 'bg-gradient-to-br from-emerald-50/60 via-white to-white border-emerald-100/80',
+    amber: 'bg-gradient-to-br from-amber-50/60 via-white to-white border-amber-100/80',
+    red: 'bg-gradient-to-br from-rose-50/60 via-white to-white border-rose-100/80',
+  }[tone]
+  const accentBar = {
+    blue: 'bg-blue-400',
+    emerald: 'bg-emerald-400',
+    amber: 'bg-amber-400',
+    red: 'bg-rose-400',
+  }[tone]
+  const valueColor = {
+    blue: 'text-blue-700',
+    emerald: 'text-emerald-700',
+    amber: 'text-amber-700',
+    red: 'text-rose-700',
   }[tone]
 
   return (
-    <div className="group rounded-[1.5rem] border border-white/70 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.10)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_26px_78px_rgba(15,23,42,0.16)]">
+    <div className={`group relative overflow-hidden rounded-[1.5rem] border p-5 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(15,23,42,0.13)] ${cardGradient}`}>
+      <div className={`absolute right-0 top-0 h-1 w-full rounded-t-[1.5rem] ${accentBar} opacity-60`} />
       <div className="flex items-start justify-between gap-4">
-        <span className={`grid h-11 w-11 place-items-center rounded-2xl border ${toneClass}`}>
-          <Icon className="h-4 w-4" />
+        <span className={`grid h-11 w-11 place-items-center rounded-2xl border ${iconClass} shadow-sm`}>
+          <Icon className="h-5 w-5" />
         </span>
-        <CheckCircle2 className="h-4 w-4 text-emerald-500 opacity-70" />
+        <CheckCircle2 className="h-4 w-4 text-emerald-500 opacity-60" />
       </div>
-      <p className="mt-5 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">{label}</p>
-      <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{value}</p>
+      <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">{label}</p>
+      <p className={`mt-1.5 text-3xl font-bold tracking-tight ${valueColor}`}>{value}</p>
       <p className="mt-2 text-sm leading-5 text-slate-500">{detail}</p>
     </div>
   )
@@ -1976,20 +2018,25 @@ function DropPanel({
   children: ReactNode
 }) {
   return (
-    <details id={id} open={defaultOpen} className="group scroll-mt-32 overflow-hidden rounded-[1.5rem] border border-white/70 bg-white shadow-[0_18px_65px_rgba(15,23,42,0.10)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_28px_90px_rgba(15,23,42,0.16)] open:shadow-[0_28px_90px_rgba(15,23,42,0.16)]">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 bg-gradient-to-br from-white to-slate-50 px-5 py-4 marker:hidden">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-base font-semibold text-slate-950">{title}</h2>
-            {badge ? <span className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-blue-700">{badge}</span> : null}
+    <details id={id} open={defaultOpen} className="group scroll-mt-32 overflow-hidden rounded-[1.5rem] border border-slate-100 bg-white shadow-sm transition duration-300 hover:shadow-md open:shadow-md">
+      <summary className="relative flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5 marker:hidden select-none">
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-200/60 to-transparent group-open:via-blue-300/70" />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+            {badge ? (
+              <span className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-blue-600">
+                {badge}
+              </span>
+            ) : null}
           </div>
-          <p className="mt-1 text-sm leading-5 text-slate-500">{description}</p>
+          <p className="mt-1 text-sm leading-5 text-slate-400">{description}</p>
         </div>
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition group-open:rotate-180">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-500 shadow-sm transition group-open:rotate-180 group-open:border-blue-200 group-open:bg-blue-50 group-open:text-blue-600">
           <ChevronDown className="h-4 w-4" />
         </div>
       </summary>
-      <div className="border-t border-slate-100 bg-white">
+      <div className="border-t border-slate-100 bg-slate-50/30">
         {children}
       </div>
     </details>
@@ -2132,38 +2179,57 @@ function PriorityOpsWorkbench({
 
 function MiniMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-      <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">{label}</p>
-      <p className="mt-3 text-lg font-semibold leading-tight text-black">{value}</p>
+    <div className="group min-w-0 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">{label}</p>
+      <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{value}</p>
+      <div className="mt-3 h-0.5 w-6 rounded-full bg-blue-400/50 transition-all duration-300 group-hover:w-full group-hover:bg-blue-400/70" />
     </div>
   )
 }
 
 function ActionTile({ title, value, detail, tone, className = '' }: { title: string; value: string; detail: string; tone: 'rose' | 'amber' | 'blue' | 'emerald'; className?: string }) {
-  const edgeCls = {
-    rose: 'border-rose-100 bg-gradient-to-br from-white to-rose-50',
-    amber: 'border-amber-100 bg-gradient-to-br from-white to-amber-50 text-amber-950',
-    blue: 'border-sky-100 bg-gradient-to-br from-white to-sky-50',
-    emerald: 'border-emerald-100 bg-gradient-to-br from-white to-emerald-50',
-  }
-  const numCls = {
-    rose: 'kpi-number-rose',
-    amber: '',
-    blue: 'kpi-number-cyan',
-    emerald: 'kpi-number-emerald',
-  }
-  const textTone = { rose: 'text-rose-950', amber: 'text-amber-950', blue: 'text-zinc-900', emerald: 'text-zinc-900' }
+  const card = {
+    rose: 'border-rose-100 bg-white',
+    amber: 'border-amber-100 bg-white',
+    blue: 'border-sky-100 bg-white',
+    emerald: 'border-emerald-100 bg-white',
+  }[tone]
+  const accentBar = {
+    rose: 'from-rose-400 to-rose-300',
+    amber: 'from-amber-400 to-amber-300',
+    blue: 'from-sky-500 to-blue-400',
+    emerald: 'from-emerald-500 to-emerald-400',
+  }[tone]
+  const valueColor = {
+    rose: 'text-rose-600',
+    amber: 'text-amber-600',
+    blue: 'text-sky-600',
+    emerald: 'text-emerald-600',
+  }[tone]
+  const labelColor = {
+    rose: 'text-rose-400',
+    amber: 'text-amber-500',
+    blue: 'text-sky-500',
+    emerald: 'text-emerald-500',
+  }[tone]
+  const iconBg = {
+    rose: 'border-rose-100 bg-rose-50 text-rose-500',
+    amber: 'border-amber-100 bg-amber-50 text-amber-500',
+    blue: 'border-sky-100 bg-sky-50 text-sky-500',
+    emerald: 'border-emerald-100 bg-emerald-50 text-emerald-500',
+  }[tone]
 
   return (
-    <div className={`group min-w-0 rounded-[1.5rem] border p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(15,23,42,0.14)] ${edgeCls[tone]} ${className}`}>
-      <div className="mb-5 flex justify-end">
-        <span className="grid h-9 w-9 place-items-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition group-hover:scale-105">
-          <ArrowUpRight className="h-4 w-4" />
+    <div className={`group relative min-w-0 overflow-hidden rounded-[1.5rem] border p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(15,23,42,0.12)] ${card} ${className}`}>
+      <div className={`absolute left-0 top-0 h-1 w-full bg-gradient-to-r ${accentBar}`} />
+      <div className="flex items-start justify-between gap-3">
+        <p className={`text-[10px] font-bold uppercase tracking-[0.22em] ${labelColor}`}>{title}</p>
+        <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl border transition group-hover:scale-110 ${iconBg}`}>
+          <ArrowUpRight className="h-3.5 w-3.5" />
         </span>
       </div>
-      <p className={`text-[10px] font-semibold uppercase tracking-[0.22em] opacity-60 ${textTone[tone]}`}>{title}</p>
-      <p className={`mt-3 text-3xl font-bold ${numCls[tone] || textTone[tone]}`}>{value}</p>
-      <p className={`mt-2 text-sm leading-relaxed opacity-70 ${textTone[tone]}`}>{detail}</p>
+      <p className={`mt-4 text-4xl font-bold tracking-tight ${valueColor}`}>{value}</p>
+      <p className="mt-2 text-sm leading-relaxed text-slate-500">{detail}</p>
     </div>
   )
 }
