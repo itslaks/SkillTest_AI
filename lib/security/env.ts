@@ -28,6 +28,20 @@ function isHttpUrl(value: string | undefined): value is string {
   }
 }
 
+function normalizeHttpUrl(value: string | undefined): string | null {
+  if (!isHttpUrl(value)) return null
+  return value.trim().replace(/\/+$/, '')
+}
+
+function isLocalSiteUrl(value: string): boolean {
+  try {
+    const url = new URL(value)
+    return ['localhost', '127.0.0.1', '0.0.0.0', '::1'].includes(url.hostname)
+  } catch {
+    return false
+  }
+}
+
 function isRealKey(value: string | undefined): value is string {
   return Boolean(value && !PLACEHOLDER_VALUES.has(value.trim()))
 }
@@ -84,26 +98,26 @@ export function getSupabaseServiceRoleKey(): string {
 }
 
 /**
- * Returns the site URL, falling back to localhost in development.
+ * Returns the public site URL for links in emails, auth redirects, and callbacks.
+ * Localhost is allowed only during local development.
  */
 export function getSiteUrl(): string {
-  // 1. Prefer the documented app URL when explicitly provided
-  if (process.env.NEXT_PUBLIC_APP_URL) {
-    return process.env.NEXT_PUBLIC_APP_URL
-  }
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production'
+  const candidates = [
+    normalizeHttpUrl(process.env.NEXT_PUBLIC_APP_URL),
+    normalizeHttpUrl(process.env.NEXT_PUBLIC_SITE_URL),
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ? normalizeHttpUrl(`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`) : null,
+    process.env.VERCEL_URL ? normalizeHttpUrl(`https://${process.env.VERCEL_URL}`) : null,
+  ].filter(Boolean) as string[]
 
-  // 2. Check for manual site override (e.g., in production)
-  if (process.env.NEXT_PUBLIC_SITE_URL) {
-    return process.env.NEXT_PUBLIC_SITE_URL
-  }
+  const siteUrl = candidates.find((candidate) => !isProduction || !isLocalSiteUrl(candidate))
+  if (siteUrl) return siteUrl
 
-  // 3. Check for Vercel deployment URL
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`
-  }
+  if (!isProduction) return 'http://localhost:3000'
 
-  // 4. Fallback to localhost for development
-  return 'http://localhost:3000'
+  throw new Error(
+    'Invalid public app URL for production. Set NEXT_PUBLIC_APP_URL or NEXT_PUBLIC_SITE_URL to your deployed https URL; localhost cannot be used in production emails.'
+  )
 }
 
 /**
