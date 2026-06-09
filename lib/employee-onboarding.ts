@@ -178,7 +178,8 @@ export async function sendEmployeeSetupEmail(
   email: string,
   fullName?: string | null,
 ): Promise<{ success: boolean; error?: string }> {
-  const redirectTo = `${getSiteUrl()}/auth/update-password`
+  const siteUrl = getSiteUrl().replace(/\/$/, '')
+  const redirectTo = `${siteUrl}/auth/update-password`
   const { data, error } = await supabase.auth.admin.generateLink({
     type: 'recovery',
     email,
@@ -189,12 +190,21 @@ export async function sendEmployeeSetupEmail(
     return { success: false, error: error?.message || 'Could not generate password setup link' }
   }
 
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('employee_id')
+    .eq('email', email)
+    .maybeSingle()
+  const signUpParams = new URLSearchParams({ role: 'employee', email })
+  if (profile?.employee_id) signUpParams.set('employeeId', profile.employee_id)
+
   const emailResult = await sendEmail({
     to: email,
     subject: 'Set up your SkillTest_AI account',
     html: buildEmployeeWelcomeEmail({
       employeeName: fullName,
       setupLink: data.properties.action_link,
+      signUpLink: `${siteUrl}/auth/sign-up?${signUpParams.toString()}`,
     }),
   })
 

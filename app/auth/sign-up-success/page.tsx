@@ -26,6 +26,7 @@ function SignUpSuccessContent() {
   const searchParams = useSearchParams()
   const email = searchParams.get('email')
   const role = searchParams.get('role')
+  const isSetupResent = searchParams.get('setup') === 'resent'
   const isTrainer = role === 'trainer'
   const [resendLoading, setResendLoading] = useState(false)
   const [resendSuccess, setResendSuccess] = useState(false)
@@ -127,7 +128,7 @@ function SignUpSuccessContent() {
             </div>
             <h1 className="text-2xl font-bold">Check your email</h1>
             <p className="text-white/80 mt-2 text-sm">
-              We&apos;ve sent a confirmation link to{' '}
+              {isSetupResent ? 'We sent an account setup link to ' : 'We sent a confirmation link to '}
               {email ? <strong>{email}</strong> : 'your email'}
             </p>
           </div>
@@ -149,11 +150,15 @@ function SignUpSuccessContent() {
             <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800">
               <div className="flex items-start gap-2">
                 <ShieldCheck className="h-4 w-4 shrink-0 mt-0.5 text-blue-500" />
-                <p>Click the link in your email to verify your account, then sign in to start learning.</p>
+                <p>
+                  {isSetupResent
+                    ? 'Your admin-created employee record was found. Open the setup link we sent, set your password, and your account will stay synced to that email and Employee ID.'
+                    : 'Click the link in your email to verify your account, then sign in to start learning.'}
+                </p>
               </div>
             </div>
 
-            <p className="text-sm text-center text-muted-foreground">
+            {!isSetupResent ? <p className="text-sm text-center text-muted-foreground">
               Didn&apos;t receive the email? Check spam or{' '}
               <button
                 onClick={handleResend}
@@ -162,7 +167,7 @@ function SignUpSuccessContent() {
               >
                 {resendLoading ? 'Sending...' : 'resend it'}
               </button>
-            </p>
+            </p> : null}
 
             <Button asChild className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 text-white border-0">
               <Link href="/auth/login">Go to Login</Link>

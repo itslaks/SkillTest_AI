@@ -257,9 +257,11 @@ export function buildQuizAssignedEmail(opts: {
 export function buildEmployeeWelcomeEmail(opts: {
   employeeName?: string | null
   setupLink: string
+  signUpLink?: string | null
 }) {
   const employeeName = escapeHtml(opts.employeeName || 'Learner')
   const setupLink = escapeHtml(opts.setupLink)
+  const signUpLink = opts.signUpLink ? escapeHtml(opts.signUpLink) : null
 
   return `
   <div style="font-family:system-ui,sans-serif;max-width:620px;margin:0 auto;padding:24px;background:#f8fafc;">
@@ -269,8 +271,9 @@ export function buildEmployeeWelcomeEmail(opts: {
     </div>
     <div style="background:#fff;border:1px solid #e5e7eb;border-top:0;padding:24px;border-radius:0 0 18px 18px;">
       <p>Hi ${employeeName},</p>
-      <p>Your SkillTest_AI learner account has been created. Set your password to access assigned quizzes, training sessions, leaderboards, badges, and certificates.</p>
+      <p>Your SkillTest_AI learner record has been created by your admin. Use the same work email and Employee ID from your admin record so your sign-in stays synced with assigned quizzes, training sessions, leaderboards, badges, and certificates.</p>
       <a href="${setupLink}" style="display:inline-block;background:#000;color:#fff;padding:12px 20px;border-radius:999px;text-decoration:none;font-weight:700;margin:12px 0;">Set Password</a>
+      ${signUpLink ? `<p style="color:#64748b;font-size:13px;">If you open the sign-up page first, use this synced sign-up path:</p><p style="word-break:break-all;color:#334155;font-size:13px;">${signUpLink}</p>` : ''}
       <p style="color:#64748b;font-size:13px;">If the button does not work, open this link in your browser:</p>
       <p style="word-break:break-all;color:#334155;font-size:13px;">${setupLink}</p>
     </div>

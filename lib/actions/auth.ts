@@ -13,6 +13,7 @@ import {
 import { getAuthRedirectUrl, getSiteUrl, isSupabaseConfigured, isSupabaseAdminConfigured } from '@/lib/security/env'
 import { revalidatePath } from 'next/cache'
 import { normalizeDomain } from '@/lib/domain-options'
+import { sendEmployeeSetupEmail } from '@/lib/employee-onboarding'
 
 function safeRedirectPath(value: string | undefined | null) {
   if (!value || !value.startsWith('/') || value.startsWith('//')) return null
@@ -37,6 +38,58 @@ export async function signUp(formData: FormData) {
   const approvalStatus = role === 'trainer' ? 'pending' : 'approved'
 
   const supabase = await createClient()
+  const adminClient = createAdminClient()
+
+  if (role === 'employee') {
+    const { data: existingEmployeeProfile, error: existingProfileError } = await adminClient
+      .from('profiles')
+      .select('id, email, employee_id, role')
+      .eq('email', email)
+      .maybeSingle()
+
+    if (existingProfileError) {
+      return { error: existingProfileError.message }
+    }
+
+    if (existingEmployeeProfile) {
+      if (existingEmployeeProfile.role !== 'employee') {
+        return { error: 'This email is already registered for a staff account. Please sign in or contact an admin.' }
+      }
+
+      const existingEmployeeId = String(existingEmployeeProfile.employee_id || '').trim().toLowerCase()
+      const enteredEmployeeId = String(employeeId || '').trim().toLowerCase()
+      if (existingEmployeeId && existingEmployeeId !== enteredEmployeeId) {
+        return { error: 'Employee ID does not match the employee record added by your admin. Please use the same email and Employee ID.' }
+      }
+
+      const { error: updateError } = await adminClient
+        .from('profiles')
+        .update({
+          full_name: fullName,
+          employee_id: employeeId || existingEmployeeProfile.employee_id || null,
+          domain,
+          department: department || domain,
+          role: 'employee',
+          approval_status: 'approved',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingEmployeeProfile.id)
+
+      if (updateError) {
+        return { error: updateError.message }
+      }
+
+      const setupResult = await sendEmployeeSetupEmail(adminClient, email, fullName)
+      if (!setupResult.success) {
+        return { error: `Your employee record was found, but we could not send the account setup email: ${setupResult.error}` }
+      }
+
+      return {
+        success: true,
+        redirectTo: `/auth/sign-up-success?email=${encodeURIComponent(email)}&role=employee&setup=resent`,
+      }
+    }
+  }
 
   const { error, data: signUpData } = await supabase.auth.signUp({
     email,
@@ -60,7 +113,6 @@ export async function signUp(formData: FormData) {
 
   // After sign up, update the profile with role and approval_status
   if (signUpData?.user) {
-    const adminClient = createAdminClient()
     await adminClient
       .from('profiles')
       .update({

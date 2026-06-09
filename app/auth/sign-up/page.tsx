@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { Suspense, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -22,12 +22,16 @@ import {
 
 type SignUpRole = 'employee' | 'trainer'
 
-export default function SignUpPage() {
+function SignUpForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [showPassword, setShowPassword] = useState(false)
-  const [selectedRole, setSelectedRole] = useState<SignUpRole>('employee')
+  const initialRole = searchParams.get('role') === 'trainer' ? 'trainer' : 'employee'
+  const initialEmail = searchParams.get('email') || ''
+  const initialEmployeeId = searchParams.get('employeeId') || searchParams.get('employee_id') || ''
+  const [selectedRole, setSelectedRole] = useState<SignUpRole>(initialRole)
 
   function handleSignUp(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -219,7 +223,7 @@ export default function SignUpPage() {
               <label htmlFor="email" className="text-sm font-semibold">Work Email</label>
               <div className="relative">
                 <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
-                <Input id="email" name="email" type="email" placeholder="yourname@company.com" required className="pl-11 h-11 rounded-xl border-border/70 bg-muted/30 focus-visible:ring-1 focus-visible:ring-primary/30" />
+                <Input id="email" name="email" type="email" placeholder="yourname@company.com" defaultValue={initialEmail} required className="pl-11 h-11 rounded-xl border-border/70 bg-muted/30 focus-visible:ring-1 focus-visible:ring-primary/30" />
               </div>
               <p className="text-xs text-muted-foreground">Use your official work or corporate email</p>
             </div>
@@ -235,6 +239,7 @@ export default function SignUpPage() {
                   name="employeeId"
                   type="text"
                   placeholder="e.g., EMP1024"
+                  defaultValue={initialEmployeeId}
                   required={!isTrainer}
                   className="h-11 rounded-xl border-border/70 bg-muted/30 focus-visible:ring-1 focus-visible:ring-primary/30"
                 />
@@ -311,5 +316,13 @@ export default function SignUpPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense>
+      <SignUpForm />
+    </Suspense>
   )
 }
