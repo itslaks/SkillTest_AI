@@ -40,7 +40,7 @@ export default async function ManagerLayout({
         <ManagerHeader profile={profile} notifications={notifications} />
         {/* Command strip — terminal-style quick actions */}
         <div className="border-b border-zinc-900/10 bg-zinc-950 px-4 py-2 md:px-6">
-          <div className="mx-auto flex max-w-[1600px] items-center gap-3 overflow-x-auto">
+          <div className="flex w-full items-center gap-3 overflow-x-auto">
             <div className="terminal-badge shrink-0">CMD</div>
             <div className="h-4 w-px bg-white/10 shrink-0" />
             <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
@@ -59,7 +59,7 @@ export default async function ManagerLayout({
             </div>
           </div>
         </div>
-        <main className="mx-auto max-w-[1600px] overflow-x-hidden p-4 md:p-8">
+        <main className="w-full overflow-x-hidden p-4 md:p-8">
           {children}
         </main>
       </div>

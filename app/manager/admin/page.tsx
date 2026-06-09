@@ -129,7 +129,7 @@ export default async function AdminConsolePage() {
       </Card>
 
       {/* ── USER ROLE MANAGEMENT + TMS CONTROLS ── */}
-      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(22rem,0.8fr)] 2xl:grid-cols-[minmax(0,1.35fr)_minmax(26rem,0.65fr)]">
         <Card className="border-zinc-200 shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -144,7 +144,7 @@ export default async function AdminConsolePage() {
             {users.length === 0 ? (
               <p className="rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 p-6 text-center text-sm text-zinc-500">No staff users found.</p>
             ) : users.map((user: any) => (
-              <form key={user.id} action={updateRoleAction} className="grid gap-3 rounded-2xl border border-zinc-200 p-4 md:grid-cols-[1fr_auto_auto] md:items-center">
+              <form key={user.id} action={updateRoleAction} className="grid gap-3 rounded-2xl border border-zinc-200 p-4 md:grid-cols-[minmax(0,1fr)_auto] xl:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center">
                 <input type="hidden" name="user_id" value={user.id} />
                 <div className="min-w-0">
                   <p className="font-medium">{user.full_name || user.email}</p>
@@ -221,14 +221,14 @@ export default async function AdminConsolePage() {
             </span>
           </div>
         </CardHeader>
-        <CardContent className="space-y-3">
+          <CardContent className="grid gap-3 xl:grid-cols-2">
           {(certificateQuizzes || []).length === 0 ? (
             <p className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50 p-6 text-center text-sm text-zinc-500">No quizzes available for certificate rules.</p>
           ) : (certificateQuizzes || []).slice(0, 20).map((quiz: any) => (
             <form key={quiz.id} action={certificateRuleAction} className="rounded-2xl border border-zinc-200 bg-zinc-50/70 p-3">
               <input type="hidden" name="quiz_id" value={quiz.id} />
               <input type="hidden" name="existing_template_image_url" value={quiz.certificate_rule?.template_image_url || ''} />
-              <div className="grid items-end gap-3 md:grid-cols-[minmax(0,1fr)_9rem_8rem_auto]">
+              <div className="grid items-end gap-3 md:grid-cols-[minmax(0,1fr)_9rem_8rem_auto] xl:grid-cols-[minmax(0,1fr)_7.5rem_6.5rem_auto] 2xl:grid-cols-[minmax(0,1fr)_9rem_8rem_auto]">
                 <label className="flex min-w-0 items-start gap-3">
                   <input
                     name="enabled"
@@ -256,7 +256,7 @@ export default async function AdminConsolePage() {
               </div>
               <details className="mt-3 rounded-xl border border-zinc-200 bg-white p-3">
                 <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Advanced certificate content and preview</summary>
-                <div className="mt-3 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(260px,0.7fr)]">
+                <div className="mt-3 grid gap-4 2xl:grid-cols-[minmax(0,1fr)_minmax(260px,0.7fr)]">
                   <div className="grid gap-2 md:grid-cols-2">
                     <label className="grid gap-1 text-xs font-medium text-zinc-600">
                       Certificate name shown to employee

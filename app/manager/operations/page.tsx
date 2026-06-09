@@ -479,7 +479,7 @@ export default async function ManagerOperationsPage({
         </div>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[17rem_1fr]">
+      <div className="grid gap-6 lg:grid-cols-[15rem_1fr] 2xl:grid-cols-[17rem_1fr]">
         <aside className="self-start rounded-[1.5rem] border border-zinc-200 bg-white p-3 shadow-sm xl:sticky xl:top-24">
           <div className="rounded-[1.25rem] border border-zinc-900 bg-black p-4 text-white">
             <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-zinc-500">Mission Control</p>
@@ -497,7 +497,7 @@ export default async function ManagerOperationsPage({
         </aside>
 
         <main className="min-w-0 space-y-8">
-      <section id="overview" className="scroll-mt-32 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <section id="overview" className="scroll-mt-32 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
         <ActionTile
           title="Attendance due"
           value={`${summary.attendanceDueToday}`}
@@ -540,7 +540,7 @@ export default async function ManagerOperationsPage({
       </section>
 
       <section id="batches" className="scroll-mt-32">
-      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(22rem,0.85fr)]">
         <DropPanel
           id="batch-board-panel"
           title="Live Batch Board"
@@ -783,7 +783,7 @@ export default async function ManagerOperationsPage({
         </CardContent>
       </DropPanel>
 
-      <section id="assessment" className="scroll-mt-32 grid gap-6 xl:grid-cols-[1fr_1fr]">
+      <section id="assessment" className="scroll-mt-32 grid gap-6 lg:grid-cols-2">
         {canCoordinate ? (
         <DropPanel
           id="assessment-setup"
@@ -1105,7 +1105,7 @@ export default async function ManagerOperationsPage({
 
       <section id="setup" className="scroll-mt-32">
       {canCoordinate ? (
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
         <DropPanel
           id="create-batch"
           title="Create Training Batch"
@@ -1542,7 +1542,7 @@ export default async function ManagerOperationsPage({
         <TrainerScorecardDeck items={trainerScorecards} />
       </section>
 
-      <section id="audit" className="scroll-mt-32 grid gap-6 xl:grid-cols-4">
+      <section id="audit" className="scroll-mt-32 grid gap-6 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
         <AuditPanel
           title="Batch Change Audit"
           empty="No batch lifecycle or configuration changes have been audited yet."
@@ -1984,7 +1984,7 @@ function PriorityOpsWorkbench({
           The dense tools are still below, but this strip puts the highest-value actions first so a non-technical admin knows where to click.
         </p>
       </div>
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
         {tasks.filter((task) => task.enabled).map((task, index) => {
           const Icon = task.icon
           return (
@@ -2083,7 +2083,7 @@ function ScheduleTimeline({ items }: { items: Array<{ id: string; type: string; 
                   Next {nextItems.length} milestone(s)
                 </Badge>
               </div>
-              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                 {Array.from(dayBuckets.entries()).slice(0, 4).map(([day, dayItems]) => (
                   <div key={day} className="min-h-40 rounded-2xl border border-white/10 bg-white/[0.06] p-4">
                     <div className="flex items-center justify-between gap-2">
@@ -2109,7 +2109,7 @@ function ScheduleTimeline({ items }: { items: Array<{ id: string; type: string; 
               </div>
             </div>
 
-            <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(20rem,0.8fr)]">
             <div className="rounded-[1.5rem] border border-zinc-200 bg-zinc-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Upcoming execution lane</p>
               <div className="mt-4 grid gap-3">
