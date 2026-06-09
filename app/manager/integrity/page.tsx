@@ -123,6 +123,42 @@ async function deleteProctoredAttemptAction(formData: FormData) {
   revalidatePath('/manager/integrity')
 }
 
+async function deleteEvidenceAction(formData: FormData) {
+  'use server'
+  const { userId, role } = await requireTrainingStaff()
+  const admin = createAdminClient()
+  const evidenceId = String(formData.get('evidence_id') || '')
+  const storagePath = String(formData.get('storage_path') || '')
+  if (!evidenceId && !storagePath) return
+
+  // Verify the evidence belongs to an attempt the staff can access
+  const { data: evidenceRow } = await admin
+    .from('quiz_proctoring_evidence')
+    .select('id, storage_path, quiz_proctoring_events(attempt_id, quiz_attempts(quiz_id))')
+    .eq(evidenceId ? 'id' : 'storage_path', evidenceId || storagePath)
+    .maybeSingle()
+  if (!evidenceRow) return
+
+  const quizId = (evidenceRow as any).quiz_proctoring_events?.quiz_attempts?.quiz_id
+  if (quizId) {
+    const scopedQuizIds = await getScopedQuizIds(admin, userId, role)
+    if (scopedQuizIds && !scopedQuizIds.includes(quizId)) return
+  }
+
+  // Delete from storage
+  const path = evidenceRow.storage_path as string
+  if (path) {
+    const objectPath = path.startsWith(`${PROCTORING_EVIDENCE_BUCKET}/`)
+      ? path.split('/').slice(1).join('/')
+      : path
+    await admin.storage.from(PROCTORING_EVIDENCE_BUCKET).remove([objectPath])
+  }
+
+  // Delete the DB row
+  await admin.from('quiz_proctoring_evidence').delete().eq('id', evidenceRow.id)
+  revalidatePath('/manager/integrity')
+}
+
 export default async function AssessmentIntegrityPage() {
   const { userId, role } = await requireTrainingStaff()
   const admin = createAdminClient()
@@ -181,6 +217,7 @@ export default async function AssessmentIntegrityPage() {
       riskScore: event.risk_score,
       riskLevel: event.severity,
       evidenceUrl: null,
+      evidenceId: evidence?.id || null,
       evidenceStoragePath: evidence?.storage_path || null,
       evidencePath: event.metadata?.evidencePath || null,
     })
@@ -417,23 +454,76 @@ export default async function AssessmentIntegrityPage() {
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <Card className="border-zinc-800 bg-zinc-950 text-white">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileWarning className="h-5 w-5 text-rose-200" />
-              Evidence review panel
-            </CardTitle>
-            <CardDescription className="text-zinc-400">Latest captured frames and incident context.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-2">
-            {eventFeed.filter(({ event }: any) => event.evidenceUrl).slice(0, 6).map(({ event, attempt }: any, index: number) => (
-              <div key={`${attempt.id}-evidence-${index}`} className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={event.evidenceUrl} alt="" className="aspect-video w-full object-cover" />
-                <div className="p-3">
-                  <p className="truncate text-sm font-semibold">{attempt.profiles?.full_name || 'Employee'}</p>
-                  <p className="mt-1 text-xs text-zinc-500">{event.type} - {formatDate(event.occurredAt)}</p>
-                </div>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <FileWarning className="h-5 w-5 text-rose-200" />
+                  Evidence review panel
+                </CardTitle>
+                <CardDescription className="mt-1 text-zinc-400">
+                  Captured violation frames. Delete or export each image individually.
+                </CardDescription>
               </div>
-            ))}
+              {eventFeed.filter(({ event }: any) => event.evidenceUrl).length > 0 && (
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+                  {eventFeed.filter(({ event }: any) => event.evidenceUrl).length} frame{eventFeed.filter(({ event }: any) => event.evidenceUrl).length !== 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            {eventFeed.filter(({ event }: any) => event.evidenceUrl).slice(0, 6).map(({ event, attempt }: any, index: number) => {
+              const encodedPath = encodeURIComponent(event.evidenceStoragePath || '')
+              return (
+                <div key={`${attempt.id}-evidence-${index}`} className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
+                  {/* Image */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={event.evidenceUrl} alt="Evidence frame" className="aspect-video w-full object-cover" />
+
+                  {/* Info */}
+                  <div className="px-3 pt-3">
+                    <p className="truncate text-sm font-semibold text-white">{attempt.profiles?.full_name || 'Employee'}</p>
+                    <p className="mt-0.5 text-xs text-zinc-500">{String(event.type).replace(/-/g, ' ')} · {formatDate(event.occurredAt)}</p>
+                  </div>
+
+                  {/* Export buttons */}
+                  <div className="px-3 pt-2">
+                    <p className="mb-1.5 text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-600">Export as</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(['png', 'jpg', 'pdf', 'docx'] as const).map((fmt) => (
+                        <a
+                          key={fmt}
+                          href={`/api/export/evidence-image?path=${encodedPath}&format=${fmt}`}
+                          download
+                          className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-300 transition hover:border-cyan-400/40 hover:bg-cyan-400/10 hover:text-cyan-300"
+                        >
+                          {fmt}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Delete */}
+                  <div className="p-3">
+                    {event.evidenceId || event.evidenceStoragePath ? (
+                      <form action={deleteEvidenceAction}>
+                        <input type="hidden" name="evidence_id" value={event.evidenceId || ''} />
+                        <input type="hidden" name="storage_path" value={event.evidenceStoragePath || ''} />
+                        <button
+                          type="submit"
+                          className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/5 py-2 text-xs font-semibold text-zinc-400 transition hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-400"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          Delete frame
+                        </button>
+                      </form>
+                    ) : (
+                      <p className="text-center text-[10px] text-zinc-600">No storage path — cannot delete</p>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
             {eventFeed.filter(({ event }: any) => event.evidenceUrl).length === 0 && (
               <div className="sm:col-span-2">
                 <EmptyPanel text="Evidence frames will appear here when violations include camera snapshots." />
