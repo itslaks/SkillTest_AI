@@ -13,6 +13,7 @@ import { SuspiciousReviewButtons, CandidateReviewButtons } from '@/components/ma
 import {
   AlertTriangle,
   Camera,
+  Download,
   FileWarning,
   Gauge,
   MailCheck,
@@ -21,6 +22,7 @@ import {
   ShieldCheck,
   ShieldX,
   Siren,
+  Trash2,
   Users,
 } from 'lucide-react'
 
@@ -97,6 +99,27 @@ async function deleteAttemptAction(formData: FormData) {
   // Hard delete: removes attempt + cascade (events, evidence rows)
   await admin.from('quiz_attempts').delete().eq('id', attemptId)
 
+  revalidatePath('/manager/integrity')
+}
+
+async function deleteProctoredAttemptAction(formData: FormData) {
+  'use server'
+  const { userId, role } = await requireTrainingStaff()
+  const admin = createAdminClient()
+  const attemptId = String(formData.get('attempt_id') || '')
+  if (!attemptId) return
+
+  const { data: attempt } = await admin
+    .from('quiz_attempts')
+    .select('id, quiz_id')
+    .eq('id', attemptId)
+    .maybeSingle()
+  if (!attempt) return
+
+  const scopedQuizIds = await getScopedQuizIds(admin, userId, role)
+  if (scopedQuizIds && !scopedQuizIds.includes(attempt.quiz_id)) return
+
+  await admin.from('quiz_attempts').delete().eq('id', attemptId)
   revalidatePath('/manager/integrity')
 }
 
@@ -288,11 +311,24 @@ export default async function AssessmentIntegrityPage() {
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <Card className="border-zinc-800 bg-zinc-950 text-white">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Camera className="h-5 w-5 text-cyan-200" />
-              Live proctoring center
-            </CardTitle>
-            <CardDescription className="text-zinc-400">Recent proctored attempts sorted by latest activity.</CardDescription>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Camera className="h-5 w-5 text-cyan-200" />
+                  Live proctoring center
+                </CardTitle>
+                <CardDescription className="mt-1 text-zinc-400">
+                  Recent proctored attempts sorted by latest activity. {proctoredAttempts.length} record{proctoredAttempts.length !== 1 ? 's' : ''} loaded.
+                </CardDescription>
+              </div>
+              <a
+                href="/api/export/proctoring"
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-white transition hover:bg-white/10"
+              >
+                <Download className="h-3.5 w-3.5 text-cyan-300" />
+                Export Excel
+              </a>
+            </div>
           </CardHeader>
           <CardContent className="grid gap-3">
             {proctoredAttempts.length === 0 ? (
@@ -302,7 +338,7 @@ export default async function AssessmentIntegrityPage() {
               const latestEvidence = latestEvidenceImage(attempt, normalizedEventsByAttempt)
 
               return (
-                <div key={attempt.id} className="grid gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 md:grid-cols-[120px_1fr_auto] md:items-center">
+                <div key={attempt.id} className="grid gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 md:grid-cols-[120px_1fr_auto] md:items-start">
                   <div className="relative aspect-video overflow-hidden rounded-xl border border-white/10 bg-zinc-900">
                     {latestEvidence ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -319,16 +355,28 @@ export default async function AssessmentIntegrityPage() {
                       <RiskBadge level={risk.level} />
                       {attempt.auto_submitted && <Badge className="bg-amber-200 text-amber-950">Auto submitted</Badge>}
                     </div>
-                    <p className="mt-1 truncate text-sm text-zinc-400">{attempt.quizzes?.title || 'Assessment'} - {attempt.quizzes?.topic || 'General'}</p>
+                    <p className="mt-1 truncate text-sm text-zinc-400">{attempt.quizzes?.title || 'Assessment'} · {attempt.quizzes?.topic || 'General'}</p>
                     <div className="mt-3 grid gap-2 text-xs text-zinc-500 sm:grid-cols-3">
                       <span>Score {attempt.score ?? 0}%</span>
                       <span>Violations {attempt.proctoring_violations_count ?? 0}</span>
                       <span>{formatDate(attempt.completed_at || attempt.started_at)}</span>
                     </div>
                   </div>
-                  <div className="text-left md:text-right">
-                    <p className="text-3xl font-semibold">{risk.score}</p>
-                    <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Risk score</p>
+                  <div className="flex flex-col items-end gap-3">
+                    <div className="text-right">
+                      <p className="text-3xl font-semibold">{risk.score}</p>
+                      <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Risk score</p>
+                    </div>
+                    <form action={deleteProctoredAttemptAction}>
+                      <input type="hidden" name="attempt_id" value={attempt.id} />
+                      <button
+                        type="submit"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-zinc-400 transition hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-400"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        Delete
+                      </button>
+                    </form>
                   </div>
                 </div>
               )
