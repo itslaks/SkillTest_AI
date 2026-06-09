@@ -437,7 +437,7 @@ export default async function ManagerOperationsPage({
   ]
 
   return (
-    <div className="min-h-screen space-y-8 rounded-[2rem] bg-[#0B1220] p-4 text-slate-950 md:p-6">
+    <div className="space-y-8 text-slate-950">
       <OpsResultToast />
       <OpsAutoRefresh intervalMs={15000} />
       <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.32),transparent_34%),linear-gradient(135deg,#0B1220_0%,#111827_52%,#172554_100%)] p-6 text-white shadow-[0_30px_110px_rgba(2,6,23,0.45)] md:p-8">
@@ -482,7 +482,7 @@ export default async function ManagerOperationsPage({
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[15rem_1fr] 2xl:grid-cols-[17rem_1fr]">
-        <aside className="self-start rounded-[1.5rem] border border-white/10 bg-white/95 p-3 shadow-[0_18px_60px_rgba(2,6,23,0.18)] backdrop-blur xl:sticky xl:top-24">
+        <aside className="self-start rounded-[1.5rem] border border-slate-200 bg-white p-3 shadow-sm xl:sticky xl:top-24">
           <div className="rounded-[1.25rem] border border-slate-900 bg-[#0B1220] p-4 text-white">
             <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-sky-300">Command Rail</p>
             <p className="mt-2 text-sm font-semibold">Mission Control</p>
