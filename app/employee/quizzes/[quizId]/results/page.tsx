@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { FeedbackRequiredExit } from '@/components/quiz/feedback-required-exit'
 import {
+  Award,
   Brain,
   Clock,
   Crown,
@@ -28,9 +29,12 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
     .select('id, quiz_id, user_id, answers, score, total_questions, correct_answers, time_taken_seconds, points_earned, status, auto_submitted, proctoring_status, proctoring_violations_count, proctoring_risk_level, review_status, completed_at')
     .eq('quiz_id', quizId)
     .eq('user_id', user.id)
-    .single()
+    .in('status', ['completed', 'suspicious'])
+    .order('completed_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
-  if (!attempt || !['completed', 'suspicious'].includes(attempt.status)) {
+  if (!attempt) {
     redirect(`/employee/quizzes/${quizId}`)
   }
 
@@ -38,7 +42,11 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
     .from('quizzes')
     .select('*, questions(*)')
     .eq('id', quizId)
-    .single()
+    .maybeSingle()
+
+  if (!quiz) {
+    redirect('/employee/quizzes')
+  }
 
   const { data: history } = await supabase
     .from('quiz_attempts')
@@ -46,14 +54,21 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
     .eq('user_id', user.id)
     .eq('status', 'completed')
 
+  const { data: certificate } = await supabase
+    .from('certificates')
+    .select('id, cert_number, issued_at')
+    .eq('quiz_id', quizId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
   const { data: leaderboard } = await getQuizLeaderboard(quizId)
   const userRank = leaderboard?.find((entry) => entry.user_id === user.id)?.rank || 0
   const totalParticipants = leaderboard?.length || 0
-  const isPassing = attempt.score >= (quiz?.passing_score || 60)
-  const topicAttempts = getTopicAttempts(history || [], quiz?.topic)
-  const behavior = analyzeAttemptPattern(attempt.answers || [], quiz?.difficulty, topicAttempts)
-  const retentionCheck = buildRetentionChecks(topicAttempts).find((item) => item.topic.toLowerCase() === (quiz?.topic || '').toLowerCase())
-  const questionMap = new Map<string, any>((quiz?.questions || []).map((question: any) => [question.id, question]))
+  const isPassing = attempt.score >= (quiz.passing_score || 60)
+  const topicAttempts = getTopicAttempts(history || [], quiz.topic)
+  const behavior = analyzeAttemptPattern(attempt.answers || [], quiz.difficulty, topicAttempts)
+  const retentionCheck = buildRetentionChecks(topicAttempts).find((item) => item.topic.toLowerCase() === (quiz.topic || '').toLowerCase())
+  const questionMap = new Map<string, any>((quiz.questions || []).map((question: any) => [question.id, question]))
   const isUnderReview = attempt.status === 'suspicious' || attempt.proctoring_status === 'suspicious'
 
   function formatTime(seconds: number) {
@@ -75,12 +90,12 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
               This attempt was flagged by integrity monitoring. Your final score, certificate, badges, and completion email are paused until an authorized reviewer clears the attempt.
             </p>
             <div className="mt-6 rounded-2xl border border-amber-200 bg-white/70 p-4 text-left text-sm text-amber-900">
-              <p><strong>Quiz:</strong> {quiz?.title || 'Assessment'}</p>
+              <p><strong>Quiz:</strong> {quiz.title || 'Assessment'}</p>
               <p><strong>Warnings:</strong> {attempt.proctoring_violations_count || 0}</p>
               <p><strong>Risk:</strong> {String(attempt.proctoring_risk_level || 'pending review')}</p>
               <p><strong>Review status:</strong> {String(attempt.review_status || 'pending').replace(/_/g, ' ')}</p>
             </div>
-            <FeedbackRequiredExit feedbackUrl={quiz?.feedback_form_url} backHref="/employee/quizzes" />
+            <FeedbackRequiredExit feedbackUrl={quiz.feedback_form_url} backHref="/employee/quizzes" />
           </CardContent>
         </Card>
       </div>
@@ -89,6 +104,16 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 px-4 py-8">
+      <div className="flex items-center justify-between gap-4">
+        <a href="/employee/quizzes" className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors">
+          ← My Quizzes
+        </a>
+        {certificate && (
+          <a href={`/certificates/${certificate.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-full bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 transition-colors">
+            <Award className="h-4 w-4" /> View Certificate
+          </a>
+        )}
+      </div>
       <Card className="overflow-hidden border-zinc-900 bg-black text-white shadow-[0_40px_120px_rgba(0,0,0,0.55)]">
         <div className="grid gap-6 p-8 md:grid-cols-[1.1fr_0.9fr] md:p-10">
           <div>
@@ -99,7 +124,7 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
             <h1 className="text-4xl font-semibold tracking-tight">
               {isPassing ? 'Mission Cleared' : 'Progress Logged'}
             </h1>
-            <p className="mt-3 text-zinc-400">{quiz?.title}</p>
+            <p className="mt-3 text-zinc-400">{quiz.title}</p>
 
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <ResultMetric label="Score" value={`${attempt.score}%`} />
@@ -236,6 +261,34 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
         </Card>
 
         <div className="space-y-6">
+          {certificate && (
+            <Card className="border-amber-300 bg-gradient-to-br from-amber-50 to-yellow-50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-amber-900">
+                  <Award className="h-5 w-5 text-amber-600" />
+                  Certificate Earned
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-amber-800">
+                  You earned a certificate for completing this assessment. Certificate No: <strong>{certificate.cert_number}</strong>
+                </p>
+                <p className="text-xs text-amber-700">
+                  Issued on {new Date(certificate.issued_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </p>
+                <a
+                  href={`/certificates/${certificate.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-full bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-700 transition-colors"
+                >
+                  <Award className="h-4 w-4" />
+                  View &amp; Download Certificate
+                </a>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="border-zinc-900 bg-black text-white">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -247,7 +300,7 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
               <p>{behavior.masterySignal}</p>
               <p>Average answer time: {behavior.averageAnswerTime}s</p>
               {behavior.antiGamingDetected && (
-                <p>A challenge variant is recommended for the next {quiz?.topic} attempt.</p>
+                <p>A challenge variant is recommended for the next {quiz.topic} attempt.</p>
               )}
             </CardContent>
           </Card>
@@ -303,7 +356,7 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
         </div>
       </div>
 
-      <FeedbackRequiredExit feedbackUrl={quiz?.feedback_form_url} backHref="/employee/quizzes" />
+      <FeedbackRequiredExit feedbackUrl={quiz.feedback_form_url} backHref="/employee/quizzes" />
     </div>
   )
 }

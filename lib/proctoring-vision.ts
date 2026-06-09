@@ -34,8 +34,17 @@ type ModelBundle = {
   objectDetector: any
 }
 
-const COOLDOWN_MS = 15_000
-const NO_FACE_MS = 5_000
+const COOLDOWN_MS_DEFAULT = 12_000
+const COOLDOWN_MS: Record<string, number> = {
+  multiple_faces: 4_000,
+  no_face: 5_000,
+  gaze_down: 10_000,
+  gaze_away: 10_000,
+  phone_detected: 8_000,
+  electronic_device: 8_000,
+  book_detected: 10_000,
+}
+const NO_FACE_MS = 4_000
 const MAX_BUFFER = 6
 let modelPromise: Promise<ModelBundle | null> | null = null
 let faceDetectorPromise: Promise<any | null> | null = null
@@ -242,7 +251,7 @@ async function inspectFrame(config: VisionProctoringConfig, state: VisionState, 
     state.noFaceSince = null
     emitViolation(config, state, {
       type: 'multiple_faces',
-      label: 'Multiple faces detected in camera frame.',
+      label: `Multiple people detected (${faces.length} faces). Only one person is allowed during the assessment.`,
       confidence: averageFaceScore(faces),
       timestamp: now,
     })
@@ -330,8 +339,9 @@ function emitViolation(
   state: VisionState,
   violation: Omit<VisionViolation, 'evidenceDataUrl'>,
 ) {
+  const cooldown = COOLDOWN_MS[violation.type] ?? COOLDOWN_MS_DEFAULT
   const last = state.lastEmittedAt.get(violation.type) || 0
-  if (violation.timestamp - last < COOLDOWN_MS) return
+  if (violation.timestamp - last < cooldown) return
   state.lastEmittedAt.set(violation.type, violation.timestamp)
   config.onViolation({
     ...violation,

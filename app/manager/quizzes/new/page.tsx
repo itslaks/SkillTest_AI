@@ -592,7 +592,10 @@ export default function NewQuizPage() {
                         <div className={cn('absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all', certificateEnabled ? 'left-4' : 'left-0.5')} />
                       </div>
                     </button>
-                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    {!certificateEnabled && (
+                      <p className="mt-3 text-xs text-amber-700">Toggle on to configure certificate details — title, message, threshold, and template image.</p>
+                    )}
+                    {certificateEnabled && <div className="mt-4 grid gap-3 md:grid-cols-2">
                       <div className="space-y-1.5">
                         <label className="text-xs font-semibold text-amber-950">Certificate Title</label>
                         <Input value={certificateTitle} onChange={(event) => setCertificateTitle(event.target.value)} className="h-10 rounded-xl bg-white" />
@@ -621,7 +624,7 @@ export default function NewQuizPage() {
                         <label className="text-xs font-semibold text-amber-950">Certificate Template Image</label>
                         <Input type="file" accept="image/*" onChange={(event) => setCertificateTemplateFile(event.target.files?.[0] || null)} className="h-10 rounded-xl bg-white" />
                       </div>
-                    </div>
+                    </div>}
                   </div>
 
                   {allowRetakes && (

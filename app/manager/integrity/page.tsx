@@ -8,6 +8,7 @@ import { after } from 'next/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { LiveIntegrityFeed, type LiveIntegrityEvent } from '@/components/manager/live-integrity-feed'
+import { SuspiciousReviewButtons, CandidateReviewButtons } from '@/components/manager/integrity-review-buttons'
 import {
   AlertTriangle,
   Camera,
@@ -160,8 +161,8 @@ export default async function AssessmentIntegrityPage() {
     .slice(0, 12)
 
   const visibleEvidenceEvents = [
-    ...proctoredAttempts.slice(0, 8).map((attempt: any) => normalizedEventsByAttempt.get(attempt.id)?.find((event: any) => event.evidenceStoragePath)).filter(Boolean),
-    ...eventFeed.map(({ event }: any) => event).filter((event: any) => event.evidenceStoragePath).slice(0, 6),
+    ...proctoredAttempts.slice(0, 5).map((attempt: any) => normalizedEventsByAttempt.get(attempt.id)?.find((event: any) => event.evidenceStoragePath)).filter(Boolean),
+    ...eventFeed.map(({ event }: any) => event).filter((event: any) => event.evidenceStoragePath).slice(0, 4),
   ]
   const signedEvidenceByEvent = await signVisibleEvidence(admin, visibleEvidenceEvents)
   for (const events of normalizedEventsByAttempt.values()) {
@@ -242,11 +243,7 @@ export default async function AssessmentIntegrityPage() {
                   <p className="mt-2 text-xs text-amber-700">Risk {risk.score} - Violations {attempt.proctoring_violations_count ?? 0} - Status {attempt.status}</p>
                 </div>
                 <form action={updateIntegrityReviewAction} className="flex flex-wrap gap-2">
-                  <input type="hidden" name="attempt_id" value={attempt.id} />
-                  <button name="review_decision" value="approved" className="rounded-full bg-emerald-700 px-3 py-2 text-xs font-semibold text-white">Approve</button>
-                  <button name="review_decision" value="approved" className="rounded-full bg-white px-3 py-2 text-xs font-semibold text-emerald-800 ring-1 ring-emerald-200">Dismiss</button>
-                  <button name="review_decision" value="rejected" className="rounded-full bg-red-700 px-3 py-2 text-xs font-semibold text-white">Reject</button>
-                  <button name="review_decision" value="retest_required" className="rounded-full bg-amber-700 px-3 py-2 text-xs font-semibold text-white">Require retest</button>
+                  <SuspiciousReviewButtons attemptId={attempt.id} />
                 </form>
               </div>
             )
@@ -394,20 +391,11 @@ export default async function AssessmentIntegrityPage() {
                         name="review_notes"
                         rows={2}
                         className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-white placeholder:text-zinc-600"
-                        placeholder="Review notes"
+                        placeholder="Review notes (optional)"
                         defaultValue={attempt.review_notes || ''}
                       />
                       <div className="grid gap-2 sm:grid-cols-2">
-                        {REVIEW_DECISIONS.map((decision) => (
-                          <button
-                            key={`${decision.status}-${decision.label}`}
-                            name="review_decision"
-                            value={decision.status}
-                            className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-zinc-200 transition hover:bg-white hover:text-black"
-                          >
-                            {decision.label}
-                          </button>
-                        ))}
+                        <CandidateReviewButtons />
                       </div>
                     </form>
                   </div>
@@ -491,17 +479,20 @@ async function sendApprovedAttemptEmail(admin: ReturnType<typeof createAdminClie
       admin.from('certificates').select('id').eq('quiz_id', attempt.quiz_id).eq('user_id', attempt.user_id).maybeSingle(),
     ])
 
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
     await sendEmail({
       to: profile.email,
-      subject: `Quiz Results Released: ${quiz?.title || 'Assessment'} - ${attempt.score}%`,
+      subject: `Quiz Results Released: ${quiz?.title || 'Assessment'} — ${attempt.score}%`,
       html: buildQuizCompletedEmail({
         employeeName: profile.full_name,
         quizTitle: quiz?.title || 'Assessment',
         score: attempt.score || 0,
         points: attempt.points_earned || 0,
+        passingScore: quiz?.passing_score ?? 60,
         badgesEarned: earnedBadges?.length || 0,
         certificateIssued: Boolean(certificate),
-        resultUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/employee/quizzes/${attempt.quiz_id}/results`,
+        certificateUrl: certificate ? `${baseUrl}/certificates/${certificate.id}` : undefined,
+        resultUrl: `${baseUrl}/employee/quizzes/${attempt.quiz_id}/results`,
       }),
     })
   } catch (error) {

@@ -190,6 +190,13 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const [violationToasts, setViolationToasts] = useState<ViolationToastItem[]>([])
   const [warningModal, setWarningModal] = useState<WarningModalState>(null)
   const [recentViolations, setRecentViolations] = useState<ProctoringEvent[]>([])
+  const [multipleFacesAlertAt, setMultipleFacesAlertAt] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!multipleFacesAlertAt) return
+    const timer = window.setTimeout(() => setMultipleFacesAlertAt(null), 30_000)
+    return () => window.clearTimeout(timer)
+  }, [multipleFacesAlertAt])
 
   useEffect(() => {
     setMounted(true)
@@ -494,6 +501,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     if (!requiresProctoring || !started || finishedRef.current || submittingRef.current) return
 
     setLatestViolation(label)
+    if (type === 'multiple_faces') setMultipleFacesAlertAt(Date.now())
     const toastId = `${type}-${Date.now()}-${Math.random().toString(36).slice(2)}`
     setWarningModal({ id: toastId, type, label, createdAt: Date.now() })
     setViolationToasts((previous) => [
@@ -1509,6 +1517,20 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
           warningCount={violationCount}
         />
       )}
+      {multipleFacesAlertAt && (
+        <div className="fixed inset-x-0 top-12 z-[60] mx-auto max-w-2xl px-4">
+          <div className="flex items-center gap-4 rounded-2xl border-2 border-red-500 bg-red-600 px-5 py-4 text-white shadow-2xl">
+            <ShieldAlert className="h-7 w-7 shrink-0" />
+            <div className="flex-1">
+              <p className="font-bold text-lg leading-tight">Multiple People Detected!</p>
+              <p className="text-sm text-red-100">Only one person is allowed during the assessment. This violation has been recorded and reported.</p>
+            </div>
+            <button type="button" onClick={() => setMultipleFacesAlertAt(null)} className="rounded-full bg-white/20 px-3 py-1.5 text-xs font-semibold hover:bg-white/30">
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
       <ViolationToast
         items={violationToasts}
         onDismiss={(id) => setViolationToasts((previous) => previous.filter((item) => item.id !== id))}
@@ -1743,11 +1765,13 @@ function StatusPill({ label, active }: { label: string; active: boolean }) {
 }
 
 function WarningModal({ warning, onDismiss }: { warning: WarningModalState; onDismiss: () => void }) {
-  const [secondsLeft, setSecondsLeft] = useState(5)
+  const isMultiFace = warning?.type === 'multiple_faces'
+  const autoCloseSeconds = isMultiFace ? 10 : 5
+  const [secondsLeft, setSecondsLeft] = useState(autoCloseSeconds)
 
   useEffect(() => {
     if (!warning) return
-    setSecondsLeft(5)
+    setSecondsLeft(autoCloseSeconds)
     const interval = window.setInterval(() => {
       setSecondsLeft((previous) => {
         if (previous <= 1) {
@@ -1759,7 +1783,7 @@ function WarningModal({ warning, onDismiss }: { warning: WarningModalState; onDi
       })
     }, 1000)
     return () => window.clearInterval(interval)
-  }, [onDismiss, warning])
+  }, [autoCloseSeconds, onDismiss, warning])
 
   if (!warning) return null
 
@@ -1767,15 +1791,22 @@ function WarningModal({ warning, onDismiss }: { warning: WarningModalState; onDi
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/65 px-4" role="alertdialog" aria-modal="true" aria-labelledby="proctoring-warning-title">
       <div className="w-full max-w-lg animate-in zoom-in-95 rounded-2xl border border-red-300 bg-gradient-to-br from-red-700 via-rose-700 to-red-950 p-8 text-center text-white shadow-2xl">
         <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-white text-5xl text-red-700">⚠</div>
-        <h2 id="proctoring-warning-title" className="mt-6 text-4xl font-black tracking-tight">WARNING</h2>
+        <h2 id="proctoring-warning-title" className="mt-6 text-4xl font-black tracking-tight">
+          {isMultiFace ? 'MULTIPLE PEOPLE DETECTED' : 'WARNING'}
+        </h2>
         <p className="mt-4 text-xl font-semibold">{warning.label}</p>
-        <p className="mt-3 text-sm text-red-100">This incident has been recorded.</p>
+        {isMultiFace && (
+          <p className="mt-3 rounded-xl bg-white/10 px-4 py-3 text-sm font-semibold text-red-100">
+            Only one person is allowed during the assessment. Repeated violations will result in automatic submission and your attempt being flagged for review.
+          </p>
+        )}
+        <p className="mt-3 text-sm text-red-100">This incident has been recorded and reported to your administrator.</p>
         <button
           type="button"
           onClick={onDismiss}
           className="mt-6 rounded-full bg-white px-6 py-3 text-sm font-bold text-red-800 hover:bg-red-50"
         >
-          Dismiss ({secondsLeft})
+          I Understand ({secondsLeft})
         </button>
       </div>
     </div>

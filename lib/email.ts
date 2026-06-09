@@ -282,27 +282,40 @@ export function buildQuizCompletedEmail(opts: {
   quizTitle: string
   score: number
   points: number
+  passingScore?: number
   badgesEarned?: number
   certificateIssued?: boolean
+  certificateUrl?: string
   resultUrl?: string
 }) {
-  const resultUrl = escapeHtml(opts.resultUrl || `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/employee/quizzes`)
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+  const resultUrl = escapeHtml(opts.resultUrl || `${baseUrl}/employee/quizzes`)
+  const certificateUrl = opts.certificateUrl ? escapeHtml(opts.certificateUrl) : null
+  const isPassing = opts.score >= (opts.passingScore ?? 60)
   return `
   <div style="font-family:system-ui,sans-serif;max-width:620px;margin:0 auto;padding:24px;background:#f8fafc;">
     <div style="background:#111827;color:#fff;padding:24px;border-radius:18px 18px 0 0;">
       <p style="margin:0;color:#22c55e;font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;">SkillTest_AI Result</p>
-      <h1 style="margin:10px 0 0;font-size:24px;">Quiz completed</h1>
+      <h1 style="margin:10px 0 0;font-size:24px;">${isPassing ? '🎉 Quiz Passed!' : 'Quiz Completed'}</h1>
     </div>
     <div style="background:#fff;border:1px solid #e5e7eb;border-top:0;padding:24px;border-radius:0 0 18px 18px;">
-      <p>Hi ${opts.employeeName || 'Learner'},</p>
-      <p>Your result for <strong>${opts.quizTitle}</strong> is ready.</p>
-      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:18px 0;">
-        <div style="padding:16px;border-radius:14px;background:#ecfdf5;color:#065f46;"><strong style="font-size:24px;">${opts.score}%</strong><br/>Score</div>
-        <div style="padding:16px;border-radius:14px;background:#eef2ff;color:#3730a3;"><strong style="font-size:24px;">${opts.points}</strong><br/>Points</div>
+      <p>Hi ${escapeHtml(opts.employeeName || 'Learner')},</p>
+      <p>Your result for <strong>${escapeHtml(opts.quizTitle)}</strong> is ready.</p>
+      <div style="display:flex;gap:12px;margin:18px 0;">
+        <div style="flex:1;padding:20px;border-radius:14px;background:${isPassing ? '#ecfdf5' : '#fff7ed'};color:${isPassing ? '#065f46' : '#9a3412'};text-align:center;">
+          <strong style="font-size:32px;">${opts.score}%</strong><br/><span style="font-size:13px;">Your Score</span>
+        </div>
+        <div style="flex:1;padding:20px;border-radius:14px;background:#eef2ff;color:#3730a3;text-align:center;">
+          <strong style="font-size:32px;">+${opts.points}</strong><br/><span style="font-size:13px;">Points Earned</span>
+        </div>
       </div>
-      <p>${opts.badgesEarned ? `You unlocked ${opts.badgesEarned} badge(s).` : 'Keep going to unlock more badges.'}</p>
-      ${opts.certificateIssued ? '<p style="color:#b45309;font-weight:700;">A certificate has been issued for this result.</p>' : ''}
-      <a href="${resultUrl}" style="display:inline-block;background:#000;color:#fff;padding:12px 20px;border-radius:999px;text-decoration:none;font-weight:700;">View Results</a>
+      ${opts.badgesEarned ? `<p style="color:#374151;">You unlocked <strong>${opts.badgesEarned} badge(s)</strong> for this attempt.</p>` : ''}
+      ${opts.certificateIssued ? '<p style="color:#b45309;font-weight:700;background:#fffbeb;padding:12px 16px;border-radius:10px;border:1px solid #fde68a;">🏆 A certificate of completion has been issued for this quiz.</p>' : ''}
+      <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;">
+        <a href="${resultUrl}" style="display:inline-block;background:#111827;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:700;font-size:14px;">View Full Results &amp; Score Breakdown</a>
+        ${certificateUrl ? `<a href="${certificateUrl}" style="display:inline-block;background:#d97706;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:700;font-size:14px;">Download Certificate</a>` : ''}
+      </div>
+      <p style="color:#6b7280;font-size:12px;margin-top:16px;">If the button does not open, paste this link in your browser:<br/><span style="color:#374151;word-break:break-all;">${resultUrl}</span></p>
     </div>
   </div>`
 }

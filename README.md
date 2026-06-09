@@ -60,7 +60,7 @@ The application is designed for **admins, managers, training coordinators, train
 | Feature | Description |
 |---|---|
 | 🤖 AI Quiz Generation | Generate MCQs from a topic or extracted CSV/XLSX/DOCX/PDF/XML/JSON content |
-| 🛡️ AI Proctoring | Optional per-quiz camera/microphone pre-checks, fullscreen enforcement, browser vision checks, large employee warnings, live violation events, auto-submit, private evidence storage, suspicious attempt gating, and staff review |
+| 🛡️ AI Proctoring | Optional per-quiz camera/microphone pre-checks, fullscreen enforcement, browser vision checks, persistent multiple-face banners with face count, auto-clearing warning toasts, live violation events, auto-submit, private evidence storage, suspicious attempt gating, and staff review |
 | 🧠 AI Manager Insights | Short coaching recommendations for batch health, attendance, trainer performance, and quiz outcomes |
 | 🎓 AI Learner Coach | Personalized recommendations based on streaks, quiz history, readiness, and retention signals |
 | 📊 Assessment Analyzer | Upload assessment results and chat with AI about scores, weak areas, and remediation |
@@ -69,7 +69,7 @@ The application is designed for **admins, managers, training coordinators, train
 | 🧭 Smart Domain Assignment | Filter large employee lists by vertical/domain with color-coded chips before assigning quizzes |
 | 🏅 Certificates | Quiz create/edit certificate controls with flexible score thresholds, uploaded image templates, personalized employee/course names, stronger visual preview, and review-gated issuing |
 | 🎖️ Badge Universe | 250+ styled badges across 12+ categories with color, rarity, and shape metadata |
-| ✉️ Email Automation | Assignment, approved-completion, and proctoring alert emails through SMTP or Resend, including score, badge, certificate, and working result links |
+| ✉️ Email Automation | Assignment, approved-completion, and proctoring alert emails through SMTP or Resend, including score, passing threshold, badge, certificate download link, and working result page links |
 | 🤖 Manager Command Chatbot | DB-aware command chatbot that answers true stats and creates structured quizzes from natural-language commands instead of saving raw prompts as titles |
 | 🧑‍🏫 Training Operations | Simplified batch creation, trainer assignment, sessions, attendance, assessments, feedback, reports |
 | ✅ Attendance Governance | Cutoff enforcement, late reason capture, version history, bulk import |
@@ -782,6 +782,21 @@ npx playwright install chromium
 | `EXECUTE.md` | Execution/demo guidance |
 | `PRESENTATION_SCRIPT.md` | Presentation narrative |
 | `DELETE_FUNCTIONALITY_SUMMARY.md` | Delete feature notes |
+
+---
+
+## 📝 Changelog
+
+### June 2026 — Bug Fixes & Improvements
+
+| Area | Change |
+|---|---|
+| **AI Proctoring** | Multiple-face detection now shows persistent red banner with exact face count; banner auto-clears after 30 s or on dismiss; type-specific violation cooldowns (4 s for multi-face, 5 s for no-face) prevent alert spam |
+| **Integrity Center** | Review buttons (Approve/Reject/Dismiss/Retest) now use `useFormStatus` to show "Saving…" and disable during submission; loading skeleton added for page revalidation; reduced evidence URL signing count for faster load |
+| **Result Emails** | "View Result" links in completion emails now open the correct results page; score email respects the quiz-level passing score threshold instead of a hard-coded 60%; certificate download button included when a certificate was issued |
+| **Result Page** | Fixed crash when an employee has multiple quiz attempts; certificate card added to sidebar with cert number, issue date, and download link |
+| **Quiz Creation** | Certificate configuration fields (title, message, threshold, template image) are now gated behind the certificate enable toggle; hint text shown when disabled |
+| **Email Security** | Employee name and quiz title are now HTML-escaped in outbound emails to prevent XSS |
 
 ---
 

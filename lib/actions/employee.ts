@@ -367,17 +367,20 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
           adminClient.from('certificates').select('id').eq('quiz_id', quiz_id).eq('user_id', user.id).maybeSingle(),
         ])
         if (profile?.email) {
+          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
           await sendEmail({
             to: profile.email,
-            subject: `Quiz Completed: ${quiz.title} - ${score}%`,
+            subject: `Quiz Result: ${quiz.title} — ${score}%`,
             html: buildQuizCompletedEmail({
               employeeName: profile.full_name,
               quizTitle: quiz.title,
               score,
               points: pointsEarned,
+              passingScore: quiz.passing_score ?? 60,
               badgesEarned: earnedBadges?.length || 0,
               certificateIssued: Boolean(certificate),
-              resultUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/employee/quizzes/${quiz_id}/results`,
+              certificateUrl: certificate ? `${baseUrl}/certificates/${certificate.id}` : undefined,
+              resultUrl: `${baseUrl}/employee/quizzes/${quiz_id}/results`,
             }),
           })
         }

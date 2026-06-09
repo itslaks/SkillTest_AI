@@ -16,7 +16,8 @@ The application keeps UI and backend responsibilities separated by folder:
 - `lib/email.ts`: SMTP, Resend, and development email fallback.
 - `lib/proctoring.ts`: proctoring risk weights, severity levels, and auto-submit thresholds.
 - `lib/proctoring-server.ts`: server-side proctoring sessions, active-attempt validation, event recording, summaries, and private evidence upload.
-- `lib/proctoring-vision.ts`: browser-only TensorFlow face, gaze, and object detection with fail-open model loading.
+- `lib/proctoring-vision.ts`: browser-only TensorFlow face, gaze, and object detection with fail-open model loading. Uses type-specific violation cooldowns (4 s for `multiple_faces`, 5 s for `no_face`, 15 s default) to prevent alert flooding.
+- `components/manager/integrity-review-buttons.tsx`: client component exposing `SuspiciousReviewButtons` and `CandidateReviewButtons` with `useFormStatus`-powered loading states; keeps `useFormStatus` inside a child `ReviewButton` component as required by React DOM.
 - `lib/domain-options.ts`: canonical signup/assignment domain options.
 - `lib/avatar-options.ts`: built-in Three.js 3D avatar preset IDs and helpers.
 - `components/avatar/`: reusable Three.js avatar renderer, preset picker, and profile avatar view.
@@ -78,6 +79,8 @@ approved attempt -> score, certificate, badges, completion email, and result pag
 ```
 
 Proctoring is intentionally opt-in per quiz. Existing and new quizzes default to non-proctored unless an admin/manager enables `Enable AI Proctoring`.
+
+Multiple-face violations surface as a persistent red banner in the quiz player (auto-dismissed after 30 s or on user click). The face count is included in the violation label so staff can assess the severity from proctoring logs. Warning modals auto-close after 10 s for multi-face events (5 s otherwise) so employees cannot become stuck behind an unresponsive overlay.
 
 Security boundaries:
 
