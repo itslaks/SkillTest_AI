@@ -535,6 +535,20 @@ async function createProfileCommand(admin: ReturnType<typeof createAdminClient>,
   const fullName = args.name || args.full_name
   if (!email || !fullName) return { error: `Use: run create ${role} email=... name="..." domain=... department=...` }
 
+  if (role === 'employee') {
+    const employeeId = args.employee_id || args.emp_id
+    const domain = args.domain
+    if (!employeeId || !domain) return { error: 'Use: run create employee email=... name="..." employee_id=... domain=...' }
+    const { profile, warning } = await createEmployeeWithSetupEmail(admin, {
+      email,
+      fullName,
+      employeeId,
+      department: args.department || null,
+      domain,
+    })
+    return { message: `Employee ${profile.full_name || email} created or updated.${warning ? ` Warning: ${warning}` : ''}`, data: profile }
+  }
+
   const { data: existing } = await admin.from('profiles').select('*').eq('email', email).maybeSingle()
   if (existing) {
     const { data, error } = await admin

@@ -162,7 +162,7 @@ async function loadModels(): Promise<ModelBundle | null> {
 
       const faceDetector = await faceDetection.createDetector(
         faceDetection.SupportedModels.MediaPipeFaceDetector,
-        { runtime: 'tfjs', modelType: 'short' },
+        { runtime: 'tfjs', modelType: 'short', maxFaces: 5 },
       )
       const landmarkDetector = await faceLandmarksDetection.createDetector(
         faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
@@ -191,7 +191,7 @@ async function loadFaceDetector() {
       const faceDetection = await runtimeImport('@tensorflow-models/face-detection')
       return faceDetection.createDetector(
         faceDetection.SupportedModels.MediaPipeFaceDetector,
-        { runtime: 'tfjs', modelType: 'short' },
+        { runtime: 'tfjs', modelType: 'short', maxFaces: 5 },
       )
     } catch (error) {
       console.warn('[proctoring-vision] face detector load failed:', error)
@@ -319,6 +319,21 @@ async function inspectGaze(config: VisionProctoringConfig, state: VisionState, m
 
 async function inspectObjects(config: VisionProctoringConfig, state: VisionState, models: ModelBundle, now: number) {
   const predictions = await models.objectDetector.detect(config.videoElement)
+  const people = (predictions || []).filter((prediction: any) => {
+    const label = String(prediction.class || '').toLowerCase()
+    const score = Number(prediction.score || 0)
+    return label === 'person' && score > 0.45
+  })
+
+  if (people.length >= 2) {
+    emitViolation(config, state, {
+      type: 'multiple_faces',
+      label: `Multiple people detected (${people.length} people). Only one person is allowed during the assessment.`,
+      confidence: Math.min(0.99, people.reduce((sum: number, item: any) => sum + Number(item.score || 0), 0) / people.length),
+      timestamp: now,
+    })
+  }
+
   for (const prediction of predictions || []) {
     const label = String(prediction.class || '').toLowerCase()
     const score = Number(prediction.score || 0)

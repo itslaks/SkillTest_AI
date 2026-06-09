@@ -103,20 +103,21 @@ export function getSupabaseServiceRoleKey(): string {
  */
 export function getSiteUrl(): string {
   const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production'
-  const candidates = [
+  const explicitCandidates = [
     normalizeHttpUrl(process.env.NEXT_PUBLIC_APP_URL),
     normalizeHttpUrl(process.env.NEXT_PUBLIC_SITE_URL),
-    process.env.VERCEL_PROJECT_PRODUCTION_URL ? normalizeHttpUrl(`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`) : null,
-    process.env.VERCEL_URL ? normalizeHttpUrl(`https://${process.env.VERCEL_URL}`) : null,
   ].filter(Boolean) as string[]
 
-  const siteUrl = candidates.find((candidate) => !isProduction || !isLocalSiteUrl(candidate))
+  const siteUrl = explicitCandidates.find((candidate) => !isProduction || !isLocalSiteUrl(candidate))
   if (siteUrl) return siteUrl
 
-  if (!isProduction) return 'http://localhost:3000'
+  if (!isProduction) {
+    const vercelPreviewUrl = process.env.VERCEL_URL ? normalizeHttpUrl(`https://${process.env.VERCEL_URL}`) : null
+    return vercelPreviewUrl || 'http://localhost:3000'
+  }
 
   throw new Error(
-    'Invalid public app URL for production. Set NEXT_PUBLIC_APP_URL or NEXT_PUBLIC_SITE_URL to your deployed https URL; localhost cannot be used in production emails.'
+    'Invalid public app URL for production. Set NEXT_PUBLIC_APP_URL or NEXT_PUBLIC_SITE_URL to your deployed https URL; localhost and Vercel preview URLs cannot be used in production emails.'
   )
 }
 

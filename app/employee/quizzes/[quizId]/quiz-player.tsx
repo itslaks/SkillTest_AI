@@ -184,6 +184,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const attemptIdRef = useRef<string | null>(null)
   const submittingRef = useRef(false)
   const activeSignalRef = useRef<Record<string, boolean>>({})
+  const lastProctoringEventAtRef = useRef<Record<string, number>>({})
   const proctoringEventRetryQueueRef = useRef<ProctoringEventPostPayload[]>([])
   const answerAdvanceTimerRef = useRef<number | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -501,10 +502,16 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const recordProctoringViolation = useCallback((type: ProctoringEventType, label: string, evidenceImage?: string | null) => {
     if (!requiresProctoring || !started || finishedRef.current || submittingRef.current) return
 
+    const now = Date.now()
+    const dedupeWindowMs = getProctoringDedupeWindowMs(type)
+    const lastRecordedAt = lastProctoringEventAtRef.current[type] || 0
+    if (now - lastRecordedAt < dedupeWindowMs) return
+    lastProctoringEventAtRef.current[type] = now
+
     setLatestViolation(label)
-    if (type === 'multiple_faces') setMultipleFacesAlertAt(Date.now())
-    const toastId = `${type}-${Date.now()}-${Math.random().toString(36).slice(2)}`
-    setWarningModal({ id: toastId, type, label, createdAt: Date.now() })
+    if (type === 'multiple_faces') setMultipleFacesAlertAt(now)
+    const toastId = `${type}-${now}-${Math.random().toString(36).slice(2)}`
+    setWarningModal({ id: toastId, type, label, createdAt: now })
     setViolationToasts((previous) => [
       { id: toastId, type, label },
       ...previous.filter((item) => item.id !== toastId),
@@ -1739,6 +1746,25 @@ function visionViolationTypeToEventType(type: string): ProctoringEventType {
     book_detected: 'book_detected',
   }
   return map[type] || 'face-covered'
+}
+
+function getProctoringDedupeWindowMs(type: ProctoringEventType) {
+  const windows: Partial<Record<ProctoringEventType, number>> = {
+    'copy-attempt': 2500,
+    'paste-attempt': 2500,
+    'context-menu': 2000,
+    'blocked-shortcut': 1500,
+    'tab-hidden': 2500,
+    'window-blur': 2500,
+    'fullscreen-exit': 2500,
+    'camera-lost': 3000,
+    'microphone-denied': 3000,
+    no_face: 3500,
+    'no-face': 3500,
+    multiple_faces: 3500,
+    'multiple-faces': 3500,
+  }
+  return windows[type] ?? 1200
 }
 
 function ProctoringStatusBar({

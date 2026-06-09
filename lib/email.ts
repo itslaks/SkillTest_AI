@@ -14,6 +14,9 @@ export interface SendEmailOptions {
   to: string | string[]
   subject: string
   html: string
+  text?: string
+  replyTo?: string
+  headers?: Record<string, string>
   /** Defaults to SkillTest_AI sender if not set */
   from?: string
 }
@@ -29,6 +32,8 @@ function escapeHtml(value: string | null | undefined) {
 
 export async function sendEmail(options: SendEmailOptions): Promise<{ success: boolean; error?: string }> {
   const from = options.from ?? (process.env.EMAIL_FROM ?? PRODUCT_EMAIL_FROM)
+  const text = options.text ?? htmlToText(options.html)
+  const replyTo = options.replyTo ?? process.env.EMAIL_REPLY_TO
 
   if (smtpConfigured) {
     try {
@@ -46,7 +51,10 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ success: b
         from,
         to: Array.isArray(options.to) ? options.to.join(',') : options.to,
         subject: options.subject,
+        text,
         html: options.html,
+        replyTo,
+        headers: options.headers,
       })
       return { success: true }
     } catch (err: any) {
@@ -70,14 +78,41 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ success: b
       from,
       to: Array.isArray(options.to) ? options.to : [options.to],
       subject: options.subject,
+      text,
       html: options.html,
-    })
+      replyTo,
+      headers: options.headers,
+    } as any)
     if (error) return { success: false, error: error.message }
     return { success: true }
   } catch (err: any) {
     console.error('[EMAIL ERROR]', err)
     return { success: false, error: err.message }
   }
+}
+
+function appLink(path: string) {
+  const baseUrl = getSiteUrl().replace(/\/$/, '')
+  return `${baseUrl}${path.startsWith('/') ? path : `/${path}`}`
+}
+
+function htmlToText(html: string) {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<\/(?:div|tr|table|h1|h2|h3|li)>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }
 
 // ─── Template helpers ────────────────────────────────────────────────────────
@@ -104,7 +139,7 @@ export function buildAttendanceCutoffEmail(opts: {
         <tr><td style="padding:8px;background:#f4f4f5;font-weight:600;border-radius:0 0 0 6px;">Date</td><td style="padding:8px;background:#fafafa;border-radius:0 0 6px 0;">${opts.sessionDate}</td></tr>
       </table>
       <p style="color:#3f3f46;">Please log in and upload attendance immediately.</p>
-      <a href="${process.env.NEXT_PUBLIC_APP_URL ?? 'https://skilltest.ai'}/manager/operations" style="display:inline-block;background:#000;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:8px;">Open Operations Console</a>
+      <a href="${appLink('/manager/operations')}" style="display:inline-block;background:#000;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:8px;">Open Operations Console</a>
     </div>
     <p style="color:#a1a1aa;font-size:12px;margin-top:16px;text-align:center;">${PRODUCT_NAME} | Automated Governance Alert</p>
   </div>`
@@ -131,7 +166,7 @@ export function buildAbsenceStreakEmail(opts: {
         <tr><td style="padding:8px;background:#f4f4f5;font-weight:600;">Email</td><td style="padding:8px;background:#fafafa;">${opts.candidateEmail}</td></tr>
         <tr><td style="padding:8px;background:#f4f4f5;font-weight:600;border-radius:0 0 0 6px;">Batch</td><td style="padding:8px;background:#fafafa;border-radius:0 0 6px 0;">${opts.batchTitle}</td></tr>
       </table>
-      <a href="${process.env.NEXT_PUBLIC_APP_URL ?? 'https://skilltest.ai'}/manager/operations" style="display:inline-block;background:#dc2626;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:8px;">Review Candidate</a>
+      <a href="${appLink('/manager/operations')}" style="display:inline-block;background:#dc2626;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:8px;">Review Candidate</a>
     </div>
     <p style="color:#a1a1aa;font-size:12px;margin-top:16px;text-align:center;">${PRODUCT_NAME} | Automated Governance Alert</p>
   </div>`
@@ -157,7 +192,7 @@ export function buildAssessmentReminderEmail(opts: {
         <tr><td style="padding:8px;background:#f4f4f5;font-weight:600;">Batch</td><td style="padding:8px;background:#fafafa;">${opts.batchTitle}</td></tr>
         <tr><td style="padding:8px;background:#f4f4f5;font-weight:600;border-radius:0 0 0 6px;">Scheduled</td><td style="padding:8px;background:#fafafa;border-radius:0 0 6px 0;">${opts.scheduledAt}</td></tr>
       </table>
-      <a href="${process.env.NEXT_PUBLIC_APP_URL ?? 'https://skilltest.ai'}/employee/training" style="display:inline-block;background:#1d4ed8;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:8px;">View Training Hub</a>
+      <a href="${appLink('/employee/training')}" style="display:inline-block;background:#1d4ed8;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:8px;">View Training Hub</a>
     </div>
     <p style="color:#a1a1aa;font-size:12px;margin-top:16px;text-align:center;">${PRODUCT_NAME} | Training Reminder</p>
   </div>`
@@ -222,7 +257,7 @@ export function buildUploadConfirmationEmail(opts: {
         <tr><td style="padding:8px;background:#f4f4f5;font-weight:600;border-radius:0 0 0 6px;">Errors / Skipped</td><td style="padding:8px;background:#fafafa;border-radius:0 0 6px 0;">${opts.errorCount ?? 0}</td></tr>
       </table>
       ${(opts.errorCount ?? 0) > 0 ? '<p style="color:#d97706;font-weight:600;">⚠️ Some records had validation errors. Please review in the Operations Console.</p>' : '<p style="color:#059669;font-weight:600;">All records imported successfully.</p>'}
-      <a href="${process.env.NEXT_PUBLIC_APP_URL ?? 'https://skilltest.ai'}/manager/operations" style="display:inline-block;background:#000;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:8px;">Open Operations Console</a>
+      <a href="${appLink('/manager/operations')}" style="display:inline-block;background:#000;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:8px;">Open Operations Console</a>
     </div>
     <p style="color:#a1a1aa;font-size:12px;margin-top:16px;text-align:center;">${PRODUCT_NAME} | Upload Notification</p>
   </div>`
@@ -271,8 +306,8 @@ export function buildEmployeeWelcomeEmail(opts: {
     </div>
     <div style="background:#fff;border:1px solid #e5e7eb;border-top:0;padding:24px;border-radius:0 0 18px 18px;">
       <p>Hi ${employeeName},</p>
-      <p>Your SkillTest_AI learner record has been created by your admin. Use the same work email and Employee ID from your admin record so your sign-in stays synced with assigned quizzes, training sessions, leaderboards, badges, and certificates.</p>
-      <a href="${setupLink}" style="display:inline-block;background:#000;color:#fff;padding:12px 20px;border-radius:999px;text-decoration:none;font-weight:700;margin:12px 0;">Set Password</a>
+      <p>Your SkillTest_AI employee record has been created by your admin. Verify this email first, then set your password so your sign-in stays synced with assigned quizzes, training sessions, leaderboards, badges, and certificates.</p>
+      <a href="${setupLink}" style="display:inline-block;background:#000;color:#fff;padding:12px 20px;border-radius:999px;text-decoration:none;font-weight:700;margin:12px 0;">Verify Email &amp; Set Password</a>
       ${signUpLink ? `<p style="color:#64748b;font-size:13px;">If you open the sign-up page first, use this synced sign-up path:</p><p style="word-break:break-all;color:#334155;font-size:13px;">${signUpLink}</p>` : ''}
       <p style="color:#64748b;font-size:13px;">If the button does not work, open this link in your browser:</p>
       <p style="word-break:break-all;color:#334155;font-size:13px;">${setupLink}</p>

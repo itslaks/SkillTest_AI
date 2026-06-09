@@ -180,6 +180,11 @@ export async function signIn(formData: FormData) {
   const role = profile?.role || data.user?.user_metadata?.role || 'employee'
   const approvalStatus = profile?.approval_status || 'approved'
 
+  if (role === 'employee' && !data.user.email_confirmed_at) {
+    await supabase.auth.signOut()
+    return { error: 'Please verify your email from the SkillTest_AI setup email before signing in.' }
+  }
+
   // Block trainer login if pending approval
   if (role === 'trainer' && approvalStatus === 'pending') {
     await supabase.auth.signOut()
