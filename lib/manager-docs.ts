@@ -297,7 +297,6 @@ export const adminGuideSections: AdminGuideSection[] = [
     ],
     relatedLinks: [
       { label: 'Document Library', href: '/manager/operations#document-library' },
-      { label: 'BRD Proof', href: '/manager/compliance' },
     ],
   },
   {

@@ -20,7 +20,6 @@ import {
   ShieldAlert,
   Crown,
   BookOpen,
-  FileCheck2,
   Bell,
   TerminalSquare,
 } from 'lucide-react'
@@ -54,7 +53,6 @@ const navigation = [
       { name: 'Analytics & AI', href: '/manager/analytics', icon: Brain, color: 'text-pink-400', bg: 'bg-pink-400/10', activeBg: 'bg-pink-500', description: 'AI-powered insights' },
       { name: 'Integrity Center', href: '/manager/integrity', icon: ShieldAlert, color: 'text-red-300', bg: 'bg-red-300/10', activeBg: 'bg-red-400', description: 'Proctoring evidence' },
       { name: 'Reports', href: '/manager/reports', icon: BarChart3, color: 'text-orange-400', bg: 'bg-orange-400/10', activeBg: 'bg-orange-500', description: 'Download reports' },
-      { name: 'BRD Proof', href: '/manager/compliance', icon: FileCheck2, color: 'text-cyan-300', bg: 'bg-cyan-300/10', activeBg: 'bg-cyan-400', description: 'Requirement coverage' },
       { name: 'Notifications', href: '/manager/notifications', icon: Bell, color: 'text-rose-300', bg: 'bg-rose-300/10', activeBg: 'bg-rose-400', description: 'Action log' },
       { name: 'Admin Console', href: '/manager/admin', icon: ShieldCheck, color: 'text-yellow-400', bg: 'bg-yellow-400/10', activeBg: 'bg-yellow-500', description: 'Roles & controls' },
     ]

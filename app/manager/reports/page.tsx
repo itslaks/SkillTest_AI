@@ -182,12 +182,6 @@ export default async function ManagerReportsPage() {
             </a>
           </Button>
           <Button variant="outline" className="border-white bg-white text-zinc-950 hover:bg-zinc-100 hover:text-zinc-950" asChild>
-            <a href="/api/reports/training-ops/download">
-              <FileSpreadsheet className="mr-2 h-4 w-4" />
-              BRD Evidence Pack
-            </a>
-          </Button>
-          <Button variant="outline" className="border-white bg-white text-zinc-950 hover:bg-zinc-100 hover:text-zinc-950" asChild>
             <a href="/api/export/pdf?type=consolidated">
               <FileText className="mr-2 h-4 w-4" />
               Consolidated PDF
@@ -218,7 +212,7 @@ export default async function ManagerReportsPage() {
 
       <Card className="border-zinc-200 bg-black text-white shadow-sm">
         <CardHeader>
-          <CardTitle>BRD-Aligned Downloads</CardTitle>
+          <CardTitle>Report Downloads</CardTitle>
           <CardDescription className="text-zinc-400">
             All reports use real live data. Topper reports include configurable scoring criteria sheets.
           </CardDescription>
@@ -265,7 +259,7 @@ export default async function ManagerReportsPage() {
               <div>
                 <CardTitle>Feedback Intelligence Center</CardTitle>
                 <CardDescription className="text-zinc-400">
-                  Standalone feedback downloads and batch sentiment signals for BRD section 5.5.
+                  Standalone feedback downloads and batch sentiment signals.
                 </CardDescription>
               </div>
               <Button asChild variant="outline" className="w-fit rounded-full border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white">
@@ -353,7 +347,7 @@ export default async function ManagerReportsPage() {
         <Card className="border-zinc-200 shadow-sm">
           <CardHeader>
             <CardTitle>Consolidated Batch Filters</CardTitle>
-            <CardDescription>BRD status filters are visible before export and mirrored in the Excel workbook.</CardDescription>
+            <CardDescription>Status filters are visible before export and mirrored in the Excel workbook.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2">
             <FilterMetric title="Discontinued" value={statusCounts.discontinued} tone="rose" />

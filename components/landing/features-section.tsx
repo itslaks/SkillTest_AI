@@ -23,8 +23,8 @@ const features = [
   },
   {
     icon: '📄',
-    title: 'BRD Evidence',
-    description: 'Attendance, imports, feedback, notifications, audits, and exports support judge-ready traceability.',
+    title: 'Audit Evidence',
+    description: 'Attendance, imports, feedback, notifications, audits, and exports support full operational traceability.',
   },
   {
     icon: '🔐',

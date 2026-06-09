@@ -2499,9 +2499,6 @@ function TrainerScorecardDeck({ items }: { items: Array<{ id: string; name: stri
               A production view of trainer impact across attendance discipline, assessment outcomes, and learner feedback.
             </CardDescription>
           </div>
-          <Badge variant="outline" className="w-fit border-cyan-300/40 bg-cyan-300/10 text-cyan-200">
-            BRD 5.6 visible
-          </Badge>
         </div>
       </CardHeader>
       <CardContent className="grid gap-3 p-5 md:grid-cols-2 xl:grid-cols-3">
