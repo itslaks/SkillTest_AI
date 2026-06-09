@@ -74,6 +74,36 @@ export default async function AnalyticsPage() {
   })
   const retentionChecks = buildRetentionChecks(attempts || [])
 
+  // Score distribution across 5 bands
+  const BANDS = [
+    { range: '0–20', min: 0, max: 20, color: '#ef4444' },
+    { range: '21–40', min: 21, max: 40, color: '#f97316' },
+    { range: '41–60', min: 41, max: 60, color: '#eab308' },
+    { range: '61–80', min: 61, max: 80, color: '#22c55e' },
+    { range: '81–100', min: 81, max: 100, color: '#3b82f6' },
+  ]
+  const scoreDistribution = BANDS.map((b) => ({
+    range: b.range,
+    count: (attempts || []).filter((a: any) => (a.score ?? 0) >= b.min && (a.score ?? 0) <= b.max).length,
+    color: b.color,
+  }))
+
+  // Per-topic average score
+  const topicMap: Record<string, number[]> = {}
+  for (const a of attempts || []) {
+    const t = (a as any).quizzes?.topic || 'General'
+    if (!topicMap[t]) topicMap[t] = []
+    topicMap[t].push((a as any).score ?? 0)
+  }
+  const topicPerformance = Object.entries(topicMap)
+    .map(([topic, scores]) => ({
+      topic: topic.length > 14 ? topic.slice(0, 14) + '…' : topic,
+      avgScore: Math.round(scores.reduce((s, v) => s + v, 0) / scores.length),
+      attempts: scores.length,
+    }))
+    .sort((a, b) => b.avgScore - a.avgScore)
+    .slice(0, 8)
+
   return (
     <div className="space-y-8">
       <section className="rounded-[2rem] border border-zinc-900 bg-black p-6 text-white shadow-[0_40px_120px_rgba(0,0,0,0.55)] md:p-8">
@@ -103,6 +133,8 @@ export default async function AnalyticsPage() {
         trainerImpact={trainerImpact}
         retentionChecks={retentionChecks}
         antiGamingWatch={antiGamingWatch}
+        scoreDistribution={scoreDistribution}
+        topicPerformance={topicPerformance}
       />
 
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
