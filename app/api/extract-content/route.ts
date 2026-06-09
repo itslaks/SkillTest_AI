@@ -1,10 +1,10 @@
-import { requireManagerForApi } from '@/lib/rbac'
+import { requireTrainingStaffForApi } from '@/lib/rbac'
 import { NextRequest, NextResponse } from 'next/server'
 import mammoth from 'mammoth'
 import * as XLSX from 'xlsx'
 
 export async function POST(request: NextRequest) {
-  const auth = await requireManagerForApi()
+  const auth = await requireTrainingStaffForApi()
   if (auth instanceof NextResponse) return auth
 
   try {

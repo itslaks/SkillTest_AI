@@ -1,9 +1,9 @@
 'use server'
 
-import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import type { CreateQuizInput, CreateQuestionInput } from '@/lib/types/database'
-import { requireManager } from '@/lib/rbac'
+import { requireTrainingStaff } from '@/lib/rbac'
 import {
   createQuizSchema,
   updateQuizSchema,
@@ -13,7 +13,7 @@ import {
   uuidSchema,
 } from '@/lib/security/validation'
 
-async function verifyQuizOwnership(supabase: Awaited<ReturnType<typeof createClient>>, quizId: string, userId: string) {
+async function verifyQuizOwnership(supabase: ReturnType<typeof createAdminClient>, quizId: string, userId: string) {
   const { data: quiz, error } = await supabase
     .from('quizzes')
     .select('id')
@@ -33,19 +33,14 @@ export async function createQuiz(input: CreateQuizInput) {
     return { error: `${firstError.path.join('.')}: ${firstError.message}` }
   }
 
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    console.error('Quiz creation failed: Not authenticated', authError)
-    return { error: 'Not authenticated' }
-  }
+  const { userId } = await requireTrainingStaff()
+  const supabase = createAdminClient()
 
   const { data, error } = await supabase
     .from('quizzes')
     .insert({
       ...parsed.data,
-      created_by: user.id,
+      created_by: userId,
       is_active: parsed.data.status !== 'draft' && parsed.data.status !== 'archived',
     })
     .select()
@@ -75,12 +70,8 @@ export async function updateQuiz(id: string, input: Partial<CreateQuizInput>) {
     return { error: `${firstError.path.join('.')}: ${firstError.message}` }
   }
 
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    return { error: 'Not authenticated' }
-  }
+  const { userId, role } = await requireTrainingStaff()
+  const supabase = createAdminClient()
 
   const updatePayload = {
     ...parsed.data,
@@ -90,11 +81,12 @@ export async function updateQuiz(id: string, input: Partial<CreateQuizInput>) {
     updated_at: new Date().toISOString(),
   }
 
-  const { data, error } = await supabase
+  let updateQuery = supabase
     .from('quizzes')
     .update(updatePayload)
     .eq('id', idResult.data)
-    .eq('created_by', user.id)
+  if (role !== 'admin') updateQuery = updateQuery.eq('created_by', userId)
+  const { data, error } = await updateQuery
     .select()
     .single()
 
@@ -113,12 +105,8 @@ export async function deleteQuiz(id: string) {
     return { error: 'Invalid quiz ID' }
   }
 
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    return { error: 'Not authenticated' }
-  }
+  const { userId, role } = await requireTrainingStaff()
+  const supabase = createAdminClient()
 
   const { count: activeAttemptCount, error: activeAttemptError } = await supabase
     .from('quiz_attempts')
@@ -134,11 +122,9 @@ export async function deleteQuiz(id: string) {
     return { error: `Cannot delete — ${activeAttemptCount} fresher(s) currently have active attempts.` }
   }
 
-  const { error } = await supabase
-    .from('quizzes')
-    .delete()
-    .eq('id', idResult.data)
-    .eq('created_by', user.id)
+  let deleteQuery = supabase.from('quizzes').delete().eq('id', idResult.data)
+  if (role !== 'admin') deleteQuery = deleteQuery.eq('created_by', userId)
+  const { error } = await deleteQuery
 
   if (error) {
     return { error: error.message }
@@ -160,14 +146,10 @@ export async function toggleQuizActive(id: string, isActive: boolean) {
     return { error: 'isActive must be a boolean' }
   }
 
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  const { userId, role } = await requireTrainingStaff()
+  const supabase = createAdminClient()
 
-  if (authError || !user) {
-    return { error: 'Not authenticated' }
-  }
-
-  const { error } = await supabase
+  let updateQuery = supabase
     .from('quizzes')
     .update({
       is_active: isActive,
@@ -175,7 +157,8 @@ export async function toggleQuizActive(id: string, isActive: boolean) {
       updated_at: new Date().toISOString(),
     })
     .eq('id', idResult.data)
-    .eq('created_by', user.id)
+  if (role !== 'admin') updateQuery = updateQuery.eq('created_by', userId)
+  const { error } = await updateQuery
 
   if (error) {
     return { error: error.message }
@@ -186,18 +169,15 @@ export async function toggleQuizActive(id: string, isActive: boolean) {
 }
 
 export async function getQuizzes() {
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  const { userId, role } = await requireTrainingStaff()
+  const supabase = createAdminClient()
 
-  if (authError || !user) {
-    return { error: 'Not authenticated', data: [] }
-  }
-
-  const { data, error } = await supabase
+  let query = supabase
     .from('quizzes')
     .select('*, questions(count)')
-    .eq('created_by', user.id)
     .order('created_at', { ascending: false })
+  if (role !== 'admin') query = query.eq('created_by', userId)
+  const { data, error } = await query
 
   if (error) {
     return { error: error.message, data: [] }
@@ -213,18 +193,15 @@ export async function getQuizWithQuestions(quizId: string) {
     return { error: 'Invalid quiz ID' }
   }
 
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  const { userId, role } = await requireTrainingStaff()
+  const supabase = createAdminClient()
 
-  if (authError || !user) {
-    return { error: 'Not authenticated' }
-  }
-
-  const { data: quiz, error: quizError } = await supabase
+  let quizQuery = supabase
     .from('quizzes')
     .select('*')
     .eq('id', idResult.data)
-    .single()
+  if (role !== 'admin') quizQuery = quizQuery.eq('created_by', userId)
+  const { data: quiz, error: quizError } = await quizQuery.single()
 
   if (quizError) {
     return { error: quizError.message }
@@ -251,7 +228,7 @@ export async function getQuizWithQuestions(quizId: string) {
 }
 
 export async function saveQuizCertificateRule(formData: FormData) {
-  const { userId, role } = await requireManager()
+  const { userId, role } = await requireTrainingStaff()
   const admin = createAdminClient()
   const quizId = String(formData.get('quiz_id') || '')
   const enabled = String(formData.get('enabled') || '') === 'on'
@@ -315,8 +292,8 @@ export async function createQuestion(input: CreateQuestionInput) {
     return { error: `${firstError.path.join('.')}: ${firstError.message}` }
   }
 
-  const { userId } = await requireManager()
-  const supabase = await createClient()
+  const { userId } = await requireTrainingStaff()
+  const supabase = createAdminClient()
 
   const ownsQuiz = await verifyQuizOwnership(supabase, parsed.data.quiz_id, userId)
   if (!ownsQuiz) {
@@ -351,8 +328,8 @@ export async function updateQuestion(id: string, input: Partial<CreateQuestionIn
     return { error: `${firstError.path.join('.')}: ${firstError.message}` }
   }
 
-  const { userId } = await requireManager()
-  const supabase = await createClient()
+  const { userId } = await requireTrainingStaff()
+  const supabase = createAdminClient()
 
   const { data: question, error: questionError } = await supabase
     .from('questions')
@@ -388,8 +365,8 @@ export async function deleteQuestion(id: string) {
     return { error: 'Invalid question ID' }
   }
 
-  const { userId } = await requireManager()
-  const supabase = await createClient()
+  const { userId } = await requireTrainingStaff()
+  const supabase = createAdminClient()
 
   const { data: question, error: questionError } = await supabase
     .from('questions')
@@ -424,8 +401,8 @@ export async function bulkCreateQuestions(questions: CreateQuestionInput[]) {
     return { error: `${firstError.path.join('.')}: ${firstError.message}` }
   }
 
-  const { userId } = await requireManager()
-  const supabase = await createClient()
+  const { userId } = await requireTrainingStaff()
+  const supabase = createAdminClient()
   const quizIds = Array.from(new Set(parsed.data.map((question) => question.quiz_id)))
 
   for (const quizId of quizIds) {
@@ -449,18 +426,15 @@ export async function bulkCreateQuestions(questions: CreateQuestionInput[]) {
 }
 
 export async function getQuizStats() {
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    return { error: 'Not authenticated' }
-  }
+  const { userId, role } = await requireTrainingStaff()
+  const supabase = createAdminClient()
 
   // Get all quizzes created by manager
-  const { data: quizzes, error: quizzesError } = await supabase
+  let quizQuery = supabase
     .from('quizzes')
     .select('id')
-    .eq('created_by', user.id)
+  if (role !== 'admin') quizQuery = quizQuery.eq('created_by', userId)
+  const { data: quizzes, error: quizzesError } = await quizQuery
 
   if (quizzesError) return { error: quizzesError.message }
 

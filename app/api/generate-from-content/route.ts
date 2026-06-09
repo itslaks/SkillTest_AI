@@ -1,5 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
-import { requireManagerForApi } from '@/lib/rbac'
+import { createAdminClient } from '@/lib/supabase/server'
+import { requireTrainingStaffForApi } from '@/lib/rbac'
 import { NextRequest, NextResponse } from 'next/server'
 import type { DifficultyLevel } from '@/lib/types/database'
 import { callAI, stripCodeFences } from '@/lib/ai'
@@ -13,10 +13,10 @@ type QuestionOption = { text: string; isCorrect: boolean }
  * Generate questions from provided content with strict difficulty enforcement
  */
 export async function POST(request: NextRequest) {
-  const auth = await requireManagerForApi()
+  const auth = await requireTrainingStaffForApi()
   if (auth instanceof NextResponse) return auth
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   const body = await request.json()
   const { quiz_id, content, difficulty, count, topic } = body as {
@@ -29,6 +29,17 @@ export async function POST(request: NextRequest) {
 
   if (!quiz_id || !content || !difficulty || !count) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+  }
+
+  const { data: quiz, error: quizError } = await supabase
+    .from('quizzes')
+    .select('id, created_by')
+    .eq('id', quiz_id)
+    .maybeSingle()
+  if (quizError) return NextResponse.json({ error: quizError.message }, { status: 500 })
+  if (!quiz) return NextResponse.json({ error: 'Quiz not found' }, { status: 404 })
+  if (auth.role !== 'admin' && quiz.created_by !== auth.userId) {
+    return NextResponse.json({ error: 'Not authorized for this quiz' }, { status: 403 })
   }
 
   const distribution = calculateStrictDistribution(difficulty, count)
