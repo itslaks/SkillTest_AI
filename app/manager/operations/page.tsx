@@ -33,7 +33,6 @@ import { AttendanceImporter } from '@/components/manager/attendance-importer'
 import { ManualAttendanceCard } from '@/components/manager/manual-attendance-card'
 import { AssessmentScoreImporter } from '@/components/manager/assessment-score-importer'
 import { BatchCandidateImporter } from '@/components/manager/batch-candidate-importer'
-import { DashboardSignalShowcase } from '@/components/insights/dashboard-signal-showcase'
 import { BatchComparisonChart } from '@/components/manager/batch-comparison-chart'
 import { BatchMemberStatusDropdown } from '@/components/manager/batch-member-status-dropdown'
 import { OpsAutoRefresh } from '@/components/manager/ops-auto-refresh'
@@ -42,18 +41,30 @@ import { OpsSubmitButton } from '@/components/manager/ops-submit-button'
 import { FeedbackSentimentChart } from '@/components/manager/feedback-sentiment-chart'
 import { createAdminClient } from '@/lib/supabase/server'
 import {
+  Activity,
+  ArrowUpRight,
+  BarChart3,
   BellRing,
   CalendarDays,
+  CheckCircle2,
   ChevronDown,
   ClipboardCheck,
+  Database,
   Trash2,
   FileText,
   FileSpreadsheet,
   FolderOpen,
+  Gauge,
+  Layers3,
+  LineChart,
+  ListChecks,
   RadioTower,
   MessageSquareQuote,
   ShieldAlert,
+  UploadCloud,
   Users,
+  Workflow,
+  Zap,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -409,65 +420,56 @@ export default async function ManagerOperationsPage({
     failed: notificationDispatchLogs.filter((item: any) => item.provider_status === 'failed').length,
     logged: notificationDispatchLogs.filter((item: any) => item.provider_status === 'logged').length,
   }
+  const pendingScoreUploads = assessmentSetups.filter((setup: any) => {
+    const status = String(setup.status || '').toLowerCase()
+    if (status === 'completed' || status === 'cancelled') return false
+    return !assessmentUploads.some((upload: any) => upload.assessment_setup_id === setup.id && Number(upload.successful_records || 0) > 0)
+  }).length
+  const openRisks = summary.attendanceDueToday + summary.absenceAlerts + summary.negativeFeedbackCount + dispatchHealth.failed
+  const automationHealth = dispatchHealth.failed > 0 ? 'Needs review' : automationRuns.length ? 'Healthy' : 'Ready'
+  const nextScheduleItems = scheduleTimeline.slice(0, 4)
   const missionNav = [
-    { label: 'Overview', href: '#overview', detail: 'KPIs and risks' },
-    { label: 'Batches', href: '#batches', detail: 'Live batch board' },
-    { label: 'Attendance', href: '#attendance', detail: 'Tracker and import' },
-    { label: 'Score Upload', href: '#assessment-upload', detail: 'Assessment results' },
-    { label: 'Assessments', href: '#assessment', detail: 'Governance and scores' },
-    { label: 'Projects', href: '#projects', detail: 'Evaluation evidence' },
-    { label: 'Feedback', href: '#communication', detail: 'Pulse and reminders' },
-    { label: 'Automation', href: '#automation', detail: 'Governed checks' },
-    { label: 'Setup', href: '#setup', detail: 'Batch, sessions, import' },
-    { label: 'Imports', href: '#import', detail: 'Learner upload' },
-    { label: 'Schedule', href: '#schedule', detail: 'Calendar lanes' },
-    { label: 'Documents', href: '#documents', detail: 'Evidence library' },
-    { label: 'Analytics', href: '#analytics', detail: 'Batch and trainer signals' },
-    { label: 'Audit', href: '#audit', detail: 'History and errors' },
+    { label: 'Live Ops', href: '#live-operations', detail: 'Daily workflow' },
+    { label: 'Governance', href: '#governance-zone', detail: 'Quality controls' },
+    { label: 'Automation', href: '#automation-zone', detail: 'Proactive checks' },
+    { label: 'Resources', href: '#resources-zone', detail: 'Setup tools' },
+    { label: 'Intelligence', href: '#intelligence-hub', detail: 'Signals and audit' },
   ]
 
   return (
-    <div className="space-y-8">
+    <div className="min-h-screen space-y-8 rounded-[2rem] bg-[#0B1220] p-4 text-slate-950 md:p-6">
       <OpsResultToast />
       <OpsAutoRefresh intervalMs={15000} />
-      <section className="rounded-[2rem] border border-zinc-900 bg-black p-6 text-white shadow-[0_40px_120px_rgba(0,0,0,0.55)] md:p-8 dashboard-grid-bg maverick-command-band">
-        <div className="grid gap-6 xl:grid-cols-[0.82fr_1.18fr]">
-          <div>
-            <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-[10px] uppercase tracking-[0.18em] text-zinc-400 sm:tracking-[0.28em]">
-              Training Execution Platform
+      <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.32),transparent_34%),linear-gradient(135deg,#0B1220_0%,#111827_52%,#172554_100%)] p-6 text-white shadow-[0_30px_110px_rgba(2,6,23,0.45)] md:p-8">
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sky-300 to-transparent" />
+        <div className="grid gap-8 xl:grid-cols-[minmax(0,0.95fr)_minmax(28rem,1.05fr)] xl:items-end">
+          <div className="max-w-4xl">
+            <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-white/10 bg-white/8 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-sky-100">
+              <RadioTower className="h-3.5 w-3.5" />
+              Mission Control
             </div>
-            <h1 className="mt-4 max-w-4xl text-3xl font-semibold tracking-tight md:text-5xl">Operations control room for training delivery</h1>
-            <p className="mt-4 max-w-3xl text-sm leading-relaxed text-zinc-400">
-              Your daily control room for batch health, attendance discipline, trainer ownership, reminders, feedback, and exports.
+            <h1 className="mt-6 max-w-4xl text-4xl font-semibold tracking-tight md:text-6xl">Training Ops Workspace</h1>
+            <p className="mt-5 max-w-3xl text-base leading-7 text-slate-300">
+              Manage batches, assessments, attendance, projects, and training governance from a unified operational workspace.
             </p>
-          </div>
-          <div className="space-y-4">
-            <DashboardSignalShowcase
-              theme="dark"
-              badge="Ops Control Deck"
-              title="Today's risks are visible before they become follow-ups."
-              subtitle="Cut-off misses, absence streaks, feedback risks, and batch progress are brought into one manager-friendly view."
-            />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <StatCard label="Active batches" value={`${summary.activeBatches}`} icon={Users} />
-              <StatCard label="Upcoming sessions" value={`${summary.upcomingSessions}`} icon={CalendarDays} />
-              <StatCard label="Attendance health" value={`${summary.attendanceRate}%`} icon={ClipboardCheck} />
-              <StatCard label="Action alerts" value={`${summary.attendanceDueToday + summary.absenceAlerts + summary.negativeFeedbackCount}`} icon={ShieldAlert} />
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Button asChild className="rounded-full bg-white px-5 text-[#0B1220] shadow-lg shadow-sky-950/20 hover:bg-slate-100">
+                <a href="#live-operations">Open live operations</a>
+              </Button>
+              <Button asChild variant="outline" className="rounded-full border-white/20 bg-white/5 px-5 text-white hover:bg-white/10 hover:text-white">
+                <a href="/api/reports/training-ops/download">Export evidence pack</a>
+              </Button>
             </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <MissionKpiCard label="Active Batches" value={`${summary.activeBatches}`} detail={`${summary.upcomingSessions} sessions queued`} icon={Layers3} tone="blue" />
+            <MissionKpiCard label="Attendance Due" value={`${summary.attendanceDueToday}`} detail={`${summary.attendanceRate}% attendance health`} icon={ClipboardCheck} tone={summary.attendanceDueToday > 0 ? 'amber' : 'emerald'} />
+            <MissionKpiCard label="Pending Score Uploads" value={`${pendingScoreUploads}`} detail={`${overallAssessmentClearance}% clearance signal`} icon={UploadCloud} tone={pendingScoreUploads > 0 ? 'amber' : 'emerald'} />
+            <MissionKpiCard label="Open Risks" value={`${openRisks}`} detail={`${summary.absenceAlerts} absence, ${summary.negativeFeedbackCount} feedback`} icon={ShieldAlert} tone={openRisks > 0 ? 'red' : 'emerald'} />
           </div>
         </div>
       </section>
-
-      <PriorityOpsWorkbench
-        canCoordinate={canCoordinate}
-        attendanceDue={summary.attendanceDueToday}
-        absenceAlerts={summary.absenceAlerts}
-        activeBatches={summary.activeBatches}
-        upcomingSessions={summary.upcomingSessions}
-        remainingCandidates={summary.remainingCandidates}
-        assessmentClearance={overallAssessmentClearance}
-        negativeFeedback={summary.negativeFeedbackCount}
-      />
 
       {(operationMessage?.ops_status || operationMessage?.ops_error) ? (
         <div className={`rounded-2xl border p-4 text-sm font-medium ${
@@ -480,67 +482,86 @@ export default async function ManagerOperationsPage({
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[15rem_1fr] 2xl:grid-cols-[17rem_1fr]">
-        <aside className="self-start rounded-[1.5rem] border border-zinc-200 bg-white p-3 shadow-sm xl:sticky xl:top-24">
-          <div className="rounded-[1.25rem] border border-zinc-900 bg-black p-4 text-white">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-zinc-500">Mission Control</p>
-            <p className="mt-2 text-sm font-semibold">Training Ops workspace</p>
-            <p className="mt-1 text-xs leading-relaxed text-zinc-400">All existing controls are grouped into focused operating zones.</p>
+        <aside className="self-start rounded-[1.5rem] border border-white/10 bg-white/95 p-3 shadow-[0_18px_60px_rgba(2,6,23,0.18)] backdrop-blur xl:sticky xl:top-24">
+          <div className="rounded-[1.25rem] border border-slate-900 bg-[#0B1220] p-4 text-white">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-sky-300">Command Rail</p>
+            <p className="mt-2 text-sm font-semibold">Mission Control</p>
+            <p className="mt-1 text-xs leading-relaxed text-slate-400">{automationHealth} automation, {openRisks} open risk signal(s).</p>
           </div>
           <nav className="mt-3 grid gap-1">
             {missionNav.map((item) => (
-              <a key={item.href} href={item.href} className="group rounded-2xl px-3 py-2.5 transition hover:bg-zinc-50">
-                <span className="block text-sm font-semibold text-zinc-900 group-hover:text-cyan-700">{item.label}</span>
-                <span className="block text-xs text-zinc-500">{item.detail}</span>
+              <a key={item.href} href={item.href} className="group rounded-2xl px-3 py-2.5 transition hover:-translate-y-0.5 hover:bg-sky-50">
+                <span className="block text-sm font-semibold text-slate-950 group-hover:text-blue-700">{item.label}</span>
+                <span className="block text-xs text-slate-500">{item.detail}</span>
               </a>
             ))}
           </nav>
         </aside>
 
         <main className="min-w-0 space-y-8">
-      <section id="overview" className="scroll-mt-32 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
-        <ActionTile
-          title="Attendance due"
-          value={`${summary.attendanceDueToday}`}
-          detail="Sessions past the 10:00 AM discipline window with no positive mark yet."
-          tone="rose"
-        />
-        <ActionTile
-          title="3-day absence risks"
-          value={`${summary.absenceAlerts}`}
-          detail="Learners absent across the latest three attendance-required sessions."
-          tone="amber"
-        />
-        <ActionTile
-          title="Candidates in training"
-          value={`${summary.remainingCandidates}`}
-          detail={`${summary.discontinuedCandidates} discontinued, ${summary.notClearedCandidates} not cleared, ${summary.offeredCandidates} offered/onboarded signals tracked.`}
-          tone="blue"
-        />
-        <ActionTile
-          title="Assessment clearance"
-          value={`${overallAssessmentClearance}%`}
-          detail="Aggregate pass signal across quiz, imported assessment, and project evaluation records."
-          tone="emerald"
-        />
-        <div className="rounded-[1.5rem] border border-zinc-200 bg-black p-5 text-white shadow-sm">
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <FileSpreadsheet className="h-4 w-4" />
-            Batch export
+      <section id="overview" className="scroll-mt-32 grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(20rem,0.75fr)]">
+        <div className="grid gap-4 md:grid-cols-2">
+          <ActionTile
+            title="Attendance Due"
+            value={`${summary.attendanceDueToday}`}
+            detail="Sessions past the governance window with no positive attendance mark."
+            tone="amber"
+            className="md:row-span-2"
+          />
+          <ActionTile
+            title="3-Day Absence Risks"
+            value={`${summary.absenceAlerts}`}
+            detail="Learners absent across the latest required sessions."
+            tone="rose"
+          />
+          <ActionTile
+            title="Assessment Clearance"
+            value={`${overallAssessmentClearance}%`}
+            detail="Combined pass signal across quizzes, imports, and project evaluations."
+            tone="emerald"
+          />
+          <ActionTile
+            title="Candidates In Training"
+            value={`${summary.remainingCandidates}`}
+            detail={`${summary.discontinuedCandidates} discontinued, ${summary.notClearedCandidates} not cleared, ${summary.offeredCandidates} offered/onboarded.`}
+            tone="blue"
+            className="md:col-span-2"
+          />
+        </div>
+        <div className="rounded-[1.5rem] border border-white/10 bg-[#111827] p-5 text-white shadow-[0_18px_70px_rgba(2,6,23,0.28)]">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <FileSpreadsheet className="h-4 w-4 text-sky-300" />
+              Evidence Pack
+            </div>
+            <Badge variant="outline" className="border-white/15 bg-white/10 text-slate-100">Export-ready</Badge>
           </div>
-          <p className="mt-3 text-sm text-zinc-400">Download batches, attendance, feedback, reminders, and linked assessments in one Excel workbook.</p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Button asChild className="rounded-full bg-white text-black hover:bg-zinc-200">
+          <p className="mt-4 text-sm leading-6 text-slate-400">Download batches, attendance, feedback, reminders, audit history, and linked assessment evidence in one workbook.</p>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Button asChild className="rounded-full bg-white text-[#0B1220] hover:bg-slate-200">
               <a href="/api/reports/training-ops/download">Excel</a>
             </Button>
             <Button asChild variant="outline" className="rounded-full border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white">
               <a href="/api/reports/training-ops/pdf">PDF</a>
             </Button>
           </div>
+          <div className="mt-5 grid gap-2 text-xs text-slate-400">
+            <div className="flex items-center justify-between rounded-2xl bg-white/5 px-3 py-2"><span>Automation health</span><span className="font-semibold text-white">{automationHealth}</span></div>
+            <div className="flex items-center justify-between rounded-2xl bg-white/5 px-3 py-2"><span>Provider failures</span><span className="font-semibold text-white">{dispatchHealth.failed}</span></div>
+          </div>
         </div>
       </section>
 
-      <section id="batches" className="scroll-mt-32">
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(22rem,0.85fr)]">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MissionSignalCard icon={Gauge} label="Automation Health" value={automationHealth} detail={`${automationRuns.length} governed run(s) logged`} tone="blue" />
+        <MissionSignalCard icon={ListChecks} label="Schedule Lanes" value={`${nextScheduleItems.length}`} detail={`${scheduleTimeline.length} total sessions and assessments`} tone="emerald" />
+        <MissionSignalCard icon={Database} label="Evidence Objects" value={`${assessmentSetups.length + projectEvaluations.length}`} detail="Assessment files and project evidence indexed" tone="amber" />
+        <MissionSignalCard icon={Workflow} label="Dispatch Health" value={`${dispatchHealth.sent}/${dispatchHealth.failed}`} detail="Sent vs failed notification outcomes" tone={dispatchHealth.failed > 0 ? 'red' : 'emerald'} />
+      </section>
+
+      <section id="live-operations" className="scroll-mt-32 space-y-4">
+      <SectionIntro eyebrow="Primary Zone" title="Live Operations" description="The daily operating loop: batches, attendance, score uploads, and schedule lanes." />
+      <div id="batches" className="grid gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(22rem,0.75fr)]">
         <DropPanel
           id="batch-board-panel"
           title="Live Batch Board"
@@ -754,7 +775,6 @@ export default async function ManagerOperationsPage({
           </CardContent>
         </DropPanel>
       </div>
-      </section>
 
       <AttendanceTrackerPanel
         sessions={sessions}
@@ -782,8 +802,11 @@ export default async function ManagerOperationsPage({
           />
         </CardContent>
       </DropPanel>
+      </section>
 
-      <section id="assessment" className="scroll-mt-32 grid gap-6 lg:grid-cols-2">
+      <section id="governance-zone" className="scroll-mt-32 space-y-4">
+        <SectionIntro eyebrow="Governance Zone" title="Quality, Compliance, Oversight" description="Assessment governance, project evidence, feedback pulse, and audit readiness in one operating layer." />
+        <div id="assessment" className="grid gap-6 lg:grid-cols-2">
         {canCoordinate ? (
         <DropPanel
           id="assessment-setup"
@@ -1029,9 +1052,13 @@ export default async function ManagerOperationsPage({
             </div>
           </CardContent>
         </DropPanel>
+        </div>
       </section>
 
       {canCoordinate ? (
+      <section id="automation-zone" className="scroll-mt-32 space-y-4">
+      <SectionIntro eyebrow="Automation Zone" title="Proactive Governance" description="Compact automation controls with recent status, alert health, and governed runbooks." />
+      <div>
       <DropPanel
         id="automation"
         title="Automation Runbook"
@@ -1101,9 +1128,13 @@ export default async function ManagerOperationsPage({
           </div>
         </CardContent>
       </DropPanel>
+      </div>
+      </section>
       ) : null}
 
-      <section id="setup" className="scroll-mt-32">
+      <section id="resources-zone" className="scroll-mt-32 space-y-4">
+      <SectionIntro eyebrow="Resources Zone" title="Operational Utilities" description="Secondary tools for setup, learner imports, schedule maintenance, and evidence libraries." />
+      <div id="setup">
       {canCoordinate ? (
       <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
         <DropPanel
@@ -1514,7 +1545,7 @@ export default async function ManagerOperationsPage({
           </CardContent>
         </Card>
       )}
-      </section>
+      </div>
 
       {canCoordinate ? (
         <section id="import" className="scroll-mt-32">
@@ -1533,16 +1564,24 @@ export default async function ManagerOperationsPage({
           batches={batches.map((batch: any) => ({ id: batch.id, title: batch.title }))}
         />
       </section>
+      </section>
 
-      <section id="analytics" className="scroll-mt-32 space-y-6">
+      <section id="intelligence-hub" className="scroll-mt-32 space-y-4">
+        <SectionIntro eyebrow="Intelligence Hub" title="Executive Signals" description="Batch trends, trainer performance, risk indicators, and audit evidence for decisions." />
+      <div className="grid gap-4 md:grid-cols-3">
+        <MissionSignalCard icon={BarChart3} label="Batch Signals" value={`${batchComparisonData.length}`} detail="Attendance, assessment, and clearance trends" tone="blue" />
+        <MissionSignalCard icon={LineChart} label="Trainer Signals" value={`${trainerScorecards.length}`} detail="Impact scorecards ranked by execution quality" tone="emerald" />
+        <MissionSignalCard icon={Zap} label="AI Summary" value={openRisks > 0 ? 'Action' : 'Clear'} detail={openRisks > 0 ? 'Prioritize risk queues before new setup work' : 'No critical operating risk is open'} tone={openRisks > 0 ? 'amber' : 'emerald'} />
+      </div>
+      <div id="analytics" className="space-y-6">
         {batchComparisonData.length > 0 && (
           <BatchComparisonChart data={batchComparisonData} />
         )}
 
         <TrainerScorecardDeck items={trainerScorecards} />
-      </section>
+      </div>
 
-      <section id="audit" className="scroll-mt-32 grid gap-6 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+      <div id="audit" className="grid gap-6 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
         <AuditPanel
           title="Batch Change Audit"
           empty="No batch lifecycle or configuration changes have been audited yet."
@@ -1594,6 +1633,7 @@ export default async function ManagerOperationsPage({
             meta: new Date(item.created_at).toLocaleString(),
           }))}
         />
+      </div>
       </section>
         </main>
       </div>
@@ -1609,6 +1649,91 @@ function StatCard({ label, value, icon: Icon }: { label: string; value: string; 
         <Icon className="h-4 w-4 text-white/60" />
       </div>
       <p className="mt-4 text-3xl font-bold text-white">{value}</p>
+    </div>
+  )
+}
+
+function MissionKpiCard({
+  label,
+  value,
+  detail,
+  icon: Icon,
+  tone,
+}: {
+  label: string
+  value: string
+  detail: string
+  icon: any
+  tone: 'blue' | 'emerald' | 'amber' | 'red'
+}) {
+  const toneClass = {
+    blue: 'from-sky-400/20 to-blue-500/10 text-sky-100',
+    emerald: 'from-emerald-400/20 to-emerald-500/10 text-emerald-100',
+    amber: 'from-amber-400/22 to-amber-500/10 text-amber-100',
+    red: 'from-rose-500/24 to-red-500/10 text-rose-100',
+  }[tone]
+
+  return (
+    <div className={`group min-w-0 rounded-[1.5rem] border border-white/10 bg-gradient-to-br ${toneClass} p-5 shadow-[0_16px_50px_rgba(2,6,23,0.22)] transition duration-300 hover:-translate-y-1 hover:border-white/25 hover:bg-white/10`}>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/60">{label}</p>
+        <span className="grid h-10 w-10 place-items-center rounded-2xl border border-white/10 bg-white/10 text-white transition group-hover:scale-105">
+          <Icon className="h-4 w-4" />
+        </span>
+      </div>
+      <p className="mt-5 text-4xl font-semibold tracking-tight text-white">{value}</p>
+      <p className="mt-2 text-sm leading-5 text-white/62">{detail}</p>
+    </div>
+  )
+}
+
+function SectionIntro({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
+  return (
+    <div className="flex flex-col gap-3 rounded-[1.5rem] border border-white/10 bg-white/[0.96] p-5 shadow-[0_18px_60px_rgba(2,6,23,0.12)] sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-blue-700">{eyebrow}</p>
+        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 md:text-3xl">{title}</h2>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">{description}</p>
+      </div>
+      <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
+        <Activity className="h-3.5 w-3.5 text-blue-600" />
+        Live signals
+      </div>
+    </div>
+  )
+}
+
+function MissionSignalCard({
+  icon: Icon,
+  label,
+  value,
+  detail,
+  tone,
+}: {
+  icon: any
+  label: string
+  value: string
+  detail: string
+  tone: 'blue' | 'emerald' | 'amber' | 'red'
+}) {
+  const toneClass = {
+    blue: 'border-blue-100 bg-blue-50 text-blue-700',
+    emerald: 'border-emerald-100 bg-emerald-50 text-emerald-700',
+    amber: 'border-amber-100 bg-amber-50 text-amber-700',
+    red: 'border-rose-100 bg-rose-50 text-rose-700',
+  }[tone]
+
+  return (
+    <div className="group rounded-[1.5rem] border border-white/70 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.10)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_26px_78px_rgba(15,23,42,0.16)]">
+      <div className="flex items-start justify-between gap-4">
+        <span className={`grid h-11 w-11 place-items-center rounded-2xl border ${toneClass}`}>
+          <Icon className="h-4 w-4" />
+        </span>
+        <CheckCircle2 className="h-4 w-4 text-emerald-500 opacity-70" />
+      </div>
+      <p className="mt-5 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">{label}</p>
+      <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{value}</p>
+      <p className="mt-2 text-sm leading-5 text-slate-500">{detail}</p>
     </div>
   )
 }
@@ -1851,20 +1976,20 @@ function DropPanel({
   children: ReactNode
 }) {
   return (
-    <details id={id} open={defaultOpen} className="group scroll-mt-32 overflow-hidden rounded-[1.35rem] border border-zinc-200 bg-white shadow-sm transition open:shadow-md">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 marker:hidden">
+    <details id={id} open={defaultOpen} className="group scroll-mt-32 overflow-hidden rounded-[1.5rem] border border-white/70 bg-white shadow-[0_18px_65px_rgba(15,23,42,0.10)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_28px_90px_rgba(15,23,42,0.16)] open:shadow-[0_28px_90px_rgba(15,23,42,0.16)]">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 bg-gradient-to-br from-white to-slate-50 px-5 py-4 marker:hidden">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-base font-semibold text-zinc-950">{title}</h2>
-            {badge ? <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">{badge}</span> : null}
+            <h2 className="text-base font-semibold text-slate-950">{title}</h2>
+            {badge ? <span className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-blue-700">{badge}</span> : null}
           </div>
-          <p className="mt-1 text-sm leading-5 text-zinc-500">{description}</p>
+          <p className="mt-1 text-sm leading-5 text-slate-500">{description}</p>
         </div>
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-zinc-50 text-zinc-600 transition group-open:rotate-180">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition group-open:rotate-180">
           <ChevronDown className="h-4 w-4" />
         </div>
       </summary>
-      <div className="border-t border-zinc-100 bg-white">
+      <div className="border-t border-slate-100 bg-white">
         {children}
       </div>
     </details>
@@ -2014,12 +2139,12 @@ function MiniMetric({ label, value }: { label: string; value: string }) {
   )
 }
 
-function ActionTile({ title, value, detail, tone }: { title: string; value: string; detail: string; tone: 'rose' | 'amber' | 'blue' | 'emerald' }) {
+function ActionTile({ title, value, detail, tone, className = '' }: { title: string; value: string; detail: string; tone: 'rose' | 'amber' | 'blue' | 'emerald'; className?: string }) {
   const edgeCls = {
-    rose: 'edge-lit-rose bg-white',
-    amber: 'border-amber-100 bg-amber-50 text-amber-950',
-    blue: 'edge-lit bg-white',
-    emerald: 'edge-lit-emerald bg-white',
+    rose: 'border-rose-100 bg-gradient-to-br from-white to-rose-50',
+    amber: 'border-amber-100 bg-gradient-to-br from-white to-amber-50 text-amber-950',
+    blue: 'border-sky-100 bg-gradient-to-br from-white to-sky-50',
+    emerald: 'border-emerald-100 bg-gradient-to-br from-white to-emerald-50',
   }
   const numCls = {
     rose: 'kpi-number-rose',
@@ -2030,7 +2155,12 @@ function ActionTile({ title, value, detail, tone }: { title: string; value: stri
   const textTone = { rose: 'text-rose-950', amber: 'text-amber-950', blue: 'text-zinc-900', emerald: 'text-zinc-900' }
 
   return (
-    <div className={`min-w-0 rounded-[1.5rem] border p-5 shadow-sm crosshair-focus ${edgeCls[tone]}`}>
+    <div className={`group min-w-0 rounded-[1.5rem] border p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(15,23,42,0.14)] ${edgeCls[tone]} ${className}`}>
+      <div className="mb-5 flex justify-end">
+        <span className="grid h-9 w-9 place-items-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition group-hover:scale-105">
+          <ArrowUpRight className="h-4 w-4" />
+        </span>
+      </div>
       <p className={`text-[10px] font-semibold uppercase tracking-[0.22em] opacity-60 ${textTone[tone]}`}>{title}</p>
       <p className={`mt-3 text-3xl font-bold ${numCls[tone] || textTone[tone]}`}>{value}</p>
       <p className={`mt-2 text-sm leading-relaxed opacity-70 ${textTone[tone]}`}>{detail}</p>
