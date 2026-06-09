@@ -74,6 +74,31 @@ async function updateIntegrityReviewAction(formData: FormData) {
   revalidatePath(`/employee/quizzes/${attempt.quiz_id}/results`)
 }
 
+async function deleteAttemptAction(formData: FormData) {
+  'use server'
+  const { userId, role } = await requireTrainingStaff()
+  const admin = createAdminClient()
+  const attemptId = String(formData.get('attempt_id') || '')
+  if (!attemptId) return
+
+  // Only allow deleting suspicious/flagged attempts
+  const { data: attempt } = await admin
+    .from('quiz_attempts')
+    .select('id, quiz_id, status, proctoring_status')
+    .eq('id', attemptId)
+    .maybeSingle()
+  if (!attempt) return
+  if (!['suspicious', 'flagged'].includes(attempt.status) && attempt.proctoring_status !== 'suspicious') return
+
+  const scopedQuizIds = await getScopedQuizIds(admin, userId, role)
+  if (scopedQuizIds && !scopedQuizIds.includes(attempt.quiz_id)) return
+
+  // Hard delete: removes attempt + cascade (events, evidence rows)
+  await admin.from('quiz_attempts').delete().eq('id', attemptId)
+
+  revalidatePath('/manager/integrity')
+}
+
 export default async function AssessmentIntegrityPage() {
   const { userId, role } = await requireTrainingStaff()
   const admin = createAdminClient()
@@ -242,9 +267,17 @@ export default async function AssessmentIntegrityPage() {
                   <p className="mt-1 text-sm text-amber-800">{attempt.quizzes?.title || 'Assessment'}</p>
                   <p className="mt-2 text-xs text-amber-700">Risk {risk.score} - Violations {attempt.proctoring_violations_count ?? 0} - Status {attempt.status}</p>
                 </div>
-                <form action={updateIntegrityReviewAction} className="flex flex-wrap gap-2">
-                  <SuspiciousReviewButtons attemptId={attempt.id} />
-                </form>
+                <div className="flex flex-wrap items-center gap-2">
+                  <form action={updateIntegrityReviewAction} className="flex flex-wrap gap-2">
+                    <SuspiciousReviewButtons attemptId={attempt.id} />
+                  </form>
+                  <form action={deleteAttemptAction}>
+                    <input type="hidden" name="attempt_id" value={attempt.id} />
+                    <button type="submit" className="rounded-full border border-zinc-300 bg-white px-3 py-2 text-xs font-semibold text-zinc-600 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700">
+                      Delete record
+                    </button>
+                  </form>
+                </div>
               </div>
             )
           })}

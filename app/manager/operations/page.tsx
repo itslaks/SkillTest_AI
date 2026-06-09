@@ -45,12 +45,10 @@ import {
   ClipboardCheck,
   Trash2,
   FileText,
-  FileCheck2,
   FileSpreadsheet,
   FolderOpen,
-  Gauge,
-  MessageSquareQuote,
   RadioTower,
+  MessageSquareQuote,
   ShieldAlert,
   Users,
 } from 'lucide-react'
@@ -390,26 +388,20 @@ export default async function ManagerOperationsPage({
     failed: notificationDispatchLogs.filter((item: any) => item.provider_status === 'failed').length,
     logged: notificationDispatchLogs.filter((item: any) => item.provider_status === 'logged').length,
   }
-  const proofMetrics = {
-    brdReadiness: 100,
-    evidenceFiles: assessmentSetups.filter((setup: any) => setup.question_file_name).length + projectEvaluations.filter((item: any) => item.evidence_file_name).length,
-    auditRows: attendanceVersions.length + assessmentUploads.length + batchChangeAudit.length + notificationDispatchLogs.length + automationRuns.length,
-    comparisonReady: batchComparisonData.length,
-  }
   const missionNav = [
     { label: 'Overview', href: '#overview', detail: 'KPIs and risks' },
-    { label: 'Setup', href: '#setup', detail: 'Batch, sessions, import' },
-    { label: 'Imports', href: '#import', detail: 'Learner upload' },
-    { label: 'Assessments', href: '#assessment', detail: 'Governance and scores' },
-    { label: 'Score Upload', href: '#assessment-upload', detail: 'Assessment results' },
-    { label: 'Projects', href: '#projects', detail: 'Evaluation evidence' },
-    { label: 'Schedule', href: '#schedule', detail: 'Calendar lanes' },
     { label: 'Batches', href: '#batches', detail: 'Live batch board' },
     { label: 'Attendance', href: '#attendance', detail: 'Tracker and import' },
+    { label: 'Score Upload', href: '#assessment-upload', detail: 'Assessment results' },
+    { label: 'Assessments', href: '#assessment', detail: 'Governance and scores' },
+    { label: 'Projects', href: '#projects', detail: 'Evaluation evidence' },
     { label: 'Feedback', href: '#communication', detail: 'Pulse and reminders' },
+    { label: 'Automation', href: '#automation', detail: 'Governed checks' },
+    { label: 'Setup', href: '#setup', detail: 'Batch, sessions, import' },
+    { label: 'Imports', href: '#import', detail: 'Learner upload' },
+    { label: 'Schedule', href: '#schedule', detail: 'Calendar lanes' },
     { label: 'Documents', href: '#documents', detail: 'Evidence library' },
     { label: 'Analytics', href: '#analytics', detail: 'Batch and trainer signals' },
-    { label: 'Automation', href: '#automation', detail: 'Governed checks' },
     { label: 'Audit', href: '#audit', detail: 'History and errors' },
   ]
 
@@ -525,6 +517,566 @@ export default async function ManagerOperationsPage({
           </div>
         </div>
       </section>
+
+      <section id="batches" className="scroll-mt-32">
+      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+        <DropPanel
+          id="batch-board-panel"
+          title="Live Batch Board"
+          description="Scan batch health, attendance, trainers, and next action without opening every admin control."
+          badge={`${batches.length} batches`}
+          defaultOpen
+        >
+          <LiveBatchBoard
+            batches={batches}
+            sessions={sessions}
+            attendance={attendance}
+            membersByBatch={membersByBatch}
+            trainersByBatch={trainersByBatch}
+            assessmentsByBatch={assessmentsByBatch}
+            quizzesByBatch={quizzesByBatch}
+            canCoordinate={canCoordinate}
+          />
+        </DropPanel>
+
+        <DropPanel
+          id="communication"
+          title="Feedback Pulse"
+          description="Create feedback forms, track open windows, and review learner sentiment."
+          badge={`${feedbackWindows.length} forms`}
+        >
+          <CardContent className="space-y-4">
+            <form action={createFeedbackWindowAction} className="rounded-[1.5rem] border border-zinc-900 bg-black p-5 text-white">
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Create Feedback Form</p>
+                  <h3 className="mt-2 text-lg font-semibold">Open a learner feedback form from Ops</h3>
+                  <p className="mt-1 text-sm text-zinc-400">Pick the batch, optionally link a session, set the close time, and learners receive the feedback request.</p>
+                </div>
+                <Badge variant="outline" className="w-fit border-white/15 bg-white/10 text-white">
+                  {feedbackWindows.filter((item: any) => item.status === 'open').length} open
+                </Badge>
+              </div>
+              <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr_1fr_auto] lg:items-end">
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Batch</span>
+                  <select name="batch_id" required className="h-11 rounded-xl border border-white/10 bg-white px-3 text-zinc-950">
+                    <option value="">Select batch</option>
+                    {batches.map((batch: any) => (
+                      <option key={batch.id} value={batch.id}>{batch.title}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Related session</span>
+                  <select name="session_id" className="h-11 rounded-xl border border-white/10 bg-white px-3 text-zinc-950">
+                    <option value="">Optional</option>
+                    {sessions.map((session: any) => (
+                      <option key={session.id} value={session.id}>{session.title}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Close by</span>
+                  <input name="closes_at" type="datetime-local" required className="h-11 rounded-xl border border-white/10 bg-white px-3 text-zinc-950" />
+                </label>
+                <OpsSubmitButton pendingLabel="Creating and emailing..." className="rounded-full bg-white text-black hover:bg-zinc-200">Create form</OpsSubmitButton>
+              </div>
+              <p className="mt-3 text-xs text-zinc-400">
+                You will see a confirmation message with learner email counts after the form is created.
+              </p>
+              <label className="mt-3 grid gap-2 text-sm">
+                <span className="font-medium">Form title</span>
+                <input name="title" defaultValue="Training content and trainer feedback" className="h-11 rounded-xl border border-white/10 bg-white px-3 text-zinc-950" />
+              </label>
+            </form>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              <MiniMetric label="Open feedback forms" value={`${feedbackWindows.filter((item: any) => item.status === 'open').length}`} />
+              <MiniMetric label="Submitted feedback" value={`${feedback.length}`} />
+              <MiniMetric label="Negative feedback" value={`${summary.negativeFeedbackCount}`} />
+            </div>
+
+            <div className="rounded-[1.5rem] border border-zinc-200 bg-zinc-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Feedback forms</p>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                {feedbackWindows.length === 0 ? (
+                  <div className="md:col-span-2">
+                    <EmptyState text="No feedback forms have been created yet." compact />
+                  </div>
+                ) : feedbackWindows.slice(0, 6).map((window: any) => (
+                  <div key={window.id} className="rounded-2xl border border-zinc-200 bg-white p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-zinc-950" title={window.title}>{window.title}</p>
+                        <p className="mt-1 text-xs text-zinc-500">{window.batch?.title || 'Batch'}{window.session?.title ? ` - ${window.session.title}` : ''}</p>
+                      </div>
+                      <Badge variant="outline" className="capitalize">{window.status}</Badge>
+                    </div>
+                    <p className="mt-3 text-xs text-zinc-500">Closes {new Date(window.closes_at).toLocaleString()}</p>
+                    <details className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50">
+                      <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-zinc-700">Edit form</summary>
+                      <form action={updateFeedbackWindowAction} className="grid gap-2 border-t border-zinc-200 p-3">
+                        <input type="hidden" name="feedback_window_id" value={window.id} />
+                        <label className="grid gap-1 text-xs">
+                          <span className="font-medium">Title</span>
+                          <input name="title" defaultValue={window.title} className="h-9 rounded-lg border border-zinc-200 bg-white px-2 text-sm" />
+                        </label>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <label className="grid gap-1 text-xs">
+                            <span className="font-medium">Close by</span>
+                            <input name="closes_at" type="datetime-local" defaultValue={toDateTimeLocal(window.closes_at)} className="h-9 rounded-lg border border-zinc-200 bg-white px-2 text-sm" />
+                          </label>
+                          <label className="grid gap-1 text-xs">
+                            <span className="font-medium">Status</span>
+                            <select name="status" defaultValue={window.status} className="h-9 rounded-lg border border-zinc-200 bg-white px-2 text-sm">
+                              <option value="draft">Draft</option>
+                              <option value="open">Open</option>
+                              <option value="closed">Closed</option>
+                            </select>
+                          </label>
+                        </div>
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <OpsSubmitButton pendingLabel="Updating..." size="sm" variant="outline" className="h-8 rounded-full bg-white">Update</OpsSubmitButton>
+                        </div>
+                      </form>
+                      <form action={deleteFeedbackWindowAction} className="border-t border-zinc-200 p-3 text-right">
+                        <input type="hidden" name="feedback_window_id" value={window.id} />
+                        <OpsSubmitButton pendingLabel="Deleting..." size="sm" variant="outline" className="h-8 rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">Delete</OpsSubmitButton>
+                      </form>
+                    </details>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <FeedbackAnalyticsPanel
+              analytics={feedbackAnalytics}
+              batches={batches.map((batch: any) => ({ id: batch.id, title: batch.title }))}
+            />
+
+            <MiniMetric label="Notifications sent" value={`${summary.notificationsSent}`} />
+
+            <div className="rounded-[1.5rem] border border-zinc-200 bg-zinc-50 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Dispatch Evidence</p>
+                  <p className="mt-1 text-sm text-zinc-500">Recipient-level email provider outcomes from recent training notifications.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline" className="border-emerald-200 bg-white text-emerald-700">Sent {dispatchHealth.sent}</Badge>
+                  <Badge variant="outline" className="border-rose-200 bg-white text-rose-700">Failed {dispatchHealth.failed}</Badge>
+                  <Badge variant="outline" className="border-zinc-200 bg-white text-zinc-700">Logged {dispatchHealth.logged}</Badge>
+                </div>
+              </div>
+              <div className="mt-4 space-y-2">
+                {notificationDispatchLogs.length === 0 ? (
+                  <EmptyState text="No provider dispatch evidence has been logged yet." compact />
+                ) : notificationDispatchLogs.slice(0, 4).map((item: any) => {
+                  const sourceNotification = notificationById.get(item.notification_id) as any
+                  return (
+                    <div key={item.id} className="rounded-2xl border border-zinc-200 bg-white p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="min-w-0 truncate text-sm font-medium">{sourceNotification?.title || 'Training notification'}</p>
+                        <Badge variant="outline" className="capitalize">{item.provider_status}</Badge>
+                      </div>
+                      <p className="mt-1 text-xs text-zinc-500">{item.recipient_email || 'No recipient email'} - {item.provider_message || 'No provider message'}</p>
+                      <p className="mt-1 text-xs text-zinc-400">{new Date(item.created_at).toLocaleString()}</p>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Recent notifications</p>
+              {notifications.length === 0 ? (
+                <EmptyState text="No notifications yet." compact />
+              ) : (
+                notifications.slice(0, 5).map((item: any) => (
+                  <div key={item.id} className="rounded-2xl border border-zinc-200 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-medium">{item.title}</p>
+                      <Badge variant="outline" className="capitalize">{item.delivery_status}</Badge>
+                    </div>
+                    <p className="mt-1 text-sm text-zinc-500">{item.message}</p>
+                    <p className="mt-2 text-xs text-zinc-400">
+                      {item.batch?.title || item.session?.title || item.recipient?.full_name || 'General'} - {new Date(item.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Recent feedback</p>
+              {feedback.length === 0 ? (
+                <EmptyState text="No feedback submitted yet." compact />
+              ) : (
+                feedback.slice(0, 5).map((item: any) => (
+                  <div key={item.id} className="rounded-2xl border border-zinc-200 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-medium">{item.trainee?.full_name || item.trainee?.email || 'Learner'}</p>
+                      <Badge variant="outline" className="capitalize">{item.sentiment}</Badge>
+                    </div>
+                    <p className="mt-1 text-sm text-zinc-500">{item.feedback_text}</p>
+                    {item.action_item ? <p className="mt-2 text-xs text-zinc-400">Suggested action: {item.action_item}</p> : null}
+                  </div>
+                ))
+              )}
+            </div>
+
+          </CardContent>
+        </DropPanel>
+      </div>
+      </section>
+
+      <AttendanceTrackerPanel
+        sessions={sessions}
+        membersByBatch={membersByBatch}
+        attendanceBySession={attendanceBySession}
+        attendanceRate={summary.attendanceRate}
+        updateAction={updateAttendanceStatus}
+      />
+
+      <DropPanel
+        id="assessment-upload"
+        title="Assessment Score Upload"
+        description="Upload sprint, coding, and project-linked assessment scores."
+        badge={`${assessmentUploads.length} uploads`}
+      >
+        <CardContent>
+          <AssessmentScoreImporter
+            batches={batches.map((batch: any) => ({ id: batch.id, title: batch.title }))}
+            assessments={assessmentSetups.map((setup: any) => ({
+              id: setup.id,
+              batch_id: setup.batch_id,
+              title: setup.title,
+              assessment_type: setup.assessment_type,
+            }))}
+          />
+        </CardContent>
+      </DropPanel>
+
+      <section id="assessment" className="scroll-mt-32 grid gap-6 xl:grid-cols-[1fr_1fr]">
+        {canCoordinate ? (
+        <DropPanel
+          id="assessment-setup"
+          title="Assessment Governance"
+          description="Set up official assessments for each batch — define the type, schedule, pass mark, and question file."
+          badge={`${assessmentSetups.length} setups`}
+          defaultOpen
+        >
+          <CardContent className="pt-5 space-y-5">
+            <div className="grid gap-3 sm:grid-cols-3 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm">
+              <div>
+                <p className="font-semibold text-blue-900">📋 Step 1 — Pick the batch</p>
+                <p className="mt-1 text-xs text-blue-700">Choose which training batch this assessment belongs to.</p>
+              </div>
+              <div>
+                <p className="font-semibold text-blue-900">📅 Step 2 — Set type and date</p>
+                <p className="mt-1 text-xs text-blue-700">Choose Sprint Review, Coding, or Project. Set the date so candidates know when it happens.</p>
+              </div>
+              <div>
+                <p className="font-semibold text-blue-900">✅ Step 3 — Set pass mark and save</p>
+                <p className="mt-1 text-xs text-blue-700">Default is 70/100. Hit "Create" — the assessment now appears in your score upload section.</p>
+              </div>
+            </div>
+            <form action={createTrainingAssessmentSetupAction} className="grid gap-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Batch</span>
+                  <select name="batch_id" required className="h-11 rounded-xl border border-zinc-200 px-3">
+                    <option value="">Select batch</option>
+                    {batches.map((batch: any) => <option key={batch.id} value={batch.id}>{batch.title}</option>)}
+                  </select>
+                </label>
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Assessment type</span>
+                  <select name="assessment_type" defaultValue="sprint_review" className="h-11 rounded-xl border border-zinc-200 px-3">
+                    <option value="sprint_review">Sprint review</option>
+                    <option value="api_coding">API and coding</option>
+                    <option value="coding">Coding</option>
+                    <option value="project">Project evaluation</option>
+                    <option value="other">Other</option>
+                  </select>
+                </label>
+              </div>
+              <label className="grid gap-2 text-sm">
+                <span className="font-medium">Assessment title</span>
+                <input name="title" required className="h-11 rounded-xl border border-zinc-200 px-3" placeholder="Sprint 2 Review - Collections and API" />
+              </label>
+              <div className="grid gap-4 md:grid-cols-3">
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Schedule</span>
+                  <input name="scheduled_at" type="datetime-local" className="h-11 rounded-xl border border-zinc-200 px-3" />
+                </label>
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Max score</span>
+                  <input name="max_score" type="number" min="1" defaultValue="100" className="h-11 rounded-xl border border-zinc-200 px-3" />
+                </label>
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Passing score</span>
+                  <input name="passing_score" type="number" min="0" defaultValue="70" className="h-11 rounded-xl border border-zinc-200 px-3" />
+                </label>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Excel template name</span>
+                  <input name="template_name" className="h-11 rounded-xl border border-zinc-200 px-3" placeholder="api-coding-template.xlsx" />
+                </label>
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Question file name</span>
+                  <input name="question_file_name" className="h-11 rounded-xl border border-zinc-200 px-3" placeholder="sprint-2-question-bank.xlsx" />
+                </label>
+              </div>
+              <label className="grid gap-2 text-sm">
+                <span className="font-medium">Upload question file</span>
+                <input name="question_file" type="file" accept=".csv,.xlsx,.xls,.json,.xml,.pdf,.docx" className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-3 py-3 text-sm" />
+              </label>
+              <OpsSubmitButton pendingLabel="Creating..." className="w-fit rounded-full bg-black text-white hover:bg-zinc-800">Create assessment setup</OpsSubmitButton>
+            </form>
+            <div className="mt-5 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-zinc-950">Assessment setup CRUD</p>
+                <Badge variant="outline" className="bg-white">{assessmentSetups.length} setup(s)</Badge>
+              </div>
+              <div className="mt-3 grid gap-3">
+                {assessmentSetups.length === 0 ? (
+                  <EmptyState text="No assessment setups yet." compact />
+                ) : assessmentSetups.slice(0, 8).map((setup: any) => (
+                  <div key={setup.id} className="rounded-xl border border-zinc-200 bg-white p-3">
+                    <form action={updateTrainingAssessmentSetupAction} className="grid gap-2 lg:grid-cols-[1.2fr_0.9fr_0.9fr_0.7fr_0.7fr_0.8fr_auto] lg:items-end">
+                      <input type="hidden" name="assessment_setup_id" value={setup.id} />
+                      <input type="hidden" name="template_name" value={setup.template_name || ''} />
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Title</span>
+                        <input name="title" defaultValue={setup.title} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
+                      </label>
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Type</span>
+                        <select name="assessment_type" defaultValue={setup.assessment_type} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm">
+                          <option value="sprint_review">Sprint review</option>
+                          <option value="api_coding">API and coding</option>
+                          <option value="coding">Coding</option>
+                          <option value="project">Project</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </label>
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Schedule</span>
+                        <input name="scheduled_at" type="datetime-local" defaultValue={toDateTimeLocal(setup.scheduled_at)} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
+                      </label>
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Max</span>
+                        <input name="max_score" type="number" defaultValue={setup.max_score || 100} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
+                      </label>
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Pass</span>
+                        <input name="passing_score" type="number" defaultValue={setup.passing_score || 70} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
+                      </label>
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Status</span>
+                        <select name="status" defaultValue={setup.status} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm">
+                          <option value="planned">Planned</option>
+                          <option value="open">Open</option>
+                          <option value="completed">Completed</option>
+                          <option value="cancelled">Cancelled</option>
+                        </select>
+                      </label>
+                      <OpsSubmitButton pendingLabel="Updating..." size="sm" variant="outline" className="h-9 rounded-full bg-white">Update</OpsSubmitButton>
+                    </form>
+                    <form action={deleteTrainingAssessmentSetupAction} className="mt-2 flex justify-end">
+                      <input type="hidden" name="assessment_setup_id" value={setup.id} />
+                      <OpsSubmitButton pendingLabel="Deleting..." size="sm" variant="outline" className="h-8 rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">Delete</OpsSubmitButton>
+                    </form>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </DropPanel>
+        ) : null}
+
+        <DropPanel
+          id="projects"
+          title="Project Evaluation"
+          description="Record final project scores for each candidate and attach the evidence file."
+          badge={`${projectEvaluations.length} records`}
+          defaultOpen
+        >
+          <CardContent className="pt-5 space-y-5">
+            <div className="grid gap-3 sm:grid-cols-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm">
+              <div>
+                <p className="font-semibold text-emerald-900">👤 Step 1 — Pick candidate</p>
+                <p className="mt-1 text-xs text-emerald-700">Select the batch, then pick the candidate whose project you are scoring.</p>
+              </div>
+              <div>
+                <p className="font-semibold text-emerald-900">📊 Step 2 — Enter score</p>
+                <p className="mt-1 text-xs text-emerald-700">Give a score out of 100. Optionally upload a PDF/ZIP as evidence — this is stored for compliance.</p>
+              </div>
+              <div>
+                <p className="font-semibold text-emerald-900">💾 Step 3 — Save evaluation</p>
+                <p className="mt-1 text-xs text-emerald-700">Hit "Save". The score is counted in the batch assessment clearance % shown at the top of the page.</p>
+              </div>
+            </div>
+            <form action={createProjectEvaluationAction} className="grid gap-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Batch</span>
+                  <select name="batch_id" required className="h-11 rounded-xl border border-zinc-200 px-3">
+                    <option value="">Select batch</option>
+                    {batches.map((batch: any) => <option key={batch.id} value={batch.id}>{batch.title}</option>)}
+                  </select>
+                </label>
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Candidate</span>
+                  <select name="user_id" required className="h-11 rounded-xl border border-zinc-200 px-3">
+                    <option value="">Select candidate</option>
+                    {members.map((member: any) => (
+                      <option key={member.id} value={member.user_id}>{member.profile?.full_name || member.profile?.email}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <label className="grid gap-2 text-sm">
+                <span className="font-medium">Project title</span>
+                <input name="project_title" required className="h-11 rounded-xl border border-zinc-200 px-3" placeholder="Capstone API project" />
+              </label>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Score</span>
+                  <input name="score" type="number" min="0" max="100" required className="h-11 rounded-xl border border-zinc-200 px-3" />
+                </label>
+                <label className="grid gap-2 text-sm">
+                  <span className="font-medium">Evidence file</span>
+                  <input name="evidence_file_name" className="h-11 rounded-xl border border-zinc-200 px-3" placeholder="candidate-project-review.pdf" />
+                </label>
+              </div>
+              <label className="grid gap-2 text-sm">
+                <span className="font-medium">Upload evidence file</span>
+                <input name="evidence_file" type="file" accept=".csv,.xlsx,.xls,.json,.xml,.pdf,.docx,.png,.jpg,.jpeg,.zip" className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-3 py-3 text-sm" />
+              </label>
+              <label className="grid gap-2 text-sm">
+                <span className="font-medium">Remarks</span>
+                <textarea name="remarks" rows={3} className="rounded-xl border border-zinc-200 px-3 py-3" placeholder="Evaluation notes, strengths, and improvement actions." />
+              </label>
+              <OpsSubmitButton pendingLabel="Saving..." className="w-fit rounded-full bg-black text-white hover:bg-zinc-800">Save project evaluation</OpsSubmitButton>
+            </form>
+            <div className="mt-5 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-zinc-950">Project evaluation CRUD</p>
+                <Badge variant="outline" className="bg-white">{projectEvaluations.length} record(s)</Badge>
+              </div>
+              <div className="mt-3 grid gap-3">
+                {projectEvaluations.length === 0 ? (
+                  <EmptyState text="No project evaluations yet." compact />
+                ) : projectEvaluations.slice(0, 8).map((evaluation: any) => (
+                  <div key={evaluation.id} className="rounded-xl border border-zinc-200 bg-white p-3">
+                    <form action={updateProjectEvaluationAction} className="grid gap-2 lg:grid-cols-[1fr_0.5fr_1fr_auto] lg:items-end">
+                      <input type="hidden" name="project_evaluation_id" value={evaluation.id} />
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Project</span>
+                        <input name="project_title" defaultValue={evaluation.project_title} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
+                      </label>
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Score</span>
+                        <input name="score" type="number" min="0" max="100" defaultValue={evaluation.score} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
+                      </label>
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Evidence</span>
+                        <input name="evidence_file_name" defaultValue={evaluation.evidence_file_name || ''} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
+                      </label>
+                      <OpsSubmitButton pendingLabel="Updating..." size="sm" variant="outline" className="h-9 rounded-full bg-white">Update</OpsSubmitButton>
+                      <label className="grid gap-1 text-xs lg:col-span-3">
+                        <span className="font-medium">Remarks</span>
+                        <input name="remarks" defaultValue={evaluation.remarks || ''} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
+                      </label>
+                      <p className="text-xs text-zinc-500">{evaluation.trainee?.full_name || evaluation.trainee?.email || 'Candidate'}</p>
+                    </form>
+                    <form action={deleteProjectEvaluationAction} className="mt-2 flex justify-end">
+                      <input type="hidden" name="project_evaluation_id" value={evaluation.id} />
+                      <OpsSubmitButton pendingLabel="Deleting..." size="sm" variant="outline" className="h-8 rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">Delete</OpsSubmitButton>
+                    </form>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </DropPanel>
+      </section>
+
+      {canCoordinate ? (
+      <DropPanel
+        id="automation"
+        title="Automation Runbook"
+        description="One-click checks that send reminders and alerts to candidates and trainers automatically."
+        badge={`${automationRuns.length} runs`}
+        defaultOpen
+      >
+        <CardContent className="space-y-5">
+          <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-sm">
+            <p className="font-semibold text-amber-900">💡 How automation works</p>
+            <p className="mt-1 text-xs text-amber-700">
+              Each button below runs a governed check and sends notifications instantly. You can target all batches or a specific one.
+              No technical knowledge needed — just click "Run" and the system handles the rest.
+            </p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+          {automationRunTypes.map((runType) => {
+            const latestForType = automationRuns.find((item: any) => item.run_type === runType)
+            const labels: Record<string, { title: string; plain: string; emoji: string }> = {
+              attendance_cutoff: {
+                title: 'Attendance Cut-off Alert',
+                emoji: '🕙',
+                plain: `Sends an email alert to coordinators when a session has passed ${governanceSettings.attendanceCutoffTime} with no positive attendance recorded. Keeps discipline on track.`,
+              },
+              absence_streak: {
+                title: 'Absence Streak Warning',
+                emoji: '⚠️',
+                plain: `Flags candidates who have been absent for ${governanceSettings.absenceAlertDays} or more consecutive sessions. Use this to catch at-risk candidates early.`,
+              },
+              assessment_reminder: {
+                title: 'Assessment Reminder',
+                emoji: '📝',
+                plain: 'Emails all candidates who have an assessment due in the next 48 hours so they are prepared and not surprised.',
+              },
+              feedback_reminder: {
+                title: 'Feedback Window Reminder',
+                emoji: '💬',
+                plain: `Reminds candidates to submit feedback before open forms close within ${governanceSettings.feedbackWindowDays} day(s). Improves feedback submission rates.`,
+              },
+            }
+            const meta = labels[runType] || { title: runType.replaceAll('_', ' '), emoji: '▶️', plain: '' }
+            return (
+            <form key={runType} action={runTrainingAutomationAction} className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+              <input type="hidden" name="run_type" value={runType} />
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-semibold">{meta.emoji} {meta.title}</p>
+                <Badge variant="outline" className="bg-white">
+                  {latestForType ? '✓ last run logged' : 'ready to run'}
+                </Badge>
+              </div>
+              <p className="mt-2 text-sm text-zinc-600 leading-relaxed">{meta.plain}</p>
+              <div className="mt-3 rounded-xl border border-zinc-200 bg-white p-3 text-xs text-zinc-500">
+                {latestForType
+                  ? `Last run: ${new Date(latestForType.created_at).toLocaleString()} — sent ${latestForType.notifications_created} notification(s)`
+                  : 'Not run yet. Click below to run it for the first time.'}
+              </div>
+              <label className="mt-3 grid gap-2 text-sm">
+                <span className="font-medium">Target batch (leave blank for all)</span>
+                <select name="batch_id" className="h-11 rounded-xl border border-zinc-200 bg-white px-3">
+                  <option value="">All active batches</option>
+                  {batches.map((batch: any) => <option key={batch.id} value={batch.id}>{batch.title}</option>)}
+                </select>
+              </label>
+              <OpsSubmitButton pendingLabel="Running check…" variant="outline" className="mt-4 rounded-full bg-white">▶ Run now</OpsSubmitButton>
+            </form>
+          )})}
+          </div>
+        </CardContent>
+      </DropPanel>
+      ) : null}
 
       <section id="setup" className="scroll-mt-32">
       {canCoordinate ? (
@@ -925,509 +1477,6 @@ export default async function ManagerOperationsPage({
         </section>
       ) : null}
 
-      <section id="assessment" className="scroll-mt-32 grid gap-6 xl:grid-cols-[1fr_1fr]">
-        {canCoordinate ? (
-        <DropPanel
-          id="assessment-setup"
-          title="Assessment Governance"
-          description="Define type, date, template, question file, and score rules."
-          badge={`${assessmentSetups.length} setups`}
-        >
-          <CardContent className="pt-5">
-            <form action={createTrainingAssessmentSetupAction} className="grid gap-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="grid gap-2 text-sm">
-                  <span className="font-medium">Batch</span>
-                  <select name="batch_id" required className="h-11 rounded-xl border border-zinc-200 px-3">
-                    <option value="">Select batch</option>
-                    {batches.map((batch: any) => <option key={batch.id} value={batch.id}>{batch.title}</option>)}
-                  </select>
-                </label>
-                <label className="grid gap-2 text-sm">
-                  <span className="font-medium">Assessment type</span>
-                  <select name="assessment_type" defaultValue="sprint_review" className="h-11 rounded-xl border border-zinc-200 px-3">
-                    <option value="sprint_review">Sprint review</option>
-                    <option value="api_coding">API and coding</option>
-                    <option value="coding">Coding</option>
-                    <option value="project">Project evaluation</option>
-                    <option value="other">Other</option>
-                  </select>
-                </label>
-              </div>
-              <label className="grid gap-2 text-sm">
-                <span className="font-medium">Assessment title</span>
-                <input name="title" required className="h-11 rounded-xl border border-zinc-200 px-3" placeholder="Sprint 2 Review - Collections and API" />
-              </label>
-              <div className="grid gap-4 md:grid-cols-3">
-                <label className="grid gap-2 text-sm">
-                  <span className="font-medium">Schedule</span>
-                  <input name="scheduled_at" type="datetime-local" className="h-11 rounded-xl border border-zinc-200 px-3" />
-                </label>
-                <label className="grid gap-2 text-sm">
-                  <span className="font-medium">Max score</span>
-                  <input name="max_score" type="number" min="1" defaultValue="100" className="h-11 rounded-xl border border-zinc-200 px-3" />
-                </label>
-                <label className="grid gap-2 text-sm">
-                  <span className="font-medium">Passing score</span>
-                  <input name="passing_score" type="number" min="0" defaultValue="70" className="h-11 rounded-xl border border-zinc-200 px-3" />
-                </label>
-              </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="grid gap-2 text-sm">
-                  <span className="font-medium">Excel template name</span>
-                  <input name="template_name" className="h-11 rounded-xl border border-zinc-200 px-3" placeholder="api-coding-template.xlsx" />
-                </label>
-                <label className="grid gap-2 text-sm">
-                  <span className="font-medium">Question file name</span>
-                  <input name="question_file_name" className="h-11 rounded-xl border border-zinc-200 px-3" placeholder="sprint-2-question-bank.xlsx" />
-                </label>
-              </div>
-              <label className="grid gap-2 text-sm">
-                <span className="font-medium">Upload question file</span>
-                <input name="question_file" type="file" accept=".csv,.xlsx,.xls,.json,.xml,.pdf,.docx" className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-3 py-3 text-sm" />
-              </label>
-              <OpsSubmitButton pendingLabel="Creating..." className="w-fit rounded-full bg-black text-white hover:bg-zinc-800">Create assessment setup</OpsSubmitButton>
-            </form>
-            <div className="mt-5 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-zinc-950">Assessment setup CRUD</p>
-                <Badge variant="outline" className="bg-white">{assessmentSetups.length} setup(s)</Badge>
-              </div>
-              <div className="mt-3 grid gap-3">
-                {assessmentSetups.length === 0 ? (
-                  <EmptyState text="No assessment setups yet." compact />
-                ) : assessmentSetups.slice(0, 8).map((setup: any) => (
-                  <div key={setup.id} className="rounded-xl border border-zinc-200 bg-white p-3">
-                    <form action={updateTrainingAssessmentSetupAction} className="grid gap-2 lg:grid-cols-[1.2fr_0.9fr_0.9fr_0.7fr_0.7fr_0.8fr_auto] lg:items-end">
-                      <input type="hidden" name="assessment_setup_id" value={setup.id} />
-                      <input type="hidden" name="template_name" value={setup.template_name || ''} />
-                      <label className="grid gap-1 text-xs">
-                        <span className="font-medium">Title</span>
-                        <input name="title" defaultValue={setup.title} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
-                      </label>
-                      <label className="grid gap-1 text-xs">
-                        <span className="font-medium">Type</span>
-                        <select name="assessment_type" defaultValue={setup.assessment_type} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm">
-                          <option value="sprint_review">Sprint review</option>
-                          <option value="api_coding">API and coding</option>
-                          <option value="coding">Coding</option>
-                          <option value="project">Project</option>
-                          <option value="other">Other</option>
-                        </select>
-                      </label>
-                      <label className="grid gap-1 text-xs">
-                        <span className="font-medium">Schedule</span>
-                        <input name="scheduled_at" type="datetime-local" defaultValue={toDateTimeLocal(setup.scheduled_at)} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
-                      </label>
-                      <label className="grid gap-1 text-xs">
-                        <span className="font-medium">Max</span>
-                        <input name="max_score" type="number" defaultValue={setup.max_score || 100} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
-                      </label>
-                      <label className="grid gap-1 text-xs">
-                        <span className="font-medium">Pass</span>
-                        <input name="passing_score" type="number" defaultValue={setup.passing_score || 70} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
-                      </label>
-                      <label className="grid gap-1 text-xs">
-                        <span className="font-medium">Status</span>
-                        <select name="status" defaultValue={setup.status} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm">
-                          <option value="planned">Planned</option>
-                          <option value="open">Open</option>
-                          <option value="completed">Completed</option>
-                          <option value="cancelled">Cancelled</option>
-                        </select>
-                      </label>
-                      <OpsSubmitButton pendingLabel="Updating..." size="sm" variant="outline" className="h-9 rounded-full bg-white">Update</OpsSubmitButton>
-                    </form>
-                    <form action={deleteTrainingAssessmentSetupAction} className="mt-2 flex justify-end">
-                      <input type="hidden" name="assessment_setup_id" value={setup.id} />
-                      <OpsSubmitButton pendingLabel="Deleting..." size="sm" variant="outline" className="h-8 rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">Delete</OpsSubmitButton>
-                    </form>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </DropPanel>
-        ) : null}
-
-        <DropPanel
-          id="projects"
-          title="Project Evaluation"
-          description="Score projects and attach evidence filenames or files."
-          badge={`${projectEvaluations.length} records`}
-        >
-          <CardContent className="pt-5">
-            <form action={createProjectEvaluationAction} className="grid gap-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="grid gap-2 text-sm">
-                  <span className="font-medium">Batch</span>
-                  <select name="batch_id" required className="h-11 rounded-xl border border-zinc-200 px-3">
-                    <option value="">Select batch</option>
-                    {batches.map((batch: any) => <option key={batch.id} value={batch.id}>{batch.title}</option>)}
-                  </select>
-                </label>
-                <label className="grid gap-2 text-sm">
-                  <span className="font-medium">Candidate</span>
-                  <select name="user_id" required className="h-11 rounded-xl border border-zinc-200 px-3">
-                    <option value="">Select candidate</option>
-                    {members.map((member: any) => (
-                      <option key={member.id} value={member.user_id}>{member.profile?.full_name || member.profile?.email}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <label className="grid gap-2 text-sm">
-                <span className="font-medium">Project title</span>
-                <input name="project_title" required className="h-11 rounded-xl border border-zinc-200 px-3" placeholder="Capstone API project" />
-              </label>
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="grid gap-2 text-sm">
-                  <span className="font-medium">Score</span>
-                  <input name="score" type="number" min="0" max="100" required className="h-11 rounded-xl border border-zinc-200 px-3" />
-                </label>
-                <label className="grid gap-2 text-sm">
-                  <span className="font-medium">Evidence file</span>
-                  <input name="evidence_file_name" className="h-11 rounded-xl border border-zinc-200 px-3" placeholder="candidate-project-review.pdf" />
-                </label>
-              </div>
-              <label className="grid gap-2 text-sm">
-                <span className="font-medium">Upload evidence file</span>
-                <input name="evidence_file" type="file" accept=".csv,.xlsx,.xls,.json,.xml,.pdf,.docx,.png,.jpg,.jpeg,.zip" className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-3 py-3 text-sm" />
-              </label>
-              <label className="grid gap-2 text-sm">
-                <span className="font-medium">Remarks</span>
-                <textarea name="remarks" rows={3} className="rounded-xl border border-zinc-200 px-3 py-3" placeholder="Evaluation notes, strengths, and improvement actions." />
-              </label>
-              <OpsSubmitButton pendingLabel="Saving..." className="w-fit rounded-full bg-black text-white hover:bg-zinc-800">Save project evaluation</OpsSubmitButton>
-            </form>
-            <div className="mt-5 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-zinc-950">Project evaluation CRUD</p>
-                <Badge variant="outline" className="bg-white">{projectEvaluations.length} record(s)</Badge>
-              </div>
-              <div className="mt-3 grid gap-3">
-                {projectEvaluations.length === 0 ? (
-                  <EmptyState text="No project evaluations yet." compact />
-                ) : projectEvaluations.slice(0, 8).map((evaluation: any) => (
-                  <div key={evaluation.id} className="rounded-xl border border-zinc-200 bg-white p-3">
-                    <form action={updateProjectEvaluationAction} className="grid gap-2 lg:grid-cols-[1fr_0.5fr_1fr_auto] lg:items-end">
-                      <input type="hidden" name="project_evaluation_id" value={evaluation.id} />
-                      <label className="grid gap-1 text-xs">
-                        <span className="font-medium">Project</span>
-                        <input name="project_title" defaultValue={evaluation.project_title} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
-                      </label>
-                      <label className="grid gap-1 text-xs">
-                        <span className="font-medium">Score</span>
-                        <input name="score" type="number" min="0" max="100" defaultValue={evaluation.score} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
-                      </label>
-                      <label className="grid gap-1 text-xs">
-                        <span className="font-medium">Evidence</span>
-                        <input name="evidence_file_name" defaultValue={evaluation.evidence_file_name || ''} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
-                      </label>
-                      <OpsSubmitButton pendingLabel="Updating..." size="sm" variant="outline" className="h-9 rounded-full bg-white">Update</OpsSubmitButton>
-                      <label className="grid gap-1 text-xs lg:col-span-3">
-                        <span className="font-medium">Remarks</span>
-                        <input name="remarks" defaultValue={evaluation.remarks || ''} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
-                      </label>
-                      <p className="text-xs text-zinc-500">{evaluation.trainee?.full_name || evaluation.trainee?.email || 'Candidate'}</p>
-                    </form>
-                    <form action={deleteProjectEvaluationAction} className="mt-2 flex justify-end">
-                      <input type="hidden" name="project_evaluation_id" value={evaluation.id} />
-                      <OpsSubmitButton pendingLabel="Deleting..." size="sm" variant="outline" className="h-8 rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">Delete</OpsSubmitButton>
-                    </form>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </DropPanel>
-      </section>
-
-      {canCoordinate ? (
-      <DropPanel
-        id="automation"
-        title="Automation Runbook"
-        description="Run attendance, absence, assessment, and feedback checks on demand."
-        badge={`${automationRuns.length} runs`}
-      >
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          {automationRunTypes.map((runType) => {
-            const latestForType = automationRuns.find((item: any) => item.run_type === runType)
-            return (
-            <form key={runType} action={runTrainingAutomationAction} className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-              <input type="hidden" name="run_type" value={runType} />
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-semibold capitalize">{runType.replaceAll('_', ' ')}</p>
-                <Badge variant="outline" className="bg-white">
-                  {latestForType ? 'logged' : 'ready'}
-                </Badge>
-              </div>
-              <p className="mt-1 text-sm text-zinc-500">
-                {runType === 'attendance_cutoff'
-                  ? `Rule: send coordinator email alerts after ${governanceSettings.attendanceCutoffTime} when no positive attendance exists.`
-                  : runType === 'absence_streak'
-                    ? `Rule: flag candidates absent across ${governanceSettings.absenceAlertDays} attendance-required sessions.`
-                    : runType === 'assessment_reminder'
-                      ? 'Rule: email candidates for assessments due in the next 48 hours.'
-                      : `Rule: remind candidates before open feedback windows close within ${governanceSettings.feedbackWindowDays} day(s).`}
-              </p>
-              <div className="mt-3 rounded-xl border border-zinc-200 bg-white p-3 text-xs text-zinc-500">
-                Last run: {latestForType ? `${new Date(latestForType.created_at).toLocaleString()} - ${latestForType.notifications_created} notification(s)` : 'Not executed yet'}
-              </div>
-              <label className="mt-3 grid gap-2 text-sm">
-                <span className="font-medium">Optional batch</span>
-                <select name="batch_id" className="h-11 rounded-xl border border-zinc-200 bg-white px-3">
-                  <option value="">All visible batches</option>
-                  {batches.map((batch: any) => <option key={batch.id} value={batch.id}>{batch.title}</option>)}
-                </select>
-              </label>
-              <OpsSubmitButton pendingLabel="Running..." variant="outline" className="mt-4 rounded-full bg-white">Run governed check</OpsSubmitButton>
-            </form>
-          )})}
-        </CardContent>
-      </DropPanel>
-      ) : null}
-
-      <section id="batches" className="scroll-mt-32">
-      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <DropPanel
-          id="batch-board-panel"
-          title="Live Batch Board"
-          description="Scan batch health, attendance, trainers, and next action without opening every admin control."
-          badge={`${batches.length} batches`}
-          defaultOpen
-        >
-          <LiveBatchBoard
-            batches={batches}
-            sessions={sessions}
-            attendance={attendance}
-            membersByBatch={membersByBatch}
-            trainersByBatch={trainersByBatch}
-            assessmentsByBatch={assessmentsByBatch}
-            quizzesByBatch={quizzesByBatch}
-            canCoordinate={canCoordinate}
-          />
-        </DropPanel>
-
-        <DropPanel
-          id="communication"
-          title="Feedback Pulse"
-          description="Create feedback forms, track open windows, and review learner sentiment."
-          badge={`${feedbackWindows.length} forms`}
-        >
-          <CardContent className="space-y-4">
-            <form action={createFeedbackWindowAction} className="rounded-[1.5rem] border border-zinc-900 bg-black p-5 text-white">
-              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Create Feedback Form</p>
-                  <h3 className="mt-2 text-lg font-semibold">Open a learner feedback form from Ops</h3>
-                  <p className="mt-1 text-sm text-zinc-400">Pick the batch, optionally link a session, set the close time, and learners receive the feedback request.</p>
-                </div>
-                <Badge variant="outline" className="w-fit border-white/15 bg-white/10 text-white">
-                  {feedbackWindows.filter((item: any) => item.status === 'open').length} open
-                </Badge>
-              </div>
-              <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr_1fr_auto] lg:items-end">
-                <label className="grid gap-2 text-sm">
-                  <span className="font-medium">Batch</span>
-                  <select name="batch_id" required className="h-11 rounded-xl border border-white/10 bg-white px-3 text-zinc-950">
-                    <option value="">Select batch</option>
-                    {batches.map((batch: any) => (
-                      <option key={batch.id} value={batch.id}>{batch.title}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="grid gap-2 text-sm">
-                  <span className="font-medium">Related session</span>
-                  <select name="session_id" className="h-11 rounded-xl border border-white/10 bg-white px-3 text-zinc-950">
-                    <option value="">Optional</option>
-                    {sessions.map((session: any) => (
-                      <option key={session.id} value={session.id}>{session.title}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="grid gap-2 text-sm">
-                  <span className="font-medium">Close by</span>
-                  <input name="closes_at" type="datetime-local" required className="h-11 rounded-xl border border-white/10 bg-white px-3 text-zinc-950" />
-                </label>
-                <OpsSubmitButton pendingLabel="Creating and emailing..." className="rounded-full bg-white text-black hover:bg-zinc-200">Create form</OpsSubmitButton>
-              </div>
-              <p className="mt-3 text-xs text-zinc-400">
-                You will see a confirmation message with learner email counts after the form is created.
-              </p>
-              <label className="mt-3 grid gap-2 text-sm">
-                <span className="font-medium">Form title</span>
-                <input name="title" defaultValue="Training content and trainer feedback" className="h-11 rounded-xl border border-white/10 bg-white px-3 text-zinc-950" />
-              </label>
-            </form>
-
-            <div className="grid gap-3 md:grid-cols-3">
-              <MiniMetric label="Open feedback forms" value={`${feedbackWindows.filter((item: any) => item.status === 'open').length}`} />
-              <MiniMetric label="Submitted feedback" value={`${feedback.length}`} />
-              <MiniMetric label="Negative feedback" value={`${summary.negativeFeedbackCount}`} />
-            </div>
-
-            <div className="rounded-[1.5rem] border border-zinc-200 bg-zinc-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Feedback forms</p>
-              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                {feedbackWindows.length === 0 ? (
-                  <div className="md:col-span-2">
-                    <EmptyState text="No feedback forms have been created yet." compact />
-                  </div>
-                ) : feedbackWindows.slice(0, 6).map((window: any) => (
-                  <div key={window.id} className="rounded-2xl border border-zinc-200 bg-white p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate font-semibold text-zinc-950" title={window.title}>{window.title}</p>
-                        <p className="mt-1 text-xs text-zinc-500">{window.batch?.title || 'Batch'}{window.session?.title ? ` - ${window.session.title}` : ''}</p>
-                      </div>
-                      <Badge variant="outline" className="capitalize">{window.status}</Badge>
-                    </div>
-                    <p className="mt-3 text-xs text-zinc-500">Closes {new Date(window.closes_at).toLocaleString()}</p>
-                    <details className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50">
-                      <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-zinc-700">Edit form</summary>
-                      <form action={updateFeedbackWindowAction} className="grid gap-2 border-t border-zinc-200 p-3">
-                        <input type="hidden" name="feedback_window_id" value={window.id} />
-                        <label className="grid gap-1 text-xs">
-                          <span className="font-medium">Title</span>
-                          <input name="title" defaultValue={window.title} className="h-9 rounded-lg border border-zinc-200 bg-white px-2 text-sm" />
-                        </label>
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          <label className="grid gap-1 text-xs">
-                            <span className="font-medium">Close by</span>
-                            <input name="closes_at" type="datetime-local" defaultValue={toDateTimeLocal(window.closes_at)} className="h-9 rounded-lg border border-zinc-200 bg-white px-2 text-sm" />
-                          </label>
-                          <label className="grid gap-1 text-xs">
-                            <span className="font-medium">Status</span>
-                            <select name="status" defaultValue={window.status} className="h-9 rounded-lg border border-zinc-200 bg-white px-2 text-sm">
-                              <option value="draft">Draft</option>
-                              <option value="open">Open</option>
-                              <option value="closed">Closed</option>
-                            </select>
-                          </label>
-                        </div>
-                        <div className="flex flex-wrap justify-end gap-2">
-                          <OpsSubmitButton pendingLabel="Updating..." size="sm" variant="outline" className="h-8 rounded-full bg-white">Update</OpsSubmitButton>
-                        </div>
-                      </form>
-                      <form action={deleteFeedbackWindowAction} className="border-t border-zinc-200 p-3 text-right">
-                        <input type="hidden" name="feedback_window_id" value={window.id} />
-                        <OpsSubmitButton pendingLabel="Deleting..." size="sm" variant="outline" className="h-8 rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">Delete</OpsSubmitButton>
-                      </form>
-                    </details>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <FeedbackAnalyticsPanel
-              analytics={feedbackAnalytics}
-              batches={batches.map((batch: any) => ({ id: batch.id, title: batch.title }))}
-            />
-
-            <MiniMetric label="Notifications sent" value={`${summary.notificationsSent}`} />
-
-            <div className="rounded-[1.5rem] border border-zinc-200 bg-zinc-50 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Dispatch Evidence</p>
-                  <p className="mt-1 text-sm text-zinc-500">Recipient-level email provider outcomes from recent training notifications.</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="outline" className="border-emerald-200 bg-white text-emerald-700">Sent {dispatchHealth.sent}</Badge>
-                  <Badge variant="outline" className="border-rose-200 bg-white text-rose-700">Failed {dispatchHealth.failed}</Badge>
-                  <Badge variant="outline" className="border-zinc-200 bg-white text-zinc-700">Logged {dispatchHealth.logged}</Badge>
-                </div>
-              </div>
-              <div className="mt-4 space-y-2">
-                {notificationDispatchLogs.length === 0 ? (
-                  <EmptyState text="No provider dispatch evidence has been logged yet." compact />
-                ) : notificationDispatchLogs.slice(0, 4).map((item: any) => {
-                  const sourceNotification = notificationById.get(item.notification_id) as any
-                  return (
-                    <div key={item.id} className="rounded-2xl border border-zinc-200 bg-white p-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="min-w-0 truncate text-sm font-medium">{sourceNotification?.title || 'Training notification'}</p>
-                        <Badge variant="outline" className="capitalize">{item.provider_status}</Badge>
-                      </div>
-                      <p className="mt-1 text-xs text-zinc-500">{item.recipient_email || 'No recipient email'} - {item.provider_message || 'No provider message'}</p>
-                      <p className="mt-1 text-xs text-zinc-400">{new Date(item.created_at).toLocaleString()}</p>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Recent notifications</p>
-              {notifications.length === 0 ? (
-                <EmptyState text="No notifications yet." compact />
-              ) : (
-                notifications.slice(0, 5).map((item: any) => (
-                  <div key={item.id} className="rounded-2xl border border-zinc-200 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="font-medium">{item.title}</p>
-                      <Badge variant="outline" className="capitalize">{item.delivery_status}</Badge>
-                    </div>
-                    <p className="mt-1 text-sm text-zinc-500">{item.message}</p>
-                    <p className="mt-2 text-xs text-zinc-400">
-                      {item.batch?.title || item.session?.title || item.recipient?.full_name || 'General'} - {new Date(item.created_at).toLocaleString()}
-                    </p>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Recent feedback</p>
-              {feedback.length === 0 ? (
-                <EmptyState text="No feedback submitted yet." compact />
-              ) : (
-                feedback.slice(0, 5).map((item: any) => (
-                  <div key={item.id} className="rounded-2xl border border-zinc-200 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="font-medium">{item.trainee?.full_name || item.trainee?.email || 'Learner'}</p>
-                      <Badge variant="outline" className="capitalize">{item.sentiment}</Badge>
-                    </div>
-                    <p className="mt-1 text-sm text-zinc-500">{item.feedback_text}</p>
-                    {item.action_item ? <p className="mt-2 text-xs text-zinc-400">Suggested action: {item.action_item}</p> : null}
-                  </div>
-                ))
-              )}
-            </div>
-
-          </CardContent>
-        </DropPanel>
-      </div>
-      </section>
-
-      <AttendanceTrackerPanel
-        sessions={sessions}
-        membersByBatch={membersByBatch}
-        attendanceBySession={attendanceBySession}
-        attendanceRate={summary.attendanceRate}
-        updateAction={updateAttendanceStatus}
-      />
-
-      <DropPanel
-        id="assessment-upload"
-        title="Assessment Score Upload"
-        description="Upload sprint, coding, and project-linked assessment scores."
-        badge={`${assessmentUploads.length} uploads`}
-      >
-        <CardContent>
-          <AssessmentScoreImporter
-            batches={batches.map((batch: any) => ({ id: batch.id, title: batch.title }))}
-            assessments={assessmentSetups.map((setup: any) => ({
-              id: setup.id,
-              batch_id: setup.batch_id,
-              title: setup.title,
-              assessment_type: setup.assessment_type,
-            }))}
-          />
-        </CardContent>
-      </DropPanel>
-
       <section id="schedule" className="scroll-mt-32">
         <ScheduleTimeline items={scheduleTimeline} />
       </section>
@@ -1447,8 +1496,6 @@ export default async function ManagerOperationsPage({
 
         <TrainerScorecardDeck items={trainerScorecards} />
       </section>
-
-      <CommandProofStrip metrics={proofMetrics} />
 
       <section id="audit" className="scroll-mt-32 grid gap-6 xl:grid-cols-4">
         <AuditPanel
@@ -1670,65 +1717,6 @@ function LiveBatchBoard({
         )
       })}
     </CardContent>
-  )
-}
-
-function CommandProofStrip({ metrics }: { metrics: { brdReadiness: number; evidenceFiles: number; auditRows: number; comparisonReady: number } }) {
-  const items = [
-    {
-      label: 'BRD coverage',
-      value: `${metrics.brdReadiness}%`,
-      detail: 'Live requirement proof matrix',
-      icon: FileCheck2,
-      href: '/manager/compliance',
-    },
-    {
-      label: 'Evidence vault',
-      value: `${metrics.evidenceFiles}`,
-      detail: 'Question files and project proof',
-      icon: FolderOpen,
-      href: '/manager/operations#assessment',
-    },
-    {
-      label: 'Audit rows',
-      value: `${metrics.auditRows}`,
-      detail: 'Uploads, dispatches, runs, edits',
-      icon: RadioTower,
-      href: '/manager/operations',
-    },
-    {
-      label: 'Batch DNA',
-      value: `${metrics.comparisonReady}`,
-      detail: 'Programs ready for comparison',
-      icon: Gauge,
-      href: '/manager/operations',
-    },
-  ]
-
-  return (
-    <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-      {items.map((item) => {
-        const Icon = item.icon
-        return (
-          <Link
-            key={item.label}
-            href={item.href}
-            className="group rounded-[1.35rem] border border-zinc-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-md"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">{item.label}</p>
-                <p className="mt-3 text-3xl font-bold text-zinc-950">{item.value}</p>
-              </div>
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-zinc-950 text-white transition group-hover:bg-cyan-600">
-                <Icon className="h-5 w-5" />
-              </div>
-            </div>
-            <p className="mt-3 text-sm leading-relaxed text-zinc-500">{item.detail}</p>
-          </Link>
-        )
-      })}
-    </section>
   )
 }
 
