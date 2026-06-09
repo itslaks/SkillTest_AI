@@ -12,6 +12,7 @@ import {
 } from '@/lib/insights'
 import type { SubmitQuizInput, LeaderboardEntry, QuizAnswer, DifficultyLevel } from '@/lib/types/database'
 import { buildCandidateProctoringNoticeEmail, buildQuizCompletedEmail, buildQuizProctoringFlagEmail, sendEmail } from '@/lib/email'
+import { getSiteUrl } from '@/lib/security/env'
 import { calculateProctoringRisk, shouldAutoSubmitForIntegrity } from '@/lib/proctoring'
 import {
   buildProctoringSummary,
@@ -367,7 +368,7 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
           adminClient.from('certificates').select('id').eq('quiz_id', quiz_id).eq('user_id', user.id).maybeSingle(),
         ])
         if (profile?.email) {
-          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+          const baseUrl = getSiteUrl().replace(/\/$/, '')
           await sendEmail({
             to: profile.email,
             subject: `Quiz Result: ${quiz.title} — ${score}%`,
@@ -420,7 +421,7 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
             riskLevel: proctoringRisk.level,
             autoSubmitted: Boolean(proctoring?.autoSubmitted || isIntegrityAutoSubmit),
             events: safeProctoringEvents,
-            reviewUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/manager/integrity?attempt=${data.id}`,
+            reviewUrl: `${getSiteUrl().replace(/\/$/, '')}/manager/integrity?attempt=${data.id}`,
           })
 
           const mailResult = await sendEmail({

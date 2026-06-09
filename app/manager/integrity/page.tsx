@@ -3,6 +3,7 @@ import { requireTrainingStaff } from '@/lib/rbac'
 import { calculateProctoringRisk, getProctoringEventRisk } from '@/lib/proctoring'
 import { PROCTORING_EVIDENCE_BUCKET } from '@/lib/proctoring-server'
 import { buildQuizCompletedEmail, sendEmail } from '@/lib/email'
+import { getSiteUrl } from '@/lib/security/env'
 import { revalidatePath } from 'next/cache'
 import { after } from 'next/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -512,7 +513,7 @@ async function sendApprovedAttemptEmail(admin: ReturnType<typeof createAdminClie
       admin.from('certificates').select('id').eq('quiz_id', attempt.quiz_id).eq('user_id', attempt.user_id).maybeSingle(),
     ])
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+    const baseUrl = getSiteUrl().replace(/\/$/, '')
     await sendEmail({
       to: profile.email,
       subject: `Quiz Results Released: ${quiz?.title || 'Assessment'} — ${attempt.score}%`,

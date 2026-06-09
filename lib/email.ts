@@ -249,7 +249,7 @@ export function buildQuizAssignedEmail(opts: {
         <tr><td style="padding:10px;background:#f3f4f6;font-weight:700;">Difficulty</td><td style="padding:10px;background:#fafafa;">${opts.difficulty}</td></tr>
         <tr><td style="padding:10px;background:#f3f4f6;font-weight:700;">Due</td><td style="padding:10px;background:#fafafa;">${opts.dueDate || 'As scheduled by your trainer'}</td></tr>
       </table>
-      <a href="${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/employee/quizzes" style="display:inline-block;background:#000;color:#fff;padding:12px 20px;border-radius:999px;text-decoration:none;font-weight:700;">Open Quiz</a>
+      <a href="${getSiteUrl().replace(/\/$/, '')}/employee/quizzes" style="display:inline-block;background:#000;color:#fff;padding:12px 20px;border-radius:999px;text-decoration:none;font-weight:700;">Open Quiz</a>
     </div>
   </div>`
 }
@@ -288,7 +288,7 @@ export function buildQuizCompletedEmail(opts: {
   certificateUrl?: string
   resultUrl?: string
 }) {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+  const baseUrl = getSiteUrl().replace(/\/$/, '')
   const resultUrl = escapeHtml(opts.resultUrl || `${baseUrl}/employee/quizzes`)
   const certificateUrl = opts.certificateUrl ? escapeHtml(opts.certificateUrl) : null
   const isPassing = opts.score >= (opts.passingScore ?? 60)
