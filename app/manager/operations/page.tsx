@@ -561,7 +561,7 @@ export default async function ManagerOperationsPage({
 
       <section id="live-operations" className="scroll-mt-32 space-y-4">
       <SectionIntro eyebrow="Primary Zone" title="Live Operations" description="The daily operating loop: batches, attendance, score uploads, and schedule lanes." />
-      <div id="batches" className="grid gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(22rem,0.75fr)]">
+      <div id="batches" className="grid gap-6 2xl:grid-cols-[minmax(0,1.4fr)_minmax(24rem,0.6fr)]">
         <DropPanel
           id="batch-board-panel"
           title="Live Batch Board"
@@ -1766,7 +1766,7 @@ function LiveBatchBoard({
   }
 
   return (
-    <CardContent className="grid gap-4 lg:grid-cols-2">
+    <CardContent className="grid gap-4 xl:grid-cols-2">
       {batches.map((batch: any) => {
         const batchMembers = membersByBatch.get(batch.id) || []
         const batchSessions = sessions.filter((session: any) => session.batch_id === batch.id)
@@ -1806,14 +1806,14 @@ function LiveBatchBoard({
               </Badge>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-2 xl:grid-cols-4">
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
               <MiniMetric label="Learners" value={`${batchMembers.length}`} />
               <MiniMetric label="Scheduled" value={`${scheduledCount}`} />
               <MiniMetric label="Completed" value={`${completedCount}`} />
               <MiniMetric label="Assessments" value={`${assessments.length || quizzes.length}`} />
             </div>
 
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Trainers</p>
                 <p className="mt-2 text-sm text-zinc-700">{uniqueTrainerNames.length ? uniqueTrainerNames.join(', ') : 'Unassigned'}</p>
