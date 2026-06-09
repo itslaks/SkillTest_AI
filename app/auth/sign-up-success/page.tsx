@@ -108,7 +108,7 @@ function SignUpSuccessContent() {
     )
   }
 
-  // Student success page
+  // Employee success page
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-950/20 via-background to-background p-4">
       <div className="w-full max-w-md">

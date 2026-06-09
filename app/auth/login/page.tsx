@@ -70,13 +70,13 @@ function LoginContent() {
               {
                 icon: BookOpen,
                 role: 'Trainer',
-                desc: 'Create quizzes, manage batches, track student performance',
+                desc: 'Create quizzes, manage batches, track employee performance',
                 color: 'text-violet-400',
                 bg: 'bg-violet-500/10 border-violet-500/20',
               },
               {
                 icon: GraduationCap,
-                role: 'Student',
+                role: 'Employee',
                 desc: 'Take assessments, earn badges, track your learning journey',
                 color: 'text-cyan-400',
                 bg: 'bg-cyan-500/10 border-cyan-500/20',
@@ -215,7 +215,7 @@ function LoginContent() {
             <p className="text-sm text-muted-foreground">
               Don&apos;t have an account?{' '}
               <Link href="/auth/sign-up" className="text-primary font-semibold hover:underline underline-offset-4">
-                Sign up as Student or Trainer
+                Sign up as Employee or Trainer
               </Link>
             </p>
           </div>
