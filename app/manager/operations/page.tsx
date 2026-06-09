@@ -20,6 +20,9 @@ import {
   updateTrainingBatchDetails,
   updateTrainingSession,
   updateAttendanceStatus,
+  removeTrainingBatchMember,
+  deleteTrainingNotification,
+  deleteTrainingFeedback,
 } from '@/lib/actions/training'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
@@ -164,6 +167,24 @@ async function deleteProjectEvaluationAction(formData: FormData) {
   'use server'
   const result = await deleteProjectEvaluation(formData)
   redirectWithOpsResult(result, 'Project evaluation deleted.', 'project-evaluation')
+}
+
+async function removeTrainingBatchMemberAction(formData: FormData) {
+  'use server'
+  const result = await removeTrainingBatchMember(formData)
+  redirectWithOpsResult(result, 'Learner removed from batch.', 'batches')
+}
+
+async function deleteTrainingNotificationAction(formData: FormData) {
+  'use server'
+  const result = await deleteTrainingNotification(formData)
+  redirectWithOpsResult(result, 'Notification deleted.', 'schedule-session')
+}
+
+async function deleteTrainingFeedbackAction(formData: FormData) {
+  'use server'
+  const result = await deleteTrainingFeedback(formData)
+  redirectWithOpsResult(result, 'Feedback record deleted.', 'communication')
 }
 
 async function runTrainingAutomationAction(formData: FormData) {
@@ -721,6 +742,10 @@ export default async function ManagerOperationsPage({
                     </div>
                     <p className="mt-1 text-sm text-zinc-500">{item.feedback_text}</p>
                     {item.action_item ? <p className="mt-2 text-xs text-zinc-400">Suggested action: {item.action_item}</p> : null}
+                    <form action={deleteTrainingFeedbackAction}>
+                      <input type="hidden" name="feedback_id" value={item.id} />
+                      <OpsSubmitButton pendingLabel="Deleting..." size="sm" variant="outline" className="mt-2 h-7 rounded-full border-rose-200 bg-rose-50 text-xs text-rose-700 hover:bg-rose-100">Delete</OpsSubmitButton>
+                    </form>
                   </div>
                 ))
               )}
@@ -1379,6 +1404,26 @@ export default async function ManagerOperationsPage({
               </label>
               <OpsSubmitButton pendingLabel="Creating..." variant="outline" className="rounded-full">Create notification</OpsSubmitButton>
             </form>
+
+            {notifications.slice(0, 10).length > 0 && (
+              <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+                <p className="text-sm font-semibold text-zinc-950">Recent notifications</p>
+                <div className="mt-3 grid gap-2">
+                  {notifications.slice(0, 10).map((notification: any) => (
+                    <div key={notification.id} className="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white p-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{notification.title}</p>
+                        <p className="text-xs text-zinc-500">{notification.audience} · {notification.channel} · {notification.delivery_status}</p>
+                      </div>
+                      <form action={deleteTrainingNotificationAction}>
+                        <input type="hidden" name="notification_id" value={notification.id} />
+                        <OpsSubmitButton pendingLabel="Deleting..." size="sm" variant="outline" className="h-8 rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">Delete</OpsSubmitButton>
+                      </form>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </DropPanel>
 
@@ -1660,13 +1705,21 @@ function LiveBatchBoard({
 
             <div className="mt-4 flex flex-wrap gap-2">
               {batchMembers.slice(0, 6).map((member: any) => (
-                <BatchMemberStatusDropdown
-                  key={member.id}
-                  memberId={member.id}
-                  currentStatus={member.enrollment_status}
-                  name={member.profile?.full_name || member.profile?.email || 'Unknown'}
-                  canEdit={canCoordinate}
-                />
+                <div key={member.id} className="flex items-center gap-1">
+                  <BatchMemberStatusDropdown
+                    memberId={member.id}
+                    currentStatus={member.enrollment_status}
+                    name={member.profile?.full_name || member.profile?.email || 'Unknown'}
+                    canEdit={canCoordinate}
+                  />
+                  {canCoordinate && (
+                    <form action={removeTrainingBatchMemberAction}>
+                      <input type="hidden" name="member_id" value={member.id} />
+                      <input type="hidden" name="batch_id" value={batch.id} />
+                      <button type="submit" className="rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-100 transition">Remove</button>
+                    </form>
+                  )}
+                </div>
               ))}
               {batchMembers.length > 6 ? <Badge variant="outline" className="rounded-full bg-zinc-50">+{batchMembers.length - 6} more</Badge> : null}
             </div>

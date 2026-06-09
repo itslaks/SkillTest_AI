@@ -931,6 +931,40 @@ export async function updateBatchMemberStatus(formData: FormData): Promise<ApiRe
   return { data: true }
 }
 
+export async function removeTrainingBatchMember(formData: FormData): Promise<ApiResponse<boolean>> {
+  const { userId, role } = await requireManager()
+  const admin = createAdminClient()
+
+  const memberId = asRequiredString(formData.get('member_id'))
+  const batchId = asRequiredString(formData.get('batch_id'))
+  if (!memberId || !batchId) return { error: 'Member and batch are required.' }
+
+  // Check permission
+  const { data: batch } = await admin.from('training_batches').select('created_by, coordinator_id').eq('id', batchId).maybeSingle()
+  if (!batch) return { error: 'Training batch was not found.' }
+  if (role !== 'admin' && batch.created_by !== userId && batch.coordinator_id !== userId) {
+    return { error: 'You do not have permission to remove members from this batch.' }
+  }
+
+  const { data: member } = await admin.from('batch_members').select('*').eq('id', memberId).maybeSingle()
+  if (!member) return { error: 'Batch member was not found.' }
+
+  const { error } = await admin.from('batch_members').delete().eq('id', memberId)
+  if (error) return { error: error.message }
+
+  await admin.from('training_batch_change_audit').insert({
+    batch_id: batchId,
+    change_type: 'batch_member_removed',
+    previous_value: member,
+    new_value: { removed: true, user_id: member.user_id },
+    changed_by: userId,
+  }).select('id').maybeSingle()
+
+  revalidatePath('/manager/operations')
+  revalidatePath('/employee/training')
+  return { data: true }
+}
+
 export async function updateTrainingBatchStatus(formData: FormData): Promise<ApiResponse<boolean>> {
   const { userId, role } = await requireManager()
   const admin = createAdminClient()
@@ -1394,6 +1428,17 @@ export async function createTrainingNotification(formData: FormData): Promise<Ap
   return { data: true }
 }
 
+export async function deleteTrainingNotification(formData: FormData): Promise<ApiResponse<boolean>> {
+  await requireManager()
+  const admin = createAdminClient()
+  const notificationId = asRequiredString(formData.get('notification_id'))
+  if (!notificationId) return { error: 'Notification is required.' }
+  const { error } = await admin.from('training_notifications').delete().eq('id', notificationId)
+  if (error) return { error: error.message }
+  revalidatePath('/manager/operations')
+  return { data: true }
+}
+
 export async function createTrainingAssessmentSetup(formData: FormData): Promise<ApiResponse<boolean>> {
   const { userId } = await requireManager()
   const admin = createAdminClient()
@@ -1466,6 +1511,9 @@ export async function updateTrainingAssessmentSetup(formData: FormData): Promise
   const status = asRequiredString(formData.get('status'), 'planned') || 'planned'
 
   if (!setupId || !title) return { error: 'Assessment setup and title are required.' }
+  if (maxScore <= 0 || passingScore < 0 || passingScore > maxScore) {
+    return { error: 'Score ranges are invalid. Passing score must be between 0 and max score.' }
+  }
 
   const { data: previous } = await admin.from('training_assessment_setups').select('*').eq('id', setupId).maybeSingle()
   if (!previous) return { error: 'Assessment setup was not found.' }
@@ -2168,5 +2216,17 @@ export async function submitTrainingFeedback(formData: FormData): Promise<ApiRes
   revalidatePath('/manager')
   revalidatePath('/manager/operations')
   revalidatePath('/employee/training')
+  return { data: true }
+}
+
+export async function deleteTrainingFeedback(formData: FormData): Promise<ApiResponse<boolean>> {
+  const { role } = await requireManager()
+  const admin = createAdminClient()
+  if (role !== 'admin' && role !== 'manager') return { error: 'Only managers can delete feedback records.' }
+  const feedbackId = asRequiredString(formData.get('feedback_id'))
+  if (!feedbackId) return { error: 'Feedback record is required.' }
+  const { error } = await admin.from('training_feedback').delete().eq('id', feedbackId)
+  if (error) return { error: error.message }
+  revalidatePath('/manager/operations')
   return { data: true }
 }
