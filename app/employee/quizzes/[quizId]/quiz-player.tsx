@@ -177,6 +177,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const hiddenCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
+  const autoStartedCameraRef = useRef(false)
   const proctoringEventsRef = useRef<ProctoringEvent[]>([])
   const violationCountRef = useRef(0)
   const proctoringSessionIdRef = useRef<string | null>(null)
@@ -778,6 +779,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   }, [deviceErrorMessage, getActiveTrackCounts, logPermissionDebug, stopMediaStream, updatePermissionDebug, verifyCameraVisibility])
 
   const requestCameraPermission = useCallback(() => {
+    autoStartedCameraRef.current = true  // prevent duplicate auto-start after manual click
     void requestDevicePermission('camera')
   }, [requestDevicePermission])
 
@@ -1101,6 +1103,17 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       videoRef.current.play().catch(() => undefined)
     }
   }, [cameraReady, started])
+
+  // When browser permission is already granted (e.g. returning for a second quiz),
+  // the permission query immediately returns 'granted' but no stream is active yet.
+  // Auto-request the camera stream so the preview is not a black screen.
+  useEffect(() => {
+    if (!requiresProctoring || started || autoStartedCameraRef.current) return
+    if (cameraPermission.permissionState === 'granted' && !mediaStreamRef.current) {
+      autoStartedCameraRef.current = true
+      void requestDevicePermission('camera')
+    }
+  }, [cameraPermission.permissionState, requestDevicePermission, requiresProctoring, started])
 
   useEffect(() => {
     if (!requiresProctoring || !started || finished) return
