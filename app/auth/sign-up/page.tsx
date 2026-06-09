@@ -68,7 +68,7 @@ function SignUpForm() {
             <div className={`w-10 h-10 rounded-2xl mb-4 flex items-center justify-center ${isTrainer ? 'bg-violet-500/30' : 'bg-blue-500/30'}`}>
               {isTrainer ? <BookOpen className="w-5 h-5 text-violet-300" /> : <GraduationCap className="w-5 h-5 text-blue-300" />}
             </div>
-            <p className="text-[10px] uppercase tracking-widest text-white/40 mb-2">{isTrainer ? 'Trainer Portal' : 'Student Portal'}</p>
+            <p className="text-[10px] uppercase tracking-widest text-white/40 mb-2">{isTrainer ? 'Trainer Portal' : 'Employee Portal'}</p>
             <p className="text-white font-semibold text-sm leading-tight">{isTrainer ? 'Shape the next generation of talent' : 'Your learning journey starts here'}</p>
             <div className="mt-4 space-y-2">
               {(isTrainer
@@ -111,7 +111,7 @@ function SignUpForm() {
             {(isTrainer ? [
               { icon: Zap, label: 'Admin-approved access', desc: 'Your account is reviewed before activation' },
               { icon: ShieldCheck, label: 'Secure & professional', desc: 'Enterprise-grade platform controls' },
-              { icon: Star, label: 'Full analytics suite', desc: 'Measure student outcomes in real time' },
+              { icon: Star, label: 'Full analytics suite', desc: 'Measure employee outcomes in real time' },
             ] : [
               { icon: Zap, label: 'AI-powered assessments', desc: 'Smart questions tailored to your role' },
               { icon: ShieldCheck, label: 'Secure & private', desc: 'Your data is always protected' },
@@ -164,7 +164,7 @@ function SignUpForm() {
               <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-2 ${selectedRole === 'employee' ? 'bg-blue-500' : 'bg-muted'}`}>
                 <GraduationCap className={`h-5 w-5 ${selectedRole === 'employee' ? 'text-white' : 'text-muted-foreground'}`} />
               </div>
-              <p className={`font-semibold text-sm ${selectedRole === 'employee' ? 'text-blue-700' : ''}`}>Student</p>
+              <p className={`font-semibold text-sm ${selectedRole === 'employee' ? 'text-blue-700' : ''}`}>Employee</p>
               <p className="text-xs text-muted-foreground mt-0.5">Instant access</p>
               {selectedRole === 'employee' && (
                 <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
@@ -295,7 +295,7 @@ function SignUpForm() {
               >
                 {isPending
                   ? <><Spinner className="mr-2" />Creating account&hellip;</>
-                  : <>{isTrainer ? 'Submit Trainer Application' : 'Create Student Account'} <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-0.5 transition-transform" /></>
+                  : <>{isTrainer ? 'Submit Trainer Application' : 'Create Employee Account'} <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-0.5 transition-transform" /></>
                 }
               </Button>
             </div>
