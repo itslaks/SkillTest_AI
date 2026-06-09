@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { requireAdmin, requireManager } from '@/lib/rbac'
+import { requireAdmin, requireManager, requireTrainingStaff } from '@/lib/rbac'
 import { revalidatePath } from 'next/cache'
 import type { ApiResponse, EmployeeImport, EmployeeImportError, EmployeeImportResult } from '@/lib/types/database'
 import { approveTrainer, rejectTrainer } from '@/lib/actions/auth'
@@ -65,6 +65,139 @@ export async function getAdminAuditLogs() {
 
   if (error) return { error: error.message, data: [] }
   return { data: data || [] }
+}
+
+function isMissingTrainerAssignmentsTable(error: any) {
+  const message = String(error?.message || '').toLowerCase()
+  return error?.code === '42P01' || message.includes('trainer_employee_assignments') || message.includes('does not exist')
+}
+
+async function getAssignedEmployeeIdsForTrainer(admin: ReturnType<typeof createAdminClient>, trainerId: string) {
+  const { data, error } = await admin
+    .from('trainer_employee_assignments')
+    .select('employee_id')
+    .eq('trainer_id', trainerId)
+
+  if (error) {
+    if (isMissingTrainerAssignmentsTable(error)) return { ids: [] as string[], missingTable: true }
+    return { ids: [] as string[], error: error.message as string }
+  }
+
+  return { ids: (data || []).map((item: any) => item.employee_id).filter(Boolean) as string[] }
+}
+
+export async function getTrainerEmployeeAssignmentData() {
+  await requireAdmin()
+  const admin = createAdminClient()
+  const [trainersResult, employeesResult, assignmentsResult] = await Promise.all([
+    admin
+      .from('profiles')
+      .select('id, email, full_name, department, domain, created_at')
+      .eq('role', 'trainer')
+      .eq('approval_status', 'approved')
+      .order('full_name', { ascending: true }),
+    admin
+      .from('profiles')
+      .select('id, email, full_name, employee_id, department, domain, created_at')
+      .eq('role', 'employee')
+      .order('full_name', { ascending: true })
+      .limit(250),
+    admin
+      .from('trainer_employee_assignments')
+      .select('id, trainer_id, employee_id, assigned_at, notes, trainer:trainer_id(id, full_name, email), employee:employee_id(id, full_name, email, employee_id, domain, department)')
+      .order('assigned_at', { ascending: false }),
+  ])
+
+  const assignmentError = assignmentsResult.error
+  return {
+    data: {
+      trainers: trainersResult.data || [],
+      employees: employeesResult.data || [],
+      assignments: assignmentError && isMissingTrainerAssignmentsTable(assignmentError) ? [] : (assignmentsResult.data || []),
+      warning: assignmentError && isMissingTrainerAssignmentsTable(assignmentError)
+        ? 'Run database migration 041_trainer_employee_assignments.sql to enable trainer employee assignment storage.'
+        : assignmentError?.message || null,
+    },
+  }
+}
+
+export async function assignEmployeesToTrainer(formData: FormData): Promise<ApiResponse<boolean>> {
+  const { userId } = await requireAdmin()
+  const admin = createAdminClient()
+  const trainerId = String(formData.get('trainer_id') || '')
+  const employeeIds = formData.getAll('employee_ids').map((value) => String(value)).filter(Boolean)
+  const notes = String(formData.get('notes') || '').trim()
+
+  if (!trainerId) return { error: 'Select a trainer.' }
+  if (employeeIds.length === 0) return { error: 'Select at least one employee for this trainer.' }
+
+  const [{ data: trainer }, { data: employees }] = await Promise.all([
+    admin.from('profiles').select('id, role').eq('id', trainerId).maybeSingle(),
+    admin.from('profiles').select('id, role').in('id', employeeIds),
+  ])
+
+  if (!trainer || trainer.role !== 'trainer') return { error: 'Selected trainer is not a trainer account.' }
+  const validEmployeeIds = (employees || []).filter((employee: any) => employee.role === 'employee').map((employee: any) => employee.id)
+  if (validEmployeeIds.length === 0) return { error: 'Selected users are not employee accounts.' }
+
+  const rows = validEmployeeIds.map((employeeId: string) => ({
+    trainer_id: trainerId,
+    employee_id: employeeId,
+    assigned_by: userId,
+    notes: notes || null,
+  }))
+
+  const { error } = await admin
+    .from('trainer_employee_assignments')
+    .upsert(rows, { onConflict: 'trainer_id,employee_id' })
+
+  if (error) return { error: error.message }
+
+  await admin.from('training_admin_audit').insert({
+    actor_id: userId,
+    action: 'trainer_employee_assignment',
+    target_table: 'trainer_employee_assignments',
+    target_id: trainerId,
+    details: { trainer_id: trainerId, employee_ids: validEmployeeIds, notes: notes || null },
+  })
+
+  revalidatePath('/manager/admin')
+  revalidatePath('/manager/employees')
+  revalidatePath('/manager/operations')
+  return { data: true }
+}
+
+export async function removeTrainerEmployeeAssignment(formData: FormData): Promise<ApiResponse<boolean>> {
+  const { userId } = await requireAdmin()
+  const admin = createAdminClient()
+  const assignmentId = String(formData.get('assignment_id') || '')
+  if (!assignmentId) return { error: 'Assignment ID is required.' }
+
+  const { data: assignment } = await admin
+    .from('trainer_employee_assignments')
+    .select('trainer_id, employee_id')
+    .eq('id', assignmentId)
+    .maybeSingle()
+
+  const { error } = await admin
+    .from('trainer_employee_assignments')
+    .delete()
+    .eq('id', assignmentId)
+
+  if (error) return { error: error.message }
+
+  await admin.from('training_admin_audit').insert({
+    actor_id: userId,
+    action: 'trainer_employee_unassignment',
+    target_table: 'trainer_employee_assignments',
+    target_id: assignmentId,
+    details: assignment || {},
+  })
+
+  revalidatePath('/manager/admin')
+  revalidatePath('/manager/employees')
+  revalidatePath('/manager/operations')
+  return { data: true }
 }
 
 export async function updateUserRole(formData: FormData): Promise<ApiResponse<boolean>> {
@@ -228,7 +361,7 @@ export async function importEmployees(employees: EmployeeImport[]): Promise<ApiR
 
 // ─── Get all employees (for manager view) ─────────────────────────────
 export async function getEmployees() {
-  const { userId, role } = await requireManager()
+  const { userId, role } = await requireTrainingStaff()
 
   const adminClient = createAdminClient()
   const { data: currentProfile } = await adminClient
@@ -243,7 +376,12 @@ export async function getEmployees() {
     .eq('role', 'employee')
     .order('full_name', { ascending: true })
 
-  if (role !== 'admin') {
+  if (role === 'trainer') {
+    const assigned = await getAssignedEmployeeIdsForTrainer(adminClient, userId)
+    if (assigned.error) return { error: assigned.error, data: [] }
+    if (assigned.ids.length === 0) return { data: [] }
+    query = query.in('id', assigned.ids)
+  } else if (role !== 'admin') {
     query = currentProfile?.domain
       ? query.eq('domain', currentProfile.domain)
       : query.eq('id', userId)
@@ -257,7 +395,7 @@ export async function getEmployees() {
 
 // ─── Get employees grouped by domain ──────────────────────────────────
 export async function getEmployeesByDomain() {
-  const { userId, role } = await requireManager()
+  const { userId, role } = await requireTrainingStaff()
 
   const adminClient = createAdminClient()
   const { data: currentProfile } = await adminClient
@@ -272,7 +410,12 @@ export async function getEmployeesByDomain() {
     .eq('role', 'employee')
     .order('domain', { ascending: true })
 
-  if (role !== 'admin') {
+  if (role === 'trainer') {
+    const assigned = await getAssignedEmployeeIdsForTrainer(adminClient, userId)
+    if (assigned.error) return { error: assigned.error, data: {} }
+    if (assigned.ids.length === 0) return { data: {} }
+    query = query.in('id', assigned.ids)
+  } else if (role !== 'admin') {
     query = currentProfile?.domain
       ? query.eq('domain', currentProfile.domain)
       : query.eq('id', userId)

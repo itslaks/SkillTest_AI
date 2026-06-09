@@ -160,6 +160,15 @@ export interface TrainingBatchTrainer {
   assigned_at: string
 }
 
+export interface TrainerEmployeeAssignment {
+  id: string
+  trainer_id: string
+  employee_id: string
+  assigned_by: string | null
+  assigned_at: string
+  notes: string | null
+}
+
 export interface BatchMember {
   id: string
   batch_id: string

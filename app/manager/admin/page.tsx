@@ -1,10 +1,22 @@
-import { getAdminAuditLogs, getAdminUsers, updateUserRole, getPendingTrainerSignups, approveTrainerSignup, rejectTrainerSignup, getCertificateRulesForAdmin, updateCertificateRule } from '@/lib/actions/manager'
+import {
+  assignEmployeesToTrainer,
+  getAdminAuditLogs,
+  getAdminUsers,
+  updateUserRole,
+  getPendingTrainerSignups,
+  approveTrainerSignup,
+  rejectTrainerSignup,
+  getCertificateRulesForAdmin,
+  getTrainerEmployeeAssignmentData,
+  removeTrainerEmployeeAssignment,
+  updateCertificateRule,
+} from '@/lib/actions/manager'
 import { getTrainingGovernanceSettings, updateTrainingGovernanceSettings } from '@/lib/actions/training'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { CertificatePreview } from '@/components/certificates/certificate-preview'
-import { Clock, ShieldCheck, Trophy, Users, CheckCircle2, XCircle, UserCheck, AlertTriangle, Medal } from 'lucide-react'
+import { Clock, ShieldCheck, Trophy, Users, CheckCircle2, XCircle, UserCheck, AlertTriangle, Medal, UserCog, Link2Off } from 'lucide-react'
 
 async function updateRoleAction(formData: FormData) {
   'use server'
@@ -31,14 +43,30 @@ async function certificateRuleAction(formData: FormData) {
   await updateCertificateRule(formData)
 }
 
+async function trainerEmployeeAssignmentAction(formData: FormData) {
+  'use server'
+  await assignEmployeesToTrainer(formData)
+}
+
+async function removeTrainerEmployeeAssignmentAction(formData: FormData) {
+  'use server'
+  await removeTrainerEmployeeAssignment(formData)
+}
+
 export default async function AdminConsolePage() {
-  const [{ data: users }, { data: auditLogs }, governance, { data: pendingTrainers }, { data: certificateQuizzes }] = await Promise.all([
+  const [{ data: users }, { data: auditLogs }, governance, { data: pendingTrainers }, { data: certificateQuizzes }, { data: trainerEmployeeData }] = await Promise.all([
     getAdminUsers(),
     getAdminAuditLogs(),
     getTrainingGovernanceSettings(),
     getPendingTrainerSignups(),
     getCertificateRulesForAdmin(),
+    getTrainerEmployeeAssignmentData(),
   ])
+  const trainerEmployeeAssignments = trainerEmployeeData?.assignments || []
+  const assignmentCountsByTrainer = new Map<string, number>()
+  for (const assignment of trainerEmployeeAssignments) {
+    assignmentCountsByTrainer.set(assignment.trainer_id, (assignmentCountsByTrainer.get(assignment.trainer_id) || 0) + 1)
+  }
 
   return (
     <div className="space-y-8">
@@ -129,6 +157,127 @@ export default async function AdminConsolePage() {
       </Card>
 
       {/* ── USER ROLE MANAGEMENT + TMS CONTROLS ── */}
+      <Card className="border-blue-100 bg-white shadow-sm">
+        <CardHeader className="border-b border-blue-50 bg-blue-50/60">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <UserCog className="h-5 w-5 text-blue-700" />
+                Trainer Employee Scope
+              </CardTitle>
+              <CardDescription className="mt-1">
+                Assign specific employees to a trainer. Trainers only see and manage employees explicitly assigned here.
+              </CardDescription>
+            </div>
+            <Badge variant="outline" className="border-blue-200 bg-white text-blue-700">
+              {trainerEmployeeAssignments.length} active link{trainerEmployeeAssignments.length === 1 ? '' : 's'}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+          <form action={trainerEmployeeAssignmentAction} className="rounded-2xl border border-blue-100 bg-blue-50/50 p-4">
+            <div className="flex items-start gap-3">
+              <div className="rounded-2xl bg-blue-600 p-2.5 text-white">
+                <Users className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="font-semibold text-zinc-950">Create or update trainer scope</p>
+                <p className="mt-1 text-sm leading-5 text-zinc-600">Select one trainer and the employees they should manage.</p>
+              </div>
+            </div>
+
+            {trainerEmployeeData?.warning ? (
+              <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                {trainerEmployeeData.warning}
+              </div>
+            ) : null}
+
+            <label className="mt-4 grid gap-2 text-sm">
+              <span className="font-medium">Trainer</span>
+              <select name="trainer_id" required className="h-11 rounded-xl border border-blue-100 bg-white px-3">
+                <option value="">Select trainer</option>
+                {(trainerEmployeeData?.trainers || []).map((trainer: any) => (
+                  <option key={trainer.id} value={trainer.id}>
+                    {trainer.full_name || trainer.email} ({assignmentCountsByTrainer.get(trainer.id) || 0} assigned)
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="mt-4 grid gap-2 text-sm">
+              <span className="font-medium">Notes</span>
+              <input name="notes" className="h-11 rounded-xl border border-blue-100 bg-white px-3" placeholder="Optional cohort, domain, or ownership note" />
+            </label>
+
+            <div className="mt-4 rounded-2xl border border-blue-100 bg-white p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">Employees</p>
+                <Badge variant="outline" className="bg-blue-50 text-blue-700">{(trainerEmployeeData?.employees || []).length} available</Badge>
+              </div>
+              <div className="mt-3 max-h-80 space-y-2 overflow-y-auto pr-1">
+                {(trainerEmployeeData?.employees || []).length === 0 ? (
+                  <p className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 p-4 text-center text-sm text-zinc-500">No employees are available.</p>
+                ) : (trainerEmployeeData?.employees || []).map((employee: any) => (
+                  <label key={employee.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-zinc-200 bg-white p-3 transition hover:border-blue-200 hover:bg-blue-50/40">
+                    <input type="checkbox" name="employee_ids" value={employee.id} className="mt-1 h-4 w-4 rounded border-zinc-300" />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-zinc-950">{employee.full_name || employee.email}</span>
+                      <span className="block truncate text-xs text-zinc-500">{employee.email}</span>
+                      <span className="mt-1 block text-xs text-zinc-400">{employee.employee_id || 'No ID'} - {employee.domain || employee.department || 'No domain'}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <Button type="submit" className="mt-4 rounded-full bg-blue-700 text-white hover:bg-blue-800">
+              Save trainer scope
+            </Button>
+          </form>
+
+          <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="font-semibold text-zinc-950">Active trainer-employee links</p>
+                <p className="mt-1 text-sm text-zinc-500">Remove a link when an employee should no longer be managed by that trainer.</p>
+              </div>
+              <Badge variant="outline" className="bg-white">{trainerEmployeeAssignments.length} links</Badge>
+            </div>
+
+            <div className="mt-4 max-h-[32rem] space-y-3 overflow-y-auto pr-1">
+              {trainerEmployeeAssignments.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-8 text-center">
+                  <UserCheck className="mx-auto h-9 w-9 text-zinc-400" />
+                  <p className="mt-3 font-semibold text-zinc-700">No scoped trainer assignments yet</p>
+                  <p className="mt-1 text-sm text-zinc-500">Create the first trainer-employee mapping using the form.</p>
+                </div>
+              ) : trainerEmployeeAssignments.map((assignment: any) => (
+                <div key={assignment.id} className="rounded-2xl border border-zinc-200 bg-white p-4">
+                  <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-start">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">Trainer</p>
+                      <p className="truncate font-semibold text-zinc-950">{assignment.trainer?.full_name || assignment.trainer?.email || 'Trainer'}</p>
+                      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Employee</p>
+                      <p className="truncate font-medium text-zinc-800">{assignment.employee?.full_name || assignment.employee?.email || 'Employee'}</p>
+                      <p className="truncate text-xs text-zinc-500">{assignment.employee?.email} - {assignment.employee?.employee_id || 'No ID'}</p>
+                      {assignment.notes ? <p className="mt-2 text-xs text-zinc-500">Note: {assignment.notes}</p> : null}
+                      <p className="mt-2 text-xs text-zinc-400">Assigned {new Date(assignment.assigned_at).toLocaleDateString('en-IN')}</p>
+                    </div>
+                    <form action={removeTrainerEmployeeAssignmentAction}>
+                      <input type="hidden" name="assignment_id" value={assignment.id} />
+                      <Button type="submit" size="sm" variant="outline" className="rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">
+                        <Link2Off className="mr-1.5 h-3.5 w-3.5" />
+                        Remove
+                      </Button>
+                    </form>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(22rem,0.8fr)] 2xl:grid-cols-[minmax(0,1.35fr)_minmax(26rem,0.65fr)]">
         <Card className="border-zinc-200 shadow-sm">
           <CardHeader>
