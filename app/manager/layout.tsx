@@ -11,7 +11,6 @@ import {
   FileSpreadsheet,
   MessageSquareText,
   Download,
-  FileCheck2,
   BookOpenCheck,
   ShieldAlert,
 } from 'lucide-react'
@@ -50,8 +49,7 @@ export default async function ManagerLayout({
               <CmdAction href="/manager/operations#feedback" label="Feedback" icon={MessageSquareText} />
               <CmdAction href="/manager/docs" label="Docs" icon={BookOpenCheck} />
               <CmdAction href="/manager/integrity" label="Integrity" icon={ShieldAlert} />
-              <CmdAction href="/manager/compliance" label="BRD Proof" icon={FileCheck2} />
-              <CmdAction href="/manager/reports" label="Reports" icon={Download} />
+<CmdAction href="/manager/reports" label="Reports" icon={Download} />
             </div>
             <div className="ml-auto hidden xl:flex items-center gap-2">
               <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
