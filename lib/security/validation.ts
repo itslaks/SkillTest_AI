@@ -236,6 +236,7 @@ export const submitQuizSchema = z
           'notes-detected',
           'audio-anomaly',
           'voice-assistance',
+          'face_substitution',
           'auto-submit',
         ]),
         label: sanitizedString(180),
