@@ -505,8 +505,8 @@ export async function assignQuizToEmployees(quizId: string, employeeIds: string[
   revalidatePath('/manager/employees', 'layout')
 
   if (successCount > 0) {
-    await Promise.all(employees.map((profile: any) =>
-      Promise.all([
+    await Promise.allSettled(employees.map((profile: any) =>
+      Promise.allSettled([
         sendEmail({
           to: profile.email,
           subject: `Quiz Assigned: ${quiz.title || 'SkillTest_AI Assessment'}`,
@@ -516,7 +516,7 @@ export async function assignQuizToEmployees(quizId: string, employeeIds: string[
             topic: quiz.topic || 'General',
             difficulty: quiz.difficulty || 'medium',
           }),
-        }),
+        }).catch((err) => console.warn('[assignQuizToEmployees] email failed:', err)),
         supabase.from('training_notifications').insert({
           recipient_user_id: profile.id,
           title: `Quiz assigned: ${quiz.title || 'SkillTest_AI Assessment'}`,

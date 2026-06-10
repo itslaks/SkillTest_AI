@@ -236,10 +236,13 @@ export function QuizAssignmentManager({ quizzes, employees, assignments, autoOpe
                   <div className="relative">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
+                      id="assign-employee-search"
+                      name="assign-employee-search"
                       value={query}
                       onChange={(event) => setQuery(event.target.value)}
                       placeholder="Search name, employee ID, email, domain, vertical"
                       className="h-10 rounded-xl pl-9"
+                      autoComplete="off"
                     />
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -269,6 +272,8 @@ export function QuizAssignmentManager({ quizzes, employees, assignments, autoOpe
                 </div>
                 <div className="flex items-center gap-2 px-2 py-2 mb-1 border-b border-border/50">
                   <Checkbox
+                    id="assign-select-all"
+                    name="assign-select-all"
                     checked={selectedEmployees.length === filteredUnassignedEmployees.length && filteredUnassignedEmployees.length > 0}
                     onCheckedChange={handleSelectAll}
                   />
@@ -283,6 +288,8 @@ export function QuizAssignmentManager({ quizzes, employees, assignments, autoOpe
                     className="flex items-center gap-3 px-2 py-2.5 rounded-xl hover:bg-muted/40 cursor-pointer transition-colors"
                   >
                     <Checkbox
+                      id={`assign-emp-${emp.id}`}
+                      name={`assign-emp-${emp.id}`}
                       checked={selectedEmployees.includes(emp.id)}
                       onCheckedChange={() => handleToggleEmployee(emp.id)}
                     />
