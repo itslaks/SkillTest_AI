@@ -605,6 +605,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
           videoElement,
           canvasElement,
           intervalMs: 1500,
+          requireFullscreen: true,
           onViolation: (violation) => {
             const type = visionViolationTypeToEventType(violation.type)
             recordProctoringViolation(type, violation.label, violation.evidenceDataUrl)
@@ -1744,6 +1745,15 @@ function visionViolationTypeToEventType(type: string): ProctoringEventType {
     phone_detected: 'phone_detected',
     electronic_device: 'electronic_device',
     book_detected: 'book_detected',
+    tab_switch: 'tab_switch',
+    focus_loss: 'focus_loss',
+    fullscreen_exit: 'fullscreen_exit',
+    copy_detected: 'copy_detected',
+    paste_detected: 'paste_detected',
+    right_click: 'right_click',
+    dev_tools: 'dev_tools',
+    screenshot_attempt: 'screenshot_attempt',
+    window_switch: 'window_switch',
   }
   return map[type] || 'face-covered'
 }
@@ -1755,8 +1765,17 @@ function getProctoringDedupeWindowMs(type: ProctoringEventType) {
     'context-menu': 2000,
     'blocked-shortcut': 1500,
     'tab-hidden': 2500,
+    tab_switch: 2500,
     'window-blur': 2500,
+    focus_loss: 2500,
+    window_switch: 2500,
     'fullscreen-exit': 2500,
+    fullscreen_exit: 2500,
+    copy_detected: 2500,
+    paste_detected: 2500,
+    right_click: 2000,
+    dev_tools: 2500,
+    screenshot_attempt: 2500,
     'camera-lost': 3000,
     'microphone-denied': 3000,
     no_face: 3500,
