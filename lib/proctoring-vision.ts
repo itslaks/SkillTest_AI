@@ -36,16 +36,16 @@ type ModelBundle = {
 
 const COOLDOWN_MS_DEFAULT = 12_000
 const COOLDOWN_MS: Record<string, number> = {
-  multiple_faces: 4_000,
-  no_face: 5_000,
+  multiple_faces: 3_000,
+  no_face: 4_000,
   gaze_down: 10_000,
   gaze_away: 10_000,
-  phone_detected: 8_000,
+  phone_detected: 5_000,
   electronic_device: 8_000,
   book_detected: 10_000,
 }
-const NO_FACE_MS = 4_000
-const MAX_BUFFER = 6
+const NO_FACE_MS = 3_000
+const MAX_BUFFER = 5
 let modelPromise: Promise<ModelBundle | null> | null = null
 let faceDetectorPromise: Promise<any | null> | null = null
 const states = new WeakMap<HTMLVideoElement, VisionState>()
@@ -77,7 +77,7 @@ export function startVisionProctoring(config: VisionProctoringConfig) {
     }
   }
 
-  state.intervalId = window.setInterval(tick, config.intervalMs ?? 1500)
+  state.intervalId = window.setInterval(tick, config.intervalMs ?? 1000)
   void tick()
 }
 
@@ -162,7 +162,7 @@ async function loadModels(): Promise<ModelBundle | null> {
 
       const faceDetector = await faceDetection.createDetector(
         faceDetection.SupportedModels.MediaPipeFaceDetector,
-        { runtime: 'tfjs', modelType: 'short', maxFaces: 5 },
+        { runtime: 'tfjs', modelType: 'short', maxFaces: 8, scoreThreshold: 0.35 },
       )
       const landmarkDetector = await faceLandmarksDetection.createDetector(
         faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
@@ -191,7 +191,7 @@ async function loadFaceDetector() {
       const faceDetection = await runtimeImport('@tensorflow-models/face-detection')
       return faceDetection.createDetector(
         faceDetection.SupportedModels.MediaPipeFaceDetector,
-        { runtime: 'tfjs', modelType: 'short', maxFaces: 5 },
+        { runtime: 'tfjs', modelType: 'short', maxFaces: 8, scoreThreshold: 0.35 },
       )
     } catch (error) {
       console.warn('[proctoring-vision] face detector load failed:', error)
@@ -322,7 +322,7 @@ async function inspectObjects(config: VisionProctoringConfig, state: VisionState
   const people = (predictions || []).filter((prediction: any) => {
     const label = String(prediction.class || '').toLowerCase()
     const score = Number(prediction.score || 0)
-    return label === 'person' && score > 0.45
+    return label === 'person' && score > 0.35
   })
 
   if (people.length >= 2) {
@@ -334,18 +334,25 @@ async function inspectObjects(config: VisionProctoringConfig, state: VisionState
     })
   }
 
+  // Track phone evidence across labels — COCO-SSD often misclassifies phones as "remote"
+  let bestPhoneScore = 0
   for (const prediction of predictions || []) {
     const label = String(prediction.class || '').toLowerCase()
     const score = Number(prediction.score || 0)
-    if (label === 'cell phone' && score > 0.55) {
-      emitViolation(config, state, { type: 'phone_detected', label: 'Cell phone detected in camera frame.', confidence: score, timestamp: now })
+
+    if ((label === 'cell phone' || label === 'remote') && score > 0.30) {
+      if (score > bestPhoneScore) bestPhoneScore = score
     }
-    if (label === 'laptop' && score > 0.55) {
-      emitViolation(config, state, { type: 'electronic_device', label: 'Additional electronic device detected.', confidence: score, timestamp: now })
+    if ((label === 'laptop' || label === 'tablet' || label === 'monitor' || label === 'tv') && score > 0.40) {
+      emitViolation(config, state, { type: 'electronic_device', label: `Additional electronic device detected (${label}).`, confidence: score, timestamp: now })
     }
-    if (label === 'book' && score > 0.5) {
+    if (label === 'book' && score > 0.40) {
       emitViolation(config, state, { type: 'book_detected', label: 'Book or notes detected in camera frame.', confidence: score, timestamp: now })
     }
+  }
+
+  if (bestPhoneScore > 0) {
+    emitViolation(config, state, { type: 'phone_detected', label: 'Mobile phone detected in camera frame.', confidence: Math.min(0.99, bestPhoneScore), timestamp: now })
   }
 }
 
