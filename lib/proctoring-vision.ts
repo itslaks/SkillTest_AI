@@ -49,7 +49,8 @@ const COOLDOWN_MS_DEFAULT = 12_000
 const COOLDOWN_MS: Record<string, number> = {
   // AI violations
   multiple_faces:     3_000,
-  no_face:            4_000,
+  no_face:            3_000,
+  'face-covered':     3_000,
   gaze_down:         10_000,
   gaze_away:         10_000,
   phone_detected:     5_000,
@@ -70,14 +71,14 @@ const COOLDOWN_MS: Record<string, number> = {
 // ── Detection thresholds ─────────────────────────────────────────────────────
 // Lowered to catch more; consensus (below) prevents false-positive spam.
 const FACE_SCORE_THRESHOLD   = 0.25   // was 0.35
-const PERSON_SCORE_THRESHOLD = 0.28
+const PERSON_SCORE_THRESHOLD = 0.22
 const PHONE_SCORE_THRESHOLD  = 0.18   // COCO-SSD is weak at phones — low & consensus
 const DEVICE_SCORE_THRESHOLD = 0.32   // was 0.40
 const BOOK_SCORE_THRESHOLD   = 0.32   // was 0.40
 
 // ── Consensus: N consecutive frames required before emitting ─────────────────
 const CONSENSUS: Record<string, number> = {
-  multiple_faces:    2,
+  multiple_faces:    1,
   phone_detected:    3,   // 3 frames because low threshold → more noise
   electronic_device: 2,
   book_detected:     2,
@@ -123,6 +124,7 @@ export function startVisionProctoring(config: VisionProctoringConfig) {
   const tick = async () => {
     if (!state.running) return
     try {
+      if (emitCoveredCameraViolationIfNeeded(config, state)) return
       const models = await loadModels()
       if (!models) return
       await inspectFrame(config, state, models)
@@ -312,11 +314,40 @@ function fireViolation(
 
 // ── AI Frame Inspection ───────────────────────────────────────────────────────
 
+function emitCoveredCameraViolationIfNeeded(config: VisionProctoringConfig, state: VisionState) {
+  const video = config.videoElement
+  if (video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) return false
+  const frame = inspectFramePixels(video, config.canvasElement)
+  if (!frame.isCovered) return false
+
+  state.noFaceSince = null
+  advanceConsensus(state, 'multiple_faces', false, CONSENSUS.multiple_faces)
+  emitViolation(config, state, {
+    type: 'face-covered',
+    label: 'Camera appears covered or too dark. Keep your face clearly visible during the assessment.',
+    confidence: frame.confidence,
+    timestamp: Date.now(),
+  })
+  return true
+}
+
 async function inspectFrame(config: VisionProctoringConfig, state: VisionState, models: ModelBundle) {
   const video = config.videoElement
   if (video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) return
 
   const now = Date.now()
+  const frame = inspectFramePixels(video, config.canvasElement)
+  if (frame.isCovered) {
+    state.noFaceSince = null
+    advanceConsensus(state, 'multiple_faces', false, CONSENSUS.multiple_faces)
+    emitViolation(config, state, {
+      type: 'face-covered',
+      label: 'Camera appears covered or too dark. Keep your face clearly visible during the assessment.',
+      confidence: frame.confidence,
+      timestamp: now,
+    })
+    return
+  }
 
   // Run face detection and object detection in parallel for speed
   const [faces, predictions] = await Promise.all([
@@ -332,9 +363,7 @@ async function inspectFrame(config: VisionProctoringConfig, state: VisionState, 
   const effectiveFaceCount = Math.max(faces.length, cocoPersonCount)
 
   // ── Multiple people ───────────────────────────────────────────────────────
-  const shouldFireMultipleFaces = advanceConsensus(
-    state, 'multiple_faces', effectiveFaceCount >= 2, CONSENSUS.multiple_faces,
-  )
+  const shouldFireMultipleFaces = advanceConsensus(state, 'multiple_faces', effectiveFaceCount >= 2, CONSENSUS.multiple_faces)
   if (effectiveFaceCount >= 2) {
     state.noFaceSince = null
     if (shouldFireMultipleFaces) {

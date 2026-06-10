@@ -1780,6 +1780,7 @@ function getProctoringDedupeWindowMs(type: ProctoringEventType) {
     'microphone-denied': 3000,
     no_face: 3500,
     'no-face': 3500,
+    'face-covered': 3000,
     multiple_faces: 3500,
     'multiple-faces': 3500,
   }

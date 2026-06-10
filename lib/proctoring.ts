@@ -134,6 +134,9 @@ export function shouldAutoSubmitForIntegrity(events: ProctoringEvent[], violatio
     violationCount >= PROCTORING_VIOLATION_LIMIT
     || risk.score > PROCTORING_CRITICAL_RISK_SCORE
     || typeCount('multiple-faces') > 3
+    || typeCount('multiple_faces') > 3
     || typeCount('phone-detected') > 3
+    || typeCount('face-covered') > 3
+    || typeCount('no_face') > 3
   )
 }
