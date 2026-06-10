@@ -109,7 +109,7 @@ export function QuizAssignmentManager({ quizzes, employees, assignments, autoOpe
         toast({ title: 'Quiz assigned', description: `Assigned to ${selectedEmployees.length} employee(s).` })
         setSelectedEmployees([])
         setIsOpen(false)
-        router.refresh()
+        router.push(`/manager/quizzes/${selectedQuiz}`)
       }
     })
   }
@@ -121,7 +121,7 @@ export function QuizAssignmentManager({ quizzes, employees, assignments, autoOpe
         toast({ title: 'Error', description: result.error, variant: 'destructive' })
       } else {
         toast({ title: 'Unassigned', description: 'Quiz unassigned from employee.' })
-        router.refresh()
+        router.push(`/manager/quizzes/${quizId}`)
       }
     })
   }

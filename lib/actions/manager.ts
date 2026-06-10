@@ -501,8 +501,8 @@ export async function assignQuizToEmployees(quizId: string, employeeIds: string[
 
   const successCount = rows.length
 
-  revalidatePath('/manager/quizzes', 'layout')
-  revalidatePath('/manager/employees', 'layout')
+  revalidatePath('/manager/quizzes', 'page')
+  revalidatePath('/manager/employees', 'page')
 
   if (successCount > 0) {
     await Promise.allSettled(employees.map((profile: any) =>
@@ -552,8 +552,8 @@ export async function unassignQuizFromEmployee(quizId: string, employeeId: strin
 
   if (error) return { error: error.message }
 
-  revalidatePath('/manager/quizzes', 'layout')
-  revalidatePath('/manager/employees', 'layout')
+  revalidatePath('/manager/quizzes', 'page')
+  revalidatePath('/manager/employees', 'page')
   return { success: true }
 }
 
