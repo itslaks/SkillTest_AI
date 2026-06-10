@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState, useTransition } from "react";
+import { Suspense, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -9,11 +9,11 @@ import { createClient } from "@/lib/supabase/client";
 import { AlertTriangle, ArrowLeft, CheckCircle2, Eye, EyeOff, KeyRound, ShieldCheck, Sparkles } from "lucide-react";
 
 function recoveryErrorMessage(message?: string) {
-  if (!message) return "This account setup link is invalid or expired.";
+  if (!message) return "This password reset link is invalid or expired.";
   if (/code verifier|pkce|expired|invalid|otp|token/i.test(message)) {
-    return "This account setup link is invalid or expired. Please request a fresh email and open the new link in the same browser.";
+    return "This password reset link is invalid or expired. Please request a fresh reset email and open the newest link.";
   }
-  return "We could not verify this account setup link. Please request a fresh email and try again.";
+  return "We could not verify this password reset link. Please request a fresh email and try again.";
 }
 
 function UpdatePasswordForm() {
@@ -24,6 +24,7 @@ function UpdatePasswordForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const recoveryPreparedRef = useRef(false);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -31,6 +32,8 @@ function UpdatePasswordForm() {
     let mounted = true;
 
     async function prepareRecoverySession() {
+      if (recoveryPreparedRef.current) return;
+      recoveryPreparedRef.current = true;
       const supabase = createClient();
       const code = searchParams.get("code");
       const tokenHash = searchParams.get("token_hash");
@@ -159,17 +162,17 @@ function UpdatePasswordForm() {
         <div className="relative z-10 max-w-lg">
           <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.3em] text-emerald-100">
             <ShieldCheck className="h-3.5 w-3.5" />
-            Setup Protected
+            Reset Protected
           </div>
-          <h1 className="mt-5 max-w-md font-display text-5xl font-semibold leading-tight tracking-tight">Verify and set your password.</h1>
+          <h1 className="mt-5 max-w-md font-display text-5xl font-semibold leading-tight tracking-tight">Verify and reset your password.</h1>
           <p className="mt-5 text-base leading-relaxed text-white/65">
-            We verify your secure email link first, then unlock password setup for your account.
+            We verify your secure email link first, then unlock password reset for your account.
           </p>
         </div>
 
         <div className="relative z-10 space-y-4">
           {[
-            { icon: Sparkles, title: "Email link check", body: "We verify your setup token automatically." },
+            { icon: Sparkles, title: "Email link check", body: "We verify your reset token automatically." },
             { icon: KeyRound, title: "Password update", body: "Choose a strong password with at least 8 characters." },
             { icon: ShieldCheck, title: "Safe redirect", body: "After success, you return to sign in with the new password." },
           ].map((item) => (
@@ -194,7 +197,7 @@ function UpdatePasswordForm() {
           <div className="mb-8">
             <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-emerald-700">
               <ShieldCheck className="h-3.5 w-3.5" />
-              Setup Protected
+              Reset Protected
             </div>
             <h1 className="mt-4 text-3xl font-semibold tracking-tight">Set a new password</h1>
             <p className="mt-2 text-sm leading-relaxed text-zinc-500">
@@ -222,7 +225,7 @@ function UpdatePasswordForm() {
 
             {!isRecoveryReady && !isCheckingLink && !success && (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                Request a fresh account setup or password reset email and open the newest link in this browser to continue.
+                Request a fresh password reset email and open the newest link to continue.
               </div>
             )}
 

@@ -14,6 +14,7 @@ import { getAuthRedirectUrl, getSiteUrl, isSupabaseConfigured, isSupabaseAdminCo
 import { revalidatePath } from 'next/cache'
 import { normalizeDomain } from '@/lib/domain-options'
 import { sendEmployeeSetupEmail } from '@/lib/employee-onboarding'
+import { sendEmail } from '@/lib/email'
 
 function safeRedirectPath(value: string | undefined | null) {
   if (!value || !value.startsWith('/') || value.startsWith('//')) return null
@@ -365,11 +366,59 @@ export async function syncProfileFromUserMetadata(userId: string, userMetadata: 
 export async function sendPasswordReset(formData: FormData) {
   const email = formData.get('email') as string;
   if (!email) return { error: 'Email is required' };
-  const supabase = await createClient();
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${getSiteUrl().replace(/\/$/, '')}/auth/update-password`,
-  });
-  if (error) return { error: error.message };
+  const normalizedEmail = email.trim().toLowerCase()
+  const siteUrl = getSiteUrl().replace(/\/$/, '')
+
+  if (!isSupabaseAdminConfigured()) {
+    const supabase = await createClient();
+    const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+      redirectTo: `${siteUrl}/auth/update-password`,
+    });
+    if (error) return { error: error.message };
+    return { success: true };
+  }
+
+  const adminClient = createAdminClient()
+  const { data, error } = await adminClient.auth.admin.generateLink({
+    type: 'recovery',
+    email: normalizedEmail,
+    options: {
+      redirectTo: `${siteUrl}/auth/update-password`,
+    },
+  })
+
+  if (error || !data.properties?.action_link) {
+    return { error: error?.message || 'Could not generate password reset link.' }
+  }
+
+  const { data: profile } = await adminClient
+    .from('profiles')
+    .select('full_name')
+    .eq('email', normalizedEmail)
+    .maybeSingle()
+
+  const resetLink = data.properties.action_link
+  const emailResult = await sendEmail({
+    to: normalizedEmail,
+    subject: 'Reset your SkillTest_AI password',
+    html: `
+      <div style="font-family:system-ui,sans-serif;max-width:620px;margin:0 auto;padding:24px;background:#f8fafc;">
+        <div style="background:#0f172a;color:#fff;padding:24px;border-radius:18px 18px 0 0;">
+          <p style="margin:0;color:#5eead4;font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;">SkillTest_AI Password Reset</p>
+          <h1 style="margin:10px 0 0;font-size:24px;">Set a new password</h1>
+        </div>
+        <div style="background:#fff;border:1px solid #e5e7eb;border-top:0;padding:24px;border-radius:0 0 18px 18px;">
+          <p>Hi ${profile?.full_name || 'Learner'},</p>
+          <p>Use the secure link below to set a new password for your SkillTest_AI account.</p>
+          <a href="${resetLink}" style="display:inline-block;background:#059669;color:#fff;padding:12px 20px;border-radius:999px;text-decoration:none;font-weight:700;margin:12px 0;">Reset Password</a>
+          <p style="color:#64748b;font-size:13px;">If the button does not work, open this link in your browser:</p>
+          <p style="word-break:break-all;color:#334155;font-size:13px;">${resetLink}</p>
+          <p style="color:#991b1b;font-size:13px;">For security, use the newest reset email only. Older reset links may expire after a new one is requested.</p>
+        </div>
+      </div>`,
+  })
+
+  if (!emailResult.success) return { error: emailResult.error || 'Could not send password reset email.' }
   return { success: true };
 }
 

@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { createClient } from "@/lib/supabase/client";
+import { sendPasswordReset } from "@/lib/actions/auth";
 import { AlertTriangle, ArrowLeft, CheckCircle2, KeyRound, Mail, ShieldCheck, Sparkles } from "lucide-react";
 
 export default function ResetPasswordPage() {
@@ -24,18 +24,9 @@ export default function ResetPasswordPage() {
         return;
       }
 
-      let supabase;
-      try {
-        supabase = createClient();
-      } catch {
-        setError("Supabase is not configured. Add real Supabase URL and anon key values, then restart the app.");
-        return;
-      }
+      const result = await sendPasswordReset(formData);
 
-      const redirectTo = `${window.location.origin}/auth/update-password`;
-      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
-
-      if (error) setError("We could not send a reset link right now. Please check the email and try again.");
+      if (result.error) setError("We could not send a reset link right now. Please check the email and try again.");
       else setSuccess("Reset link sent. Open it in this same browser, then set your new password.");
     });
   }

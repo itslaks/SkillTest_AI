@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   const errorCode = searchParams.get('error_code')
   const errorDescription = searchParams.get('error_description')
 
-  if (type === 'recovery' || type === 'invite' || tokenHash || errorCode || errorDescription) {
+  if (type === 'recovery' || type === 'invite' || tokenHash || errorCode || errorDescription || searchParams.get('next') === '/auth/update-password') {
     const updateParams = new URLSearchParams()
     if (recoveryCode) updateParams.set('code', recoveryCode)
     if (type) updateParams.set('type', type)
