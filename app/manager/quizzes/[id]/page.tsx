@@ -1,5 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
+import { createAdminClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -10,6 +9,8 @@ import {
 } from 'lucide-react'
 import { getQuizLeaderboard } from '@/lib/actions/employee'
 import { getQuizAssignments, getEmployees } from '@/lib/actions/manager'
+import { requireTrainingStaff } from '@/lib/rbac'
+import { uuidSchema } from '@/lib/security/validation'
 import { QuizToggleActive } from '@/components/manager/quiz-toggle-active'
 import { QuizAssignmentManager } from '@/components/manager/quiz-assignment-manager'
 import { AssessmentAnalyzer } from '@/components/manager/assessment-analyzer'
@@ -29,15 +30,35 @@ export default async function QuizDetailPage({ params, searchParams }: { params:
   const { assign } = await searchParams
   const autoOpenAssign = assign === '1'
 
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/auth/login')
+  const idResult = uuidSchema.safeParse(quizId)
+  if (!idResult.success) {
+    return (
+      <div className="text-center py-20">
+        <h2 className="text-2xl font-bold">Invalid quiz link</h2>
+        <p className="mt-2 text-sm text-muted-foreground">This quiz URL does not contain a valid quiz ID.</p>
+      </div>
+    )
+  }
 
-  const { data: quiz } = await supabase
+  const { userId, role } = await requireTrainingStaff()
+  const supabase = createAdminClient()
+
+  let quizQuery = supabase
     .from('quizzes')
     .select('*')
-    .eq('id', quizId)
-    .single()
+    .eq('id', idResult.data)
+  if (role !== 'admin') quizQuery = quizQuery.eq('created_by', userId)
+  const { data: quiz, error: quizError } = await quizQuery.maybeSingle()
+
+  if (quizError) {
+    console.error('Quiz detail fetch error:', quizError)
+    return (
+      <div className="text-center py-20">
+        <h2 className="text-2xl font-bold">Could not load quiz</h2>
+        <p className="mt-2 text-sm text-muted-foreground">{quizError.message}</p>
+      </div>
+    )
+  }
 
   if (!quiz) {
     return (
@@ -47,21 +68,27 @@ export default async function QuizDetailPage({ params, searchParams }: { params:
     )
   }
 
-  const { data: questions } = await supabase
+  const { data: questions, error: questionsError } = await supabase
     .from('questions')
     .select('*')
-    .eq('quiz_id', quizId)
+    .eq('quiz_id', idResult.data)
     .order('order_index', { ascending: true })
 
-  const { data: leaderboard } = await getQuizLeaderboard(quizId)
-  const { data: assignmentData } = await getQuizAssignments(quizId)
-  const { data: allEmployees } = await getEmployees()
+  if (questionsError) {
+    console.error('Quiz questions fetch error:', questionsError)
+  }
+
+  const [{ data: leaderboard }, { data: assignmentData }, { data: allEmployees }] = await Promise.all([
+    getQuizLeaderboard(idResult.data),
+    getQuizAssignments(idResult.data),
+    getEmployees(),
+  ])
 
   // Get attempt count for delete button
   const { count: attemptCount } = await supabase
     .from('quiz_attempts')
     .select('*', { count: 'exact', head: true })
-    .eq('quiz_id', quizId)
+    .eq('quiz_id', idResult.data)
     .not('completed_at', 'is', null)
 
   const formatTime = (s: number) => `${Math.floor(s / 60)}m ${s % 60}s`

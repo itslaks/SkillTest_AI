@@ -7,6 +7,7 @@ import type { ApiResponse, EmployeeImport, EmployeeImportError, EmployeeImportRe
 import { approveTrainer, rejectTrainer } from '@/lib/actions/auth'
 import { buildQuizAssignedEmail, sendEmail } from '@/lib/email'
 import { createEmployeeWithSetupEmail, sendEmployeeSetupEmail } from '@/lib/employee-onboarding'
+import { uuidSchema } from '@/lib/security/validation'
 
 // ─── Pending Trainer Sign-Ups (Admin only) ────────────────────────────
 
@@ -454,69 +455,72 @@ export async function getImportHistory() {
 
 // ─── Assign a quiz to employees ───────────────────────────────────────
 export async function assignQuizToEmployees(quizId: string, employeeIds: string[]) {
-  const { userId } = await requireManager()
+  const { userId, role } = await requireManager()
 
-  // Use admin client to bypass RLS which can cause infinite recursion on profiles policy
-  let supabase: any
-  try {
-    supabase = createAdminClient()
-  } catch {
-    supabase = await createClient()
-  }
+  const quizIdResult = uuidSchema.safeParse(quizId)
+  if (!quizIdResult.success) return { error: 'Invalid quiz ID' }
 
-  // Build assignment rows
-  const rows = employeeIds.map((empId) => ({
-    quiz_id: quizId,
-    user_id: empId,
+  const uniqueEmployeeIds = Array.from(new Set(employeeIds))
+  const validEmployeeIds = uniqueEmployeeIds.filter((id) => uuidSchema.safeParse(id).success)
+  if (validEmployeeIds.length === 0) return { error: 'Select at least one employee.' }
+  if (validEmployeeIds.length !== uniqueEmployeeIds.length) return { error: 'One or more selected employees are invalid.' }
+
+  const supabase = createAdminClient()
+
+  let quizQuery = supabase
+    .from('quizzes')
+    .select('id, title, topic, difficulty, created_by, is_active')
+    .eq('id', quizIdResult.data)
+  if (role !== 'admin') quizQuery = quizQuery.eq('created_by', userId)
+  const { data: quiz, error: quizError } = await quizQuery.maybeSingle()
+
+  if (quizError) return { error: quizError.message }
+  if (!quiz) return { error: 'Quiz was not found or you do not have access to assign it.' }
+  if (!quiz.is_active) return { error: 'Activate this quiz before assigning it to employees.' }
+
+  const { data: profiles, error: profilesError } = await supabase
+    .from('profiles')
+    .select('id, full_name, email, role')
+    .in('id', validEmployeeIds)
+
+  if (profilesError) return { error: profilesError.message }
+  const employees = (profiles || []).filter((profile: any) => profile.role === 'employee')
+  if (employees.length === 0) return { error: 'Selected users are not employee accounts.' }
+
+  const rows = employees.map((profile: any) => ({
+    quiz_id: quizIdResult.data,
+    user_id: profile.id,
     assigned_by: userId,
   }))
 
-  // Insert assignments one by one to handle duplicates gracefully
-  let successCount = 0
-  const errors: string[] = []
+  const { error } = await supabase
+    .from('quiz_assignments')
+    .upsert(rows, { onConflict: 'quiz_id,user_id', ignoreDuplicates: true })
 
-  for (const row of rows) {
-    const { error } = await supabase
-      .from('quiz_assignments')
-      .insert(row)
+  if (error) return { error: error.message }
 
-    if (error) {
-      // Duplicate (unique constraint violation) is fine — count as success
-      if (error.code === '23505') {
-        successCount++
-      } else {
-        errors.push(`${row.user_id}: ${error.message}`)
-      }
-    } else {
-      successCount++
-    }
-  }
+  const successCount = rows.length
 
   revalidatePath('/manager/quizzes', 'layout')
   revalidatePath('/manager/employees', 'layout')
 
   if (successCount > 0) {
-    const [{ data: quiz }, { data: profiles }] = await Promise.all([
-      supabase.from('quizzes').select('title, topic, difficulty').eq('id', quizId).maybeSingle(),
-      supabase.from('profiles').select('id, full_name, email').in('id', employeeIds),
-    ])
-
-    await Promise.all((profiles || []).map((profile: any) =>
+    await Promise.all(employees.map((profile: any) =>
       Promise.all([
         sendEmail({
           to: profile.email,
-          subject: `Quiz Assigned: ${quiz?.title || 'SkillTest_AI Assessment'}`,
+          subject: `Quiz Assigned: ${quiz.title || 'SkillTest_AI Assessment'}`,
           html: buildQuizAssignedEmail({
             employeeName: profile.full_name,
-            quizTitle: quiz?.title || 'SkillTest_AI Assessment',
-            topic: quiz?.topic || 'General',
-            difficulty: quiz?.difficulty || 'medium',
+            quizTitle: quiz.title || 'SkillTest_AI Assessment',
+            topic: quiz.topic || 'General',
+            difficulty: quiz.difficulty || 'medium',
           }),
         }),
         supabase.from('training_notifications').insert({
           recipient_user_id: profile.id,
-          title: `Quiz assigned: ${quiz?.title || 'SkillTest_AI Assessment'}`,
-          message: `${profile.full_name || profile.email} was assigned ${quiz?.title || 'a SkillTest_AI assessment'}.`,
+          title: `Quiz assigned: ${quiz.title || 'SkillTest_AI Assessment'}`,
+          message: `${profile.full_name || profile.email} was assigned ${quiz.title || 'a SkillTest_AI assessment'}.`,
           audience: 'individual',
           channel: 'in_app',
           delivery_status: 'sent',
@@ -527,28 +531,24 @@ export async function assignQuizToEmployees(quizId: string, employeeIds: string[
     ))
   }
 
-  if (errors.length > 0) {
-    return { error: `Assigned ${successCount}/${rows.length}. Errors: ${errors.join('; ')}` }
-  }
-
   return { data: true, assigned: successCount }
 }
 
 // ─── Unassign a quiz from an employee ─────────────────────────────────
 export async function unassignQuizFromEmployee(quizId: string, employeeId: string) {
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return { error: 'Not authenticated' }
+  await requireManager()
+  const quizIdResult = uuidSchema.safeParse(quizId)
+  const employeeIdResult = uuidSchema.safeParse(employeeId)
+  if (!quizIdResult.success || !employeeIdResult.success) return { error: 'Invalid assignment.' }
 
   // Use admin client to bypass RLS — assignments are created via admin client
-  let adminClient: any
-  try { adminClient = createAdminClient() } catch { adminClient = supabase }
+  const adminClient = createAdminClient()
 
   const { error } = await adminClient
     .from('quiz_assignments')
     .delete()
-    .eq('quiz_id', quizId)
-    .eq('user_id', employeeId)
+    .eq('quiz_id', quizIdResult.data)
+    .eq('user_id', employeeIdResult.data)
 
   if (error) return { error: error.message }
 
@@ -559,18 +559,17 @@ export async function unassignQuizFromEmployee(quizId: string, employeeId: strin
 
 // ─── Get assignments for a quiz ───────────────────────────────────────
 export async function getQuizAssignments(quizId: string) {
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return { error: 'Not authenticated', data: [] }
+  await requireTrainingStaff()
+  const quizIdResult = uuidSchema.safeParse(quizId)
+  if (!quizIdResult.success) return { error: 'Invalid quiz ID', data: [] }
 
   // Use admin client to bypass RLS — assignments are created via admin client
-  let adminClient: any
-  try { adminClient = createAdminClient() } catch { adminClient = supabase }
+  const adminClient = createAdminClient()
 
   const { data, error } = await adminClient
     .from('quiz_assignments')
-    .select('*, profiles:user_id(id, full_name, email, employee_id, department, avatar_url)')
-    .eq('quiz_id', quizId)
+    .select('*, profiles:user_id(id, full_name, email, employee_id, department, domain, avatar_url)')
+    .eq('quiz_id', quizIdResult.data)
     .order('assigned_at', { ascending: false })
 
   if (error) return { error: error.message, data: [] }
@@ -579,16 +578,16 @@ export async function getQuizAssignments(quizId: string) {
 
 // ─── Get all quizzes with assignment info for manager ─────────────────
 export async function getQuizzesForAssignment() {
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return { error: 'Not authenticated', data: [] }
+  const { userId, role } = await requireManager()
+  const supabase = createAdminClient()
 
-  const { data: quizzes, error } = await supabase
+  let query = supabase
     .from('quizzes')
     .select('id, title, topic, difficulty, is_active, questions(count)')
-    .eq('created_by', user.id)
     .eq('is_active', true)
     .order('created_at', { ascending: false })
+  if (role !== 'admin') query = query.eq('created_by', userId)
+  const { data: quizzes, error } = await query
 
   if (error) return { error: error.message, data: [] }
   return { data: quizzes || [] }
