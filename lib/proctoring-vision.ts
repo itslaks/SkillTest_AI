@@ -1,8 +1,14 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// proctoring-vision.ts  –  AI + DOM proctoring for online assessments
+// ─────────────────────────────────────────────────────────────────────────────
+
 export interface VisionProctoringConfig {
   videoElement: HTMLVideoElement
   canvasElement: HTMLCanvasElement
   onViolation: (violation: VisionViolation) => void
   intervalMs?: number
+  /** Emit fullscreen_exit violations when the user leaves fullscreen (default false) */
+  requireFullscreen?: boolean
 }
 
 export interface VisionViolation {
@@ -26,6 +32,10 @@ type VisionState = {
   noFaceSince: number | null
   gazeRatios: number[]
   yawReadings: number[]
+  /** Consecutive-frame counts for each AI violation type */
+  frameViolations: Map<string, number>
+  /** Cleanup callbacks for DOM listeners */
+  domUnsubscribers: Array<() => void>
 }
 
 type ModelBundle = {
@@ -34,21 +44,60 @@ type ModelBundle = {
   objectDetector: any
 }
 
+// ── Cooldowns ────────────────────────────────────────────────────────────────
 const COOLDOWN_MS_DEFAULT = 12_000
 const COOLDOWN_MS: Record<string, number> = {
-  multiple_faces: 3_000,
-  no_face: 4_000,
-  gaze_down: 10_000,
-  gaze_away: 10_000,
-  phone_detected: 5_000,
-  electronic_device: 8_000,
-  book_detected: 10_000,
+  // AI violations
+  multiple_faces:     3_000,
+  no_face:            4_000,
+  gaze_down:         10_000,
+  gaze_away:         10_000,
+  phone_detected:     5_000,
+  electronic_device:  8_000,
+  book_detected:     10_000,
+  // DOM violations
+  tab_switch:         5_000,
+  focus_loss:         5_000,
+  fullscreen_exit:    8_000,
+  copy_detected:      2_000,
+  paste_detected:     2_000,
+  right_click:        5_000,
+  dev_tools:          5_000,
+  screenshot_attempt: 3_000,
+  window_switch:      3_000,
 }
+
+// ── Detection thresholds ─────────────────────────────────────────────────────
+// Lowered to catch more; consensus (below) prevents false-positive spam.
+const FACE_SCORE_THRESHOLD   = 0.25   // was 0.35
+const PERSON_SCORE_THRESHOLD = 0.28
+const PHONE_SCORE_THRESHOLD  = 0.18   // COCO-SSD is weak at phones — low & consensus
+const DEVICE_SCORE_THRESHOLD = 0.32   // was 0.40
+const BOOK_SCORE_THRESHOLD   = 0.32   // was 0.40
+
+// ── Consensus: N consecutive frames required before emitting ─────────────────
+const CONSENSUS: Record<string, number> = {
+  multiple_faces:    2,
+  phone_detected:    3,   // 3 frames because low threshold → more noise
+  electronic_device: 2,
+  book_detected:     2,
+}
+
+// ── Gaze thresholds ──────────────────────────────────────────────────────────
+const GAZE_DOWN_RATIO_THRESHOLD = 0.65   // was 0.70
+const GAZE_YAW_MEDIAN_DEGREES   = 25     // median yaw (was: all 5 readings > 30)
+
 const NO_FACE_MS = 3_000
 const MAX_BUFFER = 5
+
+const PHONE_LABELS  = new Set(['cell phone', 'remote'])
+const DEVICE_LABELS = new Set(['laptop', 'tablet', 'monitor', 'tv'])
+
 let modelPromise: Promise<ModelBundle | null> | null = null
 let faceDetectorPromise: Promise<any | null> | null = null
 const states = new WeakMap<HTMLVideoElement, VisionState>()
+
+// ── Public API ────────────────────────────────────────────────────────────────
 
 export function startVisionProctoring(config: VisionProctoringConfig) {
   if (typeof window === 'undefined') return
@@ -63,8 +112,13 @@ export function startVisionProctoring(config: VisionProctoringConfig) {
     noFaceSince: null,
     gazeRatios: [],
     yawReadings: [],
+    frameViolations: new Map(),
+    domUnsubscribers: [],
   }
   states.set(config.videoElement, state)
+
+  // Attach DOM-based proctoring (tab switch, copy/paste, shortcuts …)
+  setupDomProctoring(config, state)
 
   const tick = async () => {
     if (!state.running) return
@@ -73,11 +127,11 @@ export function startVisionProctoring(config: VisionProctoringConfig) {
       if (!models) return
       await inspectFrame(config, state, models)
     } catch (error) {
-      console.warn('[proctoring-vision] frame inspection failed open:', error)
+      console.warn('[proctoring-vision] frame inspection failed:', error)
     }
   }
 
-  state.intervalId = window.setInterval(tick, config.intervalMs ?? 1000)
+  state.intervalId = window.setInterval(tick, config.intervalMs ?? 1_000)
   void tick()
 }
 
@@ -87,6 +141,7 @@ export function stopVisionProctoring(videoElement?: HTMLVideoElement | null) {
   if (!state) return
   state.running = false
   if (state.intervalId !== null) window.clearInterval(state.intervalId)
+  cleanupDomProctoring(state)
   states.delete(videoElement)
 }
 
@@ -107,9 +162,7 @@ export async function validateCameraFrameForProctoring(
   }
 
   const detector = await loadFaceDetector()
-  if (!detector) {
-    return cameraPreviewFallback()
-  }
+  if (!detector) return cameraPreviewFallback()
 
   try {
     const faces = await detector.estimateFaces(videoElement, { flipHorizontal: false })
@@ -125,12 +178,16 @@ export async function validateCameraFrameForProctoring(
       return { status: 'partial_face', message: 'Face position could not be verified. Sit centered and fully visible.', confidence: 0.55 }
     }
 
-    const width = videoElement.videoWidth || 1
+    const width  = videoElement.videoWidth  || 1
     const height = videoElement.videoHeight || 1
     const faceArea = (box.width * box.height) / (width * height)
-    const marginX = width * 0.04
+    const marginX = width  * 0.04
     const marginY = height * 0.04
-    const centeredEnough = box.x >= marginX && box.y >= marginY && (box.x + box.width) <= width - marginX && (box.y + box.height) <= height - marginY
+    const centeredEnough = (
+      box.x >= marginX && box.y >= marginY &&
+      (box.x + box.width)  <= width  - marginX &&
+      (box.y + box.height) <= height - marginY
+    )
     const sizedEnough = faceArea >= 0.07 && faceArea <= 0.72
 
     if (!centeredEnough || !sizedEnough) {
@@ -144,13 +201,345 @@ export async function validateCameraFrameForProctoring(
   }
 }
 
+// ── DOM-based Proctoring ──────────────────────────────────────────────────────
+
+function setupDomProctoring(config: VisionProctoringConfig, state: VisionState) {
+  // Helper: attach + register cleanup in one call
+  const on = <T extends Event>(
+    target: EventTarget,
+    type: string,
+    handler: (e: T) => void,
+    opts?: AddEventListenerOptions,
+  ) => {
+    const wrapped = handler as EventListener
+    target.addEventListener(type, wrapped, opts)
+    state.domUnsubscribers.push(() => target.removeEventListener(type, wrapped, opts))
+  }
+
+  // ── Tab switch ──────────────────────────────────────────────────────────────
+  on(document, 'visibilitychange', () => {
+    if (document.hidden) {
+      fireViolation(config, state, 'tab_switch', 'Tab switch detected — exam tab is no longer active.', 0.99)
+    }
+  })
+
+  // ── Another window/app gained focus ────────────────────────────────────────
+  let blurTimer: ReturnType<typeof setTimeout> | null = null
+  on<FocusEvent>(window, 'blur', () => {
+    blurTimer = setTimeout(() => {
+      if (!document.hasFocus() && !document.hidden) {
+        fireViolation(config, state, 'focus_loss', 'Focus moved to another application or window.', 0.95)
+      }
+    }, 300)
+  })
+  on<FocusEvent>(window, 'focus', () => {
+    if (blurTimer !== null) { clearTimeout(blurTimer); blurTimer = null }
+  })
+
+  // ── Fullscreen exit (opt-in) ────────────────────────────────────────────────
+  if (config.requireFullscreen) {
+    const onFsChange = () => {
+      if (!document.fullscreenElement) {
+        fireViolation(config, state, 'fullscreen_exit', 'Fullscreen mode exited during the exam.', 0.99)
+      }
+    }
+    on(document, 'fullscreenchange', onFsChange)
+    on(document, 'webkitfullscreenchange', onFsChange)
+  }
+
+  // ── Copy / Cut / Paste ──────────────────────────────────────────────────────
+  on(document, 'copy', () => {
+    fireViolation(config, state, 'copy_detected', 'Content copy attempt detected.', 0.99)
+  })
+  on(document, 'cut', () => {
+    fireViolation(config, state, 'copy_detected', 'Content cut attempt detected.', 0.99)
+  })
+  on(document, 'paste', () => {
+    fireViolation(config, state, 'paste_detected', 'Paste attempt detected.', 0.99)
+  })
+
+  // ── Right-click (suppress menu + flag) ─────────────────────────────────────
+  on<MouseEvent>(document, 'contextmenu', (e) => {
+    e.preventDefault()
+    fireViolation(config, state, 'right_click', 'Right-click attempt detected.', 0.99)
+  })
+
+  // ── Suspicious keyboard shortcuts ──────────────────────────────────────────
+  on<KeyboardEvent>(document, 'keydown', (e) => {
+    const key   = e.key
+    const ctrl  = e.ctrlKey || e.metaKey
+    const shift = e.shiftKey
+
+    // Screenshot
+    if (key === 'PrintScreen') {
+      fireViolation(config, state, 'screenshot_attempt', 'Screenshot key detected.', 0.95)
+      return
+    }
+
+    // Developer tools: F12 | Ctrl+Shift+{I,J,C,K} | Ctrl+U
+    if (
+      key === 'F12' ||
+      (ctrl && shift && ['I', 'J', 'C', 'K'].includes(key)) ||
+      (ctrl && key === 'u')
+    ) {
+      e.preventDefault()
+      fireViolation(config, state, 'dev_tools', 'Developer tools shortcut detected.', 0.95)
+      return
+    }
+
+    // Alt+Tab — OS usually intercepts, but catch if the browser sees it
+    if (e.altKey && key === 'Tab') {
+      fireViolation(config, state, 'window_switch', 'Window switch shortcut detected (Alt+Tab).', 0.9)
+    }
+  })
+}
+
+function cleanupDomProctoring(state: VisionState) {
+  for (const unsub of state.domUnsubscribers) unsub()
+  state.domUnsubscribers = []
+}
+
+/** Emit a violation triggered by a DOM event (bypasses consensus, uses cooldown only). */
+function fireViolation(
+  config: VisionProctoringConfig,
+  state: VisionState,
+  type: string,
+  label: string,
+  confidence: number,
+) {
+  emitViolation(config, state, { type, label, confidence, timestamp: Date.now() })
+}
+
+// ── AI Frame Inspection ───────────────────────────────────────────────────────
+
+async function inspectFrame(config: VisionProctoringConfig, state: VisionState, models: ModelBundle) {
+  const video = config.videoElement
+  if (video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) return
+
+  const now = Date.now()
+
+  // Run face detection and object detection in parallel for speed
+  const [faces, predictions] = await Promise.all([
+    models.faceDetector.estimateFaces(video, { flipHorizontal: false }) as Promise<any[]>,
+    models.objectDetector.detect(video) as Promise<any[]>,
+  ])
+
+  // ── Cross-validate face count using COCO-SSD "person" class ──────────────
+  // COCO-SSD can see bodies that the face detector misses (profiles, partial faces)
+  const cocoPersonCount = (predictions ?? []).filter(
+    (p: any) => String(p.class || '').toLowerCase() === 'person' && Number(p.score || 0) > PERSON_SCORE_THRESHOLD,
+  ).length
+  const effectiveFaceCount = Math.max(faces.length, cocoPersonCount)
+
+  // ── Multiple people ───────────────────────────────────────────────────────
+  const shouldFireMultipleFaces = advanceConsensus(
+    state, 'multiple_faces', effectiveFaceCount >= 2, CONSENSUS.multiple_faces,
+  )
+  if (effectiveFaceCount >= 2) {
+    state.noFaceSince = null
+    if (shouldFireMultipleFaces) {
+      emitViolation(config, state, {
+        type: 'multiple_faces',
+        label: `Multiple people detected (${effectiveFaceCount}). Only one person is allowed during the assessment.`,
+        confidence: Math.min(0.99, averageFaceScore(faces) || 0.85),
+        timestamp: now,
+      })
+    }
+  } else if (faces.length === 0) {
+    // ── No face ──────────────────────────────────────────────────────────────
+    state.noFaceSince ??= now
+    if (now - state.noFaceSince > NO_FACE_MS) {
+      emitViolation(config, state, {
+        type: 'no_face',
+        label: 'No face detected in camera frame.',
+        confidence: 0.9,
+        timestamp: now,
+      })
+    }
+  } else {
+    // ── Single face — check gaze ──────────────────────────────────────────
+    state.noFaceSince = null
+    await inspectGaze(config, state, models, now)
+  }
+
+  // ── Objects: phones, devices, books ──────────────────────────────────────
+  inspectObjectViolations(config, state, predictions ?? [], now)
+}
+
+async function inspectGaze(
+  config: VisionProctoringConfig,
+  state: VisionState,
+  models: ModelBundle,
+  now: number,
+) {
+  const faces = await models.landmarkDetector.estimateFaces(config.videoElement, { flipHorizontal: false })
+  const face = faces?.[0]
+  const keypoints: Array<{ name?: string; x: number; y: number }> = face?.keypoints ?? []
+  if (!face || keypoints.length === 0) return
+
+  const leftEye    = namedPoint(keypoints, ['leftEye',   'left eye'])
+  const rightEye   = namedPoint(keypoints, ['rightEye',  'right eye'])
+  const noseTip    = namedPoint(keypoints, ['noseTip',   'nose tip'])
+  const lips       = namedPoint(keypoints, ['lips',      'mouthCenter', 'mouth center'])
+  const leftCheek  = namedPoint(keypoints, ['leftCheek', 'left cheek'])
+  const rightCheek = namedPoint(keypoints, ['rightCheek','right cheek'])
+  if (!leftEye || !rightEye || !noseTip) return
+
+  // ── Downward gaze (possible note reading) ────────────────────────────────
+  if (lips) {
+    const eyeY       = (leftEye.y + rightEye.y) / 2
+    const faceHeight = Math.max(1, Math.abs(lips.y - eyeY))
+    pushReading(state.gazeRatios, (noseTip.y - eyeY) / faceHeight)
+    if (
+      state.gazeRatios.length >= MAX_BUFFER &&
+      median(state.gazeRatios) > GAZE_DOWN_RATIO_THRESHOLD
+    ) {
+      emitViolation(config, state, {
+        type: 'gaze_down',
+        label: 'Sustained downward gaze detected — possible note-reading.',
+        confidence: Math.min(0.99, median(state.gazeRatios)),
+        timestamp: now,
+      })
+    }
+  }
+
+  // ── Lateral face-turn / looking away (yaw) ───────────────────────────────
+  if (leftCheek && rightCheek) {
+    const faceWidth  = Math.max(1, Math.abs(rightCheek.x - leftCheek.x))
+    const centerX    = (leftCheek.x + rightCheek.x) / 2
+    const yawDegrees = Math.abs(((noseTip.x - centerX) / faceWidth) * 90)
+    pushReading(state.yawReadings, yawDegrees)
+    if (
+      state.yawReadings.length >= MAX_BUFFER &&
+      median(state.yawReadings) > GAZE_YAW_MEDIAN_DEGREES
+    ) {
+      emitViolation(config, state, {
+        type: 'gaze_away',
+        label: 'Face turned away from screen for an extended period.',
+        confidence: Math.min(0.99, median(state.yawReadings) / 45),
+        timestamp: now,
+      })
+    }
+  }
+}
+
+function inspectObjectViolations(
+  config: VisionProctoringConfig,
+  state: VisionState,
+  predictions: any[],
+  now: number,
+) {
+  // Collect best scores for this frame
+  let bestPhoneScore  = 0
+  let bestBookScore   = 0
+  const deviceScores  = new Map<string, number>()
+
+  for (const pred of predictions) {
+    const label = String(pred.class || '').toLowerCase()
+    const score = Number(pred.score || 0)
+
+    // ── Phone ───────────────────────────────────────────────────────────────
+    // COCO-SSD frequently misclassifies phones as "remote"; we cover both.
+    // Low threshold + 3-frame consensus keeps false positives low.
+    if (PHONE_LABELS.has(label) && score > PHONE_SCORE_THRESHOLD) {
+      bestPhoneScore = Math.max(bestPhoneScore, score)
+    }
+
+    // ── Electronic devices ───────────────────────────────────────────────────
+    if (DEVICE_LABELS.has(label) && score > DEVICE_SCORE_THRESHOLD) {
+      deviceScores.set(label, Math.max(deviceScores.get(label) ?? 0, score))
+    }
+
+    // ── Book / notes ─────────────────────────────────────────────────────────
+    if (label === 'book' && score > BOOK_SCORE_THRESHOLD) {
+      bestBookScore = Math.max(bestBookScore, score)
+    }
+  }
+
+  // ── Emit phone (consensus-gated) ─────────────────────────────────────────
+  if (advanceConsensus(state, 'phone_detected', bestPhoneScore > 0, CONSENSUS.phone_detected)) {
+    emitViolation(config, state, {
+      type: 'phone_detected',
+      label: 'Mobile phone detected in camera frame.',
+      confidence: Math.min(0.99, bestPhoneScore),
+      timestamp: now,
+    })
+  }
+
+  // ── Emit each device type separately (consensus-gated) ────────────────────
+  for (const label of DEVICE_LABELS) {
+    const score   = deviceScores.get(label) ?? 0
+    const present = score > 0
+    if (advanceConsensus(state, `device_${label}`, present, CONSENSUS.electronic_device) && present) {
+      emitViolation(config, state, {
+        type: 'electronic_device',
+        label: `Additional electronic device detected (${label}).`,
+        confidence: score,
+        timestamp: now,
+      })
+    }
+  }
+
+  // ── Emit book (consensus-gated) ───────────────────────────────────────────
+  if (advanceConsensus(state, 'book_detected', bestBookScore > 0, CONSENSUS.book_detected)) {
+    emitViolation(config, state, {
+      type: 'book_detected',
+      label: 'Book or notes detected in camera frame.',
+      confidence: Math.min(0.99, bestBookScore),
+      timestamp: now,
+    })
+  }
+}
+
+// ── Consensus Helper ──────────────────────────────────────────────────────────
+
+/**
+ * Increments or decrements the per-type consecutive-frame counter.
+ * Returns true only after `required` consecutive positive frames.
+ * On absence, the count decays by 1 per frame (avoids instant reset on brief gaps).
+ */
+function advanceConsensus(
+  state: VisionState,
+  key: string,
+  detected: boolean,
+  required: number,
+): boolean {
+  const current = state.frameViolations.get(key) ?? 0
+  if (detected) {
+    const next = Math.min(current + 1, required) // cap to avoid overflow
+    state.frameViolations.set(key, next)
+    return next >= required
+  }
+  state.frameViolations.set(key, Math.max(0, current - 1))
+  return false
+}
+
+// ── Violation Emitter ─────────────────────────────────────────────────────────
+
+function emitViolation(
+  config: VisionProctoringConfig,
+  state: VisionState,
+  violation: Omit<VisionViolation, 'evidenceDataUrl'>,
+) {
+  const cooldown = COOLDOWN_MS[violation.type] ?? COOLDOWN_MS_DEFAULT
+  const last     = state.lastEmittedAt.get(violation.type) ?? 0
+  if (violation.timestamp - last < cooldown) return
+  state.lastEmittedAt.set(violation.type, violation.timestamp)
+  config.onViolation({
+    ...violation,
+    evidenceDataUrl: captureFrame(config.videoElement, config.canvasElement),
+  })
+}
+
+// ── Model Loading ─────────────────────────────────────────────────────────────
+
 async function loadModels(): Promise<ModelBundle | null> {
   if (typeof window === 'undefined') return null
   if (modelPromise) return modelPromise
 
   modelPromise = (async () => {
     try {
-      const tf = await runtimeImport('@tensorflow/tfjs')
+      const tf      = await runtimeImport('@tensorflow/tfjs')
       const backend = await prepareTensorflowBackend(tf)
       if (!backend) return null
 
@@ -160,19 +549,22 @@ async function loadModels(): Promise<ModelBundle | null> {
         runtimeImport('@tensorflow-models/coco-ssd'),
       ])
 
-      const faceDetector = await faceDetection.createDetector(
-        faceDetection.SupportedModels.MediaPipeFaceDetector,
-        { runtime: 'tfjs', modelType: 'short', maxFaces: 8, scoreThreshold: 0.35 },
-      )
-      const landmarkDetector = await faceLandmarksDetection.createDetector(
-        faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
-        { runtime: 'tfjs', refineLandmarks: true },
-      )
-      const objectDetector = await cocoSsd.load()
+      // Load all three models in parallel to reduce startup time
+      const [faceDetector, landmarkDetector, objectDetector] = await Promise.all([
+        faceDetection.createDetector(
+          faceDetection.SupportedModels.MediaPipeFaceDetector,
+          { runtime: 'tfjs', modelType: 'short', maxFaces: 8, scoreThreshold: FACE_SCORE_THRESHOLD },
+        ),
+        faceLandmarksDetection.createDetector(
+          faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
+          { runtime: 'tfjs', refineLandmarks: true },
+        ),
+        cocoSsd.load(),
+      ])
 
       return { faceDetector, landmarkDetector, objectDetector }
     } catch (error) {
-      console.warn('[proctoring-vision] model load failed open:', error)
+      console.warn('[proctoring-vision] model load failed:', error)
       return null
     }
   })()
@@ -180,18 +572,18 @@ async function loadModels(): Promise<ModelBundle | null> {
   return modelPromise
 }
 
-async function loadFaceDetector() {
+async function loadFaceDetector(): Promise<any | null> {
   if (faceDetectorPromise) return faceDetectorPromise
 
   faceDetectorPromise = (async () => {
     try {
-      const tf = await runtimeImport('@tensorflow/tfjs')
+      const tf      = await runtimeImport('@tensorflow/tfjs')
       const backend = await prepareTensorflowBackend(tf)
       if (!backend) return null
       const faceDetection = await runtimeImport('@tensorflow-models/face-detection')
       return faceDetection.createDetector(
         faceDetection.SupportedModels.MediaPipeFaceDetector,
-        { runtime: 'tfjs', modelType: 'short', maxFaces: 8, scoreThreshold: 0.35 },
+        { runtime: 'tfjs', modelType: 'short', maxFaces: 8, scoreThreshold: FACE_SCORE_THRESHOLD },
       )
     } catch (error) {
       console.warn('[proctoring-vision] face detector load failed:', error)
@@ -202,17 +594,16 @@ async function loadFaceDetector() {
   return faceDetectorPromise
 }
 
-async function prepareTensorflowBackend(tf: any) {
+async function prepareTensorflowBackend(tf: any): Promise<string | null> {
   if (hasWebGlSupport()) {
     try {
       await tf.setBackend('webgl')
       await tf.ready()
       return 'webgl'
     } catch (error) {
-      console.warn('[proctoring-vision] WebGL backend unavailable; trying CPU face detection.', error)
+      console.warn('[proctoring-vision] WebGL unavailable; falling back to CPU.', error)
     }
   }
-
   try {
     await tf.setBackend('cpu')
     await tf.ready()
@@ -223,7 +614,7 @@ async function prepareTensorflowBackend(tf: any) {
   }
 }
 
-function hasWebGlSupport() {
+function hasWebGlSupport(): boolean {
   try {
     const canvas = document.createElement('canvas')
     return Boolean(canvas.getContext('webgl') || canvas.getContext('experimental-webgl'))
@@ -235,153 +626,24 @@ function hasWebGlSupport() {
 function cameraPreviewFallback(): CameraVisibilityCheck {
   return {
     status: 'visible',
-    message: 'Camera preview is live. Advanced face verification is unavailable in this browser, so keep your full face inside the preview while you continue.',
+    message: 'Camera preview is live. Advanced face verification is unavailable in this browser — keep your full face inside the preview.',
     confidence: 0.45,
   }
 }
 
-async function inspectFrame(config: VisionProctoringConfig, state: VisionState, models: ModelBundle) {
-  const video = config.videoElement
-  if (video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) return
+// ── Frame / Pixel Helpers ─────────────────────────────────────────────────────
 
-  const faces = await models.faceDetector.estimateFaces(video, { flipHorizontal: false })
-  const now = Date.now()
-
-  if (faces.length >= 2) {
-    state.noFaceSince = null
-    emitViolation(config, state, {
-      type: 'multiple_faces',
-      label: `Multiple people detected (${faces.length} faces). Only one person is allowed during the assessment.`,
-      confidence: averageFaceScore(faces),
-      timestamp: now,
-    })
-  } else if (faces.length === 0) {
-    state.noFaceSince ??= now
-    if (now - state.noFaceSince > NO_FACE_MS) {
-      emitViolation(config, state, {
-        type: 'no_face',
-        label: 'No face detected in camera frame.',
-        confidence: 0.9,
-        timestamp: now,
-      })
-    }
-  } else {
-    state.noFaceSince = null
-    await inspectGaze(config, state, models, now)
-  }
-
-  await inspectObjects(config, state, models, now)
-}
-
-async function inspectGaze(config: VisionProctoringConfig, state: VisionState, models: ModelBundle, now: number) {
-  const faces = await models.landmarkDetector.estimateFaces(config.videoElement, { flipHorizontal: false })
-  const face = faces[0]
-  const keypoints = face?.keypoints || []
-  if (!face || keypoints.length === 0) return
-
-  const leftEye = namedPoint(keypoints, ['leftEye', 'left eye'])
-  const rightEye = namedPoint(keypoints, ['rightEye', 'right eye'])
-  const noseTip = namedPoint(keypoints, ['noseTip', 'nose tip'])
-  const lips = namedPoint(keypoints, ['lips', 'mouthCenter', 'mouth center'])
-  const leftCheek = namedPoint(keypoints, ['leftCheek', 'left cheek'])
-  const rightCheek = namedPoint(keypoints, ['rightCheek', 'right cheek'])
-  if (!leftEye || !rightEye || !noseTip) return
-
-  if (lips) {
-    const eyeY = (leftEye.y + rightEye.y) / 2
-    const faceHeight = Math.max(1, Math.abs(lips.y - eyeY))
-    pushReading(state.gazeRatios, (noseTip.y - eyeY) / faceHeight)
-    if (state.gazeRatios.length === MAX_BUFFER && median(state.gazeRatios) > 0.7) {
-      emitViolation(config, state, {
-        type: 'gaze_down',
-        label: 'Downward gaze detected for an extended period.',
-        confidence: Math.min(0.99, median(state.gazeRatios)),
-        timestamp: now,
-      })
-    }
-  }
-
-  if (leftCheek && rightCheek) {
-    const faceWidth = Math.max(1, Math.abs(rightCheek.x - leftCheek.x))
-    const centerX = (leftCheek.x + rightCheek.x) / 2
-    const yawDegrees = Math.abs(((noseTip.x - centerX) / faceWidth) * 90)
-    pushReading(state.yawReadings, yawDegrees)
-    if (state.yawReadings.length === MAX_BUFFER && state.yawReadings.every((reading) => reading > 30)) {
-      emitViolation(config, state, {
-        type: 'gaze_away',
-        label: 'Face turned away from assessment screen.',
-        confidence: Math.min(0.99, median(state.yawReadings) / 45),
-        timestamp: now,
-      })
-    }
-  }
-}
-
-async function inspectObjects(config: VisionProctoringConfig, state: VisionState, models: ModelBundle, now: number) {
-  const predictions = await models.objectDetector.detect(config.videoElement)
-  const people = (predictions || []).filter((prediction: any) => {
-    const label = String(prediction.class || '').toLowerCase()
-    const score = Number(prediction.score || 0)
-    return label === 'person' && score > 0.35
-  })
-
-  if (people.length >= 2) {
-    emitViolation(config, state, {
-      type: 'multiple_faces',
-      label: `Multiple people detected (${people.length} people). Only one person is allowed during the assessment.`,
-      confidence: Math.min(0.99, people.reduce((sum: number, item: any) => sum + Number(item.score || 0), 0) / people.length),
-      timestamp: now,
-    })
-  }
-
-  // Track phone evidence across labels — COCO-SSD often misclassifies phones as "remote"
-  let bestPhoneScore = 0
-  for (const prediction of predictions || []) {
-    const label = String(prediction.class || '').toLowerCase()
-    const score = Number(prediction.score || 0)
-
-    if ((label === 'cell phone' || label === 'remote') && score > 0.30) {
-      if (score > bestPhoneScore) bestPhoneScore = score
-    }
-    if ((label === 'laptop' || label === 'tablet' || label === 'monitor' || label === 'tv') && score > 0.40) {
-      emitViolation(config, state, { type: 'electronic_device', label: `Additional electronic device detected (${label}).`, confidence: score, timestamp: now })
-    }
-    if (label === 'book' && score > 0.40) {
-      emitViolation(config, state, { type: 'book_detected', label: 'Book or notes detected in camera frame.', confidence: score, timestamp: now })
-    }
-  }
-
-  if (bestPhoneScore > 0) {
-    emitViolation(config, state, { type: 'phone_detected', label: 'Mobile phone detected in camera frame.', confidence: Math.min(0.99, bestPhoneScore), timestamp: now })
-  }
-}
-
-function emitViolation(
-  config: VisionProctoringConfig,
-  state: VisionState,
-  violation: Omit<VisionViolation, 'evidenceDataUrl'>,
-) {
-  const cooldown = COOLDOWN_MS[violation.type] ?? COOLDOWN_MS_DEFAULT
-  const last = state.lastEmittedAt.get(violation.type) || 0
-  if (violation.timestamp - last < cooldown) return
-  state.lastEmittedAt.set(violation.type, violation.timestamp)
-  config.onViolation({
-    ...violation,
-    evidenceDataUrl: captureFrame(config.videoElement, config.canvasElement),
-  })
-}
-
-function captureFrame(video: HTMLVideoElement, canvas: HTMLCanvasElement) {
-  const sourceWidth = video.videoWidth || 640
+function captureFrame(video: HTMLVideoElement, canvas: HTMLCanvasElement): string {
+  const sourceWidth  = video.videoWidth  || 640
   const sourceHeight = video.videoHeight || 480
-  const ratio = Math.min(800 / sourceWidth, 600 / sourceHeight, 1)
-  const width = Math.max(1, Math.round(sourceWidth * ratio))
+  const ratio  = Math.min(800 / sourceWidth, 600 / sourceHeight, 1)
+  const width  = Math.max(1, Math.round(sourceWidth  * ratio))
   const height = Math.max(1, Math.round(sourceHeight * ratio))
-  canvas.width = width
+  canvas.width  = width
   canvas.height = height
-  const context = canvas.getContext('2d')
-  if (!context) return ''
-  context.drawImage(video, 0, 0, width, height)
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return ''
+  ctx.drawImage(video, 0, 0, width, height)
   let quality = 0.7
   let dataUrl = canvas.toDataURL('image/jpeg', quality)
   while (dataUrl.length > 1_100_000 && quality > 0.35) {
@@ -391,9 +653,49 @@ function captureFrame(video: HTMLVideoElement, canvas: HTMLCanvasElement) {
   return dataUrl
 }
 
-function namedPoint(points: Array<{ name?: string; x: number; y: number }>, names: string[]) {
-  return points.find((point) => {
-    const name = point.name?.toLowerCase()
+function inspectFramePixels(video: HTMLVideoElement, canvas: HTMLCanvasElement) {
+  const sampleWidth  = 96
+  const sampleHeight = Math.max(54, Math.round((video.videoHeight / Math.max(1, video.videoWidth)) * sampleWidth))
+  canvas.width  = sampleWidth
+  canvas.height = sampleHeight
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return { isCovered: false, confidence: 0 }
+  ctx.drawImage(video, 0, 0, sampleWidth, sampleHeight)
+  const { data } = ctx.getImageData(0, 0, sampleWidth, sampleHeight)
+  let sum = 0, sumSquares = 0
+  for (let i = 0; i < data.length; i += 4) {
+    const lum   = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) / 255
+    sum        += lum
+    sumSquares += lum * lum
+  }
+  const count     = data.length / 4
+  const mean      = sum / count
+  const variance  = Math.max(0, sumSquares / count - mean * mean)
+  const contrast  = Math.sqrt(variance)
+  const isCovered = mean < 0.08 || (mean < 0.16 && contrast < 0.035)
+  return {
+    isCovered,
+    confidence: isCovered ? Math.min(0.98, 1 - mean + (0.08 - Math.min(0.08, contrast))) : 0.4,
+  }
+}
+
+function faceBox(face: any): { x: number; y: number; width: number; height: number } | null {
+  const box = face.box || face.boundingBox
+  if (!box) return null
+  const x      = Number(box.xMin ?? box.x ?? box.topLeft?.[0] ?? 0)
+  const y      = Number(box.yMin ?? box.y ?? box.topLeft?.[1] ?? 0)
+  const width  = Number(box.width  ?? ((box.xMax ?? box.bottomRight?.[0] ?? 0) - x))
+  const height = Number(box.height ?? ((box.yMax ?? box.bottomRight?.[1] ?? 0) - y))
+  if (![x, y, width, height].every(Number.isFinite) || width <= 0 || height <= 0) return null
+  return { x, y, width, height }
+}
+
+function namedPoint(
+  points: Array<{ name?: string; x: number; y: number }>,
+  names: string[],
+) {
+  return points.find((p) => {
+    const name = p.name?.toLowerCase()
     return name ? names.some((expected) => name === expected.toLowerCase()) : false
   })
 }
@@ -403,50 +705,17 @@ function pushReading(buffer: number[], value: number) {
   if (buffer.length > MAX_BUFFER) buffer.shift()
 }
 
-function median(values: number[]) {
+function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b)
-  return sorted[Math.floor(sorted.length / 2)] || 0
+  return sorted[Math.floor(sorted.length / 2)] ?? 0
 }
 
-function averageFaceScore(faces: any[]) {
-  const scores = faces.map((face) => Number(face.score ?? face.box?.score ?? 0.8)).filter(Number.isFinite)
+function averageFaceScore(faces: any[]): number {
+  const scores = faces
+    .map((f) => Number(f.score ?? f.box?.score ?? 0.8))
+    .filter(Number.isFinite)
   if (!scores.length) return 0.8
-  return scores.reduce((sum, score) => sum + score, 0) / scores.length
-}
-
-function inspectFramePixels(video: HTMLVideoElement, canvas: HTMLCanvasElement) {
-  const sampleWidth = 96
-  const sampleHeight = Math.max(54, Math.round((video.videoHeight / Math.max(1, video.videoWidth)) * sampleWidth))
-  canvas.width = sampleWidth
-  canvas.height = sampleHeight
-  const context = canvas.getContext('2d')
-  if (!context) return { isCovered: false, confidence: 0 }
-  context.drawImage(video, 0, 0, sampleWidth, sampleHeight)
-  const { data } = context.getImageData(0, 0, sampleWidth, sampleHeight)
-  let sum = 0
-  let sumSquares = 0
-  for (let index = 0; index < data.length; index += 4) {
-    const luminance = (0.299 * data[index] + 0.587 * data[index + 1] + 0.114 * data[index + 2]) / 255
-    sum += luminance
-    sumSquares += luminance * luminance
-  }
-  const count = data.length / 4
-  const mean = sum / count
-  const variance = Math.max(0, sumSquares / count - mean * mean)
-  const contrast = Math.sqrt(variance)
-  const isCovered = mean < 0.08 || (mean < 0.16 && contrast < 0.035)
-  return { isCovered, confidence: isCovered ? Math.min(0.98, 1 - mean + (0.08 - Math.min(0.08, contrast))) : 0.4 }
-}
-
-function faceBox(face: any) {
-  const box = face.box || face.boundingBox
-  if (!box) return null
-  const x = Number(box.xMin ?? box.x ?? box.topLeft?.[0] ?? 0)
-  const y = Number(box.yMin ?? box.y ?? box.topLeft?.[1] ?? 0)
-  const width = Number(box.width ?? ((box.xMax ?? box.bottomRight?.[0] ?? 0) - x))
-  const height = Number(box.height ?? ((box.yMax ?? box.bottomRight?.[1] ?? 0) - y))
-  if (![x, y, width, height].every(Number.isFinite) || width <= 0 || height <= 0) return null
-  return { x, y, width, height }
+  return scores.reduce((sum, s) => sum + s, 0) / scores.length
 }
 
 function runtimeImport(specifier: string): Promise<any> {
