@@ -35,12 +35,14 @@ function UpdatePasswordForm() {
       const code = searchParams.get("code");
       const tokenHash = searchParams.get("token_hash");
       const type = searchParams.get("type");
+      const queryError = searchParams.get("error_description") || searchParams.get("error");
       const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
       const accessToken = hash.get("access_token");
       const refreshToken = hash.get("refresh_token");
       const hashError = hash.get("error_description") || hash.get("error");
 
       try {
+        if (queryError) throw new Error(queryError);
         if (hashError) throw new Error(hashError);
         if (accessToken && refreshToken) {
           const { error } = await supabase.auth.setSession({

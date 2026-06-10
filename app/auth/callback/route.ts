@@ -4,6 +4,21 @@ import { authCallbackSchema } from '@/lib/security/validation'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl
+  const type = searchParams.get('type')
+  const recoveryCode = searchParams.get('code')
+  const tokenHash = searchParams.get('token_hash')
+  const errorCode = searchParams.get('error_code')
+  const errorDescription = searchParams.get('error_description')
+
+  if (type === 'recovery' || type === 'invite' || tokenHash || errorCode || errorDescription) {
+    const updateParams = new URLSearchParams()
+    if (recoveryCode) updateParams.set('code', recoveryCode)
+    if (type) updateParams.set('type', type)
+    if (tokenHash) updateParams.set('token_hash', tokenHash)
+    if (errorCode) updateParams.set('error_code', errorCode)
+    if (errorDescription) updateParams.set('error_description', errorDescription)
+    return NextResponse.redirect(`${origin}/auth/update-password${updateParams.toString() ? `?${updateParams.toString()}` : ''}`)
+  }
 
   // Validate and sanitize query parameters
   const parsed = authCallbackSchema.safeParse({
