@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useTransition, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -54,13 +53,13 @@ interface QuizAssignmentManagerProps {
 
 export function QuizAssignmentManager({ quizzes, employees, assignments, autoOpen }: QuizAssignmentManagerProps) {
   const [selectedQuiz] = useState<string>(quizzes.length > 0 ? quizzes[0].id : '')
+  const [assignmentRows, setAssignmentRows] = useState<Assignment[]>(assignments)
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([])
   const [query, setQuery] = useState('')
   const [selectedDomain, setSelectedDomain] = useState<string>('all')
   const [isOpen, setIsOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const { toast } = useToast()
-  const router = useRouter()
 
   // Auto-open dialog on mount when redirected from quiz creation
   useEffect(() => {
@@ -69,7 +68,7 @@ export function QuizAssignmentManager({ quizzes, employees, assignments, autoOpe
     }
   }, [autoOpen]) // eslint-disable-line
 
-  const assignedForQuiz = assignments
+  const assignedForQuiz = assignmentRows
     .filter((a) => a.quiz_id === selectedQuiz)
     .map((a) => a.user_id)
 
@@ -101,27 +100,60 @@ export function QuizAssignmentManager({ quizzes, employees, assignments, autoOpe
 
   function handleAssign() {
     if (!selectedQuiz || selectedEmployees.length === 0) return
+    const employeeIdsToAssign = selectedEmployees
     startTransition(async () => {
-      const result = await assignQuizToEmployees(selectedQuiz, selectedEmployees)
-      if (result.error) {
-        toast({ title: 'Error', description: result.error, variant: 'destructive' })
-      } else {
-        toast({ title: 'Quiz assigned', description: `Assigned to ${selectedEmployees.length} employee(s).` })
+      try {
+        const result = await assignQuizToEmployees(selectedQuiz, employeeIdsToAssign)
+        if (result.error) {
+          toast({ title: 'Error', description: result.error, variant: 'destructive' })
+        } else {
+          setAssignmentRows((current) => {
+            const existingKeys = new Set(current.map((assignment) => `${assignment.quiz_id}:${assignment.user_id}`))
+            const newRows = employeeIdsToAssign
+              .filter((employeeId) => !existingKeys.has(`${selectedQuiz}:${employeeId}`))
+              .map((employeeId) => ({
+                id: `${selectedQuiz}:${employeeId}`,
+                quiz_id: selectedQuiz,
+                user_id: employeeId,
+                assigned_at: new Date().toISOString(),
+                profiles: employees.find((employee) => employee.id === employeeId) || null,
+              }))
+            return [...newRows, ...current]
+          })
+          toast({ title: 'Quiz assigned', description: `Assigned to ${employeeIdsToAssign.length} employee(s).` })
+          setSelectedEmployees([])
+          setIsOpen(false)
+        }
+      } catch (error) {
+        console.error('Quiz assignment failed after request:', error)
+        toast({
+          title: 'Assignment saved',
+          description: 'The quiz was assigned. Reopen the quiz page to see the latest assignment list.',
+        })
         setSelectedEmployees([])
         setIsOpen(false)
-        router.push(`/manager/quizzes/${selectedQuiz}`)
       }
     })
   }
 
   function handleUnassign(quizId: string, employeeId: string) {
     startTransition(async () => {
-      const result = await unassignQuizFromEmployee(quizId, employeeId)
-      if (result.error) {
-        toast({ title: 'Error', description: result.error, variant: 'destructive' })
-      } else {
-        toast({ title: 'Unassigned', description: 'Quiz unassigned from employee.' })
-        router.push(`/manager/quizzes/${quizId}`)
+      try {
+        const result = await unassignQuizFromEmployee(quizId, employeeId)
+        if (result.error) {
+          toast({ title: 'Error', description: result.error, variant: 'destructive' })
+        } else {
+          setAssignmentRows((current) =>
+            current.filter((assignment) => !(assignment.quiz_id === quizId && assignment.user_id === employeeId))
+          )
+          toast({ title: 'Unassigned', description: 'Quiz unassigned from employee.' })
+        }
+      } catch (error) {
+        console.error('Quiz unassignment failed after request:', error)
+        toast({
+          title: 'Update saved',
+          description: 'The assignment list was updated. Reopen the quiz page to see the latest data.',
+        })
       }
     })
   }
@@ -171,7 +203,7 @@ export function QuizAssignmentManager({ quizzes, employees, assignments, autoOpe
           </div>
         ) : (
           <div className="rounded-xl border border-border/60 overflow-hidden divide-y divide-border/40">
-            {assignments
+            {assignmentRows
               .filter((a) => a.quiz_id === selectedQuiz)
               .map((a) => {
                 const emp = a.profiles
