@@ -538,6 +538,7 @@ export type ProctoringEventType =
   | 'notes-detected'
   | 'audio-anomaly'
   | 'voice-assistance'
+  | 'face_substitution'
   | 'auto-submit'
 
 export type ProctoringRiskLevel = 'low' | 'medium' | 'high' | 'critical'

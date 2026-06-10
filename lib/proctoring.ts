@@ -51,6 +51,7 @@ export const PROCTORING_RISK_WEIGHTS: Record<ProctoringEventType, number> = {
   'notes-detected': 20,
   'audio-anomaly': 30,
   'voice-assistance': 40,
+  'face_substitution': 45,  // highest-severity: possible impersonation
   'auto-submit': 0,
 }
 
@@ -93,6 +94,7 @@ export const VIOLATION_SEVERITY: Record<ProctoringEventType, ProctoringRiskLevel
   'notes-detected': 'high',
   'audio-anomaly': 'high',
   'voice-assistance': 'critical',
+  'face_substitution': 'critical',
   'auto-submit': 'critical',
 }
 

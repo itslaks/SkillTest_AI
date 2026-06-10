@@ -2,6 +2,14 @@
 // proctoring-vision.ts  –  AI + DOM proctoring for online assessments
 // ─────────────────────────────────────────────────────────────────────────────
 
+export interface ReferenceFaceCapture {
+  /** JPEG snapshot taken at quiz start */
+  dataUrl: string
+  capturedAt: number
+  /** Normalized face-geometry vector (100 values) used for identity comparison */
+  faceSignature: number[]
+}
+
 export interface VisionProctoringConfig {
   videoElement: HTMLVideoElement
   canvasElement: HTMLCanvasElement
@@ -9,6 +17,8 @@ export interface VisionProctoringConfig {
   intervalMs?: number
   /** Emit fullscreen_exit violations when the user leaves fullscreen (default false) */
   requireFullscreen?: boolean
+  /** Reference snapshot captured before the quiz started – used for face-match checks */
+  referenceCapture?: ReferenceFaceCapture
 }
 
 export interface VisionViolation {
@@ -36,6 +46,12 @@ type VisionState = {
   frameViolations: Map<string, number>
   /** Cleanup callbacks for DOM listeners */
   domUnsubscribers: Array<() => void>
+  /** Normalized face-geometry vector from the reference capture */
+  referenceFaceSignature: number[] | null
+  /** Timestamp of the last 5-second face-match check */
+  lastFaceMatchCheckAt: number
+  /** Consecutive 5-second checks that failed the face-match threshold */
+  faceMatchFails: number
 }
 
 type ModelBundle = {
@@ -45,6 +61,20 @@ type ModelBundle = {
 }
 
 // ── Cooldowns ────────────────────────────────────────────────────────────────
+// ── Reference face match ─────────────────────────────────────────────────────
+// 50 FaceMesh indices spanning face oval, eyes, nose, brows, and mouth –
+// covers enough geometry to discriminate people without expensive embeddings.
+const SIGNATURE_INDICES = [
+  10, 33, 46, 61, 78, 93, 105, 107, 127, 132,
+  133, 136, 144, 148, 149, 150, 152, 160, 172, 176,
+  195, 234, 251, 263, 276, 279, 284, 288, 291, 297,
+  308, 323, 332, 334, 336, 338, 356, 361, 362, 365,
+  373, 377, 378, 379, 387, 389, 397, 400, 402, 454,
+]
+const FACE_MATCH_THRESHOLD  = 0.88  // cosine-similarity below this → possible substitution
+const FACE_MATCH_INTERVAL_MS = 5_000 // check every 5 seconds
+const FACE_MATCH_FAIL_COUNT  = 2    // consecutive failing checks before flagging
+
 const COOLDOWN_MS_DEFAULT = 12_000
 const COOLDOWN_MS: Record<string, number> = {
   // AI violations
@@ -56,6 +86,7 @@ const COOLDOWN_MS: Record<string, number> = {
   phone_detected:     5_000,
   electronic_device:  8_000,
   book_detected:     10_000,
+  face_substitution:  60_000, // serious flag – long cooldown to avoid spam
   // DOM violations
   tab_switch:         5_000,
   focus_loss:         5_000,
@@ -115,6 +146,9 @@ export function startVisionProctoring(config: VisionProctoringConfig) {
     yawReadings: [],
     frameViolations: new Map(),
     domUnsubscribers: [],
+    referenceFaceSignature: config.referenceCapture?.faceSignature ?? null,
+    lastFaceMatchCheckAt: 0,
+    faceMatchFails: 0,
   }
   states.set(config.videoElement, state)
 
@@ -386,22 +420,51 @@ async function inspectFrame(config: VisionProctoringConfig, state: VisionState, 
       })
     }
   } else {
-    // ── Single face — check gaze ──────────────────────────────────────────
+    // ── Single face — gaze + 5-second reference-face match ───────────────
     state.noFaceSince = null
-    await inspectGaze(config, state, models, now)
+    // Fetch FaceMesh landmarks once and share between gaze check + match check
+    const landmarkFaces = await models.landmarkDetector.estimateFaces(video, { flipHorizontal: false })
+    inspectGazeFaces(config, state, landmarkFaces, now)
+
+    // Every 5 s: compare current face geometry against the reference snapshot
+    if (state.referenceFaceSignature && now - state.lastFaceMatchCheckAt >= FACE_MATCH_INTERVAL_MS) {
+      state.lastFaceMatchCheckAt = now
+      const lmFace = landmarkFaces?.[0]
+      if (lmFace) {
+        const kps: Array<{ x: number; y: number }> = lmFace.keypoints ?? []
+        const box = faceBox(lmFace)
+        if (box && kps.length >= 100) {
+          const currentSig = buildFaceSignature(kps, box)
+          const similarity = cosineSimilarity(state.referenceFaceSignature, currentSig)
+          if (similarity < FACE_MATCH_THRESHOLD) {
+            state.faceMatchFails = Math.min(state.faceMatchFails + 1, FACE_MATCH_FAIL_COUNT)
+            if (state.faceMatchFails >= FACE_MATCH_FAIL_COUNT) {
+              state.faceMatchFails = 0
+              emitViolation(config, state, {
+                type: 'face_substitution',
+                label: `Person in frame does not match the reference photo (match ${Math.round(similarity * 100)}%). Possible identity substitution detected.`,
+                confidence: Math.min(0.99, 1 - similarity + 0.1),
+                timestamp: now,
+              })
+            }
+          } else {
+            state.faceMatchFails = 0
+          }
+        }
+      }
+    }
   }
 
   // ── Objects: phones, devices, books ──────────────────────────────────────
   inspectObjectViolations(config, state, predictions ?? [], now)
 }
 
-async function inspectGaze(
+function inspectGazeFaces(
   config: VisionProctoringConfig,
   state: VisionState,
-  models: ModelBundle,
+  faces: any[],
   now: number,
 ) {
-  const faces = await models.landmarkDetector.estimateFaces(config.videoElement, { flipHorizontal: false })
   const face = faces?.[0]
   const keypoints: Array<{ name?: string; x: number; y: number }> = face?.keypoints ?? []
   if (!face || keypoints.length === 0) return
@@ -558,6 +621,69 @@ function emitViolation(
     ...violation,
     evidenceDataUrl: captureFrame(config.videoElement, config.canvasElement),
   })
+}
+
+// ── Reference face capture (called once before the quiz starts) ──────────────
+
+/**
+ * Captures the employee's reference face before the quiz begins.
+ * The returned `faceSignature` is passed to `startVisionProctoring` and used
+ * every 5 seconds to detect if a different person is in front of the camera.
+ */
+export async function captureReferenceFace(
+  videoElement: HTMLVideoElement,
+  canvasElement: HTMLCanvasElement,
+): Promise<ReferenceFaceCapture | null> {
+  if (typeof window === 'undefined') return null
+  if (videoElement.readyState < 2 || videoElement.videoWidth === 0 || videoElement.videoHeight === 0) return null
+
+  try {
+    const models = await loadModels()
+    if (!models) return null
+
+    const faces = await models.landmarkDetector.estimateFaces(videoElement, { flipHorizontal: false })
+    const face  = faces?.[0]
+    if (!face) return null
+
+    const keypoints: Array<{ x: number; y: number }> = face.keypoints ?? []
+    const box = faceBox(face)
+    if (!box || keypoints.length < 100) return null
+
+    const faceSignature = buildFaceSignature(keypoints, box)
+    const dataUrl       = captureFrame(videoElement, canvasElement)
+    return { dataUrl, capturedAt: Date.now(), faceSignature }
+  } catch (error) {
+    console.warn('[proctoring-vision] reference face capture failed:', error)
+    return null
+  }
+}
+
+function buildFaceSignature(
+  keypoints: Array<{ x: number; y: number }>,
+  box: { x: number; y: number; width: number; height: number },
+): number[] {
+  const sig: number[] = []
+  for (const idx of SIGNATURE_INDICES) {
+    const kp = keypoints[idx]
+    if (kp) {
+      sig.push((kp.x - box.x) / Math.max(1, box.width), (kp.y - box.y) / Math.max(1, box.height))
+    } else {
+      sig.push(0, 0)
+    }
+  }
+  return sig
+}
+
+function cosineSimilarity(a: number[], b: number[]): number {
+  if (a.length !== b.length || a.length === 0) return 0
+  let dot = 0, normA = 0, normB = 0
+  for (let i = 0; i < a.length; i++) {
+    dot   += a[i] * b[i]
+    normA += a[i] * a[i]
+    normB += b[i] * b[i]
+  }
+  const denom = Math.sqrt(normA) * Math.sqrt(normB)
+  return denom < 1e-10 ? 0 : dot / denom
 }
 
 // ── Model Loading ─────────────────────────────────────────────────────────────

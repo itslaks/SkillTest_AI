@@ -12,7 +12,7 @@ import { ViolationToast, type ViolationToastItem } from '@/components/employee/V
 import { startQuizAttempt, submitQuizAttempt } from '@/lib/actions/employee'
 import { shiftDifficulty } from '@/lib/insights'
 import type { DifficultyLevel, ProctoringEvent, ProctoringEventType, ProctoringSubmission, SubmittedQuizAnswer } from '@/lib/types/database'
-import type { CameraVisibilityCheck } from '@/lib/proctoring-vision'
+import type { CameraVisibilityCheck, ReferenceFaceCapture } from '@/lib/proctoring-vision'
 import {
   calculateProctoringRisk,
   getProctoringEventRisk,
@@ -186,6 +186,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const activeSignalRef = useRef<Record<string, boolean>>({})
   const lastProctoringEventAtRef = useRef<Record<string, number>>({})
   const proctoringEventRetryQueueRef = useRef<ProctoringEventPostPayload[]>([])
+  const referenceCaptureRef = useRef<ReferenceFaceCapture | null>(null)
   const answerAdvanceTimerRef = useRef<number | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [draftStorageWarning, setDraftStorageWarning] = useState(false)
@@ -193,6 +194,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const [warningModal, setWarningModal] = useState<WarningModalState>(null)
   const [recentViolations, setRecentViolations] = useState<ProctoringEvent[]>([])
   const [multipleFacesAlertAt, setMultipleFacesAlertAt] = useState<number | null>(null)
+  const [referencePhotoUrl, setReferencePhotoUrl] = useState<string | null>(null)
 
   useEffect(() => {
     if (!multipleFacesAlertAt) return
@@ -606,6 +608,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
           canvasElement,
           intervalMs: 1500,
           requireFullscreen: true,
+          referenceCapture: referenceCaptureRef.current ?? undefined,
           onViolation: (violation) => {
             const type = visionViolationTypeToEventType(violation.type)
             recordProctoringViolation(type, violation.label, violation.evidenceDataUrl)
@@ -949,6 +952,21 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       setAttemptId(nextAttemptId)
       cleanupStaleDrafts(nextAttemptId)
       proctoringSessionIdRef.current = result.proctoringSession?.id || null
+
+      // Capture reference face snapshot before the quiz begins
+      if (videoRef.current && hiddenCanvasRef.current) {
+        try {
+          const { captureReferenceFace } = await import('@/lib/proctoring-vision')
+          const capture = await captureReferenceFace(videoRef.current, hiddenCanvasRef.current)
+          if (capture) {
+            referenceCaptureRef.current = capture
+            setReferencePhotoUrl(capture.dataUrl)
+          }
+        } catch (err) {
+          console.warn('[proctoring] reference face capture failed:', err)
+        }
+      }
+
       setStarted(true)
       setQuestionStartTime(Date.now())
     })
@@ -1674,6 +1692,19 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
                 <div className="relative aspect-video overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-950">
                   <video ref={videoRef} muted playsInline className="h-full w-full object-cover" />
                   <canvas ref={canvasRef} className="hidden" />
+                  {/* Reference photo badge — shown once the snapshot is captured */}
+                  {referencePhotoUrl && (
+                    <div className="absolute bottom-2 right-2 flex flex-col items-center gap-0.5">
+                      <img
+                        src={referencePhotoUrl}
+                        alt="Reference snapshot"
+                        className="h-12 w-12 rounded-lg border-2 border-green-400 object-cover shadow-lg"
+                      />
+                      <span className="rounded bg-black/70 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-green-400">
+                        ID Photo
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <SignalRow
                   label="Camera"
@@ -1754,6 +1785,7 @@ function visionViolationTypeToEventType(type: string): ProctoringEventType {
     dev_tools: 'dev_tools',
     screenshot_attempt: 'screenshot_attempt',
     window_switch: 'window_switch',
+    face_substitution: 'face_substitution',
   }
   return map[type] || 'face-covered'
 }

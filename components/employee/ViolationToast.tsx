@@ -20,6 +20,7 @@ const icons: Record<string, string> = {
   book_detected: '📖',
   no_face: '🚫',
   'no-face': '🚫',
+  face_substitution: '🪪',
 }
 
 export function ViolationToast({
