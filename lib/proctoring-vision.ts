@@ -42,7 +42,7 @@ export interface VisionViolation {
 }
 
 export type CameraVisibilityCheck = {
-  status: 'visible' | 'covered' | 'no_face' | 'multiple_faces' | 'partial_face' | 'checking' | 'unsupported'
+  status: 'visible' | 'covered' | 'no_face' | 'multiple_faces' | 'partial_face' | 'checking' | 'model_loading' | 'model_error' | 'unsupported'
   message: string
   confidence: number
 }
@@ -73,6 +73,10 @@ type ModelBundle = {
   landmarkDetector: any
   objectDetector: any
 }
+
+type ProctoringModelLoadResult =
+  | { ok: true; models: ModelBundle }
+  | { ok: false; error: string; cause?: unknown }
 
 // ── Cooldowns ────────────────────────────────────────────────────────────────
 // ── Reference face match ─────────────────────────────────────────────────────
@@ -142,8 +146,7 @@ const PHONE_LABELS  = new Set(['cell phone', 'mobile phone', 'phone'])
 const DEVICE_LABELS = new Set(['laptop', 'tablet', 'monitor', 'tv', 'remote', 'keyboard', 'mouse'])
 const ACCESSORY_LABELS = new Set(['headphones', 'earbuds', 'smartwatch', 'calculator'])
 
-let modelPromise: Promise<ModelBundle | null> | null = null
-let faceDetectorPromise: Promise<any | null> | null = null
+let modelPromise: Promise<ProctoringModelLoadResult> | null = null
 const states = new WeakMap<HTMLVideoElement, VisionState>()
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -177,9 +180,9 @@ export function startVisionProctoring(config: VisionProctoringConfig) {
     if (!state.running) return
     try {
       if (emitCoveredCameraViolationIfNeeded(config, state)) return
-      const models = await loadModels()
-      if (!models) return
-      await inspectFrame(config, state, models)
+      const result = await loadProctoringModels()
+      if (!result.ok) return
+      await inspectFrame(config, state, result.models)
     } catch (error) {
       console.warn('[proctoring-vision] frame inspection failed:', error)
     }
@@ -215,11 +218,13 @@ export async function validateCameraFrameForProctoring(
     return { status: 'covered', message: 'Camera appears covered or too dark. Remove the cover and keep your face visible.', confidence: frame.confidence }
   }
 
-  const detector = await loadFaceDetector()
-  if (!detector) return cameraPreviewFallback()
+  const models = await loadProctoringModels()
+  if (!models.ok) {
+    return { status: 'model_error', message: models.error, confidence: 0 }
+  }
 
   try {
-    const faces = await detector.estimateFaces(videoElement, { flipHorizontal: false })
+    const faces = await models.models.faceDetector.estimateFaces(videoElement, { flipHorizontal: false })
     if (!faces.length) {
       return { status: 'no_face', message: 'No face is visible. Sit centered in front of the camera before starting.', confidence: 0.95 }
     }
@@ -251,7 +256,7 @@ export async function validateCameraFrameForProctoring(
     return { status: 'visible', message: 'Face verified. Camera proctoring is ready.', confidence: averageFaceScore(faces) }
   } catch (error) {
     console.warn('[proctoring-vision] camera visibility check failed:', error)
-    return cameraPreviewFallback()
+    return { status: 'model_error', message: 'AI proctoring model failed to load. Please refresh or contact admin.', confidence: 0 }
   }
 }
 
@@ -692,8 +697,9 @@ export async function captureReferenceFace(
   if (videoElement.readyState < 2 || videoElement.videoWidth === 0 || videoElement.videoHeight === 0) return null
 
   try {
-    const models = await loadModels()
-    if (!models) return null
+    const result = await loadProctoringModels()
+    if (!result.ok) return null
+    const models = result.models
 
     const frame = inspectFramePixels(videoElement, canvasElement)
     if (frame.isCovered) return null
@@ -763,65 +769,58 @@ function cosineSimilarity(a: number[], b: number[]): number {
 
 // ── Model Loading ─────────────────────────────────────────────────────────────
 
-async function loadModels(): Promise<ModelBundle | null> {
-  if (typeof window === 'undefined') return null
+export async function loadProctoringModels(): Promise<ProctoringModelLoadResult> {
+  if (typeof window === 'undefined') {
+    return { ok: false, error: 'AI proctoring models can only load in the browser.' }
+  }
   if (modelPromise) return modelPromise
 
   modelPromise = (async () => {
     try {
-      const tf      = await runtimeImport('@tensorflow/tfjs')
+      const tf = await import('@tensorflow/tfjs')
       const backend = await prepareTensorflowBackend(tf)
-      if (!backend) return null
+      if (!backend) {
+        return { ok: false, error: 'AI proctoring model failed to load. Please refresh or contact admin.' }
+      }
 
       const [faceDetection, faceLandmarksDetection, cocoSsd] = await Promise.all([
-        runtimeImport('@tensorflow-models/face-detection'),
-        runtimeImport('@tensorflow-models/face-landmarks-detection'),
-        runtimeImport('@tensorflow-models/coco-ssd'),
+        import('@tensorflow-models/face-detection'),
+        import('@tensorflow-models/face-landmarks-detection'),
+        import('@tensorflow-models/coco-ssd'),
       ])
+      const faceDetectionRuntime = faceDetection as any
+      const faceLandmarksRuntime = faceLandmarksDetection as any
+      const cocoSsdRuntime = cocoSsd as any
 
       // Load all three models in parallel to reduce startup time
       const [faceDetector, landmarkDetector, objectDetector] = await Promise.all([
-        faceDetection.createDetector(
-          faceDetection.SupportedModels.MediaPipeFaceDetector,
+        faceDetectionRuntime.createDetector(
+          faceDetectionRuntime.SupportedModels.MediaPipeFaceDetector,
           { runtime: 'tfjs', modelType: 'short', maxFaces: 8, scoreThreshold: FACE_SCORE_THRESHOLD },
         ),
-        faceLandmarksDetection.createDetector(
-          faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
+        faceLandmarksRuntime.createDetector(
+          faceLandmarksRuntime.SupportedModels.MediaPipeFaceMesh,
           { runtime: 'tfjs', refineLandmarks: true },
         ),
-        cocoSsd.load(),
+        cocoSsdRuntime.load(),
       ])
 
-      return { faceDetector, landmarkDetector, objectDetector }
+      return { ok: true, models: { faceDetector, landmarkDetector, objectDetector } }
     } catch (error) {
-      console.warn('[proctoring-vision] model load failed:', error)
-      return null
+      console.error('[proctoring-vision] model load failed:', error)
+      return {
+        ok: false,
+        error: 'AI proctoring model failed to load. Please refresh or contact admin.',
+        cause: error,
+      }
     }
   })()
 
   return modelPromise
 }
 
-async function loadFaceDetector(): Promise<any | null> {
-  if (faceDetectorPromise) return faceDetectorPromise
-
-  faceDetectorPromise = (async () => {
-    try {
-      const tf      = await runtimeImport('@tensorflow/tfjs')
-      const backend = await prepareTensorflowBackend(tf)
-      if (!backend) return null
-      const faceDetection = await runtimeImport('@tensorflow-models/face-detection')
-      return faceDetection.createDetector(
-        faceDetection.SupportedModels.MediaPipeFaceDetector,
-        { runtime: 'tfjs', modelType: 'short', maxFaces: 8, scoreThreshold: FACE_SCORE_THRESHOLD },
-      )
-    } catch (error) {
-      console.warn('[proctoring-vision] face detector load failed:', error)
-      return null
-    }
-  })()
-
-  return faceDetectorPromise
+export function resetProctoringModelCache() {
+  modelPromise = null
 }
 
 async function prepareTensorflowBackend(tf: any): Promise<string | null> {
@@ -853,13 +852,6 @@ function hasWebGlSupport(): boolean {
   }
 }
 
-function cameraPreviewFallback(): CameraVisibilityCheck {
-  return {
-    status: 'visible',
-    message: 'Camera preview is live. Advanced face verification is unavailable in this browser — keep your full face inside the preview.',
-    confidence: 0.45,
-  }
-}
 
 // ── Frame / Pixel Helpers ─────────────────────────────────────────────────────
 
@@ -888,7 +880,7 @@ function inspectFramePixels(video: HTMLVideoElement, canvas: HTMLCanvasElement) 
   const sampleHeight = Math.max(54, Math.round((video.videoHeight / Math.max(1, video.videoWidth)) * sampleWidth))
   canvas.width  = sampleWidth
   canvas.height = sampleHeight
-  const ctx = canvas.getContext('2d')
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
   if (!ctx) return { isCovered: false, confidence: 0 }
   ctx.drawImage(video, 0, 0, sampleWidth, sampleHeight)
   const { data } = ctx.getImageData(0, 0, sampleWidth, sampleHeight)
@@ -969,6 +961,3 @@ function averageFaceScore(faces: any[]): number {
   return scores.reduce((sum, s) => sum + s, 0) / scores.length
 }
 
-function runtimeImport(specifier: string): Promise<any> {
-  return new Function('specifier', 'return import(specifier)')(specifier)
-}

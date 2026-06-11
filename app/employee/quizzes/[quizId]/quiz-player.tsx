@@ -350,8 +350,8 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
 
     setCameraVisibility((previous) => ({
       ...previous,
-      status: 'checking',
-      message: 'Checking that your face is fully visible...',
+      status: 'model_loading',
+      message: 'Loading AI proctoring model...',
     }))
 
     try {
@@ -822,12 +822,36 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
 
   const requestCameraPermission = useCallback(() => {
     autoStartedCameraRef.current = true  // prevent duplicate auto-start after manual click
-    void requestDevicePermission('camera')
+    return requestDevicePermission('camera')
   }, [requestDevicePermission])
 
   const requestMicrophonePermission = useCallback(() => {
-    void requestDevicePermission('microphone')
+    return requestDevicePermission('microphone')
   }, [requestDevicePermission])
+
+  const retryProctoringCheck = useCallback(async () => {
+    setStartError(null)
+    setCameraVisibility({
+      status: 'model_loading',
+      message: 'Loading AI proctoring model...',
+      confidence: 0,
+    })
+
+    try {
+      const vision = await import('@/lib/proctoring-vision')
+      vision.resetProctoringModelCache()
+    } catch (error) {
+      console.warn('[proctoring] model retry reset failed:', error)
+    }
+
+    if (!mediaStreamRef.current || !cameraReady) {
+      await requestDevicePermission('camera')
+    }
+    if (microphoneRequired && !microphoneReady) {
+      await requestDevicePermission('microphone')
+    }
+    await verifyCameraVisibility()
+  }, [cameraReady, microphoneReady, microphoneRequired, requestDevicePermission, verifyCameraVisibility])
 
   const startProctoringMediaStream = useCallback(async () => {
     stopMediaStream()
@@ -972,10 +996,11 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     }
 
     let baselineCapture: ReferenceFaceCapture | null = null
-    if (videoRef.current && hiddenCanvasRef.current) {
+    const baselineCanvas = canvasRef.current || hiddenCanvasRef.current
+    if (videoRef.current && baselineCanvas) {
       try {
         const { captureReferenceFace } = await import('@/lib/proctoring-vision')
-        baselineCapture = await captureReferenceFace(videoRef.current, hiddenCanvasRef.current)
+        baselineCapture = await captureReferenceFace(videoRef.current, baselineCanvas)
       } catch (err) {
         console.warn('[proctoring] reference face capture failed:', err)
       }
@@ -1475,15 +1500,39 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
               </div>
 
               {requiresProctoring && (
-                <div className="grid gap-4 rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 sm:grid-cols-[180px_1fr]">
-                  <div className="relative aspect-video overflow-hidden rounded-2xl border border-white/10 bg-zinc-950">
-                    <video ref={videoRef} muted playsInline className="h-full w-full object-cover" />
-                    {!cameraReady && (
-                      <div className="absolute inset-0 flex items-center justify-center text-zinc-500">
-                        <Camera className="h-8 w-8" />
+                <div className="grid gap-4 rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 lg:grid-cols-[minmax(280px,0.95fr)_1fr]">
+                  <div className="space-y-3">
+                    <div className="relative aspect-video overflow-hidden rounded-2xl border border-white/10 bg-zinc-950">
+                      <video ref={videoRef} muted playsInline className="h-full w-full object-cover" />
+                      {!cameraReady && (
+                        <div className="absolute inset-0 flex items-center justify-center text-zinc-500">
+                          <Camera className="h-8 w-8" />
+                        </div>
+                      )}
+                      <canvas ref={canvasRef} className="hidden" />
+                    </div>
+                    <Button
+                      size="lg"
+                      className="h-12 w-full rounded-full bg-white px-6 text-base font-semibold text-black hover:bg-zinc-200"
+                      onClick={handleStart}
+                      disabled={!canStartQuiz}
+                    >
+                      {isPending ? 'Starting session...' : 'Start Test'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11 w-full rounded-full border-white/20 bg-transparent text-white hover:bg-white hover:text-black"
+                      onClick={() => void retryProctoringCheck()}
+                    >
+                      <Eye className="mr-2 h-4 w-4" />
+                      Retry camera/proctoring check
+                    </Button>
+                    {startError && (
+                      <div className="rounded-2xl border border-red-400/30 bg-red-500/15 px-4 py-3 text-sm font-medium text-red-100">
+                        {startError}
                       </div>
                     )}
-                    <canvas ref={canvasRef} className="hidden" />
                   </div>
                   <div className="space-y-4">
                     <DevicePermissionPanel
@@ -1493,7 +1542,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
                       onRequest={requestCameraPermission}
                     />
                     {cameraReady && (
-                      <CameraVisibilityPanel visibility={cameraVisibility} onRetry={verifyCameraVisibility} />
+                      <CameraVisibilityPanel visibility={cameraVisibility} onRetry={retryProctoringCheck} />
                     )}
                     <DevicePermissionPanel
                       kind="microphone"
@@ -1520,15 +1569,17 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
                 </div>
               )}
 
-              <Button
-                size="lg"
-                className="h-14 rounded-full bg-white px-8 text-base font-semibold text-black hover:bg-zinc-200"
-                onClick={handleStart}
-                disabled={!canStartQuiz}
-              >
-                {isPending ? 'Starting session...' : requiresProctoring ? 'Start Quiz' : 'Start Quiz'}
-              </Button>
-              {startError && (
+              {!requiresProctoring && (
+                <Button
+                  size="lg"
+                  className="h-14 rounded-full bg-white px-8 text-base font-semibold text-black hover:bg-zinc-200"
+                  onClick={handleStart}
+                  disabled={!canStartQuiz}
+                >
+                  {isPending ? 'Starting session...' : 'Start Test'}
+                </Button>
+              )}
+              {startError && !requiresProctoring && (
                 <p className="text-sm font-medium text-red-300">{startError}</p>
               )}
             </div>
@@ -2089,7 +2140,7 @@ function DevicePermissionPanel({
 
 function CameraVisibilityPanel({ visibility, onRetry }: { visibility: CameraVisibilityState; onRetry: () => void }) {
   const ready = visibility.status === 'visible'
-  const checking = visibility.status === 'checking'
+  const checking = visibility.status === 'checking' || visibility.status === 'model_loading'
   const tone = ready
     ? 'border-emerald-300/30 bg-emerald-400/10 text-emerald-100'
     : checking
@@ -2111,12 +2162,17 @@ function CameraVisibilityPanel({ visibility, onRetry }: { visibility: CameraVisi
           disabled={checking}
         >
           <Eye className="mr-2 h-4 w-4" />
-          Recheck
+          Retry check
         </Button>
       </div>
-      {!ready && (
+      {!ready && visibility.status !== 'model_error' && (
         <p className="mt-3 rounded-xl bg-black/25 px-3 py-2 text-xs font-medium">
           Remove camera covers, turn on room light, sit centered, and keep your full face inside the preview.
+        </p>
+      )}
+      {visibility.status === 'model_error' && (
+        <p className="mt-3 rounded-xl bg-black/25 px-3 py-2 text-xs font-medium">
+          Retry the proctoring check. If it fails again, refresh once or contact admin.
         </p>
       )}
     </div>
