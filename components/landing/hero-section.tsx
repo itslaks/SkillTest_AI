@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import { HeroShowcase } from "./hero-showcase";
 import Link from "next/link";
+import { BrandLogo } from "@/components/brand/brand-logo";
 
 export function HeroSection() {
   return (
@@ -37,8 +38,8 @@ export function HeroSection() {
 
       <div className="relative z-10 max-w-[1400px] mx-auto px-6 lg:px-12 pb-16 pt-8 lg:pb-20 lg:pt-10">
         <div className="mb-8 hero-rise" style={{ animationDelay: "80ms" }}>
-          <span className="inline-flex items-center gap-3 rounded-full border border-violet-200 bg-white/90 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">
-            <span className="h-2 w-2 rounded-full bg-violet-500 animate-pulse" />
+          <span className="inline-flex items-center gap-3 rounded-full border border-violet-200 bg-white/90 py-1.5 pl-2 pr-4 text-sm font-semibold text-slate-700 shadow-sm">
+            <BrandLogo variant="mark" tone="light" className="w-8" imageClassName="aspect-square" />
             SkillTest_AI: Mavericks Execution Platform
           </span>
         </div>

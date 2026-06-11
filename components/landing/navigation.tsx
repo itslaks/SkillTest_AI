@@ -5,6 +5,7 @@ import type { MouseEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 import Link from "next/link";
+import { BrandLogo } from "@/components/brand/brand-logo";
 
 const navLinks = [
   { name: "Features", href: "#features" },
@@ -61,8 +62,10 @@ export function Navigation() {
         >
           {/* Logo */}
           <a href="#" className="group flex min-w-0 flex-1 items-center gap-2">
-            <span className={`whitespace-nowrap font-display tracking-tight transition-all duration-500 ${isScrolled ? "text-xl" : "text-2xl"}`}>SkillTest_AI</span>
-            <span className={`hidden whitespace-nowrap text-muted-foreground font-mono transition-all duration-500 sm:inline ${isScrolled ? "text-[10px] mt-0.5" : "text-xs mt-1"}`}>Mavericks Execution Platform</span>
+            <BrandLogo
+              className={`transition-all duration-500 ${isScrolled ? "w-36" : "w-44"}`}
+              imageClassName="aspect-[1100/360]"
+            />
           </a>
 
           {/* Desktop Navigation */}

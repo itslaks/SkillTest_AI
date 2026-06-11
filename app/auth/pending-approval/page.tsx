@@ -1,18 +1,16 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Clock, Sparkles, LogOut, CheckCircle2, Mail } from 'lucide-react'
+import { Clock, LogOut, CheckCircle2, Mail } from 'lucide-react'
 import { signOut } from '@/lib/actions/auth'
+import { BrandLogo } from '@/components/brand/brand-logo'
 
 export default function PendingApprovalPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-violet-950/30 via-background to-background p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-orange-600 flex items-center justify-center shadow-lg">
-              <Sparkles className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-2xl font-bold">SkillTest_AI</span>
+          <Link href="/" className="inline-flex items-center">
+            <BrandLogo className="w-52" imageClassName="aspect-[1100/360]" />
           </Link>
         </div>
 

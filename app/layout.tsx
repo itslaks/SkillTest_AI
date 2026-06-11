@@ -27,6 +27,11 @@ const isVercelDeployment = process.env.VERCEL === '1'
 export const metadata: Metadata = {
   title: PRODUCT_NAME,
   description: 'SkillTest_AI: Mavericks Execution Platform is a Training Management System for batch execution, candidate onboarding, attendance, assessments, trainer coordination, feedback, dashboards, and governance reporting.',
+  icons: {
+    icon: '/brand/skilltest-ai-mark.png',
+    shortcut: '/brand/skilltest-ai-mark.png',
+    apple: '/brand/skilltest-ai-mark.png',
+  },
 }
 
 export default function RootLayout({

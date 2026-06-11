@@ -35,6 +35,7 @@ import { signOut } from '@/lib/actions/auth'
 import { useEffect, useState } from 'react'
 import { Avatar3D } from '@/components/avatar/avatar-3d'
 import { getAvatar3DId } from '@/lib/avatar-options'
+import { BrandLogo } from '@/components/brand/brand-logo'
 
 interface ManagerSidebarProps {
   profile: Profile | null
@@ -198,12 +199,7 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
           prefetch
           className="flex items-center gap-3 group"
         >
-          <div className={cn(
-            'w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-lg',
-            `bg-gradient-to-br ${sidebarAccent}`
-          )}>
-            <Sparkles className="w-4 h-4 text-white" />
-          </div>
+          <BrandLogo variant="mark" tone="light" className="w-9" imageClassName="aspect-square" />
           {!collapsed && (
             <div className="leading-none">
               <span className="font-bold text-[15px] text-white tracking-tight">SkillTest_AI</span>

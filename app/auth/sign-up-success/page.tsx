@@ -4,8 +4,9 @@ import { useState, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Mail, Sparkles, CheckCircle2, AlertCircle, Clock, ShieldCheck } from 'lucide-react'
+import { Mail, CheckCircle2, AlertCircle, Clock, ShieldCheck } from 'lucide-react'
 import { resendVerificationEmail } from '@/lib/actions/auth'
+import { BrandLogo } from '@/components/brand/brand-logo'
 
 export default function SignUpSuccessPage() {
   return (
@@ -56,11 +57,8 @@ function SignUpSuccessContent() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-violet-950 via-background to-background p-4">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
-            <Link href="/" className="inline-flex items-center gap-2 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-orange-600 flex items-center justify-center shadow-lg">
-                <Sparkles className="w-6 h-6 text-white" />
-              </div>
-              <span className="text-2xl font-bold">SkillTest_AI</span>
+            <Link href="/" className="inline-flex items-center mb-4">
+              <BrandLogo className="w-52" imageClassName="aspect-[1100/360]" />
             </Link>
           </div>
 
@@ -113,11 +111,8 @@ function SignUpSuccessContent() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-950/20 via-background to-background p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-lg">
-              <Sparkles className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-2xl font-bold">SkillTest_AI</span>
+          <Link href="/" className="inline-flex items-center mb-4">
+            <BrandLogo className="w-52" imageClassName="aspect-[1100/360]" />
           </Link>
         </div>
 

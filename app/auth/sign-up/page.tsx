@@ -15,8 +15,9 @@ import {
 import { Spinner } from '@/components/ui/spinner'
 import { signUp } from '@/lib/actions/auth'
 import { DOMAIN_OPTIONS } from '@/lib/domain-options'
+import { BrandLogo } from '@/components/brand/brand-logo'
 import {
-  Mail, Lock, User, Building, Sparkles, ArrowRight, CheckCircle2,
+  Mail, Lock, User, Building, ArrowRight, CheckCircle2,
   ShieldCheck, Zap, GraduationCap, BookOpen, Clock, Star
 } from 'lucide-react'
 
@@ -89,9 +90,7 @@ function SignUpForm() {
         </div>
 
         <Link href="/" className="relative z-10 flex items-center gap-3 w-fit">
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transition-colors duration-500 ${isTrainer ? 'bg-gradient-to-br from-violet-500 to-orange-600' : 'bg-gradient-to-br from-blue-500 to-violet-600'}`}>
-            <Sparkles className="w-5 h-5 text-white" />
-          </div>
+          <BrandLogo variant="mark" tone="light" className="w-10" imageClassName="aspect-square" />
           <span className="text-2xl font-bold text-white tracking-tight">SkillTest_AI</span>
           <span className="rounded-full border border-white/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-widest text-white/55">Mavericks Execution Platform</span>
         </Link>
@@ -138,11 +137,8 @@ function SignUpForm() {
 
         <div className="signal-shell relative z-10 w-full max-w-md rounded-[2rem] border border-zinc-200 bg-white/92 p-6 py-8 shadow-[0_30px_90px_rgba(15,23,42,0.12)] backdrop-blur md:p-8">
           {/* Mobile logo */}
-          <Link href="/" className="lg:hidden inline-flex items-center gap-2.5 mb-8">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-md ${isTrainer ? 'bg-gradient-to-br from-violet-500 to-orange-600' : 'bg-gradient-to-br from-blue-500 to-violet-600'}`}>
-              <Sparkles className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-xl font-bold tracking-tight">SkillTest_AI</span>
+          <Link href="/" className="lg:hidden inline-flex items-center mb-8">
+            <BrandLogo className="w-44" imageClassName="aspect-[1100/360]" />
           </Link>
 
           <div className="mb-6">

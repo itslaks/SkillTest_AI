@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import { AlertTriangle, ArrowLeft, CheckCircle2, Eye, EyeOff, KeyRound, ShieldCheck, Sparkles } from "lucide-react";
+import { BrandLogo } from "@/components/brand/brand-logo";
 
 function recoveryErrorMessage(message?: string) {
   if (!message) return "This password reset link is invalid or expired.";
@@ -160,6 +161,7 @@ function UpdatePasswordForm() {
         </Link>
 
         <div className="relative z-10 max-w-lg">
+          <BrandLogo variant="full" tone="light" className="mb-6 w-64" imageClassName="aspect-[1100/360]" />
           <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.3em] text-emerald-100">
             <ShieldCheck className="h-3.5 w-3.5" />
             Reset Protected

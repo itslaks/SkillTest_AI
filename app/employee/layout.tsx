@@ -8,13 +8,13 @@ import {
   FileQuestion,
   Trophy,
   Award,
-  Sparkles,
   LogOut,
   Star,
   Flame,
   CalendarDays,
   Settings,
 } from 'lucide-react'
+import { BrandLogo } from '@/components/brand/brand-logo'
 
 export default async function EmployeeLayout({
   children,
@@ -67,9 +67,7 @@ export default async function EmployeeLayout({
       <aside className="hidden md:flex w-60 flex-col bg-black fixed inset-y-0 left-0 z-50">
         {/* Logo */}
         <div className="flex items-center gap-3 px-5 h-16 border-b border-white/5 shrink-0">
-          <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shadow-lg shrink-0">
-            <Sparkles className="w-4 h-4 text-black" />
-          </div>
+          <BrandLogo variant="mark" tone="light" className="w-8" imageClassName="aspect-square" />
           <div>
             <p className="text-white font-bold text-sm leading-none tracking-tight">SkillTest_AI</p>
             <p className="text-white/55 text-[10px] mt-0.5 uppercase tracking-widest">Learner</p>
@@ -128,9 +126,7 @@ export default async function EmployeeLayout({
       {/* Mobile top bar */}
       <header className="md:hidden fixed top-0 left-0 right-0 z-50 bg-black border-b border-white/5 px-4 py-3">
         <Link href="/employee" className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-white flex items-center justify-center">
-            <Sparkles className="w-3.5 h-3.5 text-black" />
-          </div>
+          <BrandLogo variant="mark" tone="light" className="w-7" imageClassName="aspect-square" />
           <span className="text-white font-bold text-sm">SkillTest_AI</span>
         </Link>
         <nav className="mt-3 grid grid-cols-6 gap-1">

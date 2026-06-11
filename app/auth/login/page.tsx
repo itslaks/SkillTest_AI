@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { signIn } from '@/lib/actions/auth'
+import { BrandLogo } from '@/components/brand/brand-logo'
 import {
-  ArrowRight, CheckCircle2, Lock, Mail, ShieldCheck, Sparkles, Zap,
+  ArrowRight, CheckCircle2, Lock, Mail, ShieldCheck, Zap,
   GraduationCap, BookOpen, Crown
 } from 'lucide-react'
 
@@ -42,9 +43,7 @@ function LoginContent() {
         <div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300 to-transparent" />
 
         <Link href="/" className="relative z-10 flex items-center gap-3 w-fit">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-lg">
-            <Sparkles className="w-5 h-5 text-white" />
-          </div>
+          <BrandLogo variant="mark" tone="light" className="w-10" imageClassName="aspect-square" />
           <span className="text-2xl font-bold text-white tracking-tight">SkillTest_AI</span>
           <span className="rounded-full border border-white/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-widest text-white/55">Mavericks Execution Platform</span>
         </Link>
@@ -120,11 +119,8 @@ function LoginContent() {
         <div className="aura-ring right-8 top-8 h-72 w-72 bg-cyan-300/25 pointer-events-none" />
 
         <div className="signal-shell relative z-10 w-full max-w-md rounded-[2rem] border border-zinc-200 bg-white/92 p-6 py-8 shadow-[0_30px_90px_rgba(15,23,42,0.12)] backdrop-blur md:p-8">
-          <Link href="/" className="lg:hidden inline-flex items-center gap-2.5 mb-8">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-md">
-              <Sparkles className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-xl font-bold tracking-tight">SkillTest_AI</span>
+          <Link href="/" className="lg:hidden inline-flex items-center mb-8">
+            <BrandLogo className="w-44" imageClassName="aspect-[1100/360]" />
           </Link>
 
           <div className="mb-8">

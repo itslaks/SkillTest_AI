@@ -5,7 +5,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { sendPasswordReset } from "@/lib/actions/auth";
-import { AlertTriangle, ArrowLeft, CheckCircle2, KeyRound, Mail, ShieldCheck, Sparkles } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, KeyRound, Mail, ShieldCheck } from "lucide-react";
+import { BrandLogo } from "@/components/brand/brand-logo";
 
 export default function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null);
@@ -44,8 +45,9 @@ export default function ResetPasswordPage() {
         </Link>
 
         <div className="relative z-10 max-w-lg">
+          <BrandLogo variant="full" tone="light" className="mb-6 w-64" imageClassName="aspect-[1100/360]" />
           <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.3em] text-cyan-100">
-            <Sparkles className="h-3.5 w-3.5" />
+            <ShieldCheck className="h-3.5 w-3.5" />
             SkillTest_AI Recovery
           </div>
           <h1 className="mt-5 max-w-md font-display text-5xl font-semibold leading-tight tracking-tight">Get back in quickly.</h1>

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Github, Twitter, Linkedin, Sparkles } from "lucide-react";
+import { Github, Twitter, Linkedin } from "lucide-react";
+import { BrandLogo } from "@/components/brand/brand-logo";
 
 const footerLinks = [
   {
@@ -40,11 +41,8 @@ export function FooterSection() {
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-12 lg:gap-8 mb-24">
           {/* Brand */}
           <div className="col-span-2">
-            <Link href="/" className="inline-flex items-center gap-2 mb-6 group">
-              <div className="w-10 h-10 rounded-lg bg-foreground flex items-center justify-center transition-transform group-hover:rotate-12">
-                <Sparkles className="w-6 h-6 text-background" />
-              </div>
-              <span className="text-2xl font-bold">SkillTest_AI</span>
+            <Link href="/" className="inline-flex items-center mb-6 group">
+              <BrandLogo className="w-52 transition-transform group-hover:scale-[1.02]" imageClassName="aspect-[1100/360]" />
             </Link>
             <p className="text-muted-foreground max-w-xs mb-8">
               SkillTest_AI: Mavericks Execution Platform for modern training teams.
