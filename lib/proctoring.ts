@@ -6,6 +6,10 @@ export type ProctoringEventPostPayload = {
   type: ProctoringEventType
   label: string
   questionIndex?: number
+  confidence?: number | null
+  detectedCount?: number | null
+  objectLabel?: string | null
+  metadata?: Record<string, unknown> | null
   evidenceImage?: string | null
 }
 
@@ -35,7 +39,7 @@ export const PROCTORING_RISK_WEIGHTS: Record<ProctoringEventType, number> = {
   'screenshot_attempt': 22,
   'camera-lost': 25,
   'network-offline': 20,
-  'no-face': 15,
+  'no-face': 25,
   'no_face': 25,
   'multiple-faces': 35,
   'multiple_faces': 35,
@@ -51,7 +55,7 @@ export const PROCTORING_RISK_WEIGHTS: Record<ProctoringEventType, number> = {
   'notes-detected': 20,
   'audio-anomaly': 30,
   'voice-assistance': 40,
-  'face_substitution': 45,  // highest-severity: possible impersonation
+  'face_substitution': 105,  // critical: possible impersonation
   'auto-submit': 0,
 }
 

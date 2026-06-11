@@ -52,7 +52,7 @@ It is built for training managers and HR teams who need **execution evidence**, 
 | Feature | Description |
 |---------|-------------|
 | 🎯 Adaptive Quiz Engine | Questions reorder by difficulty based on live performance signals |
-| 🛡️ AI Proctoring | Camera · face detection · gaze tracking · object detection · browser lock |
+| 🛡️ AI Proctoring | Camera · baseline face identity · multiple-face detection · gadget detection · gaze tracking · browser lock |
 | 🏅 Certificates | Auto-issued on pass; downloadable with custom title, message, and template |
 | 🎖️ Badge Universe | 250+ badges across 12 categories earned from quiz performance and streaks |
 | 🏆 Leaderboard | Live and cumulative rankings with points and streaks |
@@ -201,8 +201,11 @@ Employee opens quiz
               │
               ▼
        🔵 Pre-check screen
-         Camera · Mic · Fullscreen · Face visible · Consent
+         Camera · Mic · Fullscreen · Exactly one centered face · Consent
               │ (all pass)
+              ▼
+       🔵 Capture baseline face signature
+              │
               ▼
        🟠 startQuizAttempt() — creates attempt + proctoring_session
               │
@@ -212,7 +215,7 @@ Employee opens quiz
               │
          Violation detected?
            ├── YES → POST /api/proctoring/events
-           │          Risk score calculated
+           │          Evidence uploaded + risk score calculated
            │          Threshold reached? → 🔴 Auto-submit (suspicious)
            └── NO  → continue
               │
@@ -225,6 +228,22 @@ Employee opens quiz
               ▼
        🔵 Result page
 ```
+
+### AI Proctoring Rules
+
+Pre-check now captures a baseline face only when camera permission is active, lighting is acceptable, exactly one face is visible, and the face is centered. The baseline stores a browser-generated FaceMesh geometry signature and metadata on `proctoring_sessions`; the quiz will not start if zero faces or multiple faces are visible.
+
+During the quiz, TensorFlow.js runs in the browser and sends structured events through `/api/proctoring/events`:
+
+| Rule | Warning | Evidence / metadata |
+|------|---------|---------------------|
+| Multiple faces | `Multiple faces detected: 2 faces visible` | Screenshot, `detected_count`, detector counts, high risk |
+| Different person | `Different person detected` | Screenshot, similarity score, threshold, critical risk |
+| Face missing | `Face not visible` / no-face warning | Screenshot, confidence, medium/high risk |
+| Mobile phone | `Mobile phone detected` | Screenshot, object label, confidence, high risk |
+| Electronic gadget | `Laptop detected`, `Remote detected`, etc. | Screenshot, object label, confidence, high risk |
+
+Warnings use type-specific cooldowns so the UI does not spam the employee, but ongoing violations can still create additional evidence after cooldown. Major events persist `session_id`, `attempt_id`, event type, timestamp, confidence, detected count or object label, risk delta, screenshot storage path, and metadata JSON for manager review.
 
 ### AI Provider Waterfall
 
@@ -264,7 +283,7 @@ cp .env.local.example .env.local
 #    database/migrations/001_create_profiles.sql
 #    database/migrations/002_create_quizzes.sql
 #    ... through ...
-#    database/migrations/040_suspicious_attempt_review_gate.sql
+#    database/migrations/042_proctoring_baseline_and_event_metadata.sql
 
 # 5. Seed (optional)
 node database/seeds/seed_admin.js

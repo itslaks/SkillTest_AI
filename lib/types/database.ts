@@ -550,6 +550,10 @@ export interface ProctoringEvent {
   questionIndex?: number
   riskScore?: number
   riskLevel?: ProctoringRiskLevel
+  confidence?: number | null
+  detectedCount?: number | null
+  objectLabel?: string | null
+  metadata?: Record<string, unknown> | null
   evidenceImage?: string | null
   evidencePath?: string | null
 }

@@ -11,6 +11,10 @@ const proctoringEventSchema = z.object({
   type: z.enum(Object.keys(PROCTORING_RISK_WEIGHTS) as [keyof typeof PROCTORING_RISK_WEIGHTS, ...(keyof typeof PROCTORING_RISK_WEIGHTS)[]]),
   label: z.string().trim().min(1).max(180),
   questionIndex: z.number().int().min(0).max(1000).optional(),
+  confidence: z.number().min(0).max(1).optional().nullable(),
+  detectedCount: z.number().int().min(0).max(20).optional().nullable(),
+  objectLabel: z.string().trim().min(1).max(80).optional().nullable(),
+  metadata: z.record(z.unknown()).optional().nullable(),
   evidenceImage: z
     .string()
     .max(1_100_000, 'Evidence image is too large')
@@ -55,6 +59,10 @@ export async function POST(request: Request) {
       type: event.type,
       label: event.label,
       questionIndex: event.questionIndex,
+      confidence: event.confidence,
+      detectedCount: event.detectedCount,
+      objectLabel: event.objectLabel,
+      metadata: event.metadata,
       evidenceImage: event.evidenceImage,
     })
 

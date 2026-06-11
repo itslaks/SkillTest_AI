@@ -96,6 +96,13 @@ type WarningModalState = {
 } | null
 
 type CameraVisibilityState = CameraVisibilityCheck
+type ProctoringViolationDetails = {
+  confidence?: number | null
+  detectedCount?: number | null
+  objectLabel?: string | null
+  metadata?: Record<string, unknown> | null
+  evidenceImage?: string | null
+}
 
 const initialDevicePermission: DevicePermission = {
   status: 'required',
@@ -188,6 +195,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const proctoringEventRetryQueueRef = useRef<ProctoringEventPostPayload[]>([])
   const referenceCaptureRef = useRef<ReferenceFaceCapture | null>(null)
   const answerAdvanceTimerRef = useRef<number | null>(null)
+  const latestViolationClearTimerRef = useRef<number | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [draftStorageWarning, setDraftStorageWarning] = useState(false)
   const [violationToasts, setViolationToasts] = useState<ViolationToastItem[]>([])
@@ -204,6 +212,10 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
 
   useEffect(() => {
     setMounted(true)
+  }, [])
+
+  useEffect(() => () => {
+    if (latestViolationClearTimerRef.current) window.clearTimeout(latestViolationClearTimerRef.current)
   }, [])
 
   const questions = (quiz.questions || []) as QuizQuestion[]
@@ -501,7 +513,7 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     }
   }, [buildProctoringSubmission, doSubmit, getFinalAnswersForSubmit])
 
-  const recordProctoringViolation = useCallback((type: ProctoringEventType, label: string, evidenceImage?: string | null) => {
+  const recordProctoringViolation = useCallback((type: ProctoringEventType, label: string, details: ProctoringViolationDetails = {}) => {
     if (!requiresProctoring || !started || finishedRef.current || submittingRef.current) return
 
     const now = Date.now()
@@ -511,6 +523,11 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     lastProctoringEventAtRef.current[type] = now
 
     setLatestViolation(label)
+    if (latestViolationClearTimerRef.current) window.clearTimeout(latestViolationClearTimerRef.current)
+    latestViolationClearTimerRef.current = window.setTimeout(() => {
+      setLatestViolation(null)
+      latestViolationClearTimerRef.current = null
+    }, getProctoringWarningSafeClearMs(type))
     if (type === 'multiple_faces') setMultipleFacesAlertAt(now)
     const toastId = `${type}-${now}-${Math.random().toString(36).slice(2)}`
     setWarningModal({ id: toastId, type, label, createdAt: now })
@@ -526,6 +543,10 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       questionIndex: currentIndex,
       riskScore: getProctoringEventRisk(type),
       riskLevel: getProctoringRiskLevel(getProctoringEventRisk(type)),
+      confidence: details.confidence ?? null,
+      detectedCount: details.detectedCount ?? null,
+      objectLabel: details.objectLabel ?? null,
+      metadata: details.metadata ?? null,
     }
     proctoringEventsRef.current = [...proctoringEventsRef.current, event].slice(-50)
     setRecentViolations((previous) => [event, ...previous].slice(0, 8))
@@ -540,7 +561,11 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       type,
       label,
       questionIndex: currentIndex,
-      evidenceImage: evidenceImage || captureEvidenceFrame(),
+      confidence: details.confidence ?? null,
+      detectedCount: details.detectedCount ?? null,
+      objectLabel: details.objectLabel ?? null,
+      metadata: details.metadata ?? null,
+      evidenceImage: details.evidenceImage || captureEvidenceFrame(),
     }
 
     void flushProctoringEventQueue()
@@ -611,7 +636,13 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
           referenceCapture: referenceCaptureRef.current ?? undefined,
           onViolation: (violation) => {
             const type = visionViolationTypeToEventType(violation.type)
-            recordProctoringViolation(type, violation.label, violation.evidenceDataUrl)
+            recordProctoringViolation(type, violation.label, {
+              confidence: violation.confidence,
+              detectedCount: violation.detectedCount,
+              objectLabel: violation.objectLabel,
+              metadata: violation.metadata,
+              evidenceImage: violation.evidenceDataUrl,
+            })
           },
         })
       })
@@ -933,6 +964,31 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       if (document.fullscreenElement) await document.exitFullscreen().catch(() => undefined)
       return
     }
+    const freshFaceVisible = await verifyCameraVisibility()
+    if (!freshFaceVisible) {
+      if (document.fullscreenElement) await document.exitFullscreen().catch(() => undefined)
+      setStartError(cameraVisibility.message || 'Exactly one centered face must be visible before launching the quiz.')
+      return
+    }
+
+    let baselineCapture: ReferenceFaceCapture | null = null
+    if (videoRef.current && hiddenCanvasRef.current) {
+      try {
+        const { captureReferenceFace } = await import('@/lib/proctoring-vision')
+        baselineCapture = await captureReferenceFace(videoRef.current, hiddenCanvasRef.current)
+      } catch (err) {
+        console.warn('[proctoring] reference face capture failed:', err)
+      }
+    }
+    if (!baselineCapture) {
+      if (document.fullscreenElement) await document.exitFullscreen().catch(() => undefined)
+      setStartError('Unable to capture a reliable baseline face. Keep exactly one centered face visible in good lighting, then retry.')
+      return
+    }
+    const verifiedBaselineCapture = baselineCapture
+    referenceCaptureRef.current = verifiedBaselineCapture
+    setReferencePhotoUrl(verifiedBaselineCapture.dataUrl)
+
     window.history.pushState({ proctoredQuiz: true }, '', window.location.href)
     startTransition(async () => {
       const result = await startQuizAttempt(quiz.id, {
@@ -940,6 +996,12 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
         microphoneReady,
         fullscreenReady: Boolean(document.fullscreenElement),
         consentAccepted: true,
+        baselineFace: {
+          capturedAt: new Date(verifiedBaselineCapture.capturedAt).toISOString(),
+          faceSignature: verifiedBaselineCapture.faceSignature,
+          confidence: verifiedBaselineCapture.faceConfidence,
+          metadata: verifiedBaselineCapture.metadata,
+        },
       })
       if (result.error) {
         stopMediaStream()
@@ -952,20 +1014,6 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       setAttemptId(nextAttemptId)
       cleanupStaleDrafts(nextAttemptId)
       proctoringSessionIdRef.current = result.proctoringSession?.id || null
-
-      // Capture reference face snapshot before the quiz begins
-      if (videoRef.current && hiddenCanvasRef.current) {
-        try {
-          const { captureReferenceFace } = await import('@/lib/proctoring-vision')
-          const capture = await captureReferenceFace(videoRef.current, hiddenCanvasRef.current)
-          if (capture) {
-            referenceCaptureRef.current = capture
-            setReferencePhotoUrl(capture.dataUrl)
-          }
-        } catch (err) {
-          console.warn('[proctoring] reference face capture failed:', err)
-        }
-      }
 
       setStarted(true)
       setQuestionStartTime(Date.now())
@@ -1817,6 +1865,21 @@ function getProctoringDedupeWindowMs(type: ProctoringEventType) {
     'multiple-faces': 3500,
   }
   return windows[type] ?? 1200
+}
+
+function getProctoringWarningSafeClearMs(type: ProctoringEventType) {
+  const windows: Partial<Record<ProctoringEventType, number>> = {
+    multiple_faces: 12_000,
+    'multiple-faces': 12_000,
+    phone_detected: 14_000,
+    'phone-detected': 14_000,
+    electronic_device: 14_000,
+    face_substitution: 20_000,
+    no_face: 10_000,
+    'no-face': 10_000,
+    'face-covered': 10_000,
+  }
+  return windows[type] ?? 8_000
 }
 
 function ProctoringStatusBar({

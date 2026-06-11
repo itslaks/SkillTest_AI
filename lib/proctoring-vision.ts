@@ -8,6 +8,15 @@ export interface ReferenceFaceCapture {
   capturedAt: number
   /** Normalized face-geometry vector (100 values) used for identity comparison */
   faceSignature: number[]
+  faceConfidence: number
+  metadata: {
+    faceCount: number
+    centered: boolean
+    lighting: 'acceptable'
+    signatureVersion: string
+    videoWidth: number
+    videoHeight: number
+  }
 }
 
 export interface VisionProctoringConfig {
@@ -27,6 +36,9 @@ export interface VisionViolation {
   confidence: number
   evidenceDataUrl: string
   timestamp: number
+  detectedCount?: number
+  objectLabel?: string
+  metadata?: Record<string, unknown>
 }
 
 export type CameraVisibilityCheck = {
@@ -52,6 +64,8 @@ type VisionState = {
   lastFaceMatchCheckAt: number
   /** Consecutive 5-second checks that failed the face-match threshold */
   faceMatchFails: number
+  /** Consecutive gray-zone face-match checks that are suspicious if repeated */
+  faceMatchUncertain: number
 }
 
 type ModelBundle = {
@@ -71,9 +85,11 @@ const SIGNATURE_INDICES = [
   308, 323, 332, 334, 336, 338, 356, 361, 362, 365,
   373, 377, 378, 379, 387, 389, 397, 400, 402, 454,
 ]
-const FACE_MATCH_THRESHOLD  = 0.88  // cosine-similarity below this → possible substitution
+const FACE_MATCH_THRESHOLD  = 0.86  // cosine-similarity below this → possible substitution
+const FACE_MATCH_GRAY_ZONE_THRESHOLD = 0.92
 const FACE_MATCH_INTERVAL_MS = 5_000 // check every 5 seconds
 const FACE_MATCH_FAIL_COUNT  = 2    // consecutive failing checks before flagging
+const FACE_MATCH_UNCERTAIN_COUNT = 3
 
 const COOLDOWN_MS_DEFAULT = 12_000
 const COOLDOWN_MS: Record<string, number> = {
@@ -83,10 +99,10 @@ const COOLDOWN_MS: Record<string, number> = {
   'face-covered':     3_000,
   gaze_down:         10_000,
   gaze_away:         10_000,
-  phone_detected:     5_000,
+  phone_detected:     6_000,
   electronic_device:  8_000,
   book_detected:     10_000,
-  face_substitution:  60_000, // serious flag – long cooldown to avoid spam
+  face_substitution:  30_000, // serious flag, with repeats if it persists
   // DOM violations
   tab_switch:         5_000,
   focus_loss:         5_000,
@@ -103,15 +119,15 @@ const COOLDOWN_MS: Record<string, number> = {
 // Lowered to catch more; consensus (below) prevents false-positive spam.
 const FACE_SCORE_THRESHOLD   = 0.25   // was 0.35
 const PERSON_SCORE_THRESHOLD = 0.22
-const PHONE_SCORE_THRESHOLD  = 0.18   // COCO-SSD is weak at phones — low & consensus
+const PHONE_SCORE_THRESHOLD  = 0.30
 const DEVICE_SCORE_THRESHOLD = 0.32   // was 0.40
 const BOOK_SCORE_THRESHOLD   = 0.32   // was 0.40
 
 // ── Consensus: N consecutive frames required before emitting ─────────────────
 const CONSENSUS: Record<string, number> = {
   multiple_faces:    1,
-  phone_detected:    3,   // 3 frames because low threshold → more noise
-  electronic_device: 2,
+  phone_detected:    1,
+  electronic_device: 1,
   book_detected:     2,
 }
 
@@ -122,8 +138,9 @@ const GAZE_YAW_MEDIAN_DEGREES   = 25     // median yaw (was: all 5 readings > 30
 const NO_FACE_MS = 3_000
 const MAX_BUFFER = 5
 
-const PHONE_LABELS  = new Set(['cell phone', 'remote'])
-const DEVICE_LABELS = new Set(['laptop', 'tablet', 'monitor', 'tv'])
+const PHONE_LABELS  = new Set(['cell phone', 'mobile phone', 'phone'])
+const DEVICE_LABELS = new Set(['laptop', 'tablet', 'monitor', 'tv', 'remote', 'keyboard', 'mouse'])
+const ACCESSORY_LABELS = new Set(['headphones', 'earbuds', 'smartwatch', 'calculator'])
 
 let modelPromise: Promise<ModelBundle | null> | null = null
 let faceDetectorPromise: Promise<any | null> | null = null
@@ -149,6 +166,7 @@ export function startVisionProctoring(config: VisionProctoringConfig) {
     referenceFaceSignature: config.referenceCapture?.faceSignature ?? null,
     lastFaceMatchCheckAt: 0,
     faceMatchFails: 0,
+    faceMatchUncertain: 0,
   }
   states.set(config.videoElement, state)
 
@@ -403,8 +421,13 @@ async function inspectFrame(config: VisionProctoringConfig, state: VisionState, 
     if (shouldFireMultipleFaces) {
       emitViolation(config, state, {
         type: 'multiple_faces',
-        label: `Multiple people detected (${effectiveFaceCount}). Only one person is allowed during the assessment.`,
+        label: `Multiple faces detected: ${effectiveFaceCount} faces visible`,
         confidence: Math.min(0.99, averageFaceScore(faces) || 0.85),
+        detectedCount: effectiveFaceCount,
+        metadata: {
+          faceDetectorCount: faces.length,
+          personDetectorCount: cocoPersonCount,
+        },
         timestamp: now,
       })
     }
@@ -414,7 +437,7 @@ async function inspectFrame(config: VisionProctoringConfig, state: VisionState, 
     if (now - state.noFaceSince > NO_FACE_MS) {
       emitViolation(config, state, {
         type: 'no_face',
-        label: 'No face detected in camera frame.',
+        label: 'Face not visible',
         confidence: 0.9,
         timestamp: now,
       })
@@ -438,17 +461,41 @@ async function inspectFrame(config: VisionProctoringConfig, state: VisionState, 
           const similarity = cosineSimilarity(state.referenceFaceSignature, currentSig)
           if (similarity < FACE_MATCH_THRESHOLD) {
             state.faceMatchFails = Math.min(state.faceMatchFails + 1, FACE_MATCH_FAIL_COUNT)
+            state.faceMatchUncertain = 0
             if (state.faceMatchFails >= FACE_MATCH_FAIL_COUNT) {
               state.faceMatchFails = 0
               emitViolation(config, state, {
                 type: 'face_substitution',
-                label: `Person in frame does not match the reference photo (match ${Math.round(similarity * 100)}%). Possible identity substitution detected.`,
+                label: 'Different person detected',
                 confidence: Math.min(0.99, 1 - similarity + 0.1),
+                metadata: {
+                  similarity,
+                  threshold: FACE_MATCH_THRESHOLD,
+                  matchState: 'failed',
+                },
+                timestamp: now,
+              })
+            }
+          } else if (similarity < FACE_MATCH_GRAY_ZONE_THRESHOLD) {
+            state.faceMatchFails = 0
+            state.faceMatchUncertain = Math.min(state.faceMatchUncertain + 1, FACE_MATCH_UNCERTAIN_COUNT)
+            if (state.faceMatchUncertain >= FACE_MATCH_UNCERTAIN_COUNT) {
+              state.faceMatchUncertain = 0
+              emitViolation(config, state, {
+                type: 'face_substitution',
+                label: 'Different person detected',
+                confidence: Math.min(0.85, 1 - similarity + 0.15),
+                metadata: {
+                  similarity,
+                  threshold: FACE_MATCH_GRAY_ZONE_THRESHOLD,
+                  matchState: 'uncertain_repeated',
+                },
                 timestamp: now,
               })
             }
           } else {
             state.faceMatchFails = 0
+            state.faceMatchUncertain = 0
           }
         }
       }
@@ -523,6 +570,7 @@ function inspectObjectViolations(
 ) {
   // Collect best scores for this frame
   let bestPhoneScore  = 0
+  let bestPhoneLabel: string | null = null
   let bestBookScore   = 0
   const deviceScores  = new Map<string, number>()
 
@@ -532,13 +580,14 @@ function inspectObjectViolations(
 
     // ── Phone ───────────────────────────────────────────────────────────────
     // COCO-SSD frequently misclassifies phones as "remote"; we cover both.
-    // Low threshold + 3-frame consensus keeps false positives low.
+    // Immediate once confidence clears threshold; cooldowns prevent repeated warning spam.
     if (PHONE_LABELS.has(label) && score > PHONE_SCORE_THRESHOLD) {
       bestPhoneScore = Math.max(bestPhoneScore, score)
+      bestPhoneLabel = label
     }
 
     // ── Electronic devices ───────────────────────────────────────────────────
-    if (DEVICE_LABELS.has(label) && score > DEVICE_SCORE_THRESHOLD) {
+    if ((DEVICE_LABELS.has(label) || ACCESSORY_LABELS.has(label)) && score > DEVICE_SCORE_THRESHOLD) {
       deviceScores.set(label, Math.max(deviceScores.get(label) ?? 0, score))
     }
 
@@ -552,21 +601,26 @@ function inspectObjectViolations(
   if (advanceConsensus(state, 'phone_detected', bestPhoneScore > 0, CONSENSUS.phone_detected)) {
     emitViolation(config, state, {
       type: 'phone_detected',
-      label: 'Mobile phone detected in camera frame.',
+      label: 'Mobile phone detected',
       confidence: Math.min(0.99, bestPhoneScore),
+      objectLabel: bestPhoneLabel || 'cell phone',
+      metadata: { objectLabel: bestPhoneLabel || 'cell phone' },
       timestamp: now,
     })
   }
 
   // ── Emit each device type separately (consensus-gated) ────────────────────
-  for (const label of DEVICE_LABELS) {
+  for (const label of new Set([...DEVICE_LABELS, ...ACCESSORY_LABELS])) {
     const score   = deviceScores.get(label) ?? 0
     const present = score > 0
     if (advanceConsensus(state, `device_${label}`, present, CONSENSUS.electronic_device) && present) {
+      const displayLabel = label.replace(/\b\w/g, (char) => char.toUpperCase())
       emitViolation(config, state, {
         type: 'electronic_device',
-        label: `Additional electronic device detected (${label}).`,
+        label: `${displayLabel} detected`,
         confidence: score,
+        objectLabel: label,
+        metadata: { objectLabel: label },
         timestamp: now,
       })
     }
@@ -641,17 +695,38 @@ export async function captureReferenceFace(
     const models = await loadModels()
     if (!models) return null
 
+    const frame = inspectFramePixels(videoElement, canvasElement)
+    if (frame.isCovered) return null
+
+    const detectedFaces = await models.faceDetector.estimateFaces(videoElement, { flipHorizontal: false }) as any[]
+    if (detectedFaces.length !== 1) return null
+    const detectedBox = faceBox(detectedFaces[0])
+    if (!detectedBox || !isCenteredFace(detectedBox, videoElement.videoWidth, videoElement.videoHeight)) return null
+
     const faces = await models.landmarkDetector.estimateFaces(videoElement, { flipHorizontal: false })
-    const face  = faces?.[0]
-    if (!face) return null
+    if (faces.length !== 1) return null
+    const face = faces[0]
 
     const keypoints: Array<{ x: number; y: number }> = face.keypoints ?? []
     const box = faceBox(face)
-    if (!box || keypoints.length < 100) return null
+    if (!box || keypoints.length < 100 || !isCenteredFace(box, videoElement.videoWidth, videoElement.videoHeight)) return null
 
     const faceSignature = buildFaceSignature(keypoints, box)
     const dataUrl       = captureFrame(videoElement, canvasElement)
-    return { dataUrl, capturedAt: Date.now(), faceSignature }
+    return {
+      dataUrl,
+      capturedAt: Date.now(),
+      faceSignature,
+      faceConfidence: averageFaceScore(detectedFaces),
+      metadata: {
+        faceCount: 1,
+        centered: true,
+        lighting: 'acceptable',
+        signatureVersion: 'facemesh-geometry-v1',
+        videoWidth: videoElement.videoWidth,
+        videoHeight: videoElement.videoHeight,
+      },
+    }
   } catch (error) {
     console.warn('[proctoring-vision] reference face capture failed:', error)
     return null
@@ -843,6 +918,27 @@ function faceBox(face: any): { x: number; y: number; width: number; height: numb
   const height = Number(box.height ?? ((box.yMax ?? box.bottomRight?.[1] ?? 0) - y))
   if (![x, y, width, height].every(Number.isFinite) || width <= 0 || height <= 0) return null
   return { x, y, width, height }
+}
+
+function isCenteredFace(
+  box: { x: number; y: number; width: number; height: number },
+  videoWidth: number,
+  videoHeight: number,
+) {
+  const width = videoWidth || 1
+  const height = videoHeight || 1
+  const faceArea = (box.width * box.height) / (width * height)
+  const marginX = width * 0.04
+  const marginY = height * 0.04
+
+  return (
+    box.x >= marginX &&
+    box.y >= marginY &&
+    box.x + box.width <= width - marginX &&
+    box.y + box.height <= height - marginY &&
+    faceArea >= 0.07 &&
+    faceArea <= 0.72
+  )
 }
 
 function namedPoint(

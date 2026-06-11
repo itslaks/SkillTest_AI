@@ -11,12 +11,29 @@ import { getSiteUrl } from '@/lib/security/env'
 
 export const PROCTORING_EVIDENCE_BUCKET = 'quiz-proctoring-evidence'
 const DUPLICATE_EVENT_COOLDOWN_MS = 12_000
+const SERVER_EVENT_COOLDOWN_MS: Partial<Record<ProctoringEventType, number>> = {
+  multiple_faces: 3_000,
+  'multiple-faces': 3_000,
+  no_face: 6_000,
+  'no-face': 6_000,
+  'face-covered': 6_000,
+  phone_detected: 8_000,
+  'phone-detected': 8_000,
+  electronic_device: 10_000,
+  face_substitution: 30_000,
+}
 
 export type ProctoringPrecheck = {
   cameraReady: boolean
   microphoneReady: boolean
   fullscreenReady: boolean
   consentAccepted: boolean
+  baselineFace?: {
+    capturedAt: string
+    faceSignature: number[]
+    confidence: number
+    metadata?: Record<string, unknown>
+  } | null
 }
 
 export type ProctoringSessionRow = {
@@ -51,6 +68,10 @@ export function eventRowsToSubmissionEvents(rows: any[]): ProctoringEvent[] {
     questionIndex: typeof row.question_number === 'number' ? Math.max(0, row.question_number - 1) : undefined,
     riskScore: row.risk_score,
     riskLevel: row.severity,
+    confidence: typeof row.confidence === 'number' ? row.confidence : row.metadata?.confidence ?? null,
+    detectedCount: typeof row.detected_count === 'number' ? row.detected_count : row.metadata?.detectedCount ?? null,
+    objectLabel: typeof row.object_label === 'string' ? row.object_label : row.metadata?.objectLabel ?? null,
+    metadata: row.metadata || null,
     evidencePath: row.metadata?.evidencePath || null,
   }))
 }
@@ -96,6 +117,10 @@ export async function createOrUpdateProctoringSession({
       microphone_ready: precheck.microphoneReady,
       fullscreen_ready: precheck.fullscreenReady,
       consent_accepted: precheck.consentAccepted,
+      baseline_face_signature: precheck.baselineFace?.faceSignature || null,
+      baseline_captured_at: precheck.baselineFace?.capturedAt || null,
+      baseline_face_confidence: precheck.baselineFace?.confidence ?? null,
+      baseline_metadata: precheck.baselineFace?.metadata || {},
       status: 'active',
     }, { onConflict: 'attempt_id' })
     .select()
@@ -142,6 +167,10 @@ export async function recordProctoringEvent({
   type,
   label,
   questionIndex,
+  confidence,
+  detectedCount,
+  objectLabel,
+  metadata,
   evidenceImage,
 }: {
   admin: any
@@ -149,6 +178,10 @@ export async function recordProctoringEvent({
   type: ProctoringEventType
   label: string
   questionIndex?: number
+  confidence?: number | null
+  detectedCount?: number | null
+  objectLabel?: string | null
+  metadata?: Record<string, unknown> | null
   evidenceImage?: string | null
 }) {
   const now = new Date()
@@ -161,12 +194,21 @@ export async function recordProctoringEvent({
     .limit(1)
 
   const last = recentEvents?.[0]
-  if (last && now.getTime() - new Date(last.occurred_at).getTime() < DUPLICATE_EVENT_COOLDOWN_MS) {
+  const duplicateCooldown = SERVER_EVENT_COOLDOWN_MS[type] ?? DUPLICATE_EVENT_COOLDOWN_MS
+  if (last && now.getTime() - new Date(last.occurred_at).getTime() < duplicateCooldown) {
     return refreshAttemptProctoringSummary(admin, session, true)
   }
 
   const riskScore = getProctoringEventRisk(type)
   const riskLevel = getProctoringRiskLevel(riskScore)
+  const baseMetadata = {
+    ...(metadata || {}),
+    label,
+    confidence: confidence ?? null,
+    detectedCount: detectedCount ?? null,
+    objectLabel: objectLabel ?? null,
+    riskDelta: riskScore,
+  }
   const { data: event, error } = await admin
     .from('quiz_proctoring_events')
     .insert({
@@ -177,9 +219,12 @@ export async function recordProctoringEvent({
       violation_type: type,
       severity: riskLevel,
       risk_score: riskScore,
+      confidence: confidence ?? null,
+      detected_count: detectedCount ?? null,
+      object_label: objectLabel ?? null,
       question_number: typeof questionIndex === 'number' ? questionIndex + 1 : null,
       occurred_at: now.toISOString(),
-      metadata: { label },
+      metadata: baseMetadata,
     })
     .select()
     .single()
@@ -195,7 +240,7 @@ export async function recordProctoringEvent({
   if (evidencePath) {
     await admin
       .from('quiz_proctoring_events')
-      .update({ metadata: { label, evidencePath } })
+      .update({ metadata: { ...baseMetadata, evidencePath } })
       .eq('id', event.id)
   }
 

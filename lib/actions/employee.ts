@@ -29,6 +29,12 @@ export async function startQuizAttempt(quizId: string, precheck?: {
   microphoneReady: boolean
   fullscreenReady: boolean
   consentAccepted: boolean
+  baselineFace?: {
+    capturedAt: string
+    faceSignature: number[]
+    confidence: number
+    metadata?: Record<string, unknown>
+  } | null
 }) {
   const idResult = uuidSchema.safeParse(quizId)
   if (!idResult.success) return { error: 'Invalid quiz ID' }
