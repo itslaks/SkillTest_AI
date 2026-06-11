@@ -22,6 +22,13 @@ import {
   BookOpen,
   Bell,
   TerminalSquare,
+  AlertTriangle,
+  ClipboardCheck,
+  FileText,
+  GraduationCap,
+  Settings,
+  UserCog,
+  Workflow,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { signOut } from '@/lib/actions/auth'
@@ -35,29 +42,94 @@ interface ManagerSidebarProps {
 
 const navigation = [
   {
-    section: 'Main',
+    section: 'Mission Control',
     items: [
-      { name: 'Dashboard', href: '/manager', icon: LayoutDashboard, color: 'text-sky-400', bg: 'bg-sky-400/10', activeBg: 'bg-sky-500', description: 'Overview & stats' },
-      { name: 'Training Ops', href: '/manager/operations', icon: CalendarDays, color: 'text-cyan-400', bg: 'bg-cyan-400/10', activeBg: 'bg-cyan-500', description: 'Batches & sessions' },
-      { name: 'AI Command', href: '/manager/ai-command', icon: TerminalSquare, color: 'text-amber-300', bg: 'bg-amber-300/10', activeBg: 'bg-amber-400', description: 'Execute admin ops' },
-      { name: 'Admin Docs', href: '/manager/docs', icon: BookOpen, color: 'text-emerald-300', bg: 'bg-emerald-300/10', activeBg: 'bg-emerald-400', description: 'A to Z guide' },
-      { name: 'Quizzes', href: '/manager/quizzes', icon: FileQuestion, color: 'text-violet-400', bg: 'bg-violet-400/10', activeBg: 'bg-violet-500', description: 'Manage assessments' },
-      { name: 'Employees', href: '/manager/employees', icon: Users, color: 'text-emerald-400', bg: 'bg-emerald-400/10', activeBg: 'bg-emerald-500', description: 'Team management' },
-      { name: 'Profiles', href: '/profiles', icon: Users, color: 'text-indigo-400', bg: 'bg-indigo-400/10', activeBg: 'bg-indigo-500', description: 'People search' },
+      { name: 'Overview', href: '/manager', icon: LayoutDashboard, color: 'text-sky-400', bg: 'bg-sky-400/10', activeBg: 'bg-sky-500', description: 'Operating picture' },
+      { name: 'Alerts', href: '/manager/notifications', icon: Bell, color: 'text-rose-300', bg: 'bg-rose-300/10', activeBg: 'bg-rose-400', description: 'Action queue' },
+      { name: 'KPIs', href: '/manager/analytics', icon: BarChart3, color: 'text-blue-300', bg: 'bg-blue-300/10', activeBg: 'bg-blue-400', description: 'Performance signals' },
+      { name: 'Risk Center', href: '/manager/integrity', icon: AlertTriangle, color: 'text-red-300', bg: 'bg-red-300/10', activeBg: 'bg-red-400', description: 'Integrity risk' },
     ]
   },
   {
-    section: 'Insights',
+    section: 'Training Operations',
     items: [
-      { name: 'Leaderboard', href: '/manager/leaderboard', icon: Trophy, color: 'text-amber-400', bg: 'bg-amber-400/10', activeBg: 'bg-amber-500', description: 'Rankings & scores' },
-      { name: 'Analytics & AI', href: '/manager/analytics', icon: Brain, color: 'text-pink-400', bg: 'bg-pink-400/10', activeBg: 'bg-pink-500', description: 'AI-powered insights' },
-      { name: 'Integrity Center', href: '/manager/integrity', icon: ShieldAlert, color: 'text-red-300', bg: 'bg-red-300/10', activeBg: 'bg-red-400', description: 'Proctoring evidence' },
-      { name: 'Reports', href: '/manager/reports', icon: BarChart3, color: 'text-orange-400', bg: 'bg-orange-400/10', activeBg: 'bg-orange-500', description: 'Download reports' },
-      { name: 'Notifications', href: '/manager/notifications', icon: Bell, color: 'text-rose-300', bg: 'bg-rose-300/10', activeBg: 'bg-rose-400', description: 'Action log' },
-      { name: 'Admin Console', href: '/manager/admin', icon: ShieldCheck, color: 'text-yellow-400', bg: 'bg-yellow-400/10', activeBg: 'bg-yellow-500', description: 'Roles & controls' },
+      { name: 'Batches', href: '/manager/operations', icon: CalendarDays, color: 'text-cyan-400', bg: 'bg-cyan-400/10', activeBg: 'bg-cyan-500', description: 'Lifecycle control' },
+      { name: 'Attendance', href: '/manager/operations#attendance', icon: ClipboardCheck, color: 'text-emerald-300', bg: 'bg-emerald-300/10', activeBg: 'bg-emerald-400', description: 'Presence records' },
+      { name: 'Schedule', href: '/manager/operations#schedule', icon: CalendarDays, color: 'text-indigo-300', bg: 'bg-indigo-300/10', activeBg: 'bg-indigo-400', description: 'Sessions & plans' },
+      { name: 'Feedback', href: '/manager/operations#feedback', icon: FileText, color: 'text-teal-300', bg: 'bg-teal-300/10', activeBg: 'bg-teal-400', description: 'Learner signals' },
+    ]
+  },
+  {
+    section: 'Assessments',
+    items: [
+      { name: 'Question Bank', href: '/manager/quizzes', icon: FileQuestion, color: 'text-violet-400', bg: 'bg-violet-400/10', activeBg: 'bg-violet-500', description: 'Questions & topics' },
+      { name: 'Quiz Studio', href: '/manager/quizzes/new', icon: Sparkles, color: 'text-fuchsia-300', bg: 'bg-fuchsia-300/10', activeBg: 'bg-fuchsia-400', description: 'Create assessments' },
+      { name: 'Assignments', href: '/manager/quizzes', icon: ClipboardCheck, color: 'text-purple-300', bg: 'bg-purple-300/10', activeBg: 'bg-purple-400', description: 'Assign quizzes' },
+      { name: 'Results', href: '/manager/leaderboard', icon: Trophy, color: 'text-amber-400', bg: 'bg-amber-400/10', activeBg: 'bg-amber-500', description: 'Scores & ranks' },
+    ]
+  },
+  {
+    section: 'Integrity',
+    items: [
+      { name: 'Proctoring Review', href: '/manager/integrity', icon: ShieldAlert, color: 'text-red-300', bg: 'bg-red-300/10', activeBg: 'bg-red-400', description: 'Review events' },
+      { name: 'Evidence', href: '/manager/integrity', icon: ShieldCheck, color: 'text-orange-300', bg: 'bg-orange-300/10', activeBg: 'bg-orange-400', description: 'Evidence vault' },
+      { name: 'Suspicious Attempts', href: '/manager/integrity', icon: AlertTriangle, color: 'text-rose-300', bg: 'bg-rose-300/10', activeBg: 'bg-rose-400', description: 'Flagged attempts' },
+      { name: 'Audit Trail', href: '/manager/compliance', icon: FileText, color: 'text-yellow-300', bg: 'bg-yellow-300/10', activeBg: 'bg-yellow-400', description: 'Compliance log' },
+    ]
+  },
+  {
+    section: 'Learners',
+    items: [
+      { name: 'Employees', href: '/manager/employees', icon: Users, color: 'text-emerald-400', bg: 'bg-emerald-400/10', activeBg: 'bg-emerald-500', description: 'Learner roster' },
+      { name: 'Groups', href: '/manager/operations', icon: GraduationCap, color: 'text-lime-300', bg: 'bg-lime-300/10', activeBg: 'bg-lime-400', description: 'Batches & cohorts' },
+      { name: 'Progress', href: '/profiles', icon: BarChart3, color: 'text-indigo-400', bg: 'bg-indigo-400/10', activeBg: 'bg-indigo-500', description: 'People search' },
+      { name: 'Certifications', href: '/manager/admin', icon: ShieldCheck, color: 'text-yellow-400', bg: 'bg-yellow-400/10', activeBg: 'bg-yellow-500', description: 'Rules & awards' },
+    ]
+  },
+  {
+    section: 'Analytics',
+    items: [
+      { name: 'Insights', href: '/manager/analytics', icon: Brain, color: 'text-pink-400', bg: 'bg-pink-400/10', activeBg: 'bg-pink-500', description: 'AI signals' },
+      { name: 'Leaderboards', href: '/manager/leaderboard', icon: Trophy, color: 'text-amber-400', bg: 'bg-amber-400/10', activeBg: 'bg-amber-500', description: 'Rankings' },
+      { name: 'Reports', href: '/manager/reports', icon: BarChart3, color: 'text-orange-400', bg: 'bg-orange-400/10', activeBg: 'bg-orange-500', description: 'Exports' },
+      { name: 'AI Analysis', href: '/manager/analytics', icon: Brain, color: 'text-cyan-300', bg: 'bg-cyan-300/10', activeBg: 'bg-cyan-400', description: 'Assessment analysis' },
+    ]
+  },
+  {
+    section: 'Automation',
+    items: [
+      { name: 'Workflows', href: '/manager/operations', icon: Workflow, color: 'text-blue-300', bg: 'bg-blue-300/10', activeBg: 'bg-blue-400', description: 'Ops workflows' },
+      { name: 'Notifications', href: '/manager/notifications', icon: Bell, color: 'text-rose-300', bg: 'bg-rose-300/10', activeBg: 'bg-rose-400', description: 'Delivery log' },
+      { name: 'Imports', href: '/manager/employees', icon: FileText, color: 'text-green-300', bg: 'bg-green-300/10', activeBg: 'bg-green-400', description: 'Bulk data' },
+      { name: 'AI Commands', href: '/manager/ai-command', icon: TerminalSquare, color: 'text-amber-300', bg: 'bg-amber-300/10', activeBg: 'bg-amber-400', description: 'Command console' },
+    ]
+  },
+  {
+    section: 'Platform',
+    items: [
+      { name: 'Users', href: '/manager/admin', icon: UserCog, color: 'text-yellow-400', bg: 'bg-yellow-400/10', activeBg: 'bg-yellow-500', description: 'Accounts' },
+      { name: 'Roles', href: '/manager/admin', icon: Crown, color: 'text-orange-300', bg: 'bg-orange-300/10', activeBg: 'bg-orange-400', description: 'Access control' },
+      { name: 'Templates', href: '/manager/docs', icon: BookOpen, color: 'text-emerald-300', bg: 'bg-emerald-300/10', activeBg: 'bg-emerald-400', description: 'Guides & files' },
+      { name: 'Settings', href: '/manager/settings', icon: Settings, color: 'text-slate-300', bg: 'bg-slate-300/10', activeBg: 'bg-slate-400', description: 'Workspace config' },
     ]
   },
 ]
+
+function getNavItemPath(item: { href: string }) {
+  return item.href.split('#')[0]
+}
+
+function canShowNavItem(item: { href: string }, role: Profile['role'] | undefined) {
+  const itemPath = getNavItemPath(item)
+
+  if (role === 'trainer') {
+    return ['/manager', '/manager/operations', '/manager/docs', '/manager/quizzes', '/manager/employees', '/manager/integrity', '/manager/notifications', '/manager/leaderboard', '/manager/reports', '/profiles'].includes(itemPath)
+  }
+
+  if (itemPath === '/manager/admin') return role === 'admin'
+
+  return true
+}
 
 function getRoleBadge(role: string | undefined) {
   switch (role) {
@@ -79,6 +151,19 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
   const roleBadge = getRoleBadge(profile?.role)
   const RoleBadgeIcon = roleBadge.icon
   const avatarId = getAvatar3DId((profile as any)?.avatar_url)
+  const visibleNavigation = navigation
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => canShowNavItem(item, profile?.role)),
+    }))
+    .filter((group) => group.items.length > 0)
+  const activeItemName = visibleNavigation.flatMap((group) => group.items).find((item) => {
+    const itemPath = getNavItemPath(item)
+    return pathname === itemPath
+  })?.name ?? visibleNavigation.flatMap((group) => group.items).find((item) => {
+    const itemPath = getNavItemPath(item)
+    return itemPath !== '/manager' && pathname.startsWith(itemPath)
+  })?.name
 
   useEffect(() => {
     document.documentElement.style.setProperty('--manager-sidebar-width', collapsed ? '68px' : '16rem')
@@ -144,24 +229,14 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-3 px-2.5 space-y-5">
-        {navigation.map((group) => (
+        {visibleNavigation.map((group) => (
           <div key={group.section}>
             {!collapsed && (
               <p className="text-[10px] font-semibold text-white/50 uppercase tracking-widest px-2 mb-1.5">{group.section}</p>
             )}
             <div className="space-y-0.5">
-              {group.items.filter((item) => {
-                // Trainer only sees Dashboard and Training Ops
-                if (profile?.role === 'trainer') {
-                  return ['/manager', '/manager/operations', '/manager/docs', '/manager/quizzes', '/manager/employees', '/manager/integrity', '/manager/notifications'].includes(item.href)
-                }
-                // Admin Console only for admins
-                if (item.href === '/manager/admin') return profile?.role === 'admin'
-                if (item.href === '/manager/notifications') return profile?.role === 'admin'
-                return true
-              }).map((item) => {
-                const isActive = pathname === item.href ||
-                  (item.href !== '/manager' && pathname.startsWith(item.href))
+              {group.items.map((item) => {
+                const isActive = activeItemName === item.name
                 return (
                   <Link
                     key={item.name}

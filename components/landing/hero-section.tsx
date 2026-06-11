@@ -47,10 +47,10 @@ export function HeroSection() {
           <div className="space-y-8 hero-rise" style={{ animationDelay: "240ms" }}>
             <div>
               <h1 className="max-w-[780px] text-[clamp(3rem,8.2vw,7rem)] font-display leading-[0.94] tracking-tight text-slate-950">
-                <span className="block">SkillTest_AI</span>
-                <span className="block bg-gradient-to-r from-violet-600 via-blue-600 to-cyan-500 bg-clip-text text-transparent">Execution</span>
+                <span className="block">Execute, Assess,</span>
+                <span className="block bg-gradient-to-r from-violet-600 via-blue-600 to-cyan-500 bg-clip-text text-transparent">and Prove Learning Outcomes.</span>
               </h1>
-              <p className="mt-4 max-w-lg text-xl font-medium text-slate-600">Training management that thinks with you, not just for you.</p>
+              <p className="mt-4 max-w-xl text-xl font-medium text-slate-600">SkillTest_AI combines assessments, AI proctoring, attendance, certifications, analytics, and compliance evidence into a single training operations platform.</p>
             </div>
 
             <div className="xl:hidden">
@@ -58,7 +58,7 @@ export function HeroSection() {
             </div>
 
             <p className="text-xl lg:text-2xl text-slate-700 leading-relaxed max-w-xl">
-              SkillTest_AI: Mavericks Execution Platform brings batch operations, real-time attendance, assessment imports, trainer scorecards, feedback analytics, and automated reporting into one judge-ready TMS.
+              Run training operations from mission control: assign assessments, verify integrity, track learner progress, and export evidence-ready reports from one enterprise workspace.
             </p>
 
             <div className="helper-strip signal-sheen rounded-2xl p-4 text-sm leading-relaxed shadow-sm">
