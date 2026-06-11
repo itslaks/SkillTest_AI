@@ -116,6 +116,13 @@ export function getSiteUrl(): string {
     return vercelPreviewUrl || 'http://localhost:3000'
   }
 
+  // Vercel always provides the stable production domain — use it before
+  // failing, so auth emails keep working even without an explicit env var.
+  const vercelProductionUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? normalizeHttpUrl(`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`)
+    : null
+  if (vercelProductionUrl && !isLocalSiteUrl(vercelProductionUrl)) return vercelProductionUrl
+
   throw new Error(
     'Invalid public app URL for production. Set NEXT_PUBLIC_APP_URL or NEXT_PUBLIC_SITE_URL to your deployed https URL; localhost and Vercel preview URLs cannot be used in production emails.'
   )

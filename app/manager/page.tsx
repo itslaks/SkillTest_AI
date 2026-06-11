@@ -38,7 +38,7 @@ export default async function ManagerDashboard() {
     .from('profiles')
     .select('full_name')
     .eq('id', userId)
-    .single()
+    .maybeSingle()
 
   const { data: stats } = await getQuizStats()
 

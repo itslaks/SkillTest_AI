@@ -54,6 +54,25 @@ async function updateIntegrityReviewAction(formData: FormData) {
   const scopedQuizIds = await getScopedQuizIds(admin, userId, role)
   if (scopedQuizIds && !scopedQuizIds.includes(attempt.quiz_id)) return
 
+  if (decision === 'retest_required') {
+    // A retest means the flagged attempt is voided so the employee can start
+    // fresh. Deleting the attempt cascades to proctoring_sessions, events,
+    // and evidence (ON DELETE CASCADE), clearing the UNIQUE(quiz_id,user_id)
+    // and UNIQUE(attempt_id) constraints that would otherwise block a retake.
+    const { error: deleteError } = await admin.from('quiz_attempts').delete().eq('id', attemptId)
+    if (deleteError) {
+      console.error('[integrity] retest delete failed:', deleteError.message)
+      return
+    }
+    after(() => {
+      void sendRetestRequiredEmail(attempt, notes)
+    })
+    revalidatePath('/manager/integrity')
+    revalidatePath('/employee/quizzes')
+    revalidatePath(`/employee/quizzes/${attempt.quiz_id}`)
+    return
+  }
+
   const releaseAttempt = decision === 'approved'
   await admin
     .from('quiz_attempts')
@@ -74,6 +93,7 @@ async function updateIntegrityReviewAction(formData: FormData) {
   }
 
   revalidatePath('/manager/integrity')
+  revalidatePath('/employee/quizzes')
   revalidatePath(`/employee/quizzes/${attempt.quiz_id}/results`)
 }
 
@@ -100,6 +120,8 @@ async function deleteAttemptAction(formData: FormData) {
   await admin.from('quiz_attempts').delete().eq('id', attemptId)
 
   revalidatePath('/manager/integrity')
+  revalidatePath('/employee/quizzes')
+  revalidatePath(`/employee/quizzes/${attempt.quiz_id}`)
 }
 
 async function deleteProctoredAttemptAction(formData: FormData) {
@@ -669,6 +691,35 @@ async function sendApprovedAttemptEmail(admin: ReturnType<typeof createAdminClie
     })
   } catch (error) {
     console.warn('Approved attempt completion email failed:', error)
+  }
+}
+
+async function sendRetestRequiredEmail(attempt: any, notes: string) {
+  try {
+    const profile = Array.isArray(attempt.profiles) ? attempt.profiles[0] : attempt.profiles
+    const quiz = Array.isArray(attempt.quizzes) ? attempt.quizzes[0] : attempt.quizzes
+    if (!profile?.email) return
+
+    const baseUrl = getSiteUrl().replace(/\/$/, '')
+    const quizTitle = quiz?.title || 'Assessment'
+    await sendEmail({
+      to: profile.email,
+      subject: `Retest Required: ${quizTitle}`,
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#18181b">
+          <h2 style="margin:0 0 16px">Retest required for ${quizTitle}</h2>
+          <p>Hi ${profile.full_name || 'there'},</p>
+          <p>Your previous attempt for <strong>${quizTitle}</strong> was reviewed by training staff and a retest has been requested. Your earlier attempt has been cleared, so you can now retake the assessment.</p>
+          ${notes ? `<p style="background:#fef3c7;border-radius:8px;padding:12px"><strong>Reviewer note:</strong> ${notes}</p>` : ''}
+          <p style="margin:24px 0">
+            <a href="${baseUrl}/employee/quizzes/${attempt.quiz_id}" style="background:#18181b;color:#fff;padding:12px 24px;border-radius:9999px;text-decoration:none;font-weight:600">Retake the assessment</a>
+          </p>
+          <p style="color:#71717a;font-size:13px">Please follow the proctoring guidelines during your retake: stay in fullscreen, keep your face visible, and remain alone in the frame.</p>
+        </div>
+      `,
+    })
+  } catch (error) {
+    console.warn('Retest-required email failed:', error)
   }
 }
 

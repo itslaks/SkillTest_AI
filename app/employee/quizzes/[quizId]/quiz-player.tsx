@@ -1273,9 +1273,20 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
       event.preventDefault()
       recordProctoringViolation('copy-attempt', 'Cut action was attempted during the quiz.')
     }
+    // Text selection is often accidental (double-click, drag while reading).
+    // Count attempts within a rolling window: the first two are silently
+    // tolerated; from the 3rd consecutive attempt onward, each one is flagged.
+    let selectAttemptCount = 0
+    let lastSelectAttemptAt = 0
+    const SELECT_ATTEMPT_RESET_MS = 30_000
     const onSelectStart = (event: Event) => {
       event.preventDefault()
-      recordProctoringViolation('copy-attempt', 'Text selection was attempted during the quiz.')
+      const now = Date.now()
+      if (now - lastSelectAttemptAt > SELECT_ATTEMPT_RESET_MS) selectAttemptCount = 0
+      lastSelectAttemptAt = now
+      selectAttemptCount += 1
+      if (selectAttemptCount < 3) return
+      recordProctoringViolation('copy-attempt', `Repeated text selection attempted during the quiz (${selectAttemptCount} times).`)
     }
     const onDragOrDrop = (event: DragEvent) => {
       event.preventDefault()
