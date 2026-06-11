@@ -101,6 +101,20 @@ export const signInSchema = z
   })
   .strict()
 
+/** Password reset request — email only; strict so extra fields are rejected */
+export const passwordResetSchema = z
+  .object({
+    email: safeEmail,
+  })
+  .strict()
+
+/** Verification email resend — email only */
+export const resendVerificationSchema = z
+  .object({
+    email: safeEmail,
+  })
+  .strict()
+
 export const magicLinkSchema = z
   .object({
     email: safeEmail,
@@ -281,8 +295,10 @@ export function parseFormData<T extends z.ZodTypeAny>(
 ): { success: true; data: z.infer<T> } | { success: false; error: string } {
   const raw: Record<string, unknown> = {}
   formData.forEach((value, key) => {
-    // Only accept string values from FormData (reject File objects etc.)
-    if (typeof value === 'string') {
+    // Only accept string values from FormData (reject File objects etc.).
+    // Skip Next.js internal server-action fields ($ACTION_ID etc.) so
+    // .strict() schemas reject only genuinely unexpected user fields.
+    if (typeof value === 'string' && !key.startsWith('$')) {
       raw[key] = value
     }
   })

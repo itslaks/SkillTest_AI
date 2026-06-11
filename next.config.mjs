@@ -48,6 +48,12 @@ const nextConfig = {
             value: 'strict-origin-when-cross-origin',
           },
           {
+            // HSTS (OWASP A05): force HTTPS for 2 years incl. subdomains.
+            // Browsers ignore this header over plain HTTP, so localhost dev is unaffected.
+            key: 'Strict-Transport-Security',
+            value: 'max-age=63072000; includeSubDomains; preload',
+          },
+          {
             key: 'Permissions-Policy',
             value: 'camera=(self), microphone=(self), geolocation=()',
           },

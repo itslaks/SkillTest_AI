@@ -6,6 +6,7 @@ import { createAdminClient, createClient } from "@/lib/supabase/server"
 import type { UserRole } from "@/lib/types/database"
 import { redirect } from "next/navigation"
 import { NextResponse } from "next/server"
+import { AUTHENTICATED_RATE_LIMIT, checkUserRateLimit, rateLimitResponse } from "@/lib/security/rate-limit"
 
 export type RBACRole = UserRole
 
@@ -65,6 +66,9 @@ export async function requireManagerForApi(): Promise<{ userId: string; role: RB
   const result = await getCurrentUserRole()
   if (!result) return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
   if (!isManager(result.role)) return NextResponse.json({ error: "Forbidden: manager role required" }, { status: 403 })
+  // User-based rate limit on all authenticated API access (OWASP API4:2023).
+  const rate = checkUserRateLimit(result.userId, AUTHENTICATED_RATE_LIMIT)
+  if (!rate.allowed) return rateLimitResponse(rate)
   return result
 }
 
@@ -72,5 +76,8 @@ export async function requireTrainingStaffForApi(): Promise<{ userId: string; ro
   const result = await getCurrentUserRole()
   if (!result) return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
   if (!isTrainingStaff(result.role)) return NextResponse.json({ error: "Forbidden: training staff role required" }, { status: 403 })
+  // User-based rate limit on all authenticated API access (OWASP API4:2023).
+  const rate = checkUserRateLimit(result.userId, AUTHENTICATED_RATE_LIMIT)
+  if (!rate.allowed) return rateLimitResponse(rate)
   return result
 }

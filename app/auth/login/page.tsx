@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
-import { signIn } from '@/lib/actions/auth'
+import { resendVerificationEmail, signIn } from '@/lib/actions/auth'
 import { BrandLogo } from '@/components/brand/brand-logo'
 import {
   ArrowRight, CheckCircle2, Lock, Mail, ShieldCheck, Zap,
@@ -19,6 +19,8 @@ function LoginContent() {
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [showPassword, setShowPassword] = useState(false)
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null)
+  const [resendStatus, setResendStatus] = useState<string | null>(null)
   const resetSuccess = searchParams.get('reset') === 'success'
   const redirectTo = searchParams.get('redirect')
   const setupRequired = searchParams.get('setup') === 'supabase'
@@ -26,11 +28,26 @@ function LoginContent() {
   function handleSignIn(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
+    setUnverifiedEmail(null)
+    setResendStatus(null)
     const formData = new FormData(event.currentTarget)
     startTransition(async () => {
       const result = await signIn(formData)
-      if (result?.error) setError(result.error)
-      else if (result?.redirectTo) router.push(result.redirectTo)
+      if (result?.error) {
+        setError(result.error)
+        if ((result as any).needsVerification && (result as any).email) {
+          setUnverifiedEmail((result as any).email)
+        }
+      } else if (result?.redirectTo) router.push(result.redirectTo)
+    })
+  }
+
+  function handleResendVerification() {
+    if (!unverifiedEmail) return
+    setResendStatus(null)
+    startTransition(async () => {
+      const result = await resendVerificationEmail(unverifiedEmail)
+      setResendStatus(result?.error ? result.error : 'Verification email sent. Check your inbox and spam folder.')
     })
   }
 
@@ -145,7 +162,20 @@ function LoginContent() {
             {error && (
               <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
                 <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>{error}</span>
+                <div className="space-y-2">
+                  <span>{error}</span>
+                  {unverifiedEmail && (
+                    <button
+                      type="button"
+                      onClick={handleResendVerification}
+                      disabled={isPending}
+                      className="block text-sm font-semibold text-red-800 underline underline-offset-4 hover:text-red-900"
+                    >
+                      Resend verification email
+                    </button>
+                  )}
+                  {resendStatus && <p className="text-xs text-red-800">{resendStatus}</p>}
+                </div>
               </div>
             )}
 

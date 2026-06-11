@@ -9,7 +9,18 @@ import {
   signInSchema,
   magicLinkSchema,
   updateProfileSchema,
+  passwordResetSchema,
+  resendVerificationSchema,
 } from '@/lib/security/validation'
+import { headers } from 'next/headers'
+import {
+  AUTH_RATE_LIMIT,
+  EMAIL_FLOW_RATE_LIMIT,
+  checkIpRateLimit,
+  checkKeyRateLimit,
+  getClientIp,
+  rateLimitMessage,
+} from '@/lib/security/rate-limit'
 import { getAuthRedirectUrl, getSiteUrl, isSupabaseConfigured, isSupabaseAdminConfigured } from '@/lib/security/env'
 import { revalidatePath } from 'next/cache'
 import { normalizeDomain } from '@/lib/domain-options'
@@ -21,7 +32,18 @@ function safeRedirectPath(value: string | undefined | null) {
   return value
 }
 
+/** Client IP for rate-limit keying inside server actions. */
+async function getRequestIp(): Promise<string> {
+  return getClientIp(await headers())
+}
+
 export async function signUp(formData: FormData) {
+  // Rate limit account creation per IP (OWASP A07 — mass registration / abuse)
+  const signUpRate = checkIpRateLimit(`signup:${await getRequestIp()}`, AUTH_RATE_LIMIT)
+  if (!signUpRate.allowed) {
+    return { error: rateLimitMessage(signUpRate) }
+  }
+
   // Validate and sanitize all inputs
   const parsed = parseFormData(signUpSchema, formData)
   if (!parsed.success) {
@@ -139,6 +161,12 @@ export async function signUp(formData: FormData) {
 }
 
 export async function signIn(formData: FormData) {
+  // Rate limit sign-in attempts per IP (OWASP A07 — credential brute force)
+  const signInRate = checkIpRateLimit(`signin:${await getRequestIp()}`, AUTH_RATE_LIMIT)
+  if (!signInRate.allowed) {
+    return { error: rateLimitMessage(signInRate) }
+  }
+
   // Validate and sanitize all inputs
   const parsed = parseFormData(signInSchema, formData)
   if (!parsed.success) {
@@ -181,9 +209,17 @@ export async function signIn(formData: FormData) {
   const role = profile?.role || data.user?.user_metadata?.role || 'employee'
   const approvalStatus = profile?.approval_status || 'approved'
 
-  if (role === 'employee' && !data.user.email_confirmed_at) {
+  // Email verification gate (OWASP A07): self-registered accounts (employees
+  // and trainers) must confirm their email before they can sign in. Staff
+  // accounts provisioned by admins are auto-confirmed at creation and are
+  // unaffected.
+  if ((role === 'employee' || role === 'trainer') && !data.user.email_confirmed_at) {
     await supabase.auth.signOut()
-    return { error: 'Please verify your email from the SkillTest_AI setup email before signing in.' }
+    return {
+      error: 'Please verify your email before signing in. Check your inbox for the SkillTest_AI verification email, or request a new one below.',
+      needsVerification: true,
+      email,
+    }
   }
 
   // Block trainer login if pending approval
@@ -221,6 +257,12 @@ export async function signInWithMagicLink(formData: FormData) {
   }
 
   const { email, redirect: redirectTo } = parsed.data
+
+  // Rate limit per IP and per target address (mail-bomb mitigation)
+  const ipRate = checkIpRateLimit(`magic:${await getRequestIp()}`, EMAIL_FLOW_RATE_LIMIT)
+  if (!ipRate.allowed) return { error: rateLimitMessage(ipRate) }
+  const emailRate = checkKeyRateLimit(`magic:${email}`, EMAIL_FLOW_RATE_LIMIT)
+  if (!emailRate.allowed) return { error: rateLimitMessage(emailRate) }
 
   const supabase = await createClient()
 
@@ -326,11 +368,24 @@ export async function updateProfile(formData: FormData) {
 }
 
 export async function resendVerificationEmail(email: string) {
+  // Validate the address before using it (injection / malformed input)
+  const parsed = resendVerificationSchema.safeParse({ email })
+  if (!parsed.success) {
+    return { error: 'Please enter a valid email address.' }
+  }
+  const normalizedEmail = parsed.data.email
+
+  // Rate limit per IP and per target address (mail-bomb mitigation)
+  const ipRate = checkIpRateLimit(`resend:${await getRequestIp()}`, EMAIL_FLOW_RATE_LIMIT)
+  if (!ipRate.allowed) return { error: rateLimitMessage(ipRate) }
+  const emailRate = checkKeyRateLimit(`resend:${normalizedEmail}`, EMAIL_FLOW_RATE_LIMIT)
+  if (!emailRate.allowed) return { error: rateLimitMessage(emailRate) }
+
   const supabase = await createClient()
 
   const { error } = await supabase.auth.resend({
     type: 'signup',
-    email,
+    email: normalizedEmail,
     options: {
       emailRedirectTo: getAuthRedirectUrl(),
     },
@@ -364,9 +419,19 @@ export async function syncProfileFromUserMetadata(userId: string, userMetadata: 
 }
 
 export async function sendPasswordReset(formData: FormData) {
-  const email = formData.get('email') as string;
-  if (!email) return { error: 'Email is required' };
-  const normalizedEmail = email.trim().toLowerCase()
+  // Schema-based validation: strict shape, max length, valid email format
+  const parsed = parseFormData(passwordResetSchema, formData)
+  if (!parsed.success) {
+    return { error: 'Please enter a valid email address.' }
+  }
+  const normalizedEmail = parsed.data.email
+
+  // Rate limit per IP and per target address (OWASP A07 — abuse of reset flow)
+  const ipRate = checkIpRateLimit(`pwreset:${await getRequestIp()}`, EMAIL_FLOW_RATE_LIMIT)
+  if (!ipRate.allowed) return { error: rateLimitMessage(ipRate) }
+  const emailRate = checkKeyRateLimit(`pwreset:${normalizedEmail}`, EMAIL_FLOW_RATE_LIMIT)
+  if (!emailRate.allowed) return { error: rateLimitMessage(emailRate) }
+
   const siteUrl = getSiteUrl().replace(/\/$/, '')
 
   if (!isSupabaseAdminConfigured()) {
@@ -374,7 +439,9 @@ export async function sendPasswordReset(formData: FormData) {
     const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
       redirectTo: `${siteUrl}/auth/update-password`,
     });
-    if (error) return { error: error.message };
+    if (error) console.warn('[auth] password reset (anon path) failed:', error.message)
+    // Anti-enumeration (OWASP A07): always report success so the response
+    // does not reveal whether the address has an account.
     return { success: true };
   }
 
@@ -387,8 +454,17 @@ export async function sendPasswordReset(formData: FormData) {
     },
   })
 
-  if (error || !data.properties?.action_link) {
-    return { error: error?.message || 'Could not generate password reset link.' }
+  if (error || !data?.properties?.action_link) {
+    // generateLink fails for unknown addresses (enumeration vector) and for
+    // transient admin-API issues. Fall back to Supabase's built-in reset
+    // email — it silently no-ops for unknown users — then report generic
+    // success either way so account existence is never disclosed.
+    console.warn('[auth] generateLink failed, using built-in reset email:', error?.message)
+    const supabase = await createClient()
+    await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+      redirectTo: `${siteUrl}/auth/update-password`,
+    }).catch(() => undefined)
+    return { success: true }
   }
 
   const { data: profile } = await adminClient
@@ -418,7 +494,15 @@ export async function sendPasswordReset(formData: FormData) {
       </div>`,
   })
 
-  if (!emailResult.success) return { error: emailResult.error || 'Could not send password reset email.' }
+  if (!emailResult.success) {
+    // Operational mail failure — retry through Supabase's built-in sender so
+    // the user still gets a reset email, then report generic success.
+    console.warn('[auth] custom reset email failed, using built-in reset email:', emailResult.error)
+    const supabase = await createClient()
+    await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+      redirectTo: `${siteUrl}/auth/update-password`,
+    }).catch(() => undefined)
+  }
   return { success: true };
 }
 

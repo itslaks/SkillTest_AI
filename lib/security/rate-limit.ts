@@ -1,8 +1,16 @@
 /**
- * In-memory rate limiter for Next.js middleware.
- * Supports both IP-based and user-based (via Supabase session cookie) limits.
+ * In-memory rate limiter (OWASP API4:2023 Unrestricted Resource Consumption,
+ * OWASP A07:2021 Identification and Authentication Failures).
+ * Supports IP-based, user-based, and arbitrary-key (e.g. per-email) limits.
  * Returns standards-compliant 429 responses with Retry-After header.
+ *
+ * State is per server instance: on serverless each instance enforces limits
+ * independently, which still throttles single-source brute force — the
+ * primary threat model. Swap the Map stores for Redis/Upstash if a strict
+ * global limit is ever needed; call sites stay unchanged.
  */
+
+import { NextResponse } from 'next/server'
 
 export interface RateLimitConfig {
   /** Maximum number of requests allowed within the window */
@@ -81,6 +89,25 @@ export function checkUserRateLimit(userId: string, config: RateLimitConfig): Rat
   return checkLimit(userStore, `user:${userId}`, config)
 }
 
+/** Generic keyed limit — e.g. per-email for password-reset mail bombing. */
+export function checkKeyRateLimit(key: string, config: RateLimitConfig): RateLimitResult {
+  return checkLimit(ipStore, `key:${key}`, config)
+}
+
+/**
+ * Extracts the client IP from proxy headers. On Vercel, x-forwarded-for is
+ * platform-set and its first entry is the real client address. Unidentifiable
+ * traffic shares the 'unknown' bucket rather than bypassing limits.
+ */
+export function getClientIp(headers: Headers): string {
+  const forwarded = headers.get('x-forwarded-for')
+  if (forwarded) {
+    const first = forwarded.split(',')[0]?.trim()
+    if (first) return first
+  }
+  return headers.get('x-real-ip')?.trim() || 'unknown'
+}
+
 // ─── Default thresholds ───────────────────────────────────────────────
 // These are sensible defaults; override per-route in middleware as needed.
 
@@ -90,10 +117,10 @@ export const PUBLIC_RATE_LIMIT: RateLimitConfig = {
   windowSeconds: 60, // 20 requests per minute
 }
 
-/** Authenticated API / server-action endpoints */
+/** Authenticated API / server-action endpoints (per user) */
 export const AUTHENTICATED_RATE_LIMIT: RateLimitConfig = {
-  maxRequests: 60,
-  windowSeconds: 60, // 60 requests per minute
+  maxRequests: 120,
+  windowSeconds: 60, // 120 requests per minute — headroom for export-heavy dashboards
 }
 
 /** Specifically tight limit for auth attempts (login, sign-up) */
@@ -102,23 +129,41 @@ export const AUTH_RATE_LIMIT: RateLimitConfig = {
   windowSeconds: 300, // 10 attempts per 5 minutes
 }
 
+/** Email-sending flows (password reset, verification resend, magic link), per target address */
+export const EMAIL_FLOW_RATE_LIMIT: RateLimitConfig = {
+  maxRequests: 3,
+  windowSeconds: 900, // 3 emails per address per 15 minutes (mail-bomb mitigation)
+}
+
+/** Human-readable message for graceful in-action (server action) rejections. */
+export function rateLimitMessage(result: RateLimitResult): string {
+  const retryAfterSeconds = Math.max(1, Math.ceil((result.resetAt - Date.now()) / 1000))
+  const minutes = Math.ceil(retryAfterSeconds / 60)
+  return `Too many attempts. Please try again in ${minutes <= 1 ? 'a minute' : `${minutes} minutes`}.`
+}
+
 /**
  * Utility: build a standard 429 JSON response with correct headers.
+ * Returns NextResponse so `instanceof NextResponse` guard checks in API
+ * routes treat it as a terminal response, not an auth success object.
  */
-export function rateLimitResponse(result: RateLimitResult): Response {
-  const retryAfterSeconds = Math.ceil((result.resetAt - Date.now()) / 1000)
+export function rateLimitResponse(result: RateLimitResult): NextResponse {
+  const retryAfterSeconds = Math.max(1, Math.ceil((result.resetAt - Date.now()) / 1000))
 
-  return new Response(
-    JSON.stringify({
+  return NextResponse.json(
+    {
       error: 'Too Many Requests',
       message: 'You have exceeded the rate limit. Please try again later.',
       retryAfter: retryAfterSeconds,
-    }),
+    },
     {
       status: 429,
       headers: {
-        'Content-Type': 'application/json',
         'Retry-After': String(retryAfterSeconds),
+        // IETF RateLimit header fields (draft) + legacy X- variants
+        'RateLimit-Limit': String(result.limit),
+        'RateLimit-Remaining': '0',
+        'RateLimit-Reset': String(retryAfterSeconds),
         'X-RateLimit-Limit': String(result.limit),
         'X-RateLimit-Remaining': '0',
         'X-RateLimit-Reset': String(Math.ceil(result.resetAt / 1000)),
