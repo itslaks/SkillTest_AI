@@ -237,19 +237,7 @@ export async function validateCameraFrameForProctoring(
       return { status: 'partial_face', message: 'Face position could not be verified. Sit centered and fully visible.', confidence: 0.55 }
     }
 
-    const width  = videoElement.videoWidth  || 1
-    const height = videoElement.videoHeight || 1
-    const faceArea = (box.width * box.height) / (width * height)
-    const marginX = width  * 0.04
-    const marginY = height * 0.04
-    const centeredEnough = (
-      box.x >= marginX && box.y >= marginY &&
-      (box.x + box.width)  <= width  - marginX &&
-      (box.y + box.height) <= height - marginY
-    )
-    const sizedEnough = faceArea >= 0.07 && faceArea <= 0.72
-
-    if (!centeredEnough || !sizedEnough) {
+    if (!isCenteredFace(box, videoElement.videoWidth, videoElement.videoHeight)) {
       return { status: 'partial_face', message: 'Your full face must be centered and clearly visible in the camera frame.', confidence: averageFaceScore(faces) }
     }
 
@@ -903,12 +891,63 @@ function inspectFramePixels(video: HTMLVideoElement, canvas: HTMLCanvasElement) 
 
 function faceBox(face: any): { x: number; y: number; width: number; height: number } | null {
   const box = face.box || face.boundingBox
-  if (!box) return null
-  const x      = Number(box.xMin ?? box.x ?? box.topLeft?.[0] ?? 0)
-  const y      = Number(box.yMin ?? box.y ?? box.topLeft?.[1] ?? 0)
-  const width  = Number(box.width  ?? ((box.xMax ?? box.bottomRight?.[0] ?? 0) - x))
-  const height = Number(box.height ?? ((box.yMax ?? box.bottomRight?.[1] ?? 0) - y))
+  if (!box) return faceBoxFromKeypoints(face?.keypoints)
+
+  const topLeft = readPoint(box.topLeft)
+  const bottomRight = readPoint(box.bottomRight)
+  const x = firstFinite(box.xMin, box.x, box.left, topLeft?.x)
+  const y = firstFinite(box.yMin, box.y, box.top, topLeft?.y)
+  if (x === null || y === null) return faceBoxFromKeypoints(face?.keypoints)
+
+  const xMax = firstFinite(box.xMax, box.right, bottomRight?.x)
+  const yMax = firstFinite(box.yMax, box.bottom, bottomRight?.y)
+  const width = firstFinite(box.width, xMax === null ? null : xMax - x)
+  const height = firstFinite(box.height, yMax === null ? null : yMax - y)
+  if (width === null || height === null) return faceBoxFromKeypoints(face?.keypoints)
   if (![x, y, width, height].every(Number.isFinite) || width <= 0 || height <= 0) return null
+  return { x, y, width, height }
+}
+
+function readPoint(point: unknown): { x: number; y: number } | null {
+  if (!point) return null
+  const value = Array.isArray(point) && Array.isArray(point[0]) ? point[0] : point
+  if (Array.isArray(value)) {
+    const x = Number(value[0])
+    const y = Number(value[1])
+    return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null
+  }
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    const x = Number(record.x ?? record[0])
+    const y = Number(record.y ?? record[1])
+    return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null
+  }
+  return null
+}
+
+function firstFinite(...values: Array<unknown>): number | null {
+  for (const value of values) {
+    if (value === null || value === undefined) continue
+    const numberValue = Number(value)
+    if (Number.isFinite(numberValue)) return numberValue
+  }
+  return null
+}
+
+function faceBoxFromKeypoints(keypoints: unknown): { x: number; y: number; width: number; height: number } | null {
+  if (!Array.isArray(keypoints) || keypoints.length === 0) return null
+  const points = keypoints
+    .map(readPoint)
+    .filter((point): point is { x: number; y: number } => Boolean(point))
+  if (points.length < 2) return null
+
+  const xs = points.map((point) => point.x)
+  const ys = points.map((point) => point.y)
+  const x = Math.min(...xs)
+  const y = Math.min(...ys)
+  const width = Math.max(...xs) - x
+  const height = Math.max(...ys) - y
+  if (width <= 0 || height <= 0) return null
   return { x, y, width, height }
 }
 
@@ -920,16 +959,26 @@ function isCenteredFace(
   const width = videoWidth || 1
   const height = videoHeight || 1
   const faceArea = (box.width * box.height) / (width * height)
-  const marginX = width * 0.04
-  const marginY = height * 0.04
+  const faceCenterX = box.x + box.width / 2
+  const faceCenterY = box.y + box.height / 2
+  const safelyInsideFrame = (
+    box.x >= 0 &&
+    box.y >= 0 &&
+    box.x + box.width <= width &&
+    box.y + box.height <= height
+  )
+  const centeredEnough = (
+    faceCenterX >= width * 0.18 &&
+    faceCenterX <= width * 0.82 &&
+    faceCenterY >= height * 0.12 &&
+    faceCenterY <= height * 0.88
+  )
 
   return (
-    box.x >= marginX &&
-    box.y >= marginY &&
-    box.x + box.width <= width - marginX &&
-    box.y + box.height <= height - marginY &&
-    faceArea >= 0.07 &&
-    faceArea <= 0.72
+    safelyInsideFrame &&
+    centeredEnough &&
+    faceArea >= 0.02 &&
+    faceArea <= 0.82
   )
 }
 

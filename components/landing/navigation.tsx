@@ -63,6 +63,7 @@ export function Navigation() {
           {/* Logo */}
           <a href="#" className="group flex min-w-0 flex-1 items-center gap-2">
             <BrandLogo
+              tone="light"
               className={`transition-all duration-500 ${isScrolled ? "w-36" : "w-44"}`}
               imageClassName="aspect-[1100/360]"
             />
