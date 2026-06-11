@@ -24,10 +24,15 @@ export async function POST(request: NextRequest) {
         const result = await mammoth.extractRawText({ buffer })
         extractedText = result.value
       } else if (fileName.endsWith('.pdf')) {
-        const pdfParseModule = await import('pdf-parse')
-        const parser = (pdfParseModule as any).default ?? pdfParseModule
-        const pdfData = await parser(buffer)
-        extractedText = pdfData.text
+        // pdf-parse v2 is class-based: new PDFParse({ data }) + getText()
+        const { PDFParse } = await import('pdf-parse')
+        const parser = new PDFParse({ data: buffer })
+        try {
+          const pdfData = await parser.getText()
+          extractedText = pdfData.text
+        } finally {
+          await parser.destroy().catch(() => undefined)
+        }
       } else if (fileName.endsWith('.txt')) {
         extractedText = buffer.toString('utf-8')
       } else if (fileName.endsWith('.json')) {

@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { requireManager } from '@/lib/rbac'
+import { requireManagerForApi } from '@/lib/rbac'
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireManager()
+    const auth = await requireManagerForApi()
+    if (auth instanceof NextResponse) return auth
     const { id: employeeId } = await params
     const body = await request.json()
 
@@ -69,7 +70,8 @@ export async function DELETE(
 ) {
   try {
     // Verify manager authentication
-    await requireManager()
+    const auth = await requireManagerForApi()
+    if (auth instanceof NextResponse) return auth
     const { id: employeeId } = await params
 
     if (!employeeId) {
