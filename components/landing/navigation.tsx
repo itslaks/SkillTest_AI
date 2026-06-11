@@ -60,13 +60,20 @@ export function Navigation() {
             isScrolled ? "h-14" : "h-20"
           }`}
         >
-          {/* Logo */}
-          <a href="#" className="group flex min-w-0 flex-1 items-center gap-2">
+          {/* Logo — mark image + HTML wordmark so the text stays readable on any background */}
+          <a href="#" className="group flex min-w-0 flex-1 items-center gap-2.5">
             <BrandLogo
-              tone={isScrolled || isMobileMenuOpen ? "dark" : "light"}
-              className={`transition-all duration-500 ${isScrolled ? "w-36" : "w-44"}`}
-              imageClassName="aspect-[1100/360]"
+              variant="mark"
+              tone="light"
+              className={`transition-all duration-500 ${isScrolled ? "w-9" : "w-11"}`}
             />
+            <span
+              className={`whitespace-nowrap font-bold tracking-tight text-zinc-900 transition-all duration-500 ${
+                isScrolled ? "text-lg" : "text-xl"
+              }`}
+            >
+              SkillTest<span className="bg-gradient-to-r from-blue-600 to-sky-400 bg-clip-text text-transparent">_AI</span>
+            </span>
           </a>
 
           {/* Desktop Navigation */}
