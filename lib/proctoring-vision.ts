@@ -127,6 +127,17 @@ const PHONE_SCORE_THRESHOLD  = 0.30
 const DEVICE_SCORE_THRESHOLD = 0.32   // was 0.40
 const BOOK_SCORE_THRESHOLD   = 0.32   // was 0.40
 
+// ── Pre-check face validation thresholds ─────────────────────────────────────
+// These apply only during the pre-check (validateCameraFrameForProctoring),
+// not during live quiz monitoring.
+const PRECHECK_MIN_CONFIDENCE = 0.45   // accept face if score ≥ 0.45
+const PRECHECK_MIN_AREA_RATIO = 0.03   // face box must cover ≥ 3% of frame
+const PRECHECK_EDGE_MARGIN    = 0.08   // face box may overflow frame edge by up to 8%
+const PRECHECK_CENTER_X_MIN   = 0.20   // face center must be within 20%–80% of width
+const PRECHECK_CENTER_X_MAX   = 0.80
+const PRECHECK_CENTER_Y_MIN   = 0.15   // face center must be within 15%–85% of height
+const PRECHECK_CENTER_Y_MAX   = 0.85
+
 // ── Consensus: N consecutive frames required before emitting ─────────────────
 const CONSENSUS: Record<string, number> = {
   multiple_faces:    1,
@@ -147,6 +158,7 @@ const DEVICE_LABELS = new Set(['laptop', 'tablet', 'monitor', 'tv', 'remote', 'k
 const ACCESSORY_LABELS = new Set(['headphones', 'earbuds', 'smartwatch', 'calculator'])
 
 let modelPromise: Promise<ProctoringModelLoadResult> | null = null
+let modelLoadFailed = false
 const states = new WeakMap<HTMLVideoElement, VisionState>()
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -225,27 +237,98 @@ export async function validateCameraFrameForProctoring(
 
   try {
     const faces = await models.models.faceDetector.estimateFaces(videoElement, { flipHorizontal: false })
+    const vw = videoElement.videoWidth
+    const vh = videoElement.videoHeight
+
+    debugPrecheckLog('faces detected', { count: faces.length, videoWidth: vw, videoHeight: vh })
+
     if (!faces.length) {
-      return { status: 'no_face', message: 'No face is visible. Sit centered in front of the camera before starting.', confidence: 0.95 }
+      return { status: 'no_face', message: 'No face detected. Keep your face visible in the camera.', confidence: 0.95 }
     }
     if (faces.length > 1) {
       return { status: 'multiple_faces', message: 'Only one person may be visible during the camera test.', confidence: averageFaceScore(faces) }
     }
 
-    const box = faceBox(faces[0])
+    const face = faces[0]
+    const confidence = Number(face.score ?? face.box?.score ?? 0.8)
+
+    debugPrecheckLog('single face', { confidence })
+
+    if (confidence < PRECHECK_MIN_CONFIDENCE) {
+      debugPrecheckLog('rejected: low confidence', { confidence, threshold: PRECHECK_MIN_CONFIDENCE })
+      return {
+        status: 'partial_face',
+        message: 'Face detected with low confidence. Improve lighting or move closer to the camera.',
+        confidence,
+      }
+    }
+
+    const box = faceBox(face)
     if (!box) {
-      return { status: 'partial_face', message: 'Face position could not be verified. Sit centered and fully visible.', confidence: 0.55 }
+      // Face detected and confidence is acceptable, but box parse failed — accept it.
+      debugPrecheckLog('no bounding box parsed; accepting on confidence', { confidence })
+      return { status: 'visible', message: 'Face verified. Camera proctoring is ready.', confidence }
     }
 
-    if (!isCenteredFace(box, videoElement.videoWidth, videoElement.videoHeight)) {
-      return { status: 'partial_face', message: 'Your full face must be centered and clearly visible in the camera frame.', confidence: averageFaceScore(faces) }
+    const faceArea = (box.width * box.height) / Math.max(1, vw * vh)
+    const faceCenterX = box.x + box.width / 2
+    const faceCenterY = box.y + box.height / 2
+
+    debugPrecheckLog('face box', {
+      x: box.x, y: box.y, width: box.width, height: box.height,
+      faceAreaRatio: faceArea.toFixed(4),
+      faceCenterXRatio: (faceCenterX / vw).toFixed(3),
+      faceCenterYRatio: (faceCenterY / vh).toFixed(3),
+    })
+
+    const positionResult = checkPrecheckPosition(box, vw, vh)
+    if (!positionResult.ok) {
+      debugPrecheckLog('rejected: position', { reason: positionResult.reason })
+      return { status: 'partial_face', message: positionResult.reason, confidence }
     }
 
-    return { status: 'visible', message: 'Face verified. Camera proctoring is ready.', confidence: averageFaceScore(faces) }
+    return { status: 'visible', message: 'Face verified. Camera proctoring is ready.', confidence }
   } catch (error) {
     console.warn('[proctoring-vision] camera visibility check failed:', error)
     return { status: 'model_error', message: 'AI proctoring model failed to load. Please refresh or contact admin.', confidence: 0 }
   }
+}
+
+function debugPrecheckLog(label: string, data?: Record<string, unknown>) {
+  if (process.env.NODE_ENV !== 'development') return
+  if (data) console.log(`[proctoring-precheck] ${label}`, data)
+  else console.log(`[proctoring-precheck] ${label}`)
+}
+
+function checkPrecheckPosition(
+  box: { x: number; y: number; width: number; height: number },
+  vw: number,
+  vh: number,
+): { ok: true } | { ok: false; reason: string } {
+  const faceArea = (box.width * box.height) / Math.max(1, vw * vh)
+  if (faceArea < PRECHECK_MIN_AREA_RATIO) {
+    return { ok: false, reason: 'Face detected but too small. Move closer to the camera.' }
+  }
+
+  const edgeX = vw * PRECHECK_EDGE_MARGIN
+  const edgeY = vh * PRECHECK_EDGE_MARGIN
+  if (
+    box.x < -edgeX ||
+    box.y < -edgeY ||
+    box.x + box.width > vw + edgeX ||
+    box.y + box.height > vh + edgeY
+  ) {
+    return { ok: false, reason: 'Face is partially outside the camera frame. Move back slightly.' }
+  }
+
+  const cx = box.x + box.width / 2
+  const cy = box.y + box.height / 2
+  if (cx < vw * PRECHECK_CENTER_X_MIN) return { ok: false, reason: 'Face detected, but please move slightly to the right.' }
+  if (cx > vw * PRECHECK_CENTER_X_MAX) return { ok: false, reason: 'Face detected, but please move slightly to the left.' }
+  if (cy < vh * PRECHECK_CENTER_Y_MIN) return { ok: false, reason: 'Face detected, but please move slightly down.' }
+  if (cy > vh * PRECHECK_CENTER_Y_MAX) return { ok: false, reason: 'Face detected, but please move slightly up.' }
+
+  return { ok: true }
 }
 
 // ── DOM-based Proctoring ──────────────────────────────────────────────────────
@@ -796,6 +879,7 @@ export async function loadProctoringModels(): Promise<ProctoringModelLoadResult>
       return { ok: true, models: { faceDetector, landmarkDetector, objectDetector } }
     } catch (error) {
       console.error('[proctoring-vision] model load failed:', error)
+      modelLoadFailed = true
       return {
         ok: false,
         error: 'AI proctoring model failed to load. Please refresh or contact admin.',
@@ -809,6 +893,11 @@ export async function loadProctoringModels(): Promise<ProctoringModelLoadResult>
 
 export function resetProctoringModelCache() {
   modelPromise = null
+  modelLoadFailed = false
+}
+
+export function isProctoringModelLoadFailed(): boolean {
+  return modelLoadFailed
 }
 
 async function prepareTensorflowBackend(tf: any): Promise<string | null> {
@@ -958,28 +1047,9 @@ function isCenteredFace(
 ) {
   const width = videoWidth || 1
   const height = videoHeight || 1
+  const result = checkPrecheckPosition(box, width, height)
   const faceArea = (box.width * box.height) / (width * height)
-  const faceCenterX = box.x + box.width / 2
-  const faceCenterY = box.y + box.height / 2
-  const safelyInsideFrame = (
-    box.x >= 0 &&
-    box.y >= 0 &&
-    box.x + box.width <= width &&
-    box.y + box.height <= height
-  )
-  const centeredEnough = (
-    faceCenterX >= width * 0.18 &&
-    faceCenterX <= width * 0.82 &&
-    faceCenterY >= height * 0.12 &&
-    faceCenterY <= height * 0.88
-  )
-
-  return (
-    safelyInsideFrame &&
-    centeredEnough &&
-    faceArea >= 0.02 &&
-    faceArea <= 0.82
-  )
+  return result.ok && faceArea <= 0.85
 }
 
 function namedPoint(

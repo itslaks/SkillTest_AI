@@ -839,7 +839,11 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
 
     try {
       const vision = await import('@/lib/proctoring-vision')
-      vision.resetProctoringModelCache()
+      // Only reset the model cache if the previous load attempt failed.
+      // Resetting a successfully loaded model forces an expensive reload.
+      if (vision.isProctoringModelLoadFailed()) {
+        vision.resetProctoringModelCache()
+      }
     } catch (error) {
       console.warn('[proctoring] model retry reset failed:', error)
     }
