@@ -12,7 +12,7 @@ import { ViolationToast, type ViolationToastItem } from '@/components/employee/V
 import { startQuizAttempt, submitQuizAttempt } from '@/lib/actions/employee'
 import { shiftDifficulty } from '@/lib/insights'
 import type { DifficultyLevel, ProctoringEvent, ProctoringEventType, ProctoringSubmission, SubmittedQuizAnswer } from '@/lib/types/database'
-import type { CameraVisibilityCheck, ReferenceFaceCapture } from '@/lib/proctoring-vision'
+import type { BaselineCaptureResult, CameraVisibilityCheck, ReferenceFaceCapture } from '@/lib/proctoring-vision'
 import {
   calculateProctoringRisk,
   getProctoringEventRisk,
@@ -203,6 +203,10 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
   const [recentViolations, setRecentViolations] = useState<ProctoringEvent[]>([])
   const [multipleFacesAlertAt, setMultipleFacesAlertAt] = useState<number | null>(null)
   const [referencePhotoUrl, setReferencePhotoUrl] = useState<string | null>(null)
+  const [baselineDebug, setBaselineDebug] = useState<{
+    lastResult: BaselineCaptureResult | null
+    attemptedAt: number | null
+  }>({ lastResult: null, attemptedAt: null })
 
   useEffect(() => {
     if (!multipleFacesAlertAt) return
@@ -1003,15 +1007,36 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
     const baselineCanvas = canvasRef.current || hiddenCanvasRef.current
     if (videoRef.current && baselineCanvas) {
       try {
-        const { captureReferenceFace } = await import('@/lib/proctoring-vision')
-        baselineCapture = await captureReferenceFace(videoRef.current, baselineCanvas)
+        const { captureReferenceFaceWithResult } = await import('@/lib/proctoring-vision')
+        const captureResult = await captureReferenceFaceWithResult(videoRef.current, baselineCanvas)
+        setBaselineDebug({ lastResult: captureResult, attemptedAt: Date.now() })
+        if (captureResult.ok) {
+          baselineCapture = captureResult.capture
+        } else {
+          if (document.fullscreenElement) await document.exitFullscreen().catch(() => undefined)
+          const friendlyMessages: Record<string, string> = {
+            video_not_ready: 'Camera is not ready yet. Wait a moment and retry.',
+            model_load_failed: 'AI proctoring model could not be loaded. Refresh and retry.',
+            frame_covered: 'Camera appears covered or too dark. Remove the cover and retry.',
+            no_face_detected: 'No face detected. Keep your face visible in the camera.',
+            multiple_faces_detected: 'Multiple faces detected. Only one person may be present.',
+            low_confidence: 'Face detected with low confidence. Improve lighting or move closer.',
+            face_not_centered: captureResult.detail,
+            signature_build_failed: 'Face detected but identity signature could not be generated. Retry.',
+          }
+          setStartError(friendlyMessages[captureResult.reason] ?? captureResult.detail)
+          return
+        }
       } catch (err) {
-        console.warn('[proctoring] reference face capture failed:', err)
+        console.warn('[proctoring] reference face capture threw unexpectedly:', err)
+        if (document.fullscreenElement) await document.exitFullscreen().catch(() => undefined)
+        setStartError('Unexpected error during face baseline capture. Retry.')
+        return
       }
     }
     if (!baselineCapture) {
       if (document.fullscreenElement) await document.exitFullscreen().catch(() => undefined)
-      setStartError('Unable to capture a reliable baseline face. Keep exactly one centered face visible in good lighting, then retry.')
+      setStartError('Baseline capture could not start — camera canvas is missing. Retry.')
       return
     }
     const verifiedBaselineCapture = baselineCapture
@@ -1569,6 +1594,9 @@ export function QuizPlayer({ quiz }: QuizPlayerProps) {
                       <ReadinessLine label="Fullscreen readiness" ready={fullscreenReady} detail={fullscreenReady ? 'Requested when Start Quiz is clicked' : 'Fullscreen unsupported'} />
                     </div>
                     {showPermissionDebug && <PermissionDebugPanel debug={permissionDebug} />}
+                    {showPermissionDebug && baselineDebug.lastResult && (
+                      <BaselineDebugPanel result={baselineDebug.lastResult} attemptedAt={baselineDebug.attemptedAt} />
+                    )}
                   </div>
                 </div>
               )}
@@ -2270,6 +2298,39 @@ function PermissionDebugPanel({ debug, dark = true }: { debug: PermissionDebugSt
           <div key={label} className="grid gap-1 sm:grid-cols-[180px_1fr]">
             <dt className={dark ? 'text-zinc-500' : 'text-zinc-500'}>{label}</dt>
             <dd className="break-words font-mono">{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  )
+}
+
+function BaselineDebugPanel({ result, attemptedAt }: { result: BaselineCaptureResult; attemptedAt: number | null }) {
+  const rows: [string, string][] = result.ok
+    ? [
+        ['status', 'SUCCESS'],
+        ['face confidence', result.capture.faceConfidence.toFixed(3)],
+        ['embedding generated', String(result.capture.faceSignature.length > 0)],
+        ['embedding length', String(result.capture.faceSignature.length)],
+        ['face match enabled', String(result.capture.faceSignature.length > 0)],
+        ['signature version', result.capture.metadata.signatureVersion],
+        ['baseline stored', 'pending (saved on quiz start)'],
+        ['attempted at', attemptedAt ? new Date(attemptedAt).toLocaleTimeString() : 'unknown'],
+      ]
+    : [
+        ['status', `FAILED — ${result.reason}`],
+        ['failure detail', result.detail],
+        ['attempted at', attemptedAt ? new Date(attemptedAt).toLocaleTimeString() : 'unknown'],
+      ]
+
+  return (
+    <div className="rounded-2xl border border-amber-400/30 bg-amber-900/20 p-4 text-xs text-zinc-300">
+      <p className="mb-3 font-semibold text-amber-300">Baseline capture debug</p>
+      <dl className="grid gap-2">
+        {rows.map(([label, value]) => (
+          <div key={label} className="grid gap-1 sm:grid-cols-[200px_1fr]">
+            <dt className="text-zinc-500">{label}</dt>
+            <dd className={`break-words font-mono ${result.ok ? 'text-emerald-300' : 'text-red-300'}`}>{value}</dd>
           </div>
         ))}
       </dl>

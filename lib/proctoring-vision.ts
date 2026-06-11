@@ -525,8 +525,9 @@ async function inspectFrame(config: VisionProctoringConfig, state: VisionState, 
     const landmarkFaces = await models.landmarkDetector.estimateFaces(video, { flipHorizontal: false })
     inspectGazeFaces(config, state, landmarkFaces, now)
 
-    // Every 5 s: compare current face geometry against the reference snapshot
-    if (state.referenceFaceSignature && now - state.lastFaceMatchCheckAt >= FACE_MATCH_INTERVAL_MS) {
+    // Every 5 s: compare current face geometry against the reference snapshot.
+    // Skip when signature is empty — FaceMesh fallback was used at baseline.
+    if (state.referenceFaceSignature && state.referenceFaceSignature.length > 0 && now - state.lastFaceMatchCheckAt >= FACE_MATCH_INTERVAL_MS) {
       state.lastFaceMatchCheckAt = now
       const lmFace = landmarkFaces?.[0]
       if (lmFace) {
@@ -755,59 +756,176 @@ function emitViolation(
 
 // ── Reference face capture (called once before the quiz starts) ──────────────
 
+/** Reason string returned when baseline capture cannot proceed. */
+export type BaselineCaptureFailReason =
+  | 'video_not_ready'
+  | 'model_load_failed'
+  | 'frame_covered'
+  | 'no_face_detected'
+  | 'multiple_faces_detected'
+  | 'low_confidence'
+  | 'face_not_centered'
+  | 'signature_build_failed'
+
+/** Extended result so the caller can show a specific error instead of a generic one. */
+export type BaselineCaptureResult =
+  | { ok: true; capture: ReferenceFaceCapture }
+  | { ok: false; reason: BaselineCaptureFailReason; detail: string }
+
 /**
  * Captures the employee's reference face before the quiz begins.
- * The returned `faceSignature` is passed to `startVisionProctoring` and used
- * every 5 seconds to detect if a different person is in front of the camera.
+ * The returned `faceSignature` is used every 5 s to detect face substitution.
+ * Returns a detailed result object — never throws.
+ *
+ * Resilience notes:
+ * - If FaceMesh landmark detection returns 0 faces (common with glasses /
+ *   office lighting), falls back to a simple face-detector keypoint signature.
+ *   The live face-match check is automatically skipped when the fallback
+ *   signature is used (empty array sentinel).
+ * - If FaceMesh returns fewer than 100 keypoints, uses whatever are available
+ *   (buildFaceSignature already pads missing slots with 0,0).
  */
-export async function captureReferenceFace(
+export async function captureReferenceFaceWithResult(
   videoElement: HTMLVideoElement,
   canvasElement: HTMLCanvasElement,
-): Promise<ReferenceFaceCapture | null> {
-  if (typeof window === 'undefined') return null
-  if (videoElement.readyState < 2 || videoElement.videoWidth === 0 || videoElement.videoHeight === 0) return null
+): Promise<BaselineCaptureResult> {
+  const tag = '[proctoring-baseline]'
+
+  if (typeof window === 'undefined' || videoElement.readyState < 2 || videoElement.videoWidth === 0 || videoElement.videoHeight === 0) {
+    console.warn(tag, 'video not ready', { readyState: videoElement.readyState, w: videoElement.videoWidth, h: videoElement.videoHeight })
+    return { ok: false, reason: 'video_not_ready', detail: 'Camera frame is not live yet.' }
+  }
+
+  console.log(tag, 'starting baseline capture', { w: videoElement.videoWidth, h: videoElement.videoHeight })
 
   try {
+    // ── Step 1: models ─────────────────────────────────────────────────────
+    console.log(tag, 'loading proctoring models...')
     const result = await loadProctoringModels()
-    if (!result.ok) return null
+    if (!result.ok) {
+      console.error(tag, 'model load failed:', result.error)
+      return { ok: false, reason: 'model_load_failed', detail: result.error }
+    }
     const models = result.models
+    console.log(tag, 'models ready')
 
+    // ── Step 2: frame brightness check ────────────────────────────────────
     const frame = inspectFramePixels(videoElement, canvasElement)
-    if (frame.isCovered) return null
+    if (frame.isCovered) {
+      console.warn(tag, 'frame appears covered or too dark', frame)
+      return { ok: false, reason: 'frame_covered', detail: 'Camera appears covered or too dark.' }
+    }
 
+    // ── Step 3: face detection ────────────────────────────────────────────
+    console.log(tag, 'running face detector...')
     const detectedFaces = await models.faceDetector.estimateFaces(videoElement, { flipHorizontal: false }) as any[]
-    if (detectedFaces.length !== 1) return null
+    const faceCount = detectedFaces.length
+    const confidence = faceCount > 0 ? Number(detectedFaces[0].score ?? detectedFaces[0].box?.score ?? 0.8) : 0
+    console.log(tag, 'face detector result', { faceCount, confidence })
+
+    if (faceCount === 0) {
+      return { ok: false, reason: 'no_face_detected', detail: 'No face detected. Keep your face visible in the camera.' }
+    }
+    if (faceCount > 1) {
+      return { ok: false, reason: 'multiple_faces_detected', detail: `Multiple faces detected (${faceCount}). Only one person may be present.` }
+    }
+    if (confidence < PRECHECK_MIN_CONFIDENCE) {
+      console.warn(tag, 'face confidence too low', { confidence, threshold: PRECHECK_MIN_CONFIDENCE })
+      return { ok: false, reason: 'low_confidence', detail: `Face detected with low confidence (${confidence.toFixed(2)}). Improve lighting or move closer.` }
+    }
+
+    // ── Step 4: centering check (relaxed — same rules as pre-check) ───────
     const detectedBox = faceBox(detectedFaces[0])
-    if (!detectedBox || !isCenteredFace(detectedBox, videoElement.videoWidth, videoElement.videoHeight)) return null
+    console.log(tag, 'face detector box', detectedBox)
+    if (detectedBox) {
+      const posResult = checkPrecheckPosition(detectedBox, videoElement.videoWidth, videoElement.videoHeight)
+      if (!posResult.ok) {
+        console.warn(tag, 'face not centered (face detector box)', posResult.reason)
+        return { ok: false, reason: 'face_not_centered', detail: posResult.reason }
+      }
+    }
+    // If box is null we still proceed — face was detected with good confidence.
 
-    const faces = await models.landmarkDetector.estimateFaces(videoElement, { flipHorizontal: false })
-    if (faces.length !== 1) return null
-    const face = faces[0]
+    // ── Step 5: FaceMesh landmark detection (best-effort) ─────────────────
+    console.log(tag, 'running FaceMesh landmark detector...')
+    let faceSignature: number[] = []
+    let signatureVersion = 'face-match-disabled-v1'
 
-    const keypoints: Array<{ x: number; y: number }> = face.keypoints ?? []
-    const box = faceBox(face)
-    if (!box || keypoints.length < 100 || !isCenteredFace(box, videoElement.videoWidth, videoElement.videoHeight)) return null
+    try {
+      const landmarkFaces = await models.landmarkDetector.estimateFaces(videoElement, { flipHorizontal: false }) as any[]
+      const lmCount = landmarkFaces.length
+      console.log(tag, 'FaceMesh landmark result', { lmCount })
 
-    const faceSignature = buildFaceSignature(keypoints, box)
-    const dataUrl       = captureFrame(videoElement, canvasElement)
-    return {
+      if (lmCount >= 1) {
+        const lmFace = landmarkFaces[0]
+        const keypoints: Array<{ x: number; y: number }> = lmFace.keypoints ?? []
+        const lmBox = faceBox(lmFace)
+        console.log(tag, 'FaceMesh keypoints', { count: keypoints.length, boxParsed: Boolean(lmBox) })
+
+        if (keypoints.length >= 6) {
+          // Use whatever box is available; buildFaceSignature pads missing indices with (0,0)
+          const sigBox = lmBox ?? detectedBox ?? {
+            x: 0, y: 0, width: videoElement.videoWidth, height: videoElement.videoHeight,
+          }
+          faceSignature = buildFaceSignature(keypoints, sigBox)
+          signatureVersion = keypoints.length >= 100 ? 'facemesh-geometry-v1' : 'facemesh-partial-v1'
+          console.log(tag, 'FaceMesh signature built', { length: faceSignature.length, signatureVersion })
+        } else {
+          console.warn(tag, 'FaceMesh returned too few keypoints — face match disabled for this session')
+        }
+      } else {
+        console.warn(tag, 'FaceMesh returned 0 faces — face match disabled for this session')
+      }
+    } catch (lmError) {
+      console.warn(tag, 'FaceMesh landmark detection threw — face match disabled', lmError)
+    }
+
+    // faceSignature = [] → live face-match check will be skipped (safe fallback)
+    console.log(tag, 'embedding generation complete', {
+      embeddingLength: faceSignature.length,
+      faceMatchEnabled: faceSignature.length > 0,
+      signatureVersion,
+    })
+
+    // ── Step 6: capture frame ─────────────────────────────────────────────
+    console.log(tag, 'capturing baseline image...')
+    const dataUrl = captureFrame(videoElement, canvasElement)
+    console.log(tag, 'baseline image captured', { dataUrlLength: dataUrl.length })
+
+    const capture: ReferenceFaceCapture = {
       dataUrl,
       capturedAt: Date.now(),
       faceSignature,
-      faceConfidence: averageFaceScore(detectedFaces),
+      faceConfidence: confidence,
       metadata: {
         faceCount: 1,
         centered: true,
         lighting: 'acceptable',
-        signatureVersion: 'facemesh-geometry-v1',
+        signatureVersion,
         videoWidth: videoElement.videoWidth,
         videoHeight: videoElement.videoHeight,
       },
     }
+    console.log(tag, 'baseline capture SUCCESS', { signatureVersion, faceConfidence: confidence })
+    return { ok: true, capture }
+
   } catch (error) {
-    console.warn('[proctoring-vision] reference face capture failed:', error)
-    return null
+    console.error(tag, 'unexpected error during baseline capture:', error)
+    return {
+      ok: false,
+      reason: 'signature_build_failed',
+      detail: error instanceof Error ? error.message : 'Unexpected error during face baseline capture.',
+    }
   }
+}
+
+/** Legacy wrapper — returns null on failure (used internally for now). */
+export async function captureReferenceFace(
+  videoElement: HTMLVideoElement,
+  canvasElement: HTMLCanvasElement,
+): Promise<ReferenceFaceCapture | null> {
+  const result = await captureReferenceFaceWithResult(videoElement, canvasElement)
+  return result.ok ? result.capture : null
 }
 
 function buildFaceSignature(
