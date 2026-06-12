@@ -380,4 +380,33 @@ Private. All rights reserved.
 
 ---
 
+## Production Auth And Email Checklist
+
+Set these environment variables in production:
+
+```bash
+NEXT_PUBLIC_APP_URL=https://your-production-domain.com
+ADMIN_ALERT_EMAIL=skilltestai01@gmail.com
+RESEND_API_KEY=re_... # or configure SMTP_HOST, SMTP_USER, SMTP_PASS
+EMAIL_FROM="SkillTest_AI <noreply@yourdomain.com>"
+```
+
+Supabase dashboard requirements:
+
+- Auth -> Providers -> Email: Confirm Email must be ON.
+- Auth -> URL Configuration -> Site URL must match `NEXT_PUBLIC_APP_URL`.
+- Auth -> URL Configuration -> Redirect URLs must include `https://your-production-domain.com/auth/callback`.
+- Auth -> URL Configuration -> Redirect URLs must include `https://your-production-domain.com/auth/update-password`.
+- Supabase email provider, SMTP, or Resend must be configured so signup verification and password reset emails are actually delivered.
+- Production must not use localhost, Vercel preview URLs, or `NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL` for auth emails.
+
+Auth behavior:
+
+- Employee/trainer signup creates an unverified account and sends a verification email.
+- Unverified employees/trainers cannot sign in or open protected routes by direct URL.
+- Login shows a resend verification option when an unverified user is blocked.
+- Proctoring, flag, and security alert emails are sent to `ADMIN_ALERT_EMAIL`; for this deployment that is `skilltestai01@gmail.com`.
+
+---
+
 **Built for training teams that need execution, evidence, and insight in one place.**

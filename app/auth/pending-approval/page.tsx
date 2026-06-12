@@ -3,8 +3,13 @@ import { Button } from '@/components/ui/button'
 import { Clock, LogOut, CheckCircle2, Mail } from 'lucide-react'
 import { signOut } from '@/lib/actions/auth'
 import { BrandLogo } from '@/components/brand/brand-logo'
+import { getAdminAlertEmail } from '@/lib/security/env'
+
+export const dynamic = 'force-dynamic'
 
 export default function PendingApprovalPage() {
+  const adminEmail = getAdminAlertEmail()
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-violet-950/30 via-background to-background p-4">
       <div className="w-full max-w-md">
@@ -62,8 +67,8 @@ export default function PendingApprovalPage() {
 
             <p className="text-xs text-center text-muted-foreground">
               Need help?{' '}
-              <a href="mailto:admin@hexaware.com" className="text-primary hover:underline font-medium">
-                Contact admin@hexaware.com
+              <a href={`mailto:${adminEmail}`} className="text-primary hover:underline font-medium">
+                Contact {adminEmail}
               </a>
             </p>
           </div>

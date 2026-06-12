@@ -25,12 +25,12 @@ UPDATE profiles
 -- 5. Ensure admin account has correct role and approval status
 UPDATE profiles
   SET role = 'admin', approval_status = 'approved'
-  WHERE email = 'admin@hexaware.com';
+  WHERE email = 'skilltestai01@gmail.com';
 
--- 6. Grant admin sample trainer (trainer@hexaware.com) approved status
+-- 6. Grant sample trainer approved status
 UPDATE profiles
   SET approval_status = 'approved'
-  WHERE email = 'trainer@hexaware.com' AND role = 'trainer';
+  WHERE email = 'trainer@skilltest.ai' AND role = 'trainer';
 
 -- Done
 SELECT 'Migration 025 complete' AS status;

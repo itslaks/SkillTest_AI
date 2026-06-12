@@ -1,4 +1,4 @@
-import { getSiteUrl } from '@/lib/security/env'
+import { getPasswordResetRedirectUrl, getSiteUrl } from '@/lib/security/env'
 import { buildEmployeeWelcomeEmail, sendEmail } from '@/lib/email'
 import type { Profile } from '@/lib/types/database'
 
@@ -179,7 +179,7 @@ export async function sendEmployeeSetupEmail(
   fullName?: string | null,
 ): Promise<{ success: boolean; error?: string }> {
   const siteUrl = getSiteUrl().replace(/\/$/, '')
-  const redirectTo = `${siteUrl}/auth/update-password`
+  const redirectTo = getPasswordResetRedirectUrl()
   const { data, error } = await supabase.auth.admin.generateLink({
     type: 'invite',
     email,

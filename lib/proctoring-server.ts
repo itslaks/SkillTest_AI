@@ -7,7 +7,7 @@ import {
   VIOLATION_SEVERITY,
 } from '@/lib/proctoring'
 import { sendEmail } from '@/lib/email'
-import { getSiteUrl } from '@/lib/security/env'
+import { getAdminAlertEmail, getSiteUrl } from '@/lib/security/env'
 
 export const PROCTORING_EVIDENCE_BUCKET = 'quiz-proctoring-evidence'
 const DUPLICATE_EVENT_COOLDOWN_MS = 12_000
@@ -391,7 +391,6 @@ async function notifyProctoringViolation(admin: any, session: ProctoringSessionR
     }
 
     const recipients = [...recipientIds]
-    if (recipients.length === 0) return
 
     const dashboardLink = `${getSiteUrl()}/manager/integrity`
     const employeeName = employee?.full_name || employee?.email || 'Employee'
@@ -426,23 +425,20 @@ async function notifyProctoringViolation(admin: any, session: ProctoringSessionR
       },
     }))
 
-    const { error: notificationError } = await admin.from('training_notifications').insert(notificationRows)
-    if (notificationError && /metadata/i.test(notificationError.message || '')) {
-      await admin.from('training_notifications').insert(notificationRows.map((row) => {
-        const compatibleRow = { ...row }
-        delete (compatibleRow as any).metadata
-        return compatibleRow
-      }))
-    } else if (notificationError) {
-      console.warn('Proctoring notification insert failed:', notificationError.message)
+    if (notificationRows.length > 0) {
+      const { error: notificationError } = await admin.from('training_notifications').insert(notificationRows)
+      if (notificationError && /metadata/i.test(notificationError.message || '')) {
+        await admin.from('training_notifications').insert(notificationRows.map((row) => {
+          const compatibleRow = { ...row }
+          delete (compatibleRow as any).metadata
+          return compatibleRow
+        }))
+      } else if (notificationError) {
+        console.warn('Proctoring notification insert failed:', notificationError.message)
+      }
     }
 
-    const { data: recipientProfiles } = await admin
-      .from('profiles')
-      .select('email, full_name')
-      .in('id', recipients)
-    const emailRecipients = (recipientProfiles || []).map((profile: any) => profile.email).filter(Boolean)
-    if (emailRecipients.length === 0) return
+    const emailRecipients = [getAdminAlertEmail()]
 
     const evidenceCopy = event.evidencePath ? '<p><strong>Evidence captured and stored</strong></p>' : ''
     const html = `

@@ -12,7 +12,7 @@ import {
 } from '@/lib/insights'
 import type { SubmitQuizInput, LeaderboardEntry, QuizAnswer, DifficultyLevel } from '@/lib/types/database'
 import { buildCandidateProctoringNoticeEmail, buildQuizCompletedEmail, buildQuizProctoringFlagEmail, sendEmail } from '@/lib/email'
-import { getSiteUrl } from '@/lib/security/env'
+import { getAdminAlertEmail, getSiteUrl } from '@/lib/security/env'
 import { calculateProctoringRisk, shouldAutoSubmitForIntegrity } from '@/lib/proctoring'
 import {
   buildProctoringSummary,
@@ -398,7 +398,7 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
 
     if (isProctoringFlagged) {
       try {
-        const recipients = await getProctoringAlertRecipients(adminClient, quiz)
+        const recipients = await getProctoringAlertRecipients()
         const [{ data: profile }] = await Promise.all([
           adminClient.from('profiles').select('full_name, email, employee_id').eq('id', user.id).maybeSingle(),
         ])
@@ -480,41 +480,8 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
   }
 }
 
-async function getProctoringAlertRecipients(adminClient: ReturnType<typeof createAdminClient>, quiz: any) {
-  const recipientIds = new Set<string>()
-  if (quiz.created_by) recipientIds.add(quiz.created_by)
-
-  const [{ data: admins }, { data: batchTrainers }] = await Promise.all([
-    adminClient
-      .from('profiles')
-      .select('id, email')
-      .in('role', ['admin', 'manager', 'training_coordinator'])
-      .not('email', 'is', null),
-    quiz.batch_id
-      ? adminClient
-          .from('training_batch_trainers')
-          .select('trainer_id')
-          .eq('batch_id', quiz.batch_id)
-      : Promise.resolve({ data: [] }),
-  ])
-
-  for (const admin of admins || []) {
-    if (admin.id) recipientIds.add(admin.id)
-  }
-  for (const trainer of batchTrainers || []) {
-    if (trainer.trainer_id) recipientIds.add(trainer.trainer_id)
-  }
-
-  const ids = Array.from(recipientIds)
-  if (ids.length === 0) return []
-
-  const { data: profiles } = await adminClient
-    .from('profiles')
-    .select('email')
-    .in('id', ids)
-    .not('email', 'is', null)
-
-  return Array.from(new Set((profiles || []).map((profile: any) => profile.email).filter(Boolean)))
+async function getProctoringAlertRecipients() {
+  return [getAdminAlertEmail()]
 }
 
 // ─── Get available quizzes for employees (only assigned ones) ─────────

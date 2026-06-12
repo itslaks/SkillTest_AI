@@ -21,7 +21,13 @@ import {
   getClientIp,
   rateLimitMessage,
 } from '@/lib/security/rate-limit'
-import { getAuthRedirectUrl, getSiteUrl, isSupabaseConfigured, isSupabaseAdminConfigured } from '@/lib/security/env'
+import {
+  getAdminLoginEmail,
+  getAuthRedirectUrl,
+  getPasswordResetRedirectUrl,
+  isSupabaseConfigured,
+  isSupabaseAdminConfigured,
+} from '@/lib/security/env'
 import { revalidatePath } from 'next/cache'
 import { normalizeDomain } from '@/lib/domain-options'
 import { sendEmployeeSetupEmail } from '@/lib/employee-onboarding'
@@ -114,11 +120,19 @@ export async function signUp(formData: FormData) {
     }
   }
 
+  let authRedirectUrl: string
+  try {
+    authRedirectUrl = getAuthRedirectUrl()
+  } catch (configError: any) {
+    console.error('[auth] invalid signup redirect configuration:', configError?.message)
+    return { error: 'Authentication email links are not configured correctly. Please contact admin.' }
+  }
+
   const { error, data: signUpData } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      emailRedirectTo: getAuthRedirectUrl(),
+      emailRedirectTo: authRedirectUrl,
       data: {
         full_name: fullName,
         employee_id: employeeId,
@@ -131,10 +145,30 @@ export async function signUp(formData: FormData) {
   })
 
   if (error) {
+    console.warn('[auth] signup failed:', error.message)
     return { error: error.message }
   }
 
-  // After sign up, update the profile with role and approval_status
+  const signUpUser = signUpData?.user as (NonNullable<typeof signUpData.user> & { identities?: unknown[] }) | null
+  if (!signUpUser) {
+    console.error('[auth] signup returned no user record')
+    return { error: 'Account creation failed. Please try again or contact admin.' }
+  }
+
+  if (Array.isArray(signUpUser.identities) && signUpUser.identities.length === 0) {
+    await supabase.auth.signOut()
+    return { error: 'This email is already registered. Please sign in, reset your password, or resend the verification email from the login page.' }
+  }
+
+  if ((role === 'employee' || role === 'trainer') && (signUpData.session || signUpUser.email_confirmed_at)) {
+    await supabase.auth.signOut()
+    console.error('[auth] signup produced a verified/session user before email confirmation; enable Supabase Confirm Email.')
+    return { error: 'Email verification is not enabled for signup. Please contact admin before continuing.' }
+  }
+
+  await supabase.auth.signOut()
+
+  // After sign up, update the profile with role and approval_status.
   if (signUpData?.user) {
     await adminClient
       .from('profiles')
@@ -177,7 +211,7 @@ export async function signIn(formData: FormData) {
 
   // Support shorthand for admin
   if (email.toLowerCase() === 'admin' || email.toLowerCase() === 'manager') {
-    email = 'admin@hexaware.com'
+    email = getAdminLoginEmail()
   }
 
   if (!isSupabaseConfigured() || !isSupabaseAdminConfigured()) {
@@ -216,7 +250,7 @@ export async function signIn(formData: FormData) {
   if ((role === 'employee' || role === 'trainer') && !data.user.email_confirmed_at) {
     await supabase.auth.signOut()
     return {
-      error: 'Please verify your email before signing in. Check your inbox for the SkillTest_AI verification email, or request a new one below.',
+      error: 'Please verify your email before logging in.',
       needsVerification: true,
       email,
     }
@@ -432,12 +466,18 @@ export async function sendPasswordReset(formData: FormData) {
   const emailRate = checkKeyRateLimit(`pwreset:${normalizedEmail}`, EMAIL_FLOW_RATE_LIMIT)
   if (!emailRate.allowed) return { error: rateLimitMessage(emailRate) }
 
-  const siteUrl = getSiteUrl().replace(/\/$/, '')
+  let resetRedirectUrl: string
+  try {
+    resetRedirectUrl = getPasswordResetRedirectUrl()
+  } catch (configError: any) {
+    console.error('[auth] invalid password reset redirect configuration:', configError?.message)
+    return { error: 'Password reset email links are not configured correctly. Please contact admin.' }
+  }
 
   if (!isSupabaseAdminConfigured()) {
     const supabase = await createClient();
     const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-      redirectTo: `${siteUrl}/auth/update-password`,
+      redirectTo: resetRedirectUrl,
     });
     if (error) console.warn('[auth] password reset (anon path) failed:', error.message)
     // Anti-enumeration (OWASP A07): always report success so the response
@@ -450,7 +490,7 @@ export async function sendPasswordReset(formData: FormData) {
     type: 'recovery',
     email: normalizedEmail,
     options: {
-      redirectTo: `${siteUrl}/auth/update-password`,
+      redirectTo: resetRedirectUrl,
     },
   })
 
@@ -462,7 +502,7 @@ export async function sendPasswordReset(formData: FormData) {
     console.warn('[auth] generateLink failed, using built-in reset email:', error?.message)
     const supabase = await createClient()
     await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-      redirectTo: `${siteUrl}/auth/update-password`,
+      redirectTo: resetRedirectUrl,
     }).catch(() => undefined)
     return { success: true }
   }
@@ -500,7 +540,7 @@ export async function sendPasswordReset(formData: FormData) {
     console.warn('[auth] custom reset email failed, using built-in reset email:', emailResult.error)
     const supabase = await createClient()
     await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-      redirectTo: `${siteUrl}/auth/update-password`,
+      redirectTo: resetRedirectUrl,
     }).catch(() => undefined)
   }
   return { success: true };

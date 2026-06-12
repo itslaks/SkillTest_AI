@@ -53,6 +53,15 @@ const PROTECTED_PREFIXES = ['/manager', '/employee', '/profile', '/profiles', '/
 const AUTH_ENTRY_PAGES = ['/auth/login', '/auth/sign-up']
 
 const STAFF_ROLES = new Set(['admin', 'manager', 'training_coordinator', 'trainer'])
+const EMAIL_VERIFIED_ROLES = new Set(['employee', 'trainer'])
+
+type ProxyUser = {
+  id: string
+  email?: string | null
+  email_confirmed_at?: string | null
+  user_metadata?: Record<string, unknown>
+  app_metadata?: Record<string, unknown>
+}
 
 function isProtectedPath(path: string): boolean {
   return PROTECTED_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))
@@ -65,6 +74,29 @@ function applyNoStoreHeaders(response: NextResponse): NextResponse {
   response.headers.set('Pragma', 'no-cache')
   response.headers.set('Expires', '0')
   return response
+}
+
+function getUserRole(user: ProxyUser): string {
+  return String(user.user_metadata?.role || user.app_metadata?.role || 'employee')
+}
+
+function requiresVerifiedEmail(user: ProxyUser): boolean {
+  return EMAIL_VERIFIED_ROLES.has(getUserRole(user)) && !user.email_confirmed_at
+}
+
+function clearSupabaseAuthCookies(response: NextResponse, request: NextRequest): NextResponse {
+  for (const cookie of request.cookies.getAll()) {
+    if (cookie.name.startsWith('sb-')) response.cookies.delete(cookie.name)
+  }
+  return response
+}
+
+function redirectUnverifiedUser(request: NextRequest, user: ProxyUser): NextResponse {
+  const loginUrl = new URL('/auth/login', request.url)
+  loginUrl.searchParams.set('verified', 'required')
+  loginUrl.searchParams.set('redirect', request.nextUrl.pathname)
+  if (user.email) loginUrl.searchParams.set('email', user.email)
+  return clearSupabaseAuthCookies(applyNoStoreHeaders(NextResponse.redirect(loginUrl)), request)
 }
 
 function supabaseConfigured(): boolean {
@@ -126,7 +158,7 @@ export async function proxy(request: NextRequest) {
     },
   )
 
-  let user: { id: string; user_metadata?: Record<string, unknown> } | null = null
+  let user: ProxyUser | null = null
   try {
     const { data } = await supabase.auth.getUser()
     user = data.user
@@ -142,13 +174,18 @@ export async function proxy(request: NextRequest) {
       loginUrl.searchParams.set('redirect', path)
       return applyNoStoreHeaders(NextResponse.redirect(loginUrl))
     }
+    if (requiresVerifiedEmail(user)) {
+      return redirectUnverifiedUser(request, user)
+    }
     return applyNoStoreHeaders(response)
   }
 
   // ── 3. Auth entry pages: bounce already-authenticated users ───────────────
   if (authEntryPage && user) {
-    const metadataRole = String(user.user_metadata?.role || '')
-    const home = STAFF_ROLES.has(metadataRole) ? '/manager' : '/employee'
+    if (requiresVerifiedEmail(user)) {
+      return clearSupabaseAuthCookies(applyNoStoreHeaders(response), request)
+    }
+    const home = STAFF_ROLES.has(getUserRole(user)) ? '/manager' : '/employee'
     return NextResponse.redirect(new URL(home, request.url))
   }
 

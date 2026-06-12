@@ -2,6 +2,23 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { getSupabaseUrl, getSupabaseAnonKey, isSupabaseConfigured } from '@/lib/security/env'
 
+const EMAIL_VERIFIED_ROLES = new Set(['employee', 'trainer'])
+
+function roleForUser(user: any) {
+  return String(user?.user_metadata?.role || user?.app_metadata?.role || 'employee')
+}
+
+function needsEmailVerification(user: any) {
+  return EMAIL_VERIFIED_ROLES.has(roleForUser(user)) && !user?.email_confirmed_at
+}
+
+function clearSupabaseAuthCookies(response: NextResponse, request: NextRequest) {
+  for (const cookie of request.cookies.getAll()) {
+    if (cookie.name.startsWith('sb-')) response.cookies.delete(cookie.name)
+  }
+  return response
+}
+
 export async function updateSession(request: NextRequest) {
   if (!isSupabaseConfigured()) {
     const pathname = request.nextUrl.pathname
@@ -76,10 +93,22 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  if (isProtectedRoute && user && needsEmailVerification(user)) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/auth/login'
+    url.searchParams.set('verified', 'required')
+    url.searchParams.set('redirect', pathname)
+    if (user.email) url.searchParams.set('email', user.email)
+    return clearSupabaseAuthCookies(NextResponse.redirect(url), request)
+  }
+
   // If user is logged in and tries to access auth pages, redirect based on role
   if (user && (pathname.startsWith('/auth/login') || pathname.startsWith('/auth/sign-up'))) {
+    if (needsEmailVerification(user)) {
+      return clearSupabaseAuthCookies(supabaseResponse, request)
+    }
     const url = request.nextUrl.clone()
-    const role = user.user_metadata?.role || user.app_metadata?.role || 'employee'
+    const role = roleForUser(user)
     url.pathname = role === 'manager' || role === 'admin' ? '/manager' : '/employee'
     return NextResponse.redirect(url)
   }

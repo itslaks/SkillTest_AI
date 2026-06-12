@@ -161,7 +161,7 @@ function SignUpForm() {
                 <GraduationCap className={`h-5 w-5 ${selectedRole === 'employee' ? 'text-white' : 'text-muted-foreground'}`} />
               </div>
               <p className={`font-semibold text-sm ${selectedRole === 'employee' ? 'text-blue-700' : ''}`}>Employee</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Instant access</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Email verification</p>
               {selectedRole === 'employee' && (
                 <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
                   <CheckCircle2 className="w-3 h-3 text-white" />

@@ -33,6 +33,8 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 const allowDemoCredentials = process.env.ALLOW_DEMO_SEED_CREDENTIALS === '1'
 const adminPassword = process.env.SEED_ADMIN_PASSWORD || (allowDemoCredentials ? 'Zxcv,0987' : '')
 const trainerPassword = process.env.SEED_TRAINER_PASSWORD || (allowDemoCredentials ? 'Asdf,1234' : '')
+const adminEmail = process.env.SEED_ADMIN_EMAIL || process.env.ADMIN_ALERT_EMAIL || 'skilltestai01@gmail.com'
+const trainerEmail = process.env.SEED_TRAINER_EMAIL || 'trainer@skilltest.ai'
 
 if (!adminPassword || !trainerPassword) {
   console.error(
@@ -44,15 +46,15 @@ if (!adminPassword || !trainerPassword) {
 
 const ACCOUNTS = [
   {
-    email: 'admin@hexaware.com',
+    email: adminEmail,
     password: adminPassword,
-    full_name: 'Hexaware Admin',
+    full_name: 'SkillTest_AI Admin',
     role: 'admin',
     approval_status: 'approved',
     department: 'Administration',
   },
   {
-    email: 'trainer@hexaware.com',
+    email: trainerEmail,
     password: trainerPassword,
     full_name: 'Sample Trainer',
     role: 'trainer',
@@ -118,8 +120,8 @@ async function main() {
     await seedAccount(account)
   }
   console.log('\n✅ All done! Credentials:')
-  console.log('   Admin   → admin@hexaware.com   / configured SEED_ADMIN_PASSWORD')
-  console.log('   Trainer → trainer@hexaware.com / configured SEED_TRAINER_PASSWORD')
+  console.log(`   Admin   -> ${adminEmail} / configured SEED_ADMIN_PASSWORD`)
+  console.log(`   Trainer -> ${trainerEmail} / configured SEED_TRAINER_PASSWORD`)
 }
 
 main()

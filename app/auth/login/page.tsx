@@ -16,10 +16,12 @@ import {
 function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [error, setError] = useState<string | null>(null)
+  const verificationRequired = searchParams.get('verified') === 'required'
+  const emailFromQuery = searchParams.get('email') || ''
+  const [error, setError] = useState<string | null>(verificationRequired ? 'Please verify your email before logging in.' : null)
   const [isPending, startTransition] = useTransition()
   const [showPassword, setShowPassword] = useState(false)
-  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null)
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(verificationRequired && emailFromQuery ? emailFromQuery : null)
   const [resendStatus, setResendStatus] = useState<string | null>(null)
   const resetSuccess = searchParams.get('reset') === 'success'
   const redirectTo = searchParams.get('redirect')
@@ -189,6 +191,7 @@ function LoginContent() {
                   type="text"
                   inputMode="email"
                   placeholder="yourname@company.com"
+                  defaultValue={emailFromQuery}
                   required
                   className="pl-11 h-11 rounded-xl border-border/70 bg-muted/30 focus-visible:ring-1 focus-visible:ring-primary/30"
                 />

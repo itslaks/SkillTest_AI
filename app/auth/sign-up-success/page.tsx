@@ -123,7 +123,7 @@ function SignUpSuccessContent() {
             </div>
             <h1 className="text-2xl font-bold">Check your email</h1>
             <p className="text-white/80 mt-2 text-sm">
-              {isSetupResent ? 'We sent an account setup link to ' : 'We sent a confirmation link to '}
+              {isSetupResent ? 'We sent an account setup link to ' : 'Verification email sent to '}
               {email ? <strong>{email}</strong> : 'your email'}
             </p>
           </div>
@@ -148,7 +148,7 @@ function SignUpSuccessContent() {
                 <p>
                   {isSetupResent
                     ? 'Your admin-created employee record was found. Open the setup link we sent, set your password, and your account will stay synced to that email and Employee ID.'
-                    : 'Click the link in your email to verify your account, then sign in to start learning.'}
+                    : 'Verification email sent. Please verify your email before logging in.'}
                 </p>
               </div>
             </div>

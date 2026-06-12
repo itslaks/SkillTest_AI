@@ -10,6 +10,10 @@ import { getSiteUrl } from '@/lib/security/env'
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 const smtpConfigured = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS)
 
+function isProductionRuntime() {
+  return process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production'
+}
+
 export interface SendEmailOptions {
   to: string | string[]
   subject: string
@@ -64,7 +68,11 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ success: b
   }
 
   if (!resend) {
-    // Dev / no-key fallback: log to console so testing is unblocked
+    if (isProductionRuntime()) {
+      console.error('[EMAIL CONFIG ERROR] No production email provider configured. Set RESEND_API_KEY or SMTP_* env vars.')
+      return { success: false, error: 'Email provider is not configured.' }
+    }
+
     console.log('[EMAIL - no RESEND_API_KEY]', {
       from,
       to: options.to,

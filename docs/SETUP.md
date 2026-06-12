@@ -55,6 +55,8 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
 # ── App URL (required for emails) ───────────────────────────────
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+ADMIN_ALERT_EMAIL=skilltestai01@gmail.com
+ADMIN_LOGIN_EMAIL=skilltestai01@gmail.com
 
 # ── AI Provider — pick ONE ──────────────────────────────────────
 OPENAI_API_KEY=sk-...
@@ -75,6 +77,8 @@ SMTP_FROM=SkillTest_AI <you@gmail.com>
 
 # ── Optional ────────────────────────────────────────────────────
 CRON_SECRET=your-random-secret          # Required for /api/cron
+SEED_ADMIN_EMAIL=skilltestai01@gmail.com
+SEED_TRAINER_EMAIL=trainer@skilltest.ai
 SEED_ADMIN_PASSWORD=changeme123!        # For seed_admin.js
 SEED_TRAINER_PASSWORD=changeme123!
 ```
@@ -153,6 +157,18 @@ Open [http://localhost:3000](http://localhost:3000).
 - [ ] Seed credentials changed
 
 ---
+
+### Production Auth And Email Requirements
+
+- Set `NEXT_PUBLIC_APP_URL` to the stable production URL, not localhost or a Vercel preview URL.
+- Set `ADMIN_ALERT_EMAIL=skilltestai01@gmail.com`.
+- Configure SMTP or Resend in production; console-only email fallback is development-only.
+- In Supabase Auth, turn Confirm Email ON.
+- Set Supabase Auth Site URL to the same value as `NEXT_PUBLIC_APP_URL`.
+- Add these Supabase Auth Redirect URLs:
+  - `https://your-production-domain.com/auth/callback`
+  - `https://your-production-domain.com/auth/update-password`
+- Verify the Supabase email provider/SMTP settings can send signup verification and reset-password emails.
 
 ## Troubleshooting
 

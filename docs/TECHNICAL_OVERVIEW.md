@@ -140,7 +140,8 @@ Staff evidence previews use short-lived signed URLs from the private `quiz-proct
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Server-side admin access |
-| `NEXT_PUBLIC_APP_URL` | Recommended | Base app URL |
+| `NEXT_PUBLIC_APP_URL` | Production | Stable base app URL for auth and email links |
+| `ADMIN_ALERT_EMAIL` | Production | Recipient for flag, proctoring, and security alert emails |
 | `OPENAI_API_KEY` | Optional | Primary AI provider |
 | `GROQ_API_KEY` | Optional | Fast fallback AI provider |
 | `GROQ_MODEL` | Optional | Defaults to `llama-3.3-70b-versatile` |
