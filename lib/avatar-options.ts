@@ -1,58 +1,111 @@
+/**
+ * 3D avatar preset library.
+ *
+ * Assets: public/avatars/3d/avatar-NN.webp — 256×256 transparent-background
+ * 3D memoji-style heads derived from Microsoft Fluent Emoji 3D (MIT licensed,
+ * github.com/microsoft/fluentui-emoji). Regenerate with
+ * `node scripts/fetch-3d-avatars.js`.
+ *
+ * Storage format: profiles.avatar_url stores `avatar3d:<id>`. Only the id is
+ * persisted — asset paths are resolved at render time, so the asset base can
+ * change without touching user records.
+ */
+
 export const AVATAR_3D_PREFIX = 'avatar3d:'
-export const AVATAR_ASSET_BASE = '/avatars/memoji'
+export const AVATAR_ASSET_BASE = '/avatars/3d'
 
-export const AVATAR_3D_IDS = [
-  'm1',
-  'm2',
-  'm3',
-  'm4',
-  'm5',
-  'm6',
-  'm7',
-  'f1',
-  'f2',
-  'f3',
-  'f4',
-  'f5',
-  'f6',
-  'f7',
-] as const
+const AVATAR_COUNT = 40
 
-export type Avatar3DId = (typeof AVATAR_3D_IDS)[number]
+export const AVATAR_3D_IDS = Array.from(
+  { length: AVATAR_COUNT },
+  (_, index) => `avatar-${String(index + 1).padStart(2, '0')}`,
+)
+
+export type Avatar3DId = string
 
 export type Avatar3DMeta = {
   id: Avatar3DId
+  /** Short, neutral display label — the avatar image is the focus, not the title. */
   name: string
-  group: 'Professional' | 'Creative'
-  skin: string
-  hair: string
-  outfit: string
-  accent: string
-  bg: string
-  hairStyle: 'short' | 'sweep' | 'wave' | 'bun' | 'curly' | 'crop'
-  glasses?: boolean
-  facialHair?: 'beard' | 'mustache' | 'goatee'
+  /** Descriptive alt text for accessibility. */
+  alt: string
 }
 
-export const AVATAR_3D_LIBRARY: Avatar3DMeta[] = [
-  { id: 'm1', group: 'Professional', name: 'Executive Mentor', skin: '#f2c3a2', hair: '#3f2a1d', outfit: '#1f2937', accent: '#60a5fa', bg: '#dbeafe', hairStyle: 'sweep', facialHair: 'beard' },
-  { id: 'm2', group: 'Professional', name: 'Operations Lead', skin: '#b77752', hair: '#20120c', outfit: '#059669', accent: '#34d399', bg: '#dcfce7', hairStyle: 'crop', glasses: true },
-  { id: 'm3', group: 'Professional', name: 'Systems Specialist', skin: '#d8a27b', hair: '#164e63', outfit: '#0891b2', accent: '#22d3ee', bg: '#cffafe', hairStyle: 'short' },
-  { id: 'm4', group: 'Creative', name: 'Learning Coach', skin: '#e6aa78', hair: '#78350f', outfit: '#d97706', accent: '#f59e0b', bg: '#fef3c7', hairStyle: 'curly', facialHair: 'mustache' },
-  { id: 'm5', group: 'Creative', name: 'Security Analyst', skin: '#8d5b42', hair: '#020617', outfit: '#dc2626', accent: '#fb7185', bg: '#fee2e2', hairStyle: 'sweep', facialHair: 'goatee' },
-  { id: 'm6', group: 'Professional', name: 'Cloud Engineer', skin: '#f1c7a6', hair: '#134e4a', outfit: '#0ea5e9', accent: '#38bdf8', bg: '#e0f2fe', hairStyle: 'crop' },
-  { id: 'm7', group: 'Professional', name: 'Program Manager', skin: '#c99a72', hair: '#1e1b4b', outfit: '#475569', accent: '#818cf8', bg: '#f5f5f4', hairStyle: 'short', glasses: true, facialHair: 'beard' },
-  { id: 'f1', group: 'Creative', name: 'Product Strategist', skin: '#efc0a0', hair: '#6b3f2a', outfit: '#db2777', accent: '#f472b6', bg: '#fce7f3', hairStyle: 'wave' },
-  { id: 'f2', group: 'Professional', name: 'Delivery Manager', skin: '#efc6a8', hair: '#4c1d95', outfit: '#6d28d9', accent: '#a78bfa', bg: '#ede9fe', hairStyle: 'bun' },
-  { id: 'f3', group: 'Creative', name: 'Data Coach', skin: '#d29a75', hair: '#14532d', outfit: '#16a34a', accent: '#86efac', bg: '#f0fdf4', hairStyle: 'curly' },
-  { id: 'f4', group: 'Creative', name: 'Design Lead', skin: '#a76a4d', hair: '#86198f', outfit: '#c026d3', accent: '#e879f9', bg: '#fae8ff', hairStyle: 'wave' },
-  { id: 'f5', group: 'Professional', name: 'Training Partner', skin: '#f5cdb4', hair: '#c2410c', outfit: '#ea580c', accent: '#fb923c', bg: '#ffedd5', hairStyle: 'bun' },
-  { id: 'f6', group: 'Professional', name: 'AI Specialist', skin: '#d9a985', hair: '#312e81', outfit: '#4f46e5', accent: '#818cf8', bg: '#e0e7ff', hairStyle: 'sweep' },
-  { id: 'f7', group: 'Professional', name: 'Quality Lead', skin: '#bd7b55', hair: '#064e3b', outfit: '#0f766e', accent: '#5eead4', bg: '#ccfbf1', hairStyle: 'crop', glasses: true },
+/** Accessible descriptions per asset (source: Fluent Emoji person variants). */
+const AVATAR_ALTS: string[] = [
+  'man with brown hair, light skin tone',
+  'man with dark hair, medium skin tone',
+  'man with dark hair, dark skin tone',
+  'woman with long hair, light skin tone',
+  'woman with long hair, medium skin tone',
+  'woman with long hair, dark skin tone',
+  'person with short hair, light skin tone',
+  'person with short hair, medium-dark skin tone',
+  'boy with short hair, light skin tone',
+  'boy with short hair, medium skin tone',
+  'girl with pigtails, light skin tone',
+  'girl with pigtails, medium-dark skin tone',
+  'man with a beard, light skin tone',
+  'man with a beard, medium skin tone',
+  'man with a beard, dark skin tone',
+  'person with a beard, medium-light skin tone',
+  'man with curly hair, light skin tone',
+  'man with curly hair, medium-dark skin tone',
+  'woman with curly hair, light skin tone',
+  'woman with curly hair, medium skin tone',
+  'woman with curly hair, dark skin tone',
+  'person with curly hair, medium-light skin tone',
+  'man with red hair',
+  'man with red hair, medium skin tone',
+  'woman with red hair',
+  'woman with red hair, medium skin tone',
+  'person with red hair, light skin tone',
+  'man with white hair, light skin tone',
+  'man with white hair, dark skin tone',
+  'woman with white hair, light skin tone',
+  'woman with white hair, dark skin tone',
+  'person with white hair, medium skin tone',
+  'older man, light skin tone',
+  'older man, medium skin tone',
+  'older woman, light skin tone',
+  'older woman, medium skin tone',
+  'older person, medium-light skin tone',
+  'older person, dark skin tone',
+  'young person, light skin tone',
+  'young person, medium skin tone',
 ]
 
-export const DEFAULT_AVATAR_3D_ID: Avatar3DId = 'm1'
+export const AVATAR_3D_LIBRARY: Avatar3DMeta[] = AVATAR_3D_IDS.map((id, index) => ({
+  id,
+  name: `Avatar ${index + 1}`,
+  alt: `3D avatar of a ${AVATAR_ALTS[index] || 'person'}`,
+}))
+
+export const DEFAULT_AVATAR_3D_ID: Avatar3DId = 'avatar-01'
 export const DEFAULT_AVATAR_VALUE = toAvatar3DValue(DEFAULT_AVATAR_3D_ID)
+
+/**
+ * Legacy preset ids (the removed flat 2D set) mapped to the closest new 3D
+ * head, so existing profiles keep a sensible avatar without a forced reset.
+ * Database migration 044 rewrites stored values; this map also resolves any
+ * un-migrated value at render time.
+ */
+const LEGACY_AVATAR_3D_MAP: Record<string, Avatar3DId> = {
+  m1: 'avatar-13', // Executive Mentor (beard) → bearded man, light
+  m2: 'avatar-03', // Operations Lead → man, dark
+  m3: 'avatar-02', // Systems Specialist → man, medium
+  m4: 'avatar-17', // Learning Coach (curly) → curly-haired man, light
+  m5: 'avatar-15', // Security Analyst → bearded man, dark
+  m6: 'avatar-01', // Cloud Engineer → man, light
+  m7: 'avatar-14', // Program Manager (beard) → bearded man, medium
+  f1: 'avatar-04', // Product Strategist → woman, light
+  f2: 'avatar-05', // Delivery Manager → woman, medium
+  f3: 'avatar-20', // Data Coach (curly) → curly-haired woman, medium
+  f4: 'avatar-21', // Design Lead → curly-haired woman, dark
+  f5: 'avatar-25', // Training Partner → red-haired woman
+  f6: 'avatar-19', // AI Specialist → curly-haired woman, light
+  f7: 'avatar-06', // Quality Lead → woman, dark
+}
 
 export function toAvatar3DValue(id: Avatar3DId | string) {
   return `${AVATAR_3D_PREFIX}${id}`
@@ -61,7 +114,9 @@ export function toAvatar3DValue(id: Avatar3DId | string) {
 export function getAvatar3DId(value?: string | null): Avatar3DId | null {
   if (!value?.startsWith(AVATAR_3D_PREFIX)) return null
   const id = value.slice(AVATAR_3D_PREFIX.length)
-  return AVATAR_3D_IDS.includes(id as Avatar3DId) ? id as Avatar3DId : null
+  if (AVATAR_3D_IDS.includes(id)) return id
+  // Old stored values resolve to their mapped 3D replacement.
+  return LEGACY_AVATAR_3D_MAP[id] ?? null
 }
 
 export function isAvatar3DValue(value?: string | null) {
@@ -72,8 +127,10 @@ export function getSafeAvatar3DId(value?: string | null): Avatar3DId {
   return getAvatar3DId(value) || DEFAULT_AVATAR_3D_ID
 }
 
-export function getAvatar3DMeta(id?: Avatar3DId | string | null) {
-  return AVATAR_3D_LIBRARY.find((item) => item.id === id) || AVATAR_3D_LIBRARY[0]
+export function getAvatar3DMeta(id?: Avatar3DId | string | null): Avatar3DMeta {
+  return AVATAR_3D_LIBRARY.find((item) => item.id === id)
+    || AVATAR_3D_LIBRARY.find((item) => item.id === LEGACY_AVATAR_3D_MAP[String(id)])
+    || AVATAR_3D_LIBRARY[0]
 }
 
 export function getAvatar3DAsset(id?: Avatar3DId | string | null) {

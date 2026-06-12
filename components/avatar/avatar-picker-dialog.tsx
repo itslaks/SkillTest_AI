@@ -3,11 +3,15 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { AvatarPicker } from '@/components/avatar/avatar-3d'
-import { AvatarView } from '@/components/avatar/avatar-view'
-import { getAvatar3DMeta, toAvatar3DValue, type Avatar3DId } from '@/lib/avatar-options'
+import { AvatarPicker, Avatar3D } from '@/components/avatar/avatar-3d'
+import { getAvatar3DMeta, type Avatar3DId } from '@/lib/avatar-options'
 import { CheckCircle2, UserRound } from 'lucide-react'
 
+/**
+ * 3D avatar picker dialog: large live preview on the left, selection grid on
+ * the right. ESC closes (shadcn Dialog), tiles are keyboard-selectable, and
+ * saving still happens in the parent form (Save Changes).
+ */
 export function AvatarPickerDialog({
   value,
   onChange,
@@ -35,22 +39,26 @@ export function AvatarPickerDialog({
 
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Choose your 3D Memoji avatar</DialogTitle>
+          <DialogTitle>Choose your 3D avatar</DialogTitle>
           <DialogDescription>
-            Preview a preset and save your profile when you are ready.
+            Pick an avatar, then save your profile when you are ready.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-5 lg:grid-cols-[180px_minmax(0,1fr)]">
-          <div className="rounded-3xl border border-zinc-200 bg-zinc-50 p-4 text-center">
-            <AvatarView
-              src={toAvatar3DValue(value)}
-              alt={`${meta.name} avatar preview`}
-              size={144}
-              className="mx-auto h-36 w-36 rounded-[2rem] border border-white bg-white object-cover shadow-lg"
-              priority
-            />
-            <p className="mt-3 text-sm font-semibold text-zinc-900">{meta.name}</p>
-            <p className="text-xs text-zinc-500">Instant preview</p>
+        <div className="grid gap-5 lg:grid-cols-[190px_minmax(0,1fr)]">
+          <div className="flex flex-col items-center justify-start gap-3 rounded-3xl border border-zinc-200 bg-gradient-to-b from-zinc-50 to-white p-5 text-center">
+            <Avatar3D avatarId={value} size={150} priority className="shadow-lg" />
+            <div>
+              <p className="text-sm font-semibold text-zinc-900">{meta.name}</p>
+              <p className="text-xs text-zinc-500">Live preview</p>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button type="button" size="sm" className="rounded-lg" onClick={() => setOpen(false)}>
+                Use this avatar
+              </Button>
+              <Button type="button" size="sm" variant="ghost" className="rounded-lg" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+            </div>
           </div>
           <AvatarPicker value={value} onChange={onChange} />
         </div>

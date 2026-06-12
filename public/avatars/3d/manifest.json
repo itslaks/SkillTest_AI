@@ -1,0 +1,202 @@
+[
+  {
+    "id": "avatar-01",
+    "source": "Man / Light",
+    "alt": "3D avatar of a man, light skin tone"
+  },
+  {
+    "id": "avatar-02",
+    "source": "Man / Medium",
+    "alt": "3D avatar of a man, medium skin tone"
+  },
+  {
+    "id": "avatar-03",
+    "source": "Man / Dark",
+    "alt": "3D avatar of a man, dark skin tone"
+  },
+  {
+    "id": "avatar-04",
+    "source": "Woman / Light",
+    "alt": "3D avatar of a woman, light skin tone"
+  },
+  {
+    "id": "avatar-05",
+    "source": "Woman / Medium",
+    "alt": "3D avatar of a woman, medium skin tone"
+  },
+  {
+    "id": "avatar-06",
+    "source": "Woman / Dark",
+    "alt": "3D avatar of a woman, dark skin tone"
+  },
+  {
+    "id": "avatar-07",
+    "source": "Person / Light",
+    "alt": "3D avatar of a person, light skin tone"
+  },
+  {
+    "id": "avatar-08",
+    "source": "Person / Medium-Dark",
+    "alt": "3D avatar of a person, medium dark skin tone"
+  },
+  {
+    "id": "avatar-09",
+    "source": "Boy / Light",
+    "alt": "3D avatar of a boy, light skin tone"
+  },
+  {
+    "id": "avatar-10",
+    "source": "Boy / Medium",
+    "alt": "3D avatar of a boy, medium skin tone"
+  },
+  {
+    "id": "avatar-11",
+    "source": "Girl / Light",
+    "alt": "3D avatar of a girl, light skin tone"
+  },
+  {
+    "id": "avatar-12",
+    "source": "Girl / Medium-Dark",
+    "alt": "3D avatar of a girl, medium dark skin tone"
+  },
+  {
+    "id": "avatar-13",
+    "source": "Man beard / Light",
+    "alt": "3D avatar of a man beard, light skin tone"
+  },
+  {
+    "id": "avatar-14",
+    "source": "Man beard / Medium",
+    "alt": "3D avatar of a man beard, medium skin tone"
+  },
+  {
+    "id": "avatar-15",
+    "source": "Man beard / Dark",
+    "alt": "3D avatar of a man beard, dark skin tone"
+  },
+  {
+    "id": "avatar-16",
+    "source": "Person beard / Medium-Light",
+    "alt": "3D avatar of a person beard, medium light skin tone"
+  },
+  {
+    "id": "avatar-17",
+    "source": "Man curly hair / Light",
+    "alt": "3D avatar of a man curly hair, light skin tone"
+  },
+  {
+    "id": "avatar-18",
+    "source": "Man curly hair / Medium-Dark",
+    "alt": "3D avatar of a man curly hair, medium dark skin tone"
+  },
+  {
+    "id": "avatar-19",
+    "source": "Woman curly hair / Light",
+    "alt": "3D avatar of a woman curly hair, light skin tone"
+  },
+  {
+    "id": "avatar-20",
+    "source": "Woman curly hair / Medium",
+    "alt": "3D avatar of a woman curly hair, medium skin tone"
+  },
+  {
+    "id": "avatar-21",
+    "source": "Woman curly hair / Dark",
+    "alt": "3D avatar of a woman curly hair, dark skin tone"
+  },
+  {
+    "id": "avatar-22",
+    "source": "Person curly hair / Medium-Light",
+    "alt": "3D avatar of a person curly hair, medium light skin tone"
+  },
+  {
+    "id": "avatar-23",
+    "source": "Man red hair / Default",
+    "alt": "3D avatar of a man red hair"
+  },
+  {
+    "id": "avatar-24",
+    "source": "Man red hair / Medium",
+    "alt": "3D avatar of a man red hair, medium skin tone"
+  },
+  {
+    "id": "avatar-25",
+    "source": "Woman red hair / Default",
+    "alt": "3D avatar of a woman red hair"
+  },
+  {
+    "id": "avatar-26",
+    "source": "Woman red hair / Medium",
+    "alt": "3D avatar of a woman red hair, medium skin tone"
+  },
+  {
+    "id": "avatar-27",
+    "source": "Person red hair / Light",
+    "alt": "3D avatar of a person red hair, light skin tone"
+  },
+  {
+    "id": "avatar-28",
+    "source": "Man white hair / Light",
+    "alt": "3D avatar of a man white hair, light skin tone"
+  },
+  {
+    "id": "avatar-29",
+    "source": "Man white hair / Dark",
+    "alt": "3D avatar of a man white hair, dark skin tone"
+  },
+  {
+    "id": "avatar-30",
+    "source": "Woman white hair / Light",
+    "alt": "3D avatar of a woman white hair, light skin tone"
+  },
+  {
+    "id": "avatar-31",
+    "source": "Woman white hair / Dark",
+    "alt": "3D avatar of a woman white hair, dark skin tone"
+  },
+  {
+    "id": "avatar-32",
+    "source": "Person white hair / Medium",
+    "alt": "3D avatar of a person white hair, medium skin tone"
+  },
+  {
+    "id": "avatar-33",
+    "source": "Old man / Light",
+    "alt": "3D avatar of a old man, light skin tone"
+  },
+  {
+    "id": "avatar-34",
+    "source": "Old man / Medium",
+    "alt": "3D avatar of a old man, medium skin tone"
+  },
+  {
+    "id": "avatar-35",
+    "source": "Old woman / Light",
+    "alt": "3D avatar of a old woman, light skin tone"
+  },
+  {
+    "id": "avatar-36",
+    "source": "Old woman / Medium",
+    "alt": "3D avatar of a old woman, medium skin tone"
+  },
+  {
+    "id": "avatar-37",
+    "source": "Older person / Medium-Light",
+    "alt": "3D avatar of a older person, medium light skin tone"
+  },
+  {
+    "id": "avatar-38",
+    "source": "Older person / Dark",
+    "alt": "3D avatar of a older person, dark skin tone"
+  },
+  {
+    "id": "avatar-39",
+    "source": "Child / Light",
+    "alt": "3D avatar of a child, light skin tone"
+  },
+  {
+    "id": "avatar-40",
+    "source": "Child / Medium",
+    "alt": "3D avatar of a child, medium skin tone"
+  }
+]
