@@ -84,29 +84,6 @@ export const AVATAR_3D_LIBRARY: Avatar3DMeta[] = AVATAR_3D_IDS.map((id, index) =
 export const DEFAULT_AVATAR_3D_ID: Avatar3DId = 'avatar-01'
 export const DEFAULT_AVATAR_VALUE = toAvatar3DValue(DEFAULT_AVATAR_3D_ID)
 
-/**
- * Legacy preset ids (the removed flat 2D set) mapped to the closest new 3D
- * head, so existing profiles keep a sensible avatar without a forced reset.
- * Database migration 044 rewrites stored values; this map also resolves any
- * un-migrated value at render time.
- */
-const LEGACY_AVATAR_3D_MAP: Record<string, Avatar3DId> = {
-  m1: 'avatar-13', // Executive Mentor (beard) → bearded man, light
-  m2: 'avatar-03', // Operations Lead → man, dark
-  m3: 'avatar-02', // Systems Specialist → man, medium
-  m4: 'avatar-17', // Learning Coach (curly) → curly-haired man, light
-  m5: 'avatar-15', // Security Analyst → bearded man, dark
-  m6: 'avatar-01', // Cloud Engineer → man, light
-  m7: 'avatar-14', // Program Manager (beard) → bearded man, medium
-  f1: 'avatar-04', // Product Strategist → woman, light
-  f2: 'avatar-05', // Delivery Manager → woman, medium
-  f3: 'avatar-20', // Data Coach (curly) → curly-haired woman, medium
-  f4: 'avatar-21', // Design Lead → curly-haired woman, dark
-  f5: 'avatar-25', // Training Partner → red-haired woman
-  f6: 'avatar-19', // AI Specialist → curly-haired woman, light
-  f7: 'avatar-06', // Quality Lead → woman, dark
-}
-
 export function toAvatar3DValue(id: Avatar3DId | string) {
   return `${AVATAR_3D_PREFIX}${id}`
 }
@@ -114,9 +91,10 @@ export function toAvatar3DValue(id: Avatar3DId | string) {
 export function getAvatar3DId(value?: string | null): Avatar3DId | null {
   if (!value?.startsWith(AVATAR_3D_PREFIX)) return null
   const id = value.slice(AVATAR_3D_PREFIX.length)
-  if (AVATAR_3D_IDS.includes(id)) return id
-  // Old stored values resolve to their mapped 3D replacement.
-  return LEGACY_AVATAR_3D_MAP[id] ?? null
+  // Retired preset ids (m1–m7/f1–f7) resolve to null: the old flat set was
+  // force-assigned to every account, so stored values were never a deliberate
+  // choice. Users see the neutral "no avatar" placeholder until they pick one.
+  return AVATAR_3D_IDS.includes(id) ? id : null
 }
 
 export function isAvatar3DValue(value?: string | null) {
@@ -128,9 +106,7 @@ export function getSafeAvatar3DId(value?: string | null): Avatar3DId {
 }
 
 export function getAvatar3DMeta(id?: Avatar3DId | string | null): Avatar3DMeta {
-  return AVATAR_3D_LIBRARY.find((item) => item.id === id)
-    || AVATAR_3D_LIBRARY.find((item) => item.id === LEGACY_AVATAR_3D_MAP[String(id)])
-    || AVATAR_3D_LIBRARY[0]
+  return AVATAR_3D_LIBRARY.find((item) => item.id === id) || AVATAR_3D_LIBRARY[0]
 }
 
 export function getAvatar3DAsset(id?: Avatar3DId | string | null) {
