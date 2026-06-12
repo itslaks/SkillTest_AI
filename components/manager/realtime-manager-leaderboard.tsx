@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Trophy, Users } from 'lucide-react'
 import { buildCumulativeLeaderboard, formatDuration, type CumulativeAttempt, type CumulativeLeaderboardEntry } from '@/lib/leaderboard'
+import { AvatarView } from '@/components/avatar/avatar-view'
 
 type ManagerLeaderboardEntry = CumulativeLeaderboardEntry
 
@@ -40,7 +41,7 @@ export function RealtimeManagerLeaderboard({
             points_earned,
             completed_at,
             quizzes!inner(created_by, title),
-            profiles:user_id(full_name, email, employee_id, department)
+            profiles:user_id(full_name, email, employee_id, department, avatar_url)
           `)
           .eq('quizzes.created_by', managerId)
           .eq('status', 'completed')
@@ -152,6 +153,12 @@ export function RealtimeManagerLeaderboard({
                     }`}>
                       {entry.rank}
                     </div>
+                    <AvatarView
+                      src={entry.avatar_url}
+                      alt={`${entry.full_name || 'Employee'} avatar`}
+                      size={40}
+                      className="h-10 w-10 rounded-xl border border-white object-cover shadow-sm"
+                    />
                     <div>
                       <p className="text-sm font-semibold">{entry.full_name}</p>
                       <p className="text-xs text-muted-foreground">
@@ -233,8 +240,13 @@ function ManagerPodiumSpot({
 
   return (
     <div className={`flex flex-col items-center ${config.offset}`}>
-      <div className={`flex items-center justify-center rounded-full ring-4 shadow-md ${config.shell}`}>
-        <span className="font-bold">{rank}</span>
+      <div className={`flex items-center justify-center overflow-hidden rounded-full ring-4 shadow-md ${config.shell}`}>
+        <AvatarView
+          src={entry.avatar_url}
+          alt={`${entry.full_name || 'Top performer'} avatar`}
+          size={rank === 1 ? 80 : rank === 2 ? 64 : 56}
+          className="h-full w-full rounded-full object-cover"
+        />
       </div>
       <p className={`mt-2 w-full truncate text-center text-sm ${config.name}`}>
         {entry.full_name.split(' ')[0] || 'User'}

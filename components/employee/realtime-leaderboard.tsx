@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Trophy, Flame, Star, Crown, Medal } from 'lucide-react'
+import { Trophy, Flame, Star, Crown } from 'lucide-react'
 import { buildCumulativeLeaderboard, type CumulativeAttempt, type CumulativeLeaderboardEntry } from '@/lib/leaderboard'
+import { AvatarView } from '@/components/avatar/avatar-view'
 
 interface RealtimeLeaderboardProps {
   initialData: CumulativeLeaderboardEntry[]
@@ -137,11 +138,14 @@ export function RealtimeLeaderboard({ initialData, currentUserId }: RealtimeLead
                 }`}>
                   {entry.rank}
                 </div>
-                <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white ${
-                  index === 0 ? 'bg-gradient-to-br from-yellow-400 to-amber-500' : 'bg-gradient-to-br from-blue-400 to-violet-500'
-                }`}>
-                  {entry.full_name?.charAt(0) || '?'}
-                </div>
+                <AvatarView
+                  src={entry.avatar_url}
+                  alt={`${entry.full_name || 'Employee'} avatar`}
+                  size={36}
+                  className={`h-9 w-9 rounded-xl border border-white object-cover shadow-sm ${
+                    index === 0 ? 'ring-2 ring-yellow-300' : 'ring-1 ring-blue-100'
+                  }`}
+                />
                 <div>
                   <p className="text-sm font-semibold">
                     {entry.full_name || 'Unknown'}
@@ -215,7 +219,12 @@ function PodiumSpot({
   return (
     <div className={`flex flex-col items-center gap-2 ${config.offset}`}>
       <div className={`flex items-center justify-center rounded-full ring-4 shadow-md ${config.shell}`}>
-        <Medal className="h-7 w-7" />
+        <AvatarView
+          src={entry.avatar_url}
+          alt={`${entry.full_name || 'Top performer'} avatar`}
+          size={rank === 1 ? 80 : rank === 2 ? 64 : 56}
+          className="h-full w-full rounded-full object-cover"
+        />
       </div>
       <p className={`w-full truncate text-center text-sm ${config.name}`}>
         {entry.full_name.split(' ')[0] || 'User'}

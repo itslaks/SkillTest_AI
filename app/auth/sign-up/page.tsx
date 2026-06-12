@@ -16,9 +16,12 @@ import { Spinner } from '@/components/ui/spinner'
 import { signUp } from '@/lib/actions/auth'
 import { DOMAIN_OPTIONS } from '@/lib/domain-options'
 import { BrandLogo } from '@/components/brand/brand-logo'
+import { AvatarView } from '@/components/avatar/avatar-view'
+import { AvatarPickerDialog } from '@/components/avatar/avatar-picker-dialog'
+import { DEFAULT_AVATAR_3D_ID, toAvatar3DValue, type Avatar3DId } from '@/lib/avatar-options'
 import {
   Mail, Lock, User, Building, ArrowRight, CheckCircle2,
-  ShieldCheck, Zap, GraduationCap, BookOpen, Clock, Star
+  ShieldCheck, Zap, GraduationCap, BookOpen, Clock, Star, UserRound
 } from 'lucide-react'
 
 type SignUpRole = 'employee' | 'trainer'
@@ -33,12 +36,14 @@ function SignUpForm() {
   const initialEmail = searchParams.get('email') || ''
   const initialEmployeeId = searchParams.get('employeeId') || searchParams.get('employee_id') || ''
   const [selectedRole, setSelectedRole] = useState<SignUpRole>(initialRole)
+  const [avatarId, setAvatarId] = useState<Avatar3DId>(DEFAULT_AVATAR_3D_ID)
 
   function handleSignUp(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
     const formData = new FormData(event.currentTarget)
     formData.set('role', selectedRole)
+    formData.set('avatarUrl', selectedRole === 'employee' ? toAvatar3DValue(avatarId) : toAvatar3DValue(DEFAULT_AVATAR_3D_ID))
     startTransition(async () => {
       const result = await signUp(formData)
       if (result?.error) setError(result.error)
@@ -199,7 +204,30 @@ function SignUpForm() {
             </div>
           )}
 
+          {!isTrainer && (
+            <div className="mb-5 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+              <div className="mb-4 flex items-center gap-3">
+                <AvatarView
+                  src={toAvatar3DValue(avatarId)}
+                  alt="Selected employee avatar preview"
+                  size={64}
+                  className="h-16 w-16 rounded-2xl border border-white bg-white object-cover shadow-sm"
+                  interactive
+                />
+                <div>
+                  <p className="flex items-center gap-2 text-sm font-semibold">
+                    <UserRound className="h-4 w-4" />
+                    Employee avatar
+                  </p>
+                  <p className="text-xs text-muted-foreground">Keep the default avatar or choose another preset.</p>
+                </div>
+              </div>
+              <AvatarPickerDialog value={avatarId} onChange={setAvatarId} />
+            </div>
+          )}
+
           <form onSubmit={handleSignUp} className="space-y-4">
+            <input type="hidden" name="avatarUrl" value={toAvatar3DValue(isTrainer ? DEFAULT_AVATAR_3D_ID : avatarId)} />
             {error && (
               <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
                 <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />

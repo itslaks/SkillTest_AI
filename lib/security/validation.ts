@@ -75,6 +75,7 @@ export const signUpSchema = z
     role: z.enum(['employee', 'trainer']).default('employee'),
     domain: sanitizedString(150),
     department: sanitizedString(150).optional().nullable().or(z.literal('').transform(() => null)),
+    avatarUrl: optionalSafeImageUrl,
   })
   .strict()
   .superRefine((value, context) => {

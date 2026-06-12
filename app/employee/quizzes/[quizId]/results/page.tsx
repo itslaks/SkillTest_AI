@@ -5,6 +5,7 @@ import { analyzeAttemptPattern, buildRetentionChecks, getTopicAttempts } from '@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { FeedbackRequiredExit } from '@/components/quiz/feedback-required-exit'
+import { AvatarView } from '@/components/avatar/avatar-view'
 import {
   Award,
   Brain,
@@ -196,6 +197,12 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
                   }`}>
                     {entry.rank}
                   </div>
+                  <AvatarView
+                    src={entry.avatar_url}
+                    alt={`${entry.full_name || 'Employee'} avatar`}
+                    size={44}
+                    className="h-11 w-11 rounded-2xl border border-white object-cover shadow-sm"
+                  />
                   <div>
                     <p className="font-semibold">
                       {entry.full_name}

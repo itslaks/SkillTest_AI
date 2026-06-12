@@ -3,6 +3,7 @@ import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import { ReadinessMeter } from '@/components/insights/readiness-meter'
 import { AiLearnRecommend } from '@/components/employee/ai-learn-recommend'
+import { AvatarView } from '@/components/avatar/avatar-view'
 import Link from 'next/link'
 import {
   ArrowRight,
@@ -24,7 +25,7 @@ export default async function EmployeeDashboard() {
   const adminClient = createAdminClient()
   const { data: profile } = await adminClient
     .from('profiles')
-    .select('full_name')
+    .select('full_name, avatar_url')
     .eq('id', user?.id)
     .single()
 
@@ -57,9 +58,18 @@ export default async function EmployeeDashboard() {
               <Sparkles className="h-3.5 w-3.5 text-cyan-200" />
               Today&apos;s focus
             </p>
-            <h1 className="mt-5 max-w-2xl text-3xl font-semibold leading-tight tracking-tight md:text-5xl">
-              Welcome back, {firstName}
-            </h1>
+            <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center">
+              <AvatarView
+                src={profile?.avatar_url}
+                alt={`${fullName || 'Employee'} avatar`}
+                size={88}
+                className="h-[88px] w-[88px] rounded-[1.5rem] border border-white/10 bg-white object-cover shadow-2xl"
+                priority
+              />
+              <h1 className="max-w-2xl text-3xl font-semibold leading-tight tracking-tight md:text-5xl">
+                Welcome back, {firstName}
+              </h1>
+            </div>
             <p className="mt-4 max-w-2xl text-sm leading-relaxed text-zinc-300 md:text-base">
               Keep your learning streak moving. Start with the next assigned quiz, check readiness, then use training notes when you need context.
             </p>

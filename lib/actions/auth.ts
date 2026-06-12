@@ -30,6 +30,7 @@ import {
 } from '@/lib/security/env'
 import { revalidatePath } from 'next/cache'
 import { normalizeDomain } from '@/lib/domain-options'
+import { DEFAULT_AVATAR_VALUE } from '@/lib/avatar-options'
 import { cleanupOrphanEmployeeAuthUsersByEmail, sendEmployeeSetupEmail } from '@/lib/employee-onboarding'
 import { sendEmail } from '@/lib/email'
 
@@ -58,6 +59,7 @@ export async function signUp(formData: FormData) {
 
   const { email, password, fullName, employeeId, department, role } = parsed.data
   const domain = normalizeDomain(parsed.data.domain)
+  const avatarUrl = parsed.data.avatarUrl || DEFAULT_AVATAR_VALUE
   if (!isSupabaseConfigured() || !isSupabaseAdminConfigured()) {
     return { error: 'Supabase is not configured. Add real Supabase URL, anon key, and service role key in .env.local, then restart the dev server.' }
   }
@@ -100,6 +102,7 @@ export async function signUp(formData: FormData) {
           department: department || domain,
           role: 'employee',
           approval_status: 'approved',
+          avatar_url: avatarUrl,
           updated_at: new Date().toISOString(),
         })
         .eq('id', existingEmployeeProfile.id)
@@ -143,6 +146,7 @@ export async function signUp(formData: FormData) {
         domain,
         department,
         approval_status: approvalStatus,
+        avatar_url: avatarUrl,
       },
     }
   })
@@ -182,6 +186,7 @@ export async function signUp(formData: FormData) {
         domain,
         department: department || null,
         employee_id: employeeId || null,
+        avatar_url: avatarUrl,
         updated_at: new Date().toISOString(),
       })
       .eq('id', signUpData.user.id)
@@ -387,7 +392,8 @@ export async function updateProfile(formData: FormData) {
     return { error: parsed.error }
   }
 
-  const { fullName, department, avatarUrl } = parsed.data
+  const { fullName, department } = parsed.data
+  const avatarUrl = parsed.data.avatarUrl || DEFAULT_AVATAR_VALUE
   const employeeId = parsed.data.employeeId?.trim() || null
   const domain = normalizeDomain(parsed.data.domain)
 

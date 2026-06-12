@@ -15,11 +15,11 @@ import {
 import { Spinner } from '@/components/ui/spinner'
 import { updateProfile } from '@/lib/actions/auth'
 import type { Profile } from '@/lib/types/database'
-import { DEFAULT_AVATARS, getAvatar3DId, toAvatar3DValue, type Avatar3DId } from '@/lib/avatar-options'
+import { DEFAULT_AVATAR_VALUE, getSafeAvatar3DId, toAvatar3DValue, type Avatar3DId } from '@/lib/avatar-options'
 import { DOMAIN_OPTIONS } from '@/lib/domain-options'
 import { Save, User, CheckCircle2, Camera, Image as ImageIcon } from 'lucide-react'
-import { AvatarPicker } from '@/components/avatar/avatar-3d'
 import { AvatarView } from '@/components/avatar/avatar-view'
+import { AvatarPickerDialog } from '@/components/avatar/avatar-picker-dialog'
 
 interface ProfileFormProps {
   profile: Profile
@@ -29,7 +29,7 @@ export function ProfileForm({ profile }: ProfileFormProps) {
   const [isPending, startTransition] = useTransition()
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url || DEFAULT_AVATARS[0])
+  const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url || DEFAULT_AVATAR_VALUE)
 
   function handleAvatarUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -109,12 +109,12 @@ export function ProfileForm({ profile }: ProfileFormProps) {
                   onChange={handleAvatarUpload}
                   className="bg-white"
                 />
-                <p className="mt-2 text-xs text-muted-foreground">Upload a small photo, or choose one of the 3D emoji style presets below.</p>
+                <p className="mt-2 text-xs text-muted-foreground">Upload a small photo, or choose one of the premium 3D Memoji presets.</p>
               </div>
             </div>
             <div className="mt-4">
-              <AvatarPicker
-                value={getAvatar3DId(avatarUrl)}
+              <AvatarPickerDialog
+                value={getSafeAvatar3DId(avatarUrl)}
                 onChange={(id: Avatar3DId) => setAvatarUrl(toAvatar3DValue(id))}
               />
             </div>

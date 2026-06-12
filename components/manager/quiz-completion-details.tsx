@@ -7,6 +7,7 @@ import {
   Clock, Trophy, Target, Download, Calendar,
   User, CheckCircle2, BarChart3, FileText
 } from 'lucide-react'
+import { AvatarView } from '@/components/avatar/avatar-view'
 
 interface QuizCompletionEntry {
   id: string
@@ -27,6 +28,7 @@ interface QuizCompletionEntry {
     email: string
     employee_id: string | null
     department: string | null
+    avatar_url?: string | null
   }
 }
 
@@ -189,6 +191,12 @@ export function QuizCompletionDetails({
                       <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold border-2 ${scoreColor}`}>
                         {completion.score}%
                       </div>
+                      <AvatarView
+                        src={completion.profile.avatar_url}
+                        alt={`${completion.profile.full_name || 'Employee'} avatar`}
+                        size={48}
+                        className="h-12 w-12 rounded-2xl border border-white object-cover shadow-sm"
+                      />
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold">{completion.profile.full_name}</p>
                         <p className="truncate text-xs text-muted-foreground">

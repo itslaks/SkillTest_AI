@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { Trophy, Clock, Crown, ArrowLeft, Users, Medal, Target } from 'lucide-react'
 import type { LeaderboardEntry } from '@/lib/types/database'
+import { AvatarView } from '@/components/avatar/avatar-view'
 
 interface RealtimeQuizLeaderboardProps {
   quizId: string
@@ -195,6 +196,12 @@ export function RealtimeQuizLeaderboard({
                   }`}>
                     {entry.rank}
                   </div>
+                  <AvatarView
+                    src={entry.avatar_url}
+                    alt={`${entry.full_name || 'Employee'} avatar`}
+                    size={40}
+                    className="h-10 w-10 rounded-xl border border-white object-cover shadow-sm"
+                  />
                   <div>
                     <p className="text-sm font-medium">
                       {entry.full_name}
@@ -290,8 +297,13 @@ function QuizPodiumSpot({
 
   return (
     <div className={`flex flex-col items-center ${rank === 2 ? 'pt-8' : rank === 3 ? 'pt-12' : ''}`}>
-      <div className={`mb-2 flex items-center justify-center rounded-full ring-4 shadow-lg ${styles}`}>
-        <span className="font-bold">{rank}</span>
+      <div className={`mb-2 flex items-center justify-center overflow-hidden rounded-full ring-4 shadow-lg ${styles}`}>
+        <AvatarView
+          src={entry.avatar_url}
+          alt={`${entry.full_name || 'Top performer'} avatar`}
+          size={rank === 1 ? 80 : rank === 2 ? 64 : 56}
+          className="h-full w-full rounded-full object-cover"
+        />
       </div>
       <p className="w-full truncate text-center text-sm font-medium">{entry.full_name}</p>
       <p className="text-2xl font-bold text-yellow-600">{entry.score}%</p>

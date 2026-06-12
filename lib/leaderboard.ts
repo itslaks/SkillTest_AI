@@ -23,6 +23,7 @@ export interface CumulativeLeaderboardEntry {
   email: string
   employee_id: string | null
   department: string | null
+  avatar_url: string | null
   total_points: number
   total_quizzes: number
   avg_score: number
@@ -91,6 +92,7 @@ export function buildCumulativeLeaderboard(
       email: profile?.email || '',
       employee_id: profile?.employee_id || null,
       department: profile?.department || null,
+      avatar_url: profile?.avatar_url || null,
       total_points: pointsEarned,
       total_quizzes: 1,
       total_correct: correctAnswers,

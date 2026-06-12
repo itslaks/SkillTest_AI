@@ -3,6 +3,7 @@ import { createAdminClient, createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { LogoutForm } from '@/components/auth/logout-form'
 import { ProfileCompletionDialog } from '@/components/employee/profile-completion-dialog'
+import { AvatarView } from '@/components/avatar/avatar-view'
 import {
   LayoutDashboard,
   FileQuestion,
@@ -59,10 +60,6 @@ export default async function EmployeeLayout({
 
   const fullName = profile?.full_name || user.user_metadata?.full_name || null
 
-  const initials = fullName
-    ? fullName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
-    : (profile?.email?.[0] || user.email?.[0] || 'E').toUpperCase()
-
   return (
     <div className="min-h-screen flex bg-[#f5f5f5]">
       {/* Sidebar */}
@@ -108,9 +105,12 @@ export default async function EmployeeLayout({
             )}
           </div>
           <div className="flex items-center gap-3 px-2 py-2">
-            <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-black text-xs font-bold shrink-0">
-              {initials}
-            </div>
+            <AvatarView
+              src={profile?.avatar_url}
+              alt={`${fullName || 'Employee'} avatar`}
+              size={32}
+              className="h-8 w-8 shrink-0 rounded-xl border border-white/10 bg-white object-cover"
+            />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-white leading-none truncate">{fullName?.split(' ')[0] || 'Employee'}</p>
               <p className="text-xs text-white/55 mt-0.5 truncate">{profile?.email || ''}</p>

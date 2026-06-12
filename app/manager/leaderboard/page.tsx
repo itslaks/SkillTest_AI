@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { RealtimeManagerLeaderboard } from '@/components/manager/realtime-manager-leaderboard'
 import { QuizCompletionDetails } from '@/components/manager/quiz-completion-details'
+import { AvatarView } from '@/components/avatar/avatar-view'
 import { buildCumulativeLeaderboard, type CumulativeAttempt } from '@/lib/leaderboard'
 import { 
   Trophy, Crown, Users, TrendingUp, Clock, 
@@ -54,7 +55,7 @@ export default async function ManagerLeaderboardPage() {
         .from('quiz_attempts')
         .select(`
           *,
-          profiles:user_id(full_name, email, employee_id, department)
+          profiles:user_id(full_name, email, employee_id, department, avatar_url)
         `)
         .eq('quiz_id', quiz.id)
         .eq('status', 'completed')
@@ -76,6 +77,7 @@ export default async function ManagerLeaderboardPage() {
         email: a.profiles?.email || '',
         employee_id: a.profiles?.employee_id,
         department: a.profiles?.department,
+        avatar_url: a.profiles?.avatar_url,
         score: a.score,
         correct_answers: a.correct_answers,
         total_questions: a.total_questions,
@@ -100,7 +102,7 @@ export default async function ManagerLeaderboardPage() {
       points_earned,
       completed_at,
       quizzes!inner(title, topic, difficulty, created_by),
-      profiles:user_id(full_name, email, employee_id, department)
+      profiles:user_id(full_name, email, employee_id, department, avatar_url)
     `)
     .eq('quizzes.created_by', userId)
     .eq('status', 'completed')
@@ -227,6 +229,12 @@ export default async function ManagerLeaderboardPage() {
                     <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-100 text-green-700 font-bold text-sm">
                       {completion.score}%
                     </div>
+                    <AvatarView
+                      src={completion.profiles?.avatar_url}
+                      alt={`${completion.profiles?.full_name || 'Employee'} avatar`}
+                      size={40}
+                      className="h-10 w-10 rounded-xl border border-white object-cover shadow-sm"
+                    />
                     <div>
                       <p className="font-medium text-sm">{completion.profiles?.full_name || 'Unknown'}</p>
                       <p className="text-xs text-muted-foreground">
@@ -336,7 +344,8 @@ export default async function ManagerLeaderboardPage() {
                 full_name: c.profiles.full_name,
                 email: c.profiles.email,
                 employee_id: c.profiles.employee_id,
-                department: c.profiles.department
+                department: c.profiles.department,
+                avatar_url: c.profiles.avatar_url,
               }
             })) || []}
             exportHref="/api/leaderboard/cumulative/download"
@@ -391,6 +400,12 @@ export default async function ManagerLeaderboardPage() {
                         }`}>
                           {entry.rank <= 3 ? ['🥇', '🥈', '🥉'][entry.rank - 1] : entry.rank}
                         </div>
+                        <AvatarView
+                          src={entry.avatar_url}
+                          alt={`${entry.full_name || 'Employee'} avatar`}
+                          size={40}
+                          className="h-10 w-10 rounded-xl border border-white object-cover shadow-sm"
+                        />
                         <div>
                           <p className="font-medium text-sm">{entry.full_name}</p>
                           <p className="text-xs text-muted-foreground">
