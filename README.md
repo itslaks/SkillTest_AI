@@ -283,7 +283,7 @@ cp .env.local.example .env.local
 #    database/migrations/001_create_profiles.sql
 #    database/migrations/002_create_quizzes.sql
 #    ... through ...
-#    database/migrations/042_proctoring_baseline_and_event_metadata.sql
+#    database/migrations/043_cleanup_orphan_employee_auth_users.sql
 
 # 5. Seed (optional)
 node database/seeds/seed_admin.js

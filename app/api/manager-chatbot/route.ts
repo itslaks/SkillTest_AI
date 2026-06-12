@@ -5,7 +5,7 @@ import { getAccessibleTrainingBatchIds } from '@/lib/training-access'
 import { callAI, stripCodeFences } from '@/lib/ai'
 import { analyzeAttemptPattern } from '@/lib/insights'
 import { buildAdminGuideSearchIndex, findAdminGuideAnswer } from '@/lib/manager-docs'
-import { createEmployeeWithSetupEmail } from '@/lib/employee-onboarding'
+import { createEmployeeWithSetupEmail, deleteEmployeeAccount } from '@/lib/employee-onboarding'
 import type { DifficultyLevel, QuizAnswer } from '@/lib/types/database'
 import { revalidatePath } from 'next/cache'
 
@@ -625,9 +625,14 @@ async function deleteProfileCommand(admin: ReturnType<typeof createAdminClient>,
   const profile = await findProfileByArgs(admin, args)
   if (!profile) return { error: `No ${role} matched email/id/name.` }
   if (profile.role !== role) return { error: `Matched profile is ${profile.role}, not ${role}.` }
-  const { error } = await admin.from('profiles').delete().eq('id', profile.id)
-  if (error) return { error: error.message }
-  await admin.auth.admin.deleteUser(profile.id).catch(() => null)
+  if (role === 'employee') {
+    const deletion = await deleteEmployeeAccount(admin, { id: profile.id, email: profile.email })
+    if (deletion.warnings.length > 0) console.warn('[manager-chatbot] employee deletion warnings:', deletion.warnings)
+  } else {
+    const { error } = await admin.from('profiles').delete().eq('id', profile.id)
+    if (error) return { error: error.message }
+    await admin.auth.admin.deleteUser(profile.id).catch(() => null)
+  }
   revalidateManagerPaths()
   return { message: `${role} ${profile.full_name || profile.email} deleted.` }
 }

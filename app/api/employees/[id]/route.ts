@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireManagerForApi } from '@/lib/rbac'
+import { deleteEmployeeAccount } from '@/lib/employee-onboarding'
 
 export async function PATCH(
   request: NextRequest,
@@ -105,19 +106,33 @@ export async function DELETE(
       )
     }
 
-    // Delete from auth.users (this will cascade to profiles due to foreign key)
-    const { error: authDeleteError } = await supabase.auth.admin.deleteUser(employeeId)
+    const deletion = await deleteEmployeeAccount(supabase, {
+      id: employee.id,
+      email: employee.email,
+    })
 
-    if (authDeleteError) {
+    if (deletion.warnings.length > 0) {
+      console.warn('[employees] deletion warnings:', deletion.warnings)
+    }
+
+    const { data: remainingProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', employeeId)
+      .maybeSingle()
+
+    if (remainingProfile) {
       return NextResponse.json(
-        { error: `Failed to remove employee: ${authDeleteError.message}` },
+        { error: 'Failed to remove employee profile. Please retry or contact admin.' },
         { status: 500 }
       )
     }
 
     return NextResponse.json({
       success: true,
-      message: `Employee ${employee.full_name} has been successfully removed`
+      message: `Employee ${employee.full_name} has been successfully removed`,
+      deletedAuthUsers: deletion.deletedAuthUsers,
+      deletedProfile: deletion.deletedProfile,
     })
 
   } catch (error: any) {

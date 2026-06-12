@@ -24,11 +24,11 @@ interface DeleteEmployeeButtonProps {
   hasQuizAttempts?: boolean
 }
 
-export function DeleteEmployeeButton({ 
-  employeeId, 
-  employeeName, 
-  employeeEmail, 
-  hasQuizAttempts = false 
+export function DeleteEmployeeButton({
+  employeeId,
+  employeeName,
+  employeeEmail,
+  hasQuizAttempts = false,
 }: DeleteEmployeeButtonProps) {
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -47,21 +47,21 @@ export function DeleteEmployeeButton({
         if (response.ok) {
           toast({
             title: 'Employee Removed',
-            description: `${employeeName} has been removed from the system.`
+            description: `${employeeName} has been removed from the system.`,
           })
           router.refresh()
         } else {
           toast({
             title: 'Error',
             description: result.error || 'Failed to remove employee.',
-            variant: 'destructive'
+            variant: 'destructive',
           })
         }
-    } catch {
+      } catch {
         toast({
           title: 'Error',
           description: 'Network error. Please try again.',
-          variant: 'destructive'
+          variant: 'destructive',
         })
       }
       setOpen(false)
@@ -90,7 +90,7 @@ export function DeleteEmployeeButton({
               </span>
             )}
             <span className="block mt-2 text-amber-700 font-medium">
-              📝 Note: If this employee wants to access the system again, they will need to sign up with a new account.
+              This permanently deletes the employee profile and Supabase Auth account. The same email can be invited again later.
             </span>
             <span className="block mt-1">This action cannot be undone.</span>
           </AlertDialogDescription>
