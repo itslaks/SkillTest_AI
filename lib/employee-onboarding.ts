@@ -20,7 +20,23 @@ export interface EmployeeOnboardingResult {
 type AuthUser = {
   id: string
   email?: string
+  email_confirmed_at?: string | null
   user_metadata?: Record<string, unknown>
+}
+
+type AuthCleanupResult = {
+  foundAuthUsers: number
+  deletedAuthUsers: number
+  keptAuthUsers: AuthUser[]
+  warnings: string[]
+}
+
+function authRole(user: AuthUser) {
+  return String(user.user_metadata?.role || 'employee')
+}
+
+function logAuthCleanup(message: string, metadata: Record<string, unknown>) {
+  console.info('[employee-auth-cleanup]', { message, ...metadata })
 }
 
 export async function findAuthUsersByEmail(supabase: AdminClient, email: string): Promise<AuthUser[]> {
@@ -54,6 +70,11 @@ export async function deleteEmployeeAccount(
   const authIds = new Set<string>([input.id])
   try {
     const matchingAuthUsers = await findAuthUsersByEmail(supabase, input.email)
+    logAuthCleanup('delete flow searched auth by email', {
+      email: input.email,
+      profileId: input.id,
+      matchingAuthUserIds: matchingAuthUsers.map((user) => user.id),
+    })
     for (const user of matchingAuthUsers) authIds.add(user.id)
   } catch (error: any) {
     warnings.push(error?.message || 'Could not inspect matching Supabase Auth users before deletion.')
@@ -63,6 +84,11 @@ export async function deleteEmployeeAccount(
     const { error } = await supabase.auth.admin.deleteUser(authId)
     if (!error) {
       deletedAuthUsers++
+      logAuthCleanup('deleted auth user during employee deletion', {
+        email: input.email,
+        profileId: input.id,
+        authUserId: authId,
+      })
       continue
     }
 
@@ -93,7 +119,92 @@ export async function deleteEmployeeAccount(
     throw new Error(warnings.join(' ') || 'Employee account could not be fully deleted.')
   }
 
+  const remaining = await findAuthUsersByEmail(supabase, input.email).catch((error: any) => {
+    warnings.push(`Could not confirm auth cleanup by email: ${error?.message || 'unknown error'}`)
+    return []
+  })
+  if (remaining.length > 0) {
+    throw new Error(`Employee profile was removed, but ${remaining.length} Supabase Auth user(s) still exist for ${input.email}.`)
+  }
+
   return { deletedAuthUsers, deletedProfile, warnings }
+}
+
+export async function cleanupOrphanEmployeeAuthUsersByEmail(
+  supabase: AdminClient,
+  email: string,
+  options: { preserveProfileId?: string | null; reason?: string } = {},
+): Promise<AuthCleanupResult> {
+  const warnings: string[] = []
+  const keptAuthUsers: AuthUser[] = []
+  let deletedAuthUsers = 0
+  const authUsers = await findAuthUsersByEmail(supabase, email)
+
+  logAuthCleanup('searched auth users by email', {
+    email,
+    preserveProfileId: options.preserveProfileId || null,
+    reason: options.reason || 'not_provided',
+    foundAuthUserIds: authUsers.map((user) => user.id),
+  })
+
+  for (const authUser of authUsers) {
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, email, role')
+      .eq('id', authUser.id)
+      .maybeSingle()
+
+    if (profileError) {
+      warnings.push(`Could not inspect profile for auth user ${authUser.id}: ${profileError.message}`)
+      keptAuthUsers.push(authUser)
+      continue
+    }
+
+    if (profile) {
+      keptAuthUsers.push(authUser)
+      logAuthCleanup('kept auth user with active profile', {
+        email,
+        authUserId: authUser.id,
+        profileId: profile.id,
+        profileRole: profile.role,
+      })
+      continue
+    }
+
+    const role = authRole(authUser)
+    if (role !== 'employee') {
+      warnings.push(`Auth user ${authUser.id} has role ${role}; cleanup skipped.`)
+      keptAuthUsers.push(authUser)
+      continue
+    }
+
+    const { error } = await supabase.auth.admin.deleteUser(authUser.id)
+    if (error) {
+      warnings.push(`Auth user ${authUser.id} was not deleted: ${error.message}`)
+      keptAuthUsers.push(authUser)
+      console.warn('[employee-auth-cleanup] delete failed', {
+        email,
+        authUserId: authUser.id,
+        code: (error as any).code || null,
+        message: error.message,
+      })
+      continue
+    }
+
+    deletedAuthUsers++
+    logAuthCleanup('deleted orphan employee auth user', {
+      email,
+      authUserId: authUser.id,
+      reason: options.reason || 'not_provided',
+    })
+  }
+
+  return {
+    foundAuthUsers: authUsers.length,
+    deletedAuthUsers,
+    keptAuthUsers,
+    warnings,
+  }
 }
 
 export async function createEmployeeWithSetupEmail(
@@ -326,26 +437,65 @@ export async function sendEmployeeSetupEmail(
 ): Promise<{ success: boolean; error?: string }> {
   const siteUrl = getSiteUrl().replace(/\/$/, '')
   const redirectTo = getPasswordResetRedirectUrl()
+  const normalizedEmail = email.trim().toLowerCase()
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id, employee_id, role')
+    .eq('email', normalizedEmail)
+    .maybeSingle()
+
+  let cleanup: AuthCleanupResult
+  try {
+    cleanup = await cleanupOrphanEmployeeAuthUsersByEmail(supabase, normalizedEmail, {
+      preserveProfileId: profile?.id || null,
+      reason: 'before_setup_email',
+    })
+  } catch (error: any) {
+    return { success: false, error: error?.message || 'Could not inspect Supabase Auth before setup email' }
+  }
+
+  if (cleanup.warnings.length > 0) {
+    console.warn('[employee-auth-cleanup] setup preflight warnings', {
+      email: normalizedEmail,
+      profileId: profile?.id || null,
+      warnings: cleanup.warnings,
+    })
+  }
+
+  const activeAuthUser = cleanup.keptAuthUsers.find((authUser) => authUser.id === profile?.id)
+    || cleanup.keptAuthUsers.find((authUser) => authRole(authUser) === 'employee')
+
+  const linkType = activeAuthUser ? 'recovery' : 'invite'
+  logAuthCleanup('generating employee setup link', {
+    email: normalizedEmail,
+    profileId: profile?.id || null,
+    authUserId: activeAuthUser?.id || null,
+    linkType,
+  })
+
   const { data, error } = await supabase.auth.admin.generateLink({
-    type: 'invite',
-    email,
+    type: linkType,
+    email: normalizedEmail,
     options: { redirectTo },
   })
 
   if (error || !data.properties?.action_link) {
+    console.warn('[employee-auth-cleanup] setup link generation failed', {
+      email: normalizedEmail,
+      profileId: profile?.id || null,
+      authUserId: activeAuthUser?.id || null,
+      linkType,
+      code: (error as any)?.code || null,
+      message: error?.message || 'missing action link',
+    })
     return { success: false, error: error?.message || 'Could not generate verification setup link' }
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('employee_id')
-    .eq('email', email)
-    .maybeSingle()
-  const signUpParams = new URLSearchParams({ role: 'employee', email })
+  const signUpParams = new URLSearchParams({ role: 'employee', email: normalizedEmail })
   if (profile?.employee_id) signUpParams.set('employeeId', profile.employee_id)
 
   const emailResult = await sendEmail({
-    to: email,
+    to: normalizedEmail,
     subject: 'Verify and set up your SkillTest_AI account',
     html: buildEmployeeWelcomeEmail({
       employeeName: fullName,

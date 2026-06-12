@@ -283,7 +283,7 @@ cp .env.local.example .env.local
 #    database/migrations/001_create_profiles.sql
 #    database/migrations/002_create_quizzes.sql
 #    ... through ...
-#    database/migrations/043_cleanup_orphan_employee_auth_users.sql
+#    database/migrations/042_proctoring_baseline_and_event_metadata.sql
 
 # 5. Seed (optional)
 node database/seeds/seed_admin.js
@@ -406,6 +406,14 @@ Auth behavior:
 - Unverified employees/trainers cannot sign in or open protected routes by direct URL.
 - Login shows a resend verification option when an unverified user is blocked.
 - Proctoring, flag, and security alert emails are sent to `ADMIN_ALERT_EMAIL`; for this deployment that is `skilltestai01@gmail.com`.
+
+Employee Auth repair:
+
+```bash
+npm run cleanup:auth-user -- employee@example.com
+```
+
+Use this only for a stuck deleted employee email. The script uses the Supabase Admin API, keeps active profiles, and deletes only orphan employee Auth users.
 
 ---
 

@@ -30,7 +30,7 @@ import {
 } from '@/lib/security/env'
 import { revalidatePath } from 'next/cache'
 import { normalizeDomain } from '@/lib/domain-options'
-import { findAuthUsersByEmail, sendEmployeeSetupEmail } from '@/lib/employee-onboarding'
+import { cleanupOrphanEmployeeAuthUsersByEmail, sendEmployeeSetupEmail } from '@/lib/employee-onboarding'
 import { sendEmail } from '@/lib/email'
 
 function safeRedirectPath(value: string | undefined | null) {
@@ -198,41 +198,27 @@ export async function signUp(formData: FormData) {
 }
 
 async function removeOrphanEmployeeAuthUsers(adminClient: ReturnType<typeof createAdminClient>, email: string) {
-  let authUsers: Awaited<ReturnType<typeof findAuthUsersByEmail>>
   try {
-    authUsers = await findAuthUsersByEmail(adminClient, email)
+    const cleanup = await cleanupOrphanEmployeeAuthUsersByEmail(adminClient, email, { reason: 'before_self_signup' })
+    if (cleanup.warnings.length > 0) {
+      console.warn('[auth] orphan auth cleanup warnings before signup:', {
+        email,
+        warnings: cleanup.warnings,
+      })
+    }
+    const conflicting = cleanup.keptAuthUsers.find((authUser) => {
+      const role = String(authUser.user_metadata?.role || 'employee')
+      return role !== 'employee'
+    })
+    if (conflicting) {
+      const role = String(conflicting.user_metadata?.role || 'unknown')
+      return { error: `This email is already linked to a ${role} auth account. Please contact admin.` }
+    }
+    return { success: true }
   } catch (error: any) {
     console.warn('[auth] orphan auth lookup failed before signup:', error?.message)
     return { error: 'Could not verify whether this email has an existing account. Please try again or contact admin.' }
   }
-
-  for (const authUser of authUsers) {
-    const { data: profile } = await adminClient
-      .from('profiles')
-      .select('id, role')
-      .eq('id', authUser.id)
-      .maybeSingle()
-
-    if (profile) {
-      if (profile.role !== 'employee') {
-        return { error: `This email is already linked to a ${profile.role} account. Please sign in or contact admin.` }
-      }
-      continue
-    }
-
-    const role = String(authUser.user_metadata?.role || 'employee')
-    if (role !== 'employee') {
-      return { error: `This email is already linked to a ${role} auth account. Please contact admin.` }
-    }
-
-    const { error } = await adminClient.auth.admin.deleteUser(authUser.id)
-    if (error) {
-      console.warn('[auth] orphan auth delete failed before signup:', error.message)
-      return { error: 'This email has an incomplete previous account. Please contact admin to clear it before signing up.' }
-    }
-  }
-
-  return { success: true }
 }
 
 export async function signIn(formData: FormData) {

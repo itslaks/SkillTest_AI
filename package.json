@@ -7,6 +7,7 @@
     "dev": "next dev",
     "lint": "eslint .",
     "start": "next start",
+    "cleanup:auth-user": "node --no-warnings --experimental-strip-types scripts/cleanup-orphan-auth-user-by-email.ts",
     "test:smoke": "node scripts/browser-smoke.js",
     "fixtures:contest": "node scripts/generate-contest-demo-fixtures.js",
     "fixtures:tms": "node scripts/generate-tms-upload-fixtures.js",
