@@ -147,7 +147,7 @@ export function EmployeeImporter() {
           Import Employees
         </CardTitle>
         <CardDescription className="text-base mt-2">
-          Upload Excel or CSV with <strong>Email</strong>, <strong>name</strong>, <strong>employee_id</strong>, and <strong>domain</strong>.
+          Upload Excel, CSV, or TXT with <strong>Email</strong>, <strong>name</strong>, <strong>employee_id</strong>, and <strong>domain</strong>.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -201,7 +201,7 @@ export function EmployeeImporter() {
                 {isDragging ? "Drop it here!" : "Drag & drop your file"}
               </p>
               <p className="text-muted-foreground mt-2">
-                Accepts CSV, XLSX, DOCX, PDF, XML, or JSON
+                Accepts CSV, TXT, XLSX, DOCX, PDF, XML, or JSON
               </p>
             </div>
             <label className="mt-4">
@@ -233,8 +233,8 @@ export function EmployeeImporter() {
               </Button>
             </div>
 
-            <div className="overflow-hidden rounded-xl border border-foreground/10 bg-card">
-              <table className="w-full text-sm border-collapse">
+            <div className="overflow-x-auto rounded-xl border border-foreground/10 bg-card">
+              <table className="min-w-[42rem] w-full text-sm border-collapse">
                 <thead>
                   <tr className="bg-muted/50">
                     <th className="text-left p-4 font-bold border-b">S.No</th>

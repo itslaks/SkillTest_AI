@@ -3,8 +3,9 @@ import { requireManagerForApi } from '@/lib/rbac'
 import { NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
 import { buildCumulativeLeaderboard, formatDuration, type CumulativeAttempt } from '@/lib/leaderboard'
+import { rowsToTxt } from '@/lib/text-export'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const auth = await requireManagerForApi()
     if (auth instanceof NextResponse) return auth
@@ -66,6 +67,17 @@ export async function GET() {
         'Total Time Spent': formatDuration(entry.total_time),
       }
     })
+
+    const format = new URL(request.url).searchParams.get('format')?.toLowerCase()
+
+    if (format === 'txt') {
+      return new NextResponse(rowsToTxt(rows, 'No completed attempts yet'), {
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Content-Disposition': 'attachment; filename="cumulative-leaderboard-report.txt"',
+        },
+      })
+    }
 
     const wb = XLSX.utils.book_new()
     const ws = XLSX.utils.json_to_sheet(rows.length > 0 ? rows : [{ 'Message': 'No completed attempts yet' }])

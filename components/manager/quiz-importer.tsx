@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast'
 import { bulkCreateQuestions } from '@/lib/actions/quiz'
 import type { DifficultyLevel, CreateQuestionInput } from '@/lib/types/database'
 import { parseUniversalRowsFile, UNIVERSAL_UPLOAD_ACCEPT, normalizeHeader } from '@/lib/file-utils'
+import { downloadTextFile, rowsToTxt } from '@/lib/text-export'
 import * as XLSX from 'xlsx'
 
 const DIFFICULTIES: DifficultyLevel[] = ['easy', 'medium', 'hard', 'advanced', 'hardcore']
@@ -216,6 +217,33 @@ export function QuizImporter({
     XLSX.writeFile(wb, 'quiz_questions_template.xlsx')
   }
 
+  function downloadTxtTemplate() {
+    const template = [
+      {
+        question_text: 'What is the capital of France?',
+        option_a: 'London',
+        option_b: 'Paris',
+        option_c: 'Berlin',
+        option_d: 'Madrid',
+        correct_answer: 'B',
+        difficulty: 'easy',
+        explanation: 'Paris is the capital and largest city of France.',
+      },
+      {
+        question_text: 'Which planet is known as the Red Planet?',
+        option_a: 'Venus',
+        option_b: 'Jupiter',
+        option_c: 'Mars',
+        option_d: 'Saturn',
+        correct_answer: 'C',
+        difficulty: 'easy',
+        explanation: 'Mars appears red due to iron oxide on its surface.',
+      },
+    ]
+
+    downloadTextFile(rowsToTxt(template), 'quiz_questions_template.txt')
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -224,7 +252,7 @@ export function QuizImporter({
           Import Questions from File
         </CardTitle>
         <CardDescription>
-          Upload CSV, XLSX, DOCX, PDF, XML, or JSON questions. Download the template to see the required format.
+          Upload CSV, TXT, XLSX, DOCX, PDF, XML, or JSON questions. Download the template to see the required format.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -242,18 +270,24 @@ export function QuizImporter({
         )}
 
         {/* Template download */}
-        <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+        <div className="flex flex-col gap-4 rounded-lg bg-muted p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <FileSpreadsheet className="h-8 w-8 text-green-600" />
             <div>
               <p className="font-medium">Download Template</p>
-              <p className="text-sm text-muted-foreground">Get the Excel template with required columns</p>
+              <p className="text-sm text-muted-foreground">Get Excel or TXT templates with required columns</p>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={downloadTemplate}>
-            <Download className="mr-2 h-4 w-4" />
-            Download
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={downloadTemplate}>
+              <Download className="mr-2 h-4 w-4" />
+              XLSX
+            </Button>
+            <Button variant="outline" size="sm" onClick={downloadTxtTemplate}>
+              <Download className="mr-2 h-4 w-4" />
+              TXT
+            </Button>
+          </div>
         </div>
 
         {/* File upload */}
@@ -273,7 +307,7 @@ export function QuizImporter({
             {selectedFile ? selectedFile.name : 'Click to upload or drag and drop'}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            CSV, XLSX, DOCX, PDF, XML, or JSON files
+            CSV, TXT, XLSX, DOCX, PDF, XML, or JSON files
           </p>
         </div>
 

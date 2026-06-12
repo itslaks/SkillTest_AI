@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { 
   Clock, Trophy, Target, Download, Calendar,
-  User, CheckCircle2, BarChart3
+  User, CheckCircle2, BarChart3, FileText
 } from 'lucide-react'
 
 interface QuizCompletionEntry {
@@ -146,7 +146,7 @@ export function QuizCompletionDetails({
 
       {/* Detailed Results */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-blue-500" />
@@ -157,12 +157,20 @@ export function QuizCompletionDetails({
             </p>
           </div>
           {exportHref && completions.length > 0 && (
-            <Button asChild variant="outline" size="sm">
-              <a href={exportHref}>
-              <Download className="mr-2 h-4 w-4" />
-              Export Results
-              </a>
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild variant="outline" size="sm">
+                <a href={exportHref}>
+                  <Download className="mr-2 h-4 w-4" />
+                  XLSX
+                </a>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <a href={`${exportHref}${exportHref.includes('?') ? '&' : '?'}format=txt`}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  TXT
+                </a>
+              </Button>
+            </div>
           )}
         </CardHeader>
         <CardContent>
@@ -175,24 +183,24 @@ export function QuizCompletionDetails({
                 return (
                   <div
                     key={completion.id}
-                    className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 transition-colors"
+                    className="flex flex-col gap-4 rounded-lg border p-4 transition-colors hover:bg-muted/50 lg:flex-row lg:items-center lg:justify-between"
                   >
-                    <div className="flex items-center gap-4">
+                    <div className="flex min-w-0 items-center gap-4">
                       <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold border-2 ${scoreColor}`}>
                         {completion.score}%
                       </div>
-                      <div>
-                        <p className="font-semibold text-sm">{completion.profile.full_name}</p>
-                        <p className="text-xs text-muted-foreground">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">{completion.profile.full_name}</p>
+                        <p className="truncate text-xs text-muted-foreground">
                           {completion.profile.email} • {completion.profile.employee_id || 'No ID'}
                         </p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="truncate text-xs text-muted-foreground">
                           {completion.profile.department || 'No Department'}
                         </p>
                       </div>
                     </div>
                     
-                    <div className="flex items-center gap-6 text-sm">
+                    <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3 lg:flex lg:items-center lg:gap-6">
                       <div className="text-center">
                         <div className="flex items-center gap-1">
                           <CheckCircle2 className="h-3 w-3 text-green-500" />

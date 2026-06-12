@@ -1,11 +1,12 @@
 import * as XLSX from 'xlsx'
 
-export const UNIVERSAL_UPLOAD_ACCEPT = '.csv,.xlsx,.xls,.json,.xml,.pdf,.docx'
-export const STRUCTURED_UPLOAD_ACCEPT = '.csv,.xlsx,.xls,.json,.xml'
+export const UNIVERSAL_UPLOAD_ACCEPT = '.csv,.txt,.xlsx,.xls,.json,.xml,.pdf,.docx'
+export const STRUCTURED_UPLOAD_ACCEPT = '.csv,.txt,.xlsx,.xls,.json,.xml'
 export const DOCUMENT_UPLOAD_ACCEPT = '.pdf,.docx'
 
 const SPREADSHEET_EXTENSIONS = ['.xlsx', '.xls', '.csv']
-const STRUCTURED_EXTENSIONS = [...SPREADSHEET_EXTENSIONS, '.json', '.xml']
+const TEXT_EXTENSIONS = ['.txt']
+const STRUCTURED_EXTENSIONS = [...SPREADSHEET_EXTENSIONS, ...TEXT_EXTENSIONS, '.json', '.xml']
 const DOCUMENT_EXTENSIONS = ['.pdf', '.docx']
 
 export function normalizeHeader(value: string) {
@@ -169,6 +170,12 @@ export async function parseUniversalRowsFile(file: File) {
 
   if (SPREADSHEET_EXTENSIONS.some((extension) => fileName.endsWith(extension))) {
     return parseSpreadsheetFile(file)
+  }
+
+  if (TEXT_EXTENSIONS.some((extension) => fileName.endsWith(extension))) {
+    const text = await file.text()
+    const rows = parseTextToRows(text)
+    return rows.length > 0 ? rows : parseKeyValueText(text)
   }
 
   if (fileName.endsWith('.json')) {

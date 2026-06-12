@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dialog'
 import { Spinner } from '@/components/ui/spinner'
 import { assignQuizToEmployees, unassignQuizFromEmployee } from '@/lib/actions/manager'
-import { UserPlus, X, Check, Users, Download, ClipboardList, Search, Filter, Fingerprint } from 'lucide-react'
+import { UserPlus, X, Check, Users, Download, ClipboardList, Search, Filter, Fingerprint, FileText } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { getDomainColor } from '@/lib/domain-colors'
 
@@ -162,22 +162,32 @@ export function QuizAssignmentManager({ quizzes, employees, assignments, autoOpe
 
   return (
     <div className="rounded-2xl border border-border/60 bg-white shadow-sm overflow-hidden">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border/50 bg-muted/20">
+      <div className="flex flex-col gap-3 border-b border-border/50 bg-muted/20 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <ClipboardList className="h-4 w-4 text-primary" />
           <h2 className="font-semibold">Quiz Assignments</h2>
           <Badge variant="secondary" className="rounded-full text-xs ml-1">{assignedForQuiz.length} assigned</Badge>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {assignedForQuiz.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 rounded-xl text-xs"
-              onClick={() => window.open(`/api/leaderboard/${selectedQuiz}/download`, '_blank')}
-            >
-              <Download className="h-3.5 w-3.5 mr-1.5" />Download Report
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 rounded-xl text-xs"
+                onClick={() => window.open(`/api/leaderboard/${selectedQuiz}/download`, '_blank')}
+              >
+                <Download className="h-3.5 w-3.5 mr-1.5" />XLSX
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 rounded-xl text-xs"
+                onClick={() => window.open(`/api/leaderboard/${selectedQuiz}/download?format=txt`, '_blank')}
+              >
+                <FileText className="h-3.5 w-3.5 mr-1.5" />TXT
+              </Button>
+            </>
           )}
           <Button
             size="sm"

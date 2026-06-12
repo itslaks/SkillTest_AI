@@ -114,9 +114,9 @@ export function AttendanceImporter({ sessions }: AttendanceImporterProps) {
         <div>
           <div className="flex items-center gap-2 font-semibold">
             <FileSpreadsheet className="h-4 w-4" />
-            Excel attendance upload
+            Attendance upload
           </div>
-          <p className="mt-1 text-sm text-zinc-500">Upload one sheet with Email or Employee_ID and Status.</p>
+          <p className="mt-1 text-sm text-zinc-500">Upload XLSX, CSV, or TXT with Email or Employee_ID and Status.</p>
         </div>
         <Button asChild variant="outline" className="rounded-full">
           <a href="/api/training/attendance-template">Download template</a>
@@ -203,7 +203,7 @@ export function AttendanceImporter({ sessions }: AttendanceImporterProps) {
             </div>
           ) : null}
           {result.errors?.length ? (
-            <div className="mt-3 overflow-hidden rounded-xl border border-rose-200 bg-white text-xs text-rose-800">
+            <div className="mt-3 overflow-x-auto rounded-xl border border-rose-200 bg-white text-xs text-rose-800">
               <div className="grid grid-cols-[4.5rem_1fr_1fr_1.4fr] gap-2 border-b border-rose-100 bg-rose-50 px-3 py-2 font-semibold">
                 <span>Row</span>
                 <span>Candidate</span>

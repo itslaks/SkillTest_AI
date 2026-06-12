@@ -43,12 +43,12 @@ export default async function EmployeeLayout({
   }
 
   const navigation = [
-    { name: 'Dashboard', href: '/employee', icon: LayoutDashboard, color: 'text-white' },
-    { name: 'Training', href: '/employee/training', icon: CalendarDays, color: 'text-white' },
-    { name: 'Quizzes', href: '/employee/quizzes', icon: FileQuestion, color: 'text-white' },
-    { name: 'Leaderboard', href: '/employee/leaderboard', icon: Trophy, color: 'text-white' },
-    { name: 'Accomplishments', href: '/employee/badges', icon: Award, color: 'text-white' },
-    { name: 'Profile', href: '/profile/settings', icon: Settings, color: 'text-white' },
+    { name: 'Dashboard', mobileName: 'Home', href: '/employee', icon: LayoutDashboard, color: 'text-white' },
+    { name: 'Training', mobileName: 'Training', href: '/employee/training', icon: CalendarDays, color: 'text-white' },
+    { name: 'Quizzes', mobileName: 'Quizzes', href: '/employee/quizzes', icon: FileQuestion, color: 'text-white' },
+    { name: 'Leaderboard', mobileName: 'Ranks', href: '/employee/leaderboard', icon: Trophy, color: 'text-white' },
+    { name: 'Accomplishments', mobileName: 'Badges', href: '/employee/badges', icon: Award, color: 'text-white' },
+    { name: 'Profile', mobileName: 'Profile', href: '/profile/settings', icon: Settings, color: 'text-white' },
   ]
 
   const { data: userStats } = await supabase
@@ -126,16 +126,21 @@ export default async function EmployeeLayout({
       </aside>
 
       {/* Mobile top bar */}
-      <header className="md:hidden fixed top-0 left-0 right-0 z-50 bg-black border-b border-white/5 px-4 py-3">
+      <header className="md:hidden fixed top-0 left-0 right-0 z-50 bg-black border-b border-white/5 px-3 py-3">
         <Link href="/employee" className="flex items-center gap-2">
           <BrandLogo variant="mark" tone="light" className="w-7" imageClassName="aspect-square" />
           <span className="text-white font-bold text-sm">SkillTest_AI</span>
         </Link>
-        <nav className="mt-3 grid grid-cols-6 gap-1">
+        <nav className="-mx-3 mt-3 flex gap-1 overflow-x-auto px-3 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {navigation.map((item) => (
-            <Link key={item.name} href={item.href} className="flex flex-col items-center gap-1 rounded-lg px-1 py-2 text-white/70 hover:text-white hover:bg-white/8 transition-all">
+            <Link
+              key={item.name}
+              href={item.href}
+              aria-label={item.name}
+              className="flex min-w-[4.35rem] shrink-0 flex-col items-center gap-1 rounded-lg px-2 py-2 text-white/70 transition-all hover:bg-white/8 hover:text-white"
+            >
               <item.icon className={`h-4 w-4 ${item.color}`} />
-              <span className="text-[10px] font-medium leading-none">{item.name}</span>
+              <span className="max-w-full truncate text-[10px] font-medium leading-none">{item.mobileName}</span>
             </Link>
           ))}
         </nav>

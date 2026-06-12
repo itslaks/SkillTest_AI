@@ -9,7 +9,7 @@ import { QuizCompletionDetails } from '@/components/manager/quiz-completion-deta
 import { buildCumulativeLeaderboard, type CumulativeAttempt } from '@/lib/leaderboard'
 import { 
   Trophy, Crown, Users, TrendingUp, Clock, 
-  Download, BarChart3, Target 
+  Download, BarChart3, Target, FileText
 } from 'lucide-react'
 
 export default async function ManagerLeaderboardPage() {
@@ -137,7 +137,13 @@ export default async function ManagerLeaderboardPage() {
           <Button variant="outline" asChild>
             <a href="/api/leaderboard/cumulative/download">
               <Download className="mr-2 h-4 w-4" />
-              Download Cumulative
+              Cumulative XLSX
+            </a>
+          </Button>
+          <Button variant="outline" asChild>
+            <a href="/api/leaderboard/cumulative/download?format=txt">
+              <FileText className="mr-2 h-4 w-4" />
+              Cumulative TXT
             </a>
           </Button>
           <Button className="bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700" asChild>
@@ -275,7 +281,7 @@ export default async function ManagerLeaderboardPage() {
         {/* Cumulative Leaderboard */}
         <TabsContent value="cumulative">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <BarChart3 className="h-5 w-5 text-blue-500" />
@@ -285,12 +291,20 @@ export default async function ManagerLeaderboardPage() {
                   Overall employee performance across all quizzes
                 </CardDescription>
               </div>
-              <Button variant="outline" size="sm" asChild>
-                <a href="/api/leaderboard/cumulative/download">
-                  <Download className="mr-2 h-4 w-4" />
-                  Export
-                </a>
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" asChild>
+                  <a href="/api/leaderboard/cumulative/download">
+                    <Download className="mr-2 h-4 w-4" />
+                    XLSX
+                  </a>
+                </Button>
+                <Button variant="outline" size="sm" asChild>
+                  <a href="/api/leaderboard/cumulative/download?format=txt">
+                    <FileText className="mr-2 h-4 w-4" />
+                    TXT
+                  </a>
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <RealtimeManagerLeaderboard 
@@ -333,7 +347,7 @@ export default async function ManagerLeaderboardPage() {
         {quizzes?.map((quiz: any) => (
           <TabsContent key={quiz.id} value={quiz.id}>
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <Trophy className="h-5 w-5 text-yellow-500" />
@@ -346,12 +360,20 @@ export default async function ManagerLeaderboardPage() {
                     </Badge>
                   </CardDescription>
                 </div>
-                <Button variant="outline" size="sm" asChild>
-                  <a href={`/api/leaderboard/${quiz.id}/download`}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Export Results
-                  </a>
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" asChild>
+                    <a href={`/api/leaderboard/${quiz.id}/download`}>
+                      <Download className="mr-2 h-4 w-4" />
+                      XLSX
+                    </a>
+                  </Button>
+                  <Button variant="outline" size="sm" asChild>
+                    <a href={`/api/leaderboard/${quiz.id}/download?format=txt`}>
+                      <FileText className="mr-2 h-4 w-4" />
+                      TXT
+                    </a>
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">

@@ -26,6 +26,7 @@ import { useToast } from '@/hooks/use-toast'
 import { bulkCreateQuestions } from '@/lib/actions/quiz'
 import type { DifficultyLevel, CreateQuestionInput, ParsedQuestion } from '@/lib/types/database'
 import { parseUniversalRowsFile, UNIVERSAL_UPLOAD_ACCEPT, STRUCTURED_UPLOAD_ACCEPT } from '@/lib/file-utils'
+import { downloadTextFile, rowsToTxt } from '@/lib/text-export'
 import * as XLSX from 'xlsx'
 
 const DIFFICULTIES: DifficultyLevel[] = ['easy', 'medium', 'hard', 'advanced', 'hardcore']
@@ -130,7 +131,7 @@ export function UnifiedQuizImporter({
       
       const fileName = file.name.toLowerCase()
       const isDoc = fileName.endsWith('.pdf') || fileName.endsWith('.docx')
-      const isSpreadsheet = fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || fileName.endsWith('.csv')
+      const isSpreadsheet = fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || fileName.endsWith('.csv') || fileName.endsWith('.txt')
       const isJson = fileName.endsWith('.json')
       const isXml = fileName.endsWith('.xml')
       
@@ -357,6 +358,13 @@ export function UnifiedQuizImporter({
     XLSX.writeFile(wb, 'quiz_questions_template.xlsx')
   }
 
+  function downloadTxtTemplate() {
+    const template = [{
+      question_text: 'What is the capital of France?', option_a: 'London', option_b: 'Paris', option_c: 'Berlin', option_d: 'Madrid', correct_answer: 'B', difficulty: 'easy', explanation: 'Paris is the capital.'
+    }]
+    downloadTextFile(rowsToTxt(template), 'quiz_questions_template.txt')
+  }
+
   return (
     <Card className="border-border/50 shadow-sm overflow-hidden bg-card/50 backdrop-blur-sm">
       <CardHeader className="bg-muted/30 border-b">
@@ -414,17 +422,22 @@ export function UnifiedQuizImporter({
 
           <TabsContent value="upload" className="space-y-4">
             {!useAI && (
-               <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border mb-4">
+               <div className="mb-4 flex flex-col gap-3 rounded-lg border bg-muted/50 p-3 sm:flex-row sm:items-center sm:justify-between">
                  <div className="flex items-center gap-3">
                    <FileSpreadsheet className="h-6 w-6 text-green-600" />
                    <div>
                      <p className="text-sm font-medium">Direct Spreadsheet Import</p>
-                     <p className="text-xs text-muted-foreground">Download our template to ensure correct formatting</p>
+                     <p className="text-xs text-muted-foreground">Download a template to ensure correct formatting</p>
                    </div>
                  </div>
-                 <Button variant="outline" size="sm" onClick={downloadTemplate}>
-                   <Download className="mr-2 h-4 w-4" /> Template
-                 </Button>
+                 <div className="flex flex-wrap gap-2">
+                   <Button variant="outline" size="sm" onClick={downloadTemplate}>
+                     <Download className="mr-2 h-4 w-4" /> XLSX
+                   </Button>
+                   <Button variant="outline" size="sm" onClick={downloadTxtTemplate}>
+                     <Download className="mr-2 h-4 w-4" /> TXT
+                   </Button>
+                 </div>
                </div>
             )}
             
@@ -446,7 +459,7 @@ export function UnifiedQuizImporter({
                 {selectedFile ? selectedFile.name : 'Click to upload or drag and drop'}
               </p>
               <p className="text-xs text-muted-foreground mt-2">
-                {useAI ? 'CSV, XLSX, DOCX, PDF, XML, or JSON content for AI generation' : 'CSV, XLSX, XML, or JSON questions for direct import'}
+                {useAI ? 'CSV, TXT, XLSX, DOCX, PDF, XML, or JSON content for AI generation' : 'CSV, TXT, XLSX, XML, or JSON questions for direct import'}
               </p>
             </div>
           </TabsContent>

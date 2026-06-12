@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import { Plus, FileQuestion, Pencil, Trophy, Download, Users, CheckCircle2, Eye, BarChart3, AlertTriangle, ClipboardCheck, Clock } from 'lucide-react'
+import { Plus, FileQuestion, Pencil, Trophy, Download, Users, CheckCircle2, Eye, BarChart3, AlertTriangle, ClipboardCheck, Clock, FileText } from 'lucide-react'
 import { QuizToggleActive } from '@/components/manager/quiz-toggle-active'
 import { QuickDeleteButton } from '@/components/manager/quick-delete-button'
 
@@ -149,6 +149,16 @@ export default async function QuizzesPage() {
                 >
                   <a href={`/api/leaderboard/${quiz.id}/download`}>
                     <Download className="h-3 w-3 mr-1" />Results
+                  </a>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 rounded-xl text-xs border-blue-300 text-blue-700 hover:bg-blue-50"
+                  asChild
+                >
+                  <a href={`/api/leaderboard/${quiz.id}/download?format=txt`}>
+                    <FileText className="h-3 w-3 mr-1" />TXT
                   </a>
                 </Button>
                 <QuickDeleteButton 

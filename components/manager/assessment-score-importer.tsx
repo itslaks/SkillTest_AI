@@ -111,9 +111,9 @@ export function AssessmentScoreImporter({
         <div>
           <div className="flex items-center gap-2 font-semibold">
             <FileSpreadsheet className="h-4 w-4" />
-            Excel assessment score upload
+            Assessment score upload
           </div>
-          <p className="mt-1 text-sm text-zinc-500">Validates candidate existence, score ranges, duplicate rows, and logs upload errors.</p>
+          <p className="mt-1 text-sm text-zinc-500">Upload XLSX, CSV, or TXT scores. Validates candidate existence, score ranges, duplicate rows, and logs upload errors.</p>
         </div>
       </div>
 
@@ -171,7 +171,7 @@ export function AssessmentScoreImporter({
             ) : null}
           </div>
           {uploadErrors.length ? (
-            <div className="mt-3 overflow-hidden rounded-xl border border-rose-200 bg-white text-xs text-rose-800">
+            <div className="mt-3 overflow-x-auto rounded-xl border border-rose-200 bg-white text-xs text-rose-800">
               <div className="grid grid-cols-[5rem_1fr_1.6fr] gap-2 border-b border-rose-100 bg-rose-50 px-3 py-2 font-semibold">
                 <span>Row</span>
                 <span>Candidate</span>

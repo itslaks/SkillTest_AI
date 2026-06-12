@@ -2,9 +2,10 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { requireManagerForApi } from '@/lib/rbac'
 import { NextRequest, NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
+import { rowsToTxt } from '@/lib/text-export'
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ quizId: string }> }
 ) {
   try {
@@ -87,6 +88,18 @@ export async function GET(
       }
     })
 
+    const safeTitle = quiz?.title?.replace(/[^a-zA-Z0-9]/g, '-') || quizId
+    const format = request.nextUrl.searchParams.get('format')?.toLowerCase()
+
+    if (format === 'txt') {
+      return new NextResponse(rowsToTxt(rows, 'No completed attempts yet'), {
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Content-Disposition': `attachment; filename="quiz-report-${safeTitle}.txt"`,
+        },
+      })
+    }
+
     const wb = XLSX.utils.book_new()
     const ws = XLSX.utils.json_to_sheet(rows.length > 0 ? rows : [{ 'Message': 'No completed attempts yet' }])
 
@@ -108,7 +121,7 @@ export async function GET(
     XLSX.utils.book_append_sheet(wb, ws, 'Quiz Report')
     const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
 
-    const filename = `quiz-report-${quiz?.title?.replace(/[^a-zA-Z0-9]/g, '-') || quizId}.xlsx`
+    const filename = `quiz-report-${safeTitle}.xlsx`
 
     return new NextResponse(buffer, {
       headers: {
@@ -121,4 +134,3 @@ export async function GET(
     return NextResponse.json({ error: e.message || 'Failed to generate download' }, { status: 500 })
   }
 }
-

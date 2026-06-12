@@ -112,7 +112,12 @@ export default async function QuizDetailPage({ params, searchParams }: { params:
           </Button>
           <Button variant="outline" asChild>
             <a href={`/api/leaderboard/${quiz.id}/download`}>
-              <Download className="mr-2 h-4 w-4" /> Download Results
+              <Download className="mr-2 h-4 w-4" /> Results XLSX
+            </a>
+          </Button>
+          <Button variant="outline" asChild>
+            <a href={`/api/leaderboard/${quiz.id}/download?format=txt`}>
+              <FileText className="mr-2 h-4 w-4" /> Results TXT
             </a>
           </Button>
           <QuickDeleteButton 
@@ -264,7 +269,7 @@ export default async function QuizDetailPage({ params, searchParams }: { params:
 
       {/* Leaderboard Section */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle className="flex items-center gap-2">
               <Trophy className="h-5 w-5 text-yellow-500" />
@@ -272,12 +277,20 @@ export default async function QuizDetailPage({ params, searchParams }: { params:
             </CardTitle>
             <CardDescription>{leaderboard?.length || 0} participants</CardDescription>
           </div>
-          <Button variant="outline" asChild>
-            <a href={`/api/leaderboard/${quizId}/download`}>
-              <Download className="mr-2 h-4 w-4" />
-              Download Excel
-            </a>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" asChild>
+              <a href={`/api/leaderboard/${quizId}/download`}>
+                <Download className="mr-2 h-4 w-4" />
+                Excel
+              </a>
+            </Button>
+            <Button variant="outline" asChild>
+              <a href={`/api/leaderboard/${quizId}/download?format=txt`}>
+                <FileText className="mr-2 h-4 w-4" />
+                TXT
+              </a>
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {leaderboard && leaderboard.length > 0 ? (

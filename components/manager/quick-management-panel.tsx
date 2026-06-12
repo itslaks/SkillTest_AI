@@ -129,7 +129,7 @@ export function QuickManagementPanel({ stats, recentEmployees, recentQuizzes }: 
       </div>
 
       {/* Management Tabs */}
-      <div className="flex gap-1 p-1 bg-muted rounded-lg">
+      <div className="flex gap-1 overflow-x-auto rounded-lg bg-muted p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {[
           { id: 'overview', label: 'Overview', icon: BarChart3 },
           { id: 'employees', label: 'Quick Employee Mgmt', icon: Users },
@@ -140,7 +140,7 @@ export function QuickManagementPanel({ stats, recentEmployees, recentQuizzes }: 
             variant={activeTab === tab.id ? 'default' : 'ghost'}
             size="sm"
             onClick={() => setActiveTab(tab.id as any)}
-            className="flex-1"
+            className="min-w-fit flex-1 whitespace-nowrap"
           >
             <tab.icon className="h-4 w-4 mr-2" />
             {tab.label}
@@ -253,20 +253,20 @@ export function QuickManagementPanel({ stats, recentEmployees, recentQuizzes }: 
               <div className="space-y-3">
                 <div className="grid gap-3">
                   {recentEmployees.slice(0, 5).map((employee) => (
-                    <div key={employee.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center gap-3">
+                    <div key={employee.id} className="flex flex-col gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex min-w-0 items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-violet-500 flex items-center justify-center text-white text-xs font-bold">
                           {employee.full_name?.charAt(0) || 'E'}
                         </div>
-                        <div>
-                          <p className="font-medium text-sm">{employee.full_name}</p>
-                          <p className="text-xs text-muted-foreground">{employee.email}</p>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{employee.full_name}</p>
+                          <p className="truncate text-xs text-muted-foreground">{employee.email}</p>
                           {employee.department && (
                             <Badge variant="outline" className="text-[10px] mt-1">{employee.department}</Badge>
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                         <div className="text-right mr-2">
                           <p className="text-xs font-medium">{employee.quiz_attempts_count || 0} attempts</p>
                           <p className="text-[10px] text-muted-foreground">quiz history</p>
@@ -292,7 +292,7 @@ export function QuickManagementPanel({ stats, recentEmployees, recentQuizzes }: 
                   <Button variant="outline" size="sm" asChild>
                     <Link href="/manager/employees?tab=import">
                       <Upload className="h-4 w-4 mr-2" />
-                      Import Excel
+                      Import CSV/TXT
                     </Link>
                   </Button>
                   <Button variant="outline" size="sm" asChild>
@@ -355,15 +355,15 @@ export function QuickManagementPanel({ stats, recentEmployees, recentQuizzes }: 
               <div className="space-y-3">
                 <div className="grid gap-3">
                   {recentQuizzes.slice(0, 5).map((quiz) => (
-                    <div key={quiz.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors">
-                      <div className="flex-1">
+                    <div key={quiz.id} className="flex flex-col gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <p className="font-medium text-sm">{quiz.title}</p>
+                          <p className="truncate text-sm font-medium">{quiz.title}</p>
                           <Badge variant={quiz.is_active ? "default" : "secondary"} className="text-[10px]">
                             {quiz.is_active ? 'Active' : 'Draft'}
                           </Badge>
                         </div>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                           <span>{quiz.questions_count} questions</span>
                           <span>•</span>
                           <span>{quiz.attempts_count} attempts</span>
@@ -372,7 +372,7 @@ export function QuickManagementPanel({ stats, recentEmployees, recentQuizzes }: 
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                         <Button variant="outline" size="sm" asChild>
                           <Link href={`/manager/quizzes/${quiz.id}`}>
                             <Eye className="h-3 w-3" />
