@@ -14,7 +14,7 @@ import type { Profile } from '@/lib/types/database'
 import { Fingerprint, Layers3, UserRound } from 'lucide-react'
 import { AvatarView } from '@/components/avatar/avatar-view'
 import { AvatarPickerDialog } from '@/components/avatar/avatar-picker-dialog'
-import { DEFAULT_AVATAR_3D_ID, getSafeAvatar3DId, toAvatar3DValue, type Avatar3DId } from '@/lib/avatar-options'
+import { getAvatar3DId, toAvatar3DValue, type Avatar3DId } from '@/lib/avatar-options'
 
 interface ProfileCompletionDialogProps {
   profile: Profile
@@ -25,7 +25,8 @@ export function ProfileCompletionDialog({ profile }: ProfileCompletionDialogProp
   const [open, setOpen] = useState(!profile.employee_id || !profile.domain)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
-  const [avatarId, setAvatarId] = useState<Avatar3DId>(getSafeAvatar3DId(profile.avatar_url || toAvatar3DValue(DEFAULT_AVATAR_3D_ID)))
+  // Avatar is optional — start from whatever the profile has (often none).
+  const [avatarId, setAvatarId] = useState<Avatar3DId | null>(getAvatar3DId(profile.avatar_url))
 
   if (profile.role !== 'employee') return null
 
@@ -33,7 +34,7 @@ export function ProfileCompletionDialog({ profile }: ProfileCompletionDialogProp
     setError(null)
     formData.set('fullName', profile.full_name || profile.email)
     formData.set('department', profile.department || '')
-    formData.set('avatarUrl', toAvatar3DValue(avatarId))
+    formData.set('avatarUrl', avatarId ? toAvatar3DValue(avatarId) : '')
 
     startTransition(async () => {
       const result = await updateProfile(formData)
@@ -67,7 +68,7 @@ export function ProfileCompletionDialog({ profile }: ProfileCompletionDialogProp
           <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
             <div className="mb-4 flex items-center gap-3">
               <AvatarView
-                src={toAvatar3DValue(avatarId)}
+                src={avatarId ? toAvatar3DValue(avatarId) : null}
                 alt="Selected profile avatar preview"
                 size={64}
                 className="h-16 w-16 rounded-2xl border border-white bg-white object-cover shadow-sm"
@@ -76,9 +77,9 @@ export function ProfileCompletionDialog({ profile }: ProfileCompletionDialogProp
               <div>
                 <p className="flex items-center gap-2 text-sm font-semibold">
                   <UserRound className="h-4 w-4" />
-                  Choose your avatar
+                  Avatar (optional)
                 </p>
-                <p className="text-xs text-muted-foreground">You can keep the default or change it later in profile settings.</p>
+                <p className="text-xs text-muted-foreground">Pick one now or continue without an avatar — you can add it anytime in profile settings.</p>
               </div>
             </div>
             <AvatarPickerDialog value={avatarId} onChange={setAvatarId} />

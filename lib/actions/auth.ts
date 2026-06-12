@@ -30,7 +30,6 @@ import {
 } from '@/lib/security/env'
 import { revalidatePath } from 'next/cache'
 import { normalizeDomain } from '@/lib/domain-options'
-import { DEFAULT_AVATAR_VALUE } from '@/lib/avatar-options'
 import { cleanupOrphanEmployeeAuthUsersByEmail, sendEmployeeSetupEmail } from '@/lib/employee-onboarding'
 import { sendEmail } from '@/lib/email'
 
@@ -59,7 +58,8 @@ export async function signUp(formData: FormData) {
 
   const { email, password, fullName, employeeId, department, role } = parsed.data
   const domain = normalizeDomain(parsed.data.domain)
-  const avatarUrl = parsed.data.avatarUrl || DEFAULT_AVATAR_VALUE
+  // Avatars are optional: no default preset is assigned at signup.
+  const avatarUrl = parsed.data.avatarUrl || null
   if (!isSupabaseConfigured() || !isSupabaseAdminConfigured()) {
     return { error: 'Supabase is not configured. Add real Supabase URL, anon key, and service role key in .env.local, then restart the dev server.' }
   }
@@ -393,7 +393,8 @@ export async function updateProfile(formData: FormData) {
   }
 
   const { fullName, department } = parsed.data
-  const avatarUrl = parsed.data.avatarUrl || DEFAULT_AVATAR_VALUE
+  // Avatars are optional: an empty selection clears the avatar (NULL).
+  const avatarUrl = parsed.data.avatarUrl || null
   const employeeId = parsed.data.employeeId?.trim() || null
   const domain = normalizeDomain(parsed.data.domain)
 

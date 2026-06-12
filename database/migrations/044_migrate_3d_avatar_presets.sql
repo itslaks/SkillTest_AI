@@ -2,7 +2,10 @@
 -- closest match in the new 3D avatar library (public/avatars/3d/avatar-NN.webp).
 -- Mapping mirrors LEGACY_AVATAR_3D_MAP in lib/avatar-options.ts, which also
 -- resolves any un-migrated value at render time as a safety net.
--- Custom http(s) and data-URL uploads are preserved untouched.
+--
+-- Avatars are OPTIONAL: NULL/empty values stay NULL (the UI shows a neutral
+-- placeholder), and unknown preset ids are cleared to NULL rather than being
+-- force-assigned a default. Custom http(s) and data-URL uploads are untouched.
 
 UPDATE profiles
 SET
@@ -21,14 +24,15 @@ SET
     WHEN 'avatar3d:f5' THEN 'avatar3d:avatar-25'
     WHEN 'avatar3d:f6' THEN 'avatar3d:avatar-19'
     WHEN 'avatar3d:f7' THEN 'avatar3d:avatar-06'
-    ELSE 'avatar3d:avatar-01'
+    ELSE NULL
   END,
   updated_at = NOW()
 WHERE
-  avatar_url IS NULL
-  OR btrim(avatar_url) = ''
-  OR (
-    avatar_url LIKE 'avatar3d:%'
-    -- Any preset value that is not one of the new avatar-01..avatar-40 ids
-    AND avatar_url !~ '^avatar3d:avatar-(0[1-9]|[1-3][0-9]|40)$'
-  );
+  avatar_url LIKE 'avatar3d:%'
+  -- Any preset value that is not one of the new avatar-01..avatar-40 ids
+  AND avatar_url !~ '^avatar3d:avatar-(0[1-9]|[1-3][0-9]|40)$';
+
+-- Normalize empty strings to NULL for a consistent "no avatar" state.
+UPDATE profiles
+SET avatar_url = NULL, updated_at = NOW()
+WHERE avatar_url IS NOT NULL AND btrim(avatar_url) = '';

@@ -15,7 +15,7 @@ import {
 import { Spinner } from '@/components/ui/spinner'
 import { updateProfile } from '@/lib/actions/auth'
 import type { Profile } from '@/lib/types/database'
-import { DEFAULT_AVATAR_VALUE, getSafeAvatar3DId, toAvatar3DValue, type Avatar3DId } from '@/lib/avatar-options'
+import { getAvatar3DId, toAvatar3DValue, type Avatar3DId } from '@/lib/avatar-options'
 import { DOMAIN_OPTIONS } from '@/lib/domain-options'
 import { Save, User, CheckCircle2, Camera, Image as ImageIcon } from 'lucide-react'
 import { AvatarView } from '@/components/avatar/avatar-view'
@@ -29,7 +29,8 @@ export function ProfileForm({ profile }: ProfileFormProps) {
   const [isPending, startTransition] = useTransition()
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url || DEFAULT_AVATAR_VALUE)
+  // Avatar is optional — empty string means no avatar (saved as NULL).
+  const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url || '')
 
   function handleAvatarUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -109,13 +110,13 @@ export function ProfileForm({ profile }: ProfileFormProps) {
                   onChange={handleAvatarUpload}
                   className="bg-white"
                 />
-                <p className="mt-2 text-xs text-muted-foreground">Upload a small photo, or choose one of the premium 3D Memoji presets.</p>
+                <p className="mt-2 text-xs text-muted-foreground">Optional — upload a small photo or choose a 3D avatar preset.</p>
               </div>
             </div>
             <div className="mt-4">
               <AvatarPickerDialog
-                value={getSafeAvatar3DId(avatarUrl)}
-                onChange={(id: Avatar3DId) => setAvatarUrl(toAvatar3DValue(id))}
+                value={getAvatar3DId(avatarUrl)}
+                onChange={(id: Avatar3DId | null) => setAvatarUrl(id ? toAvatar3DValue(id) : '')}
               />
             </div>
           </div>
