@@ -12,6 +12,7 @@ import {
   updateCertificateRule,
 } from '@/lib/actions/manager'
 import { getTrainingGovernanceSettings, updateTrainingGovernanceSettings } from '@/lib/actions/training'
+import { requireManager } from '@/lib/rbac'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -54,6 +55,11 @@ async function removeTrainerEmployeeAssignmentAction(formData: FormData) {
 }
 
 export default async function AdminConsolePage() {
+  // The manager layout admits all training staff (including trainers).
+  // The admin console must be restricted further: managers/coordinators/admins
+  // only. Mutating actions additionally verify the admin role server-side.
+  await requireManager()
+
   const [{ data: users }, { data: auditLogs }, governance, { data: pendingTrainers }, { data: certificateQuizzes }, { data: trainerEmployeeData }] = await Promise.all([
     getAdminUsers(),
     getAdminAuditLogs(),

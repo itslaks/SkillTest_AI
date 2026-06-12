@@ -1,17 +1,36 @@
 /**
- * Global edge proxy (Next 16 convention, formerly middleware) — first line of defense (OWASP API4:2023).
+ * Global edge proxy (Next 16 convention, formerly middleware).
+ * Centralized first line of defense for the whole app:
  *
- * Applies IP-based rate limits to all public entry points:
- *  - /api/*       : generous per-IP ceiling for every API route
- *  - /auth/* POST : tighter backstop for credential flows (sign-in, sign-up,
- *                   password reset server actions all POST to /auth pages)
+ *  1. Rate limiting (OWASP API4:2023)
+ *     - /api/*       : per-IP ceiling for every API route
+ *     - /auth/* POST : tighter backstop for credential flows
  *
- * These are deliberately coarse backstops; precise, user-friendly limits are
- * enforced inside the auth server actions (lib/actions/auth.ts) and the
- * authenticated API guards (lib/rbac.ts), so legitimate users see graceful
- * error messages before ever hitting these 429s.
+ *  2. Centralized session validation (OWASP A01/A07)
+ *     - Every protected path (/manager, /employee, /profile(s), /certificates)
+ *       verifies the Supabase session BEFORE the page renders. Unauthenticated
+ *       requests are redirected to /auth/login?redirect=<original-path>.
+ *     - Page/layout guards (lib/rbac.ts) remain as defense-in-depth and
+ *       enforce fine-grained roles; this layer guarantees no protected route
+ *       can ever render for an anonymous visitor, even if a page forgets
+ *       its own guard.
+ *     - supabase.auth.getUser() also refreshes expiring tokens; refreshed
+ *       cookies are written back on the response, keeping sessions stable
+ *       across page reloads.
+ *
+ *  3. Auth-page redirects
+ *     - Already-authenticated users opening /auth/login or /auth/sign-up are
+ *       sent to their role's dashboard. A wrong role guess self-corrects:
+ *       the destination layout's RBAC guard re-routes to the proper area.
+ *
+ *  4. Browser-back / cache hardening (OWASP A05)
+ *     - All protected responses carry Cache-Control: no-store (+ Pragma /
+ *       Expires) so the browser never serves a protected page from cache
+ *       after logout — pressing Back forces revalidation and redirects to
+ *       login.
  */
 
+import { createServerClient } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
 import {
   checkIpRateLimit,
@@ -27,10 +46,38 @@ const API_IP_LIMIT: RateLimitConfig = { maxRequests: 300, windowSeconds: 60 }
 // password reset, magic link). Tight in-action limits trigger first.
 const AUTH_POST_IP_LIMIT: RateLimitConfig = { maxRequests: 40, windowSeconds: 300 }
 
-export function proxy(request: NextRequest) {
+/** Route prefixes that must never render without a valid session. */
+const PROTECTED_PREFIXES = ['/manager', '/employee', '/profile', '/profiles', '/certificates']
+
+/** Auth entry pages that authenticated users should be bounced away from. */
+const AUTH_ENTRY_PAGES = ['/auth/login', '/auth/sign-up']
+
+const STAFF_ROLES = new Set(['admin', 'manager', 'training_coordinator', 'trainer'])
+
+function isProtectedPath(path: string): boolean {
+  return PROTECTED_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))
+}
+
+function applyNoStoreHeaders(response: NextResponse): NextResponse {
+  // Prevent the browser and intermediaries from caching protected content,
+  // so Back after logout cannot reveal previously rendered pages.
+  response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  response.headers.set('Pragma', 'no-cache')
+  response.headers.set('Expires', '0')
+  return response
+}
+
+function supabaseConfigured(): boolean {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  return Boolean(url && key && /^https?:\/\//.test(url))
+}
+
+export async function proxy(request: NextRequest) {
   const ip = getClientIp(request.headers)
   const path = request.nextUrl.pathname
 
+  // ── 1. Rate limiting ───────────────────────────────────────────────────────
   if (path.startsWith('/api/')) {
     const result = checkIpRateLimit(`api:${ip}`, API_IP_LIMIT)
     if (!result.allowed) return rateLimitResponse(result)
@@ -43,9 +90,79 @@ export function proxy(request: NextRequest) {
     if (!result.allowed) return rateLimitResponse(result)
   }
 
-  return NextResponse.next()
+  const protectedPath = isProtectedPath(path)
+  const authEntryPage = AUTH_ENTRY_PAGES.includes(path)
+
+  // Nothing session-related to do for other matched paths.
+  if (!protectedPath && !authEntryPage) return NextResponse.next()
+
+  // Without Supabase configured (fresh local setup), fall through — the
+  // server-side page guards surface their own configuration errors.
+  if (!supabaseConfigured()) {
+    const response = NextResponse.next()
+    return protectedPath ? applyNoStoreHeaders(response) : response
+  }
+
+  // ── 2. Session validation with token refresh ──────────────────────────────
+  // Standard @supabase/ssr cookie bridge: refreshed auth cookies written by
+  // getUser() are propagated onto the response we return.
+  let response = NextResponse.next({ request })
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          response = NextResponse.next({ request })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options),
+          )
+        },
+      },
+    },
+  )
+
+  let user: { id: string; user_metadata?: Record<string, unknown> } | null = null
+  try {
+    const { data } = await supabase.auth.getUser()
+    user = data.user
+  } catch {
+    user = null // fail closed: verification errors are treated as no session
+  }
+
+  if (protectedPath) {
+    if (!user) {
+      // Page-equivalent of 401: redirect to login, preserving the intended
+      // destination so sign-in can return the user where they were going.
+      const loginUrl = new URL('/auth/login', request.url)
+      loginUrl.searchParams.set('redirect', path)
+      return applyNoStoreHeaders(NextResponse.redirect(loginUrl))
+    }
+    return applyNoStoreHeaders(response)
+  }
+
+  // ── 3. Auth entry pages: bounce already-authenticated users ───────────────
+  if (authEntryPage && user) {
+    const metadataRole = String(user.user_metadata?.role || '')
+    const home = STAFF_ROLES.has(metadataRole) ? '/manager' : '/employee'
+    return NextResponse.redirect(new URL(home, request.url))
+  }
+
+  return response
 }
 
 export const config = {
-  matcher: ['/api/:path*', '/auth/:path*'],
+  matcher: [
+    '/api/:path*',
+    '/auth/:path*',
+    '/manager/:path*',
+    '/employee/:path*',
+    '/profile/:path*',
+    '/profiles/:path*',
+    '/certificates/:path*',
+  ],
 }

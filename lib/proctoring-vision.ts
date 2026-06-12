@@ -1158,18 +1158,6 @@ function faceBoxFromKeypoints(keypoints: unknown): { x: number; y: number; width
   return { x, y, width, height }
 }
 
-function isCenteredFace(
-  box: { x: number; y: number; width: number; height: number },
-  videoWidth: number,
-  videoHeight: number,
-) {
-  const width = videoWidth || 1
-  const height = videoHeight || 1
-  const result = checkPrecheckPosition(box, width, height)
-  const faceArea = (box.width * box.height) / (width * height)
-  return result.ok && faceArea <= 0.85
-}
-
 function namedPoint(
   points: Array<{ name?: string; x: number; y: number }>,
   names: string[],

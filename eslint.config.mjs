@@ -9,6 +9,7 @@ const config = [
       'scratch/**',
       'fix-approval-system.js',
       'scripts/**',
+      'database/seeds/**',
       'next-env.d.ts',
       'tsconfig.tsbuildinfo',
     ],

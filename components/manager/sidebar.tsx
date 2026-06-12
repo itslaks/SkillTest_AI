@@ -31,7 +31,7 @@ import {
   Workflow,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { signOut } from '@/lib/actions/auth'
+import { LogoutForm } from '@/components/auth/logout-form'
 import { useEffect, useState } from 'react'
 import { Avatar3D } from '@/components/avatar/avatar-3d'
 import { getAvatar3DId } from '@/lib/avatar-options'
@@ -309,7 +309,7 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
         </div>
 
         {/* Sign out */}
-        <form action={signOut}>
+        <LogoutForm>
           <button
             type="submit"
             className={cn(
@@ -320,7 +320,7 @@ export function ManagerSidebar({ profile }: ManagerSidebarProps) {
             <LogOut className="h-4 w-4 shrink-0" />
             {!collapsed && <span>Sign Out</span>}
           </button>
-        </form>
+        </LogoutForm>
       </div>
     </aside>
   )

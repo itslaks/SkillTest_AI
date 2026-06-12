@@ -10,7 +10,7 @@ import Link from 'next/link'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import type { Profile } from '@/lib/types/database'
 import { getNotificationVerb, type StaffNotification } from '@/lib/notifications'
-import { signOut } from '@/lib/actions/auth'
+import { LogoutForm } from '@/components/auth/logout-form'
 import { Avatar3D } from '@/components/avatar/avatar-3d'
 import { getAvatar3DId } from '@/lib/avatar-options'
 import { createClient } from '@/lib/supabase/client'
@@ -182,9 +182,9 @@ export function ManagerHeader({ profile, notifications = [] }: ManagerHeaderProp
             </div>
             <DropdownMenuSeparator className="my-1" />
             <DropdownMenuItem className="rounded-lg cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50" asChild>
-              <form action={signOut} className="w-full">
+              <LogoutForm className="w-full">
                 <button type="submit" className="w-full text-left">Sign out</button>
-              </form>
+              </LogoutForm>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

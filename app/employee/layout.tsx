@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { signOut } from '@/lib/actions/auth'
+import { LogoutForm } from '@/components/auth/logout-form'
 import { ProfileCompletionDialog } from '@/components/employee/profile-completion-dialog'
 import {
   LayoutDashboard,
@@ -35,8 +35,10 @@ export default async function EmployeeLayout({
     .eq('id', user.id)
     .single()
 
+  // Role boundary: all staff roles belong in the manager area. Trainers and
+  // coordinators were previously not bounced, letting them browse employee views.
   const role = profile?.role || user.user_metadata?.role
-  if (role === 'manager' || role === 'admin') {
+  if (role === 'manager' || role === 'admin' || role === 'trainer' || role === 'training_coordinator') {
     redirect('/manager')
   }
 
@@ -114,12 +116,12 @@ export default async function EmployeeLayout({
               <p className="text-xs text-white/55 mt-0.5 truncate">{profile?.email || ''}</p>
             </div>
           </div>
-          <form action={signOut}>
+          <LogoutForm>
             <button type="submit" className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/65 hover:text-red-300 hover:bg-red-500/10 transition-all">
               <LogOut className="h-4 w-4 shrink-0" />
               Sign Out
             </button>
-          </form>
+          </LogoutForm>
         </div>
       </aside>
 
