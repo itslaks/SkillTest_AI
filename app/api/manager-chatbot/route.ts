@@ -1466,6 +1466,11 @@ function buildChatbotContext(data: Record<string, any[]>) {
 
 function buildDeterministicAnswer(message: string, data: Record<string, any[]>) {
   const lower = normalize(message)
+  const roleTarget = extractRoleRecommendationTarget(message)
+  if (roleTarget) {
+    return summarizeRoleRecommendations(roleTarget, data)
+  }
+
   const profile = findProfile(lower, data.profiles)
   const quiz = findQuiz(lower, data.quizzes, data.attempts)
   const asksForResult = /\b(result|score|marks?|performance|analysis|attempt)\b/.test(lower)
@@ -1497,6 +1502,142 @@ function buildDeterministicAnswer(message: string, data: Record<string, any[]>) 
   }
 
   return null
+}
+
+function extractRoleRecommendationTarget(message: string) {
+  const lower = normalize(message)
+  const isRecommendationIntent = /\b(recommend|ready|fit|suitable|promote|push|opening|role|position|candidate|candidates|bench|shortlist)\b/.test(lower)
+  if (!isRecommendationIntent) return null
+
+  const patterns = [
+    /\b(?:opening|vacancy|position|role)\s+(?:in|for|on|as)\s+(.+?)(?:\s+role|\s+position|\s+opening|,|\.|\?|$)/i,
+    /\b(?:recommend|shortlist|find|show|who(?:\s+all)?)\b.*?\b(?:for|to|into|as)\s+(.+?)(?:\s+role|\s+position|\s+opening|,|\.|\?|$)/i,
+    /\b(?:ready|suitable|fit)\b.*?\b(?:for|to|into|as)\s+(.+?)(?:\s+role|\s+position|\s+opening|,|\.|\?|$)/i,
+  ]
+
+  for (const pattern of patterns) {
+    const match = message.match(pattern)?.[1]?.trim()
+    if (match) return cleanRoleTarget(match)
+  }
+
+  const known = ROLE_FAMILY_KEYWORDS.flatMap((item) => [item.family, ...item.terms])
+    .sort((a, b) => b.length - a.length)
+    .find((term) => lower.includes(term))
+  return known || null
+}
+
+function cleanRoleTarget(value: string) {
+  return cleanEntity(value)
+    .replace(/\b(?:employee|employees|candidate|candidates|people|person|role|position|opening|vacancy|job|who|all|are|is|ready|good|best|for|to|be|pushed|promoted)\b/ig, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+const ROLE_FAMILY_KEYWORDS = [
+  { family: 'data engineering', terms: ['data engineering', 'rag', 'retrieval augmented generation', 'vector database', 'vector db', 'etl', 'pipeline', 'data pipeline', 'spark', 'sql', 'airflow', 'analytics', 'data lake'] },
+  { family: 'java', terms: ['java', 'spring', 'spring boot', 'jvm', 'hibernate', 'microservice', 'microservices'] },
+  { family: 'frontend', terms: ['react', 'next.js', 'nextjs', 'javascript', 'typescript', 'frontend', 'ui', 'web'] },
+  { family: 'cloud', terms: ['azure', 'aws', 'cloud', 'devops', 'docker', 'kubernetes', 'aks', 'ci cd'] },
+  { family: 'ai', terms: ['ai', 'ml', 'machine learning', 'llm', 'genai', 'prompt engineering', 'openai'] },
+  { family: 'testing', terms: ['testing', 'qa', 'automation testing', 'selenium', 'playwright'] },
+]
+
+function summarizeRoleRecommendations(target: string, data: Record<string, any[]>) {
+  const role = normalizeRoleTarget(target)
+  const employees = data.profiles.filter((profile) => profile.role === 'employee')
+  if (!employees.length) return 'No employee profiles are available for role-fit analysis.'
+
+  const scored = employees
+    .map((profile) => scoreEmployeeForRole(profile, role, data))
+    .filter((item) => item.evidenceCount > 0)
+    .sort((a, b) => b.fitScore - a.fitScore || b.directAverage - a.directAverage || b.attemptCount - a.attemptCount)
+
+  if (!scored.length) {
+    return `No completed assessment evidence found for ${role.label}. Create or assign ${role.label} / ${role.family} quizzes before shortlisting.`
+  }
+
+  const top = scored.slice(0, 5)
+  const lines = top.map((item, index) =>
+    `${index + 1}. ${displayName(item.profile)} - fit ${item.fitScore}% (${item.confidence} confidence). ${item.reason}`
+  )
+  return [
+    `Best candidates for ${role.label} (${role.family}):`,
+    ...lines,
+    `Decision basis: direct topic scores first, related ${role.family} evidence next, then overall consistency, certificates/badges, attendance, and recency.`,
+  ].join('\n')
+}
+
+function normalizeRoleTarget(target: string) {
+  const normalized = normalize(target)
+  const match = ROLE_FAMILY_KEYWORDS.find((item) =>
+    item.family === normalized || item.terms.some((term) => normalized.includes(term))
+  )
+  return {
+    label: target.trim() || match?.family || 'target role',
+    family: match?.family || normalized || 'general',
+    terms: match ? [match.family, ...match.terms] : normalized.split(/\s+/).filter(Boolean),
+  }
+}
+
+function scoreEmployeeForRole(profile: any, role: { label: string; family: string; terms: string[] }, data: Record<string, any[]>) {
+  const attempts = data.attempts.filter((attempt) => attempt.user_id === profile.id)
+  const attendanceRows = data.attendance.filter((row) => row.user_id === profile.id)
+  const badges = data.badges.filter((entry) => entry.user_id === profile.id)
+  const certs = data.certificates.filter((cert) => cert.user_id === profile.id)
+  const direct = attempts.filter((attempt) => isDirectRoleTopic(attempt.quizzes?.topic || attempt.quizzes?.title || '', role))
+  const related = attempts.filter((attempt) => !direct.includes(attempt) && getRoleFamily(attempt.quizzes?.topic || attempt.quizzes?.title || '') === role.family)
+  const overall = attempts.length ? average(attempts.map((attempt) => Number(attempt.score || 0))) : 0
+  const directAverage = direct.length ? average(direct.map((attempt) => Number(attempt.score || 0))) : 0
+  const relatedAverage = related.length ? average(related.map((attempt) => Number(attempt.score || 0))) : 0
+  const bestRelevant = Math.max(directAverage, relatedAverage, overall)
+  const latestRelevant = [...direct, ...related].sort(byLatest)[0] || attempts.slice().sort(byLatest)[0]
+  const behavior = latestRelevant
+    ? analyzeAttemptPattern((latestRelevant.answers || []) as QuizAnswer[], latestRelevant.quizzes?.difficulty as DifficultyLevel)
+    : null
+  const attendanceRate = attendanceRows.length
+    ? Math.round((attendanceRows.filter((row) => ['present', 'late', 'excused'].includes(String(row.status))).length / attendanceRows.length) * 100)
+    : 70
+  const credentialBonus = Math.min(8, certs.length * 3 + badges.length)
+  const domainBonus = getRoleFamily(profile.domain || profile.department || '') === role.family ? 5 : 0
+  const focusBonus = behavior ? clampNumber((behavior.focusScore - 65) * 0.12, -5, 5, 0) : 0
+  const evidenceCount = direct.length + related.length
+  const evidencePenalty = direct.length >= 2 ? 0 : evidenceCount >= 2 ? 4 : 10
+  const confidence = direct.length >= 2 ? 'high' : evidenceCount >= 2 ? 'medium' : 'low'
+  const evidenceScore = direct.length
+    ? directAverage * 0.72 + (relatedAverage || directAverage) * 0.18 + overall * 0.1
+    : related.length
+      ? relatedAverage * 0.76 + overall * 0.24
+      : overall
+  const fitScore = clampNumber(
+    evidenceScore + credentialBonus + domainBonus + focusBonus + (attendanceRate - 75) * 0.08 - evidencePenalty,
+    0,
+    100,
+    0
+  )
+  const directText = direct.length ? `${direct.length} direct ${role.label} attempt(s), avg ${directAverage}%` : 'no direct role attempts'
+  const relatedText = related.length ? `${related.length} related ${role.family} attempt(s), avg ${relatedAverage}%` : 'no related domain attempts'
+  const reason = `${directText}; ${relatedText}; overall avg ${overall}%; attendance ${attendanceRate}%; best evidence ${bestRelevant}%.`
+
+  return {
+    profile,
+    fitScore,
+    confidence,
+    directAverage,
+    relatedAverage,
+    attemptCount: attempts.length,
+    evidenceCount,
+    reason,
+  }
+}
+
+function isDirectRoleTopic(topic: string, role: { terms: string[] }) {
+  const normalized = normalize(topic)
+  return role.terms.some((term) => normalized.includes(normalize(term)))
+}
+
+function getRoleFamily(topic: string) {
+  const normalized = normalize(topic)
+  return ROLE_FAMILY_KEYWORDS.find((item) => item.terms.some((term) => normalized.includes(term)) || normalized.includes(item.family))?.family || normalized
 }
 
 function summarizeEmployeeLatestAttempt(profile: any, attempts: any[]) {

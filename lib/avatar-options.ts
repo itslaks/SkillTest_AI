@@ -83,7 +83,6 @@ export const AVATAR_3D_LIBRARY: Avatar3DMeta[] = AVATAR_3D_IDS.map((id, index) =
 
 export const DEFAULT_AVATAR_3D_ID: Avatar3DId = 'avatar-01'
 export const DEFAULT_AVATAR_VALUE = toAvatar3DValue(DEFAULT_AVATAR_3D_ID)
-const RETIRED_FORCED_DEFAULT_IDS = new Set<Avatar3DId>([DEFAULT_AVATAR_3D_ID])
 
 export function toAvatar3DValue(id: Avatar3DId | string) {
   return `${AVATAR_3D_PREFIX}${id}`
@@ -92,10 +91,10 @@ export function toAvatar3DValue(id: Avatar3DId | string) {
 export function getAvatar3DId(value?: string | null): Avatar3DId | null {
   if (!value?.startsWith(AVATAR_3D_PREFIX)) return null
   const id = value.slice(AVATAR_3D_PREFIX.length)
-  // Retired preset ids and the formerly forced avatar-01 default resolve to
-  // null so users are not assigned a gendered preset automatically.
-  if (!AVATAR_3D_IDS.includes(id)) return null
-  return RETIRED_FORCED_DEFAULT_IDS.has(id) ? null : id
+  // Retired preset ids (m1-m7/f1-f7) resolve to null: the old flat set was
+  // force-assigned to every account, so stored values were never a deliberate
+  // choice. Current avatar-01..avatar-40 presets remain valid user choices.
+  return AVATAR_3D_IDS.includes(id) ? id : null
 }
 
 export function isAvatar3DValue(value?: string | null) {

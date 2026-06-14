@@ -573,6 +573,9 @@ export type ProctoringReviewStatus = 'pending' | 'under_review' | 'approved' | '
 export interface ReadinessInsight {
   score: number
   predictedScore: number
+  confidence: 'low' | 'medium' | 'high'
+  evidenceCount: number
+  evidenceSummary: string
   status: 'ready' | 'revise' | 'focus'
   recommendation: string
   streakBoost: number

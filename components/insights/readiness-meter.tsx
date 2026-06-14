@@ -27,6 +27,9 @@ export function ReadinessMeter({ readiness, compact = false, className }: Readin
         <div className="text-right">
           <p className="text-[10px] uppercase tracking-[0.3em] opacity-60">Predicted</p>
           <p className="mt-2 text-xl font-medium">{readiness.predictedScore}%</p>
+          <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.18em] opacity-70">
+            {readiness.confidence || 'low'} confidence
+          </p>
         </div>
       </div>
 
@@ -41,9 +44,12 @@ export function ReadinessMeter({ readiness, compact = false, className }: Readin
       </div>
 
       {!compact && (
-        <p className={cn('mt-3 text-sm leading-relaxed', readiness.status === 'ready' ? 'text-black/70' : 'text-white/70')}>
-          {readiness.recommendation}
-        </p>
+        <div className={cn('mt-3 space-y-2 text-sm leading-relaxed', readiness.status === 'ready' ? 'text-black/70' : 'text-white/78')}>
+          <p>{readiness.recommendation}</p>
+          <p className={cn('rounded-xl px-3 py-2 text-xs font-medium', readiness.status === 'ready' ? 'bg-black/5 text-black/70' : 'bg-white/10 text-white/80')}>
+            Evidence: {readiness.evidenceSummary || `${readiness.evidenceCount || 0} completed attempt(s) reviewed.`}
+          </p>
+        </div>
       )}
     </div>
   )

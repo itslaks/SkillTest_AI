@@ -4,7 +4,7 @@ import Image from 'next/image'
 import type React from 'react'
 import { UserRound } from 'lucide-react'
 import { Avatar3D } from '@/components/avatar/avatar-3d'
-import { getAvatar3DId } from '@/lib/avatar-options'
+import { DEFAULT_AVATAR_3D_ID, getAvatar3DId } from '@/lib/avatar-options'
 
 /**
  * Neutral "no avatar" placeholder. Avatars are optional — users who have not
@@ -72,8 +72,8 @@ export function AvatarView({
     )
   }
 
-  // No avatar chosen (or an unrecognized preset id): caller fallback, else
-  // the neutral placeholder. Avatars are optional by design.
+  // No avatar chosen: show avatar-01 as the default profile image. Users can
+  // still choose another preset from profile settings.
   if (fallback) return <>{fallback}</>
-  return <AvatarPlaceholder size={size} className={className} label={alt} />
+  return <Avatar3D avatarId={DEFAULT_AVATAR_3D_ID} size={size} className={className} interactive={interactive} priority={priority} />
 }

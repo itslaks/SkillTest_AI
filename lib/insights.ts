@@ -197,44 +197,106 @@ export function computeReadinessInsight(args: {
 }): ReadinessInsight {
   const { attempts, quiz, currentStreak = 0, domain, daysInTraining = 0 } = args
   const completedAttempts = attempts.filter((attempt) => typeof attempt.score === 'number')
-  const topicAttempts = completedAttempts.filter(
-    (attempt) => getQuizRelation(attempt)?.topic?.toLowerCase() === quiz.topic.toLowerCase()
-  )
+  const targetTopic = normalizeSkillLabel(quiz.topic)
+  const targetFamily = getSkillFamily(targetTopic || normalizeSkillLabel(domain || 'general'))
+  const targetDifficultyRank = getDifficultyRank(quiz.difficulty)
+  const scoredAttempts = completedAttempts.map((attempt) => {
+    const attemptTopic = normalizeSkillLabel(getQuizRelation(attempt)?.topic || '')
+    const attemptFamily = getSkillFamily(attemptTopic)
+    const score = Number(attempt.score || 0)
+    const difficultyRankValue = getDifficultyRank(getQuizRelation(attempt)?.difficulty)
+    const completedAt = attempt.completed_at || attempt.created_at || null
+    const ageDays = completedAt
+      ? Math.max(0, Math.floor((Date.now() - new Date(completedAt).getTime()) / 86_400_000))
+      : 120
+    const recencyWeight = ageDays <= 30 ? 1 : ageDays <= 90 ? 0.85 : 0.7
+    const difficultyWeight = 1 + (difficultyRankValue - targetDifficultyRank) * 0.06
+    const topicWeight = attemptTopic === targetTopic
+      ? 1
+      : attemptFamily && attemptFamily === targetFamily
+        ? 0.72
+        : 0.36
+    return {
+      score,
+      attemptTopic,
+      weight: clamp(topicWeight * recencyWeight * difficultyWeight, 0.2, 1.15),
+      direct: attemptTopic === targetTopic,
+      related: Boolean(attemptFamily && attemptFamily === targetFamily && attemptTopic !== targetTopic),
+    }
+  })
 
-  const averageHistory = completedAttempts.length
-    ? completedAttempts.reduce((sum, attempt) => sum + (attempt.score || 0), 0) / completedAttempts.length
-    : 52
-  const averageTopic = topicAttempts.length
-    ? topicAttempts.reduce((sum, attempt) => sum + (attempt.score || 0), 0) / topicAttempts.length
-    : averageHistory
+  const directAttempts = scoredAttempts.filter((attempt) => attempt.direct)
+  const relatedAttempts = scoredAttempts.filter((attempt) => attempt.related)
+  const weightedAverage = weightedScore(scoredAttempts)
+  const directAverage = weightedScore(directAttempts)
+  const relatedAverage = weightedScore(relatedAttempts)
+  const overallAverage = completedAttempts.length
+    ? completedAttempts.reduce((sum, attempt) => sum + Number(attempt.score || 0), 0) / completedAttempts.length
+    : 0
 
-  const streakBoost = clamp((currentStreak || 0) * 2.2, 0, 14)
-  const historyBoost = clamp((averageHistory - 50) * 0.28, -12, 18)
-  const topicAlignmentBoost = clamp((averageTopic - 50) * 0.32, -15, 20)
-  const trainingDaysBoost = clamp(daysInTraining / 6, 0, 10)
-  const domainMatchBoost = domain && domain.toLowerCase() === quiz.topic.toLowerCase() ? 8 : 0
-  const difficultyPenalty = getDifficultyRank(quiz.difficulty) * 4.5
+  const evidenceCount = directAttempts.length || relatedAttempts.length || completedAttempts.length
+  const confidence: ReadinessInsight['confidence'] =
+    directAttempts.length >= 3
+      ? 'high'
+      : directAttempts.length >= 1 || relatedAttempts.length >= 3
+        ? 'medium'
+        : 'low'
+
+  const baseEvidenceScore = confidence === 'high'
+    ? directAverage
+    : confidence === 'medium'
+      ? (directAttempts.length ? directAverage * 0.7 + overallAverage * 0.3 : relatedAverage * 0.75 + overallAverage * 0.25)
+      : completedAttempts.length
+        ? weightedAverage
+        : 50
+
+  const streakBoost = clamp((currentStreak || 0) * 1.5, 0, 8)
+  const historyBoost = completedAttempts.length ? clamp((overallAverage - 65) * 0.12, -5, 5) : 0
+  const topicAlignmentBoost = directAttempts.length
+    ? clamp((directAverage - overallAverage) * 0.18, -8, 8)
+    : relatedAttempts.length
+      ? clamp((relatedAverage - overallAverage) * 0.1, -5, 5)
+      : 0
+  const trainingDaysBoost = clamp(daysInTraining / 14, 0, 5)
+  const difficultyPenalty = Math.max(0, targetDifficultyRank - 2) * 3.5
+  const lowEvidencePenalty = confidence === 'low' ? 8 : confidence === 'medium' ? 3 : 0
 
   const score = clamp(
-    Math.round(46 + streakBoost + historyBoost + topicAlignmentBoost + trainingDaysBoost + domainMatchBoost - difficultyPenalty),
-    18,
-    97
+    Math.round(baseEvidenceScore + streakBoost + historyBoost + topicAlignmentBoost + trainingDaysBoost - difficultyPenalty - lowEvidencePenalty),
+    15,
+    98
   )
-  const predictedScore = clamp(Math.round(score + getDifficultyRank(quiz.difficulty) * 2), 15, 99)
+
+  const predictedScore = clamp(
+    Math.round(score - Math.max(0, targetDifficultyRank - 2) * 2 + (confidence === 'high' ? 1 : confidence === 'low' ? -4 : -1)),
+    10,
+    99
+  )
 
   let status: ReadinessInsight['status'] = 'ready'
-  let recommendation = 'You are in a healthy zone. Attempt the quiz now.'
+  const topicLabel = quiz.topic || 'this topic'
+  let recommendation = `Evidence supports attempting ${topicLabel}. Prediction is ${confidence}-confidence from ${evidenceCount} completed attempt(s).`
   if (score < 45) {
     status = 'revise'
-    recommendation = 'Quick revision is recommended before attempting this quiz.'
+    recommendation = `Revise ${topicLabel} before attempting. Prediction is ${confidence}-confidence from ${evidenceCount} completed attempt(s).`
   } else if (score < 65) {
     status = 'focus'
-    recommendation = 'Warm up with topic review to improve confidence and speed.'
+    recommendation = `Do a focused warm-up on ${topicLabel}. Prediction is ${confidence}-confidence from ${evidenceCount} completed attempt(s).`
   }
 
   return {
     score,
     predictedScore,
+    confidence,
+    evidenceCount,
+    evidenceSummary: buildReadinessEvidenceSummary({
+      directCount: directAttempts.length,
+      relatedCount: relatedAttempts.length,
+      totalCount: completedAttempts.length,
+      directAverage,
+      relatedAverage,
+      overallAverage,
+    }),
     status,
     recommendation,
     streakBoost: Math.round(streakBoost),
@@ -242,6 +304,44 @@ export function computeReadinessInsight(args: {
     topicAlignmentBoost: Math.round(topicAlignmentBoost),
     trainingDaysBoost: Math.round(trainingDaysBoost),
   }
+}
+
+function normalizeSkillLabel(value?: string | null) {
+  return String(value || 'general').toLowerCase().replace(/[^a-z0-9 +#.-]/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+function getSkillFamily(topic: string) {
+  const normalized = normalizeSkillLabel(topic)
+  const families: Array<{ family: string; terms: string[] }> = [
+    { family: 'data engineering', terms: ['data engineering', 'rag', 'retrieval augmented generation', 'vector database', 'etl', 'pipeline', 'spark', 'sql', 'data lake', 'airflow', 'analytics'] },
+    { family: 'java', terms: ['java', 'spring', 'spring boot', 'jvm', 'microservice', 'hibernate'] },
+    { family: 'frontend', terms: ['react', 'next.js', 'nextjs', 'javascript', 'typescript', 'frontend', 'ui'] },
+    { family: 'cloud', terms: ['azure', 'aws', 'cloud', 'devops', 'kubernetes', 'docker', 'aks'] },
+    { family: 'ai', terms: ['ai', 'ml', 'machine learning', 'llm', 'prompt', 'genai', 'openai'] },
+    { family: 'testing', terms: ['testing', 'qa', 'automation', 'selenium', 'playwright'] },
+  ]
+  return families.find((item) => item.terms.some((term) => normalized.includes(term)))?.family || normalized
+}
+
+function weightedScore(items: Array<{ score: number; weight: number }>) {
+  if (!items.length) return 0
+  const weight = items.reduce((sum, item) => sum + item.weight, 0)
+  if (!weight) return 0
+  return items.reduce((sum, item) => sum + item.score * item.weight, 0) / weight
+}
+
+function buildReadinessEvidenceSummary(input: {
+  directCount: number
+  relatedCount: number
+  totalCount: number
+  directAverage: number
+  relatedAverage: number
+  overallAverage: number
+}) {
+  if (input.directCount) return `${input.directCount} direct topic attempt(s), avg ${Math.round(input.directAverage)}%.`
+  if (input.relatedCount) return `${input.relatedCount} related domain attempt(s), avg ${Math.round(input.relatedAverage)}%.`
+  if (input.totalCount) return `${input.totalCount} overall attempt(s), avg ${Math.round(input.overallAverage)}%; no direct topic history yet.`
+  return 'No completed attempts yet; prediction uses a conservative baseline until evidence is available.'
 }
 
 export function buildBatchProfile(attempts: AttemptLike[]): TopicStrengthPoint[] {

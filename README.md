@@ -380,6 +380,16 @@ Private. All rights reserved.
 
 ---
 
+## Latest Product Updates
+
+| Area | Change |
+|------|--------|
+| Readiness | Quiz readiness and predicted score now use direct topic history, related domain evidence, difficulty, recency, streak, and training tenure. The UI shows confidence and evidence count so predictions are not presented as random values. |
+| AI Command | Admin AI Command can shortlist candidates for role openings such as Java, RAG/data engineering, cloud, frontend, AI, and testing using assessment evidence, domain fit, credentials, attendance, and recency. |
+| Profiles | `avatar-01` is now a neutral default avatar for users who have not selected a profile image; users can change it from profile settings. |
+
+---
+
 ## Production Auth And Email Checklist
 
 Set these environment variables in production:
