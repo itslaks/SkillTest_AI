@@ -54,7 +54,6 @@ export default async function EmployeeLayout({
 
         <EmployeeShellNav
           variant="desktop"
-          enableRouteRefresh
           fullName={fullName}
           email={profile?.email || user.email || ''}
           avatarUrl={profile?.avatar_url}

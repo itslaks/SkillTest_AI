@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useState, useTransition } from 'react'
+import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import {
   Award,
   CalendarDays,
@@ -31,7 +31,6 @@ function isActivePath(pathname: string, href: string) {
 
 export function EmployeeShellNav({
   variant = 'desktop',
-  enableRouteRefresh = false,
   fullName,
   email,
   avatarUrl,
@@ -39,7 +38,6 @@ export function EmployeeShellNav({
   currentStreak,
 }: {
   variant?: 'desktop' | 'mobile'
-  enableRouteRefresh?: boolean
   fullName: string | null
   email: string
   avatarUrl?: string | null
@@ -47,44 +45,41 @@ export function EmployeeShellNav({
   currentStreak?: number | null
 }) {
   const pathname = usePathname()
-  const router = useRouter()
-  const [isRefreshing, startRefresh] = useTransition()
   const [isNavigating, setIsNavigating] = useState(false)
 
   useEffect(() => {
     setIsNavigating(false)
-    if (enableRouteRefresh) {
-      startRefresh(() => router.refresh())
-    }
-  }, [enableRouteRefresh, pathname, router])
+  }, [pathname])
 
-  const showTransition = isNavigating || isRefreshing
   const firstName = fullName?.split(' ')[0] || 'Employee'
 
   if (variant === 'mobile') {
     return (
-      <nav className="-mx-3 mt-3 flex gap-1 overflow-x-auto px-3 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {navigation.map((item) => {
-          const active = isActivePath(pathname, item.href)
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              aria-label={item.name}
-              aria-current={active ? 'page' : undefined}
-              onClick={() => {
-                if (!active) setIsNavigating(true)
-              }}
-              className={`flex min-w-[4.8rem] shrink-0 flex-col items-center gap-1 rounded-lg px-2 py-2.5 transition-all ${
-                active ? 'bg-white text-black' : 'text-white/78 hover:bg-white/10 hover:text-white'
-              }`}
-            >
-              <item.icon className="h-4 w-4" />
-              <span className="max-w-full truncate text-[11px] font-semibold leading-none">{item.mobileName}</span>
-            </Link>
-          )
-        })}
-      </nav>
+      <>
+        <nav className="-mx-3 mt-3 flex gap-1 overflow-x-auto px-3 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {navigation.map((item) => {
+            const active = isActivePath(pathname, item.href)
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                aria-label={item.name}
+                aria-current={active ? 'page' : undefined}
+                onClick={() => {
+                  if (!active) setIsNavigating(true)
+                }}
+                className={`flex min-w-[4.8rem] shrink-0 flex-col items-center gap-1 rounded-lg px-2 py-2.5 transition-all ${
+                  active ? 'bg-white text-black' : 'text-white/78 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                <item.icon className="h-4 w-4" />
+                <span className="max-w-full truncate text-[11px] font-semibold leading-none">{item.mobileName}</span>
+              </Link>
+            )
+          })}
+        </nav>
+        <div aria-hidden="true" className={`route-progress ${isNavigating ? 'is-active' : ''}`} />
+      </>
     )
   }
 
@@ -154,18 +149,7 @@ export function EmployeeShellNav({
           </LogoutForm>
         </div>
 
-      <div
-        aria-hidden="true"
-        className={`pointer-events-none fixed inset-x-0 top-0 z-[70] h-0.5 bg-gradient-to-r from-cyan-300 via-blue-400 to-violet-400 transition-opacity duration-200 ${
-          showTransition ? 'opacity-100' : 'opacity-0'
-        }`}
-      />
-      <div
-        aria-hidden="true"
-        className={`pointer-events-none fixed inset-0 z-[60] bg-white/35 backdrop-blur-[1px] transition-opacity duration-200 ${
-          showTransition ? 'opacity-100' : 'opacity-0'
-        }`}
-      />
+      <div aria-hidden="true" className={`route-progress ${isNavigating ? 'is-active' : ''}`} />
     </>
   )
 }
