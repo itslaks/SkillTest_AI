@@ -129,20 +129,6 @@ export default async function EmployeeDashboard() {
 
           <AiLearnRecommend stats={stats} quizzes={quizzes || []} retentionRisk={retentionRisk} />
 
-          <section className="grid gap-4 md:grid-cols-3">
-            {[
-              { title: 'Guided next steps', body: 'Follow recommendations before you start an assessment.', tone: 'border-blue-100 bg-blue-50 text-blue-800' },
-              { title: 'Healthy rhythm', body: 'Streak and readiness show whether your pace is sustainable.', tone: 'border-emerald-100 bg-emerald-50 text-emerald-800' },
-              { title: 'Review signals', body: 'Amber alerts mean a topic needs revision before moving on.', tone: 'border-amber-100 bg-amber-50 text-amber-800' },
-            ].map((item) => (
-              <div key={item.title} className={`rounded-2xl border p-4 ${item.tone}`}>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em]">Quick hint</p>
-                <p className="mt-2 font-semibold">{item.title}</p>
-                <p className="mt-1 text-sm opacity-80">{item.body}</p>
-              </div>
-            ))}
-          </section>
-
           <section className="rounded-[1.5rem] border border-zinc-200 bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>

@@ -383,6 +383,34 @@
     background-size: 22px 22px, 22px 22px, auto, auto;
   }
 
+  .bg-black :where(.text-zinc-500),
+  .bg-black :where(.text-slate-600),
+  .glass-panel-dark :where(.text-zinc-500),
+  .maverick-command-panel :where(.text-zinc-500) {
+    color: rgb(212 212 216);
+  }
+
+  .bg-black :where(.text-white\/40),
+  .dashboard-grid-bg :where(.text-white\/40) {
+    color: rgb(255 255 255 / 0.68);
+  }
+
+  .bg-black :where(.text-white\/50),
+  .bg-black :where(.text-white\/55),
+  .dashboard-grid-bg :where(.text-white\/50),
+  .dashboard-grid-bg :where(.text-white\/55) {
+    color: rgb(255 255 255 / 0.74);
+  }
+
+  .bg-black :where(.text-white\/60),
+  .bg-black :where(.text-white\/65),
+  .bg-black :where(.text-white\/70),
+  .dashboard-grid-bg :where(.text-white\/60),
+  .dashboard-grid-bg :where(.text-white\/65),
+  .dashboard-grid-bg :where(.text-white\/70) {
+    color: rgb(255 255 255 / 0.82);
+  }
+
   .maverick-ops-shell {
     background:
       linear-gradient(90deg, rgba(2, 6, 23, 0.035) 1px, transparent 1px),

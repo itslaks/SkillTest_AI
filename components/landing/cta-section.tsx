@@ -61,7 +61,7 @@ export function CTASection() {
             <Button 
               size="lg" 
               variant="outline" 
-              className="w-full sm:w-auto h-14 px-8 text-base rounded-full border-background/20 hover:bg-background/10 text-background"
+              className="w-full sm:w-auto h-14 px-8 text-base rounded-full border-white/35 bg-transparent text-white hover:bg-white hover:text-black"
               asChild
             >
               <Link href="/auth/login">Sign in to Dashboard</Link>

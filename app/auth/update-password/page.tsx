@@ -128,6 +128,7 @@ function UpdatePasswordForm() {
         roleQuery.data?.role === "manager" || roleQuery.data?.role === "admin"
           ? "/manager"
           : "/employee";
+      const fallbackLogin = `/auth/login?reset=success&redirect=${encodeURIComponent(nextPath)}`;
 
       if (user?.email) {
         await supabase.auth.signOut({ scope: "local" });
@@ -138,7 +139,7 @@ function UpdatePasswordForm() {
 
         if (signInError) {
           setSuccess("Password updated. Please sign in with your new password.");
-          setTimeout(() => router.push("/auth/login?reset=success"), 1800);
+          setTimeout(() => router.push(fallbackLogin), 1800);
           return;
         }
       }

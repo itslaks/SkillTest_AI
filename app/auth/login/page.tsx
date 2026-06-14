@@ -26,6 +26,7 @@ function LoginContent() {
   const resetSuccess = searchParams.get('reset') === 'success'
   const redirectTo = searchParams.get('redirect')
   const setupRequired = searchParams.get('setup') === 'supabase'
+  const forgotPasswordHref = `/auth/reset-password?redirect=${encodeURIComponent(redirectTo || '/employee')}`
 
   function handleSignIn(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -220,7 +221,7 @@ function LoginContent() {
               </div>
               <div className="flex justify-between mt-1">
                 <span className="text-xs text-muted-foreground">Need help signing in?</span>
-                <Link href="/auth/reset-password" className="text-xs text-primary font-semibold hover:underline underline-offset-4">
+                <Link href={forgotPasswordHref} className="text-xs text-primary font-semibold hover:underline underline-offset-4">
                   Forgot password?
                 </Link>
               </div>

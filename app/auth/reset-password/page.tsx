@@ -1,14 +1,20 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { Suspense, useState, useTransition } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { sendPasswordReset } from "@/lib/actions/auth";
 import { AlertTriangle, ArrowLeft, CheckCircle2, KeyRound, Mail, ShieldCheck } from "lucide-react";
 import { BrandLogo } from "@/components/brand/brand-logo";
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect");
+  const loginHref = redirectTo && /^\/[a-zA-Z0-9\-_/]*$/.test(redirectTo)
+    ? `/auth/login?redirect=${encodeURIComponent(redirectTo)}`
+    : "/auth/login";
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -39,7 +45,7 @@ export default function ResetPasswordPage() {
         <div className="aura-ring -bottom-16 -right-10 h-80 w-80 bg-violet-500/22" style={{ animationDelay: "1.2s" }} />
         <div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300 to-transparent" />
 
-        <Link href="/auth/login" className="relative z-10 inline-flex items-center gap-2 text-sm text-white/70 hover:text-white">
+        <Link href={loginHref} className="relative z-10 inline-flex items-center gap-2 text-sm text-white/70 hover:text-white">
           <ArrowLeft className="h-4 w-4" />
           Back to sign in
         </Link>
@@ -145,7 +151,7 @@ export default function ResetPasswordPage() {
           </form>
 
           <div className="mt-8 flex items-center justify-between gap-4 text-sm">
-            <Link href="/auth/login" className="font-semibold text-zinc-700 hover:text-black">
+            <Link href={loginHref} className="font-semibold text-zinc-700 hover:text-black">
               Back to sign in
             </Link>
             <Link href="/auth/sign-up" className="font-semibold text-blue-700 hover:text-blue-800">
@@ -155,5 +161,13 @@ export default function ResetPasswordPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense>
+      <ResetPasswordContent />
+    </Suspense>
   );
 }
