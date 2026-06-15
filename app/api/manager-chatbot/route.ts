@@ -13,17 +13,19 @@ export async function POST(request: NextRequest) {
   const auth = await requireTrainingStaffForApi()
   if (auth instanceof NextResponse) return auth
 
-  const { message } = await request.json()
+  const { message, history = [] } = await request.json()
   if (!message || typeof message !== 'string') {
     return NextResponse.json({ error: 'Message is required.' }, { status: 400 })
   }
+
+  const admin = createAdminClient()
+  const batchIds = await getAccessibleTrainingBatchIds(auth.userId, auth.role)
 
   const adminCommand = resolveAdminCommand(message)
   if (adminCommand) {
     if (auth.role !== 'admin') {
       return NextResponse.json({ error: 'AI Command mutations require admin access.' }, { status: 403 })
     }
-    const admin = createAdminClient()
     const result = await executeAdminCommand(admin, auth.userId, adminCommand)
     return NextResponse.json({
       message: result.error ? `Command failed: ${result.error}` : result.message,
@@ -32,67 +34,124 @@ export async function POST(request: NextRequest) {
     }, { status: result.error ? 400 : 200 })
   }
 
-  const admin = createAdminClient()
-  const batchIds = await getAccessibleTrainingBatchIds(auth.userId, auth.role)
-
   const [
-    { data: quizzes },
-    { data: attempts },
-    { data: profiles },
-    { data: badges },
-    { data: certificates },
-    { data: certificateRules },
-    { data: attendance },
+    quizzes,
+    attempts,
+    profiles,
+    badges,
+    certificates,
+    certificateRules,
+    attendance,
+    assignments,
+    batches,
+    batchMembers,
+    sessions,
+    assessmentResults,
+    projectEvaluations,
+    feedback,
+    proctoringEvents,
   ] = await Promise.all([
-    admin
+    safeSelect(admin
       .from('quizzes')
       .select('id, title, topic, difficulty, passing_score, created_by, batch_id')
       .or(`created_by.eq.${auth.userId}${batchIds.length ? `,batch_id.in.(${batchIds.join(',')})` : ''}`)
-      .limit(80),
-    admin
+      .limit(120), 'quizzes'),
+    safeSelect(admin
       .from('quiz_attempts')
       .select('quiz_id, user_id, score, status, correct_answers, total_questions, time_taken_seconds, points_earned, completed_at, answers, quizzes:quiz_id(title, topic, difficulty)')
       .eq('status', 'completed')
       .order('completed_at', { ascending: false })
-      .limit(250),
-    admin
+      .limit(1000), 'quiz_attempts'),
+    safeSelect(admin
       .from('profiles')
-      .select('id, full_name, email, employee_id, department, domain, role')
-      .limit(500),
-    admin
+      .select('id, full_name, email, employee_id, department, domain, role, approval_status, created_at, updated_at')
+      .limit(1000), 'profiles'),
+    safeSelect(admin
       .from('user_badges')
       .select('user_id, badges(name, category, rarity)')
-      .limit(500),
-    admin
+      .limit(500), 'user_badges'),
+    safeSelect(admin
       .from('certificates')
       .select('user_id, quiz_id, title, score, issued_at')
-      .limit(250),
-    admin
+      .limit(250), 'certificates'),
+    safeSelect(admin
       .from('certificate_rules')
       .select('quiz_id, enabled, min_score, title, certificate_name, quizzes:quiz_id(title, topic)')
-      .limit(120),
-    admin
+      .limit(120), 'certificate_rules'),
+    safeSelect(admin
       .from('session_attendance')
       .select('user_id, status, session:session_id(batch_id, title, session_date)')
-      .limit(500),
+      .limit(1000), 'session_attendance'),
+    safeSelect(admin
+      .from('quiz_assignments')
+      .select('quiz_id, user_id, due_date, assigned_at, quizzes:quiz_id(title, topic, passing_score)')
+      .limit(1000), 'quiz_assignments'),
+    safeSelect(admin
+      .from('training_batches')
+      .select('id, title, domain, status, start_date, end_date, trainer_id, coordinator_id, created_by')
+      .in('id', batchIds.length ? batchIds : ['00000000-0000-0000-0000-000000000000'])
+      .limit(200), 'training_batches'),
+    safeSelect(admin
+      .from('batch_members')
+      .select('batch_id, user_id, enrollment_status, support_status, joined_at, completed_at')
+      .limit(2000), 'batch_members'),
+    safeSelect(admin
+      .from('training_sessions')
+      .select('id, batch_id, title, session_date, status, attendance_required')
+      .limit(1000), 'training_sessions'),
+    safeSelect(admin
+      .from('assessment_results')
+      .select('batch_id, quiz_id, candidate_email, candidate_name, candidate_id, test_name, test_status, percentage, performance_category, appeared_on, proctoring_flag, created_at')
+      .limit(1000), 'assessment_results'),
+    safeSelect(admin
+      .from('training_project_evaluations')
+      .select('batch_id, user_id, project_title, score, remarks, created_at')
+      .limit(500), 'training_project_evaluations'),
+    safeSelect(admin
+      .from('training_feedback')
+      .select('batch_id, session_id, user_id, rating, sentiment, feedback_text, created_at')
+      .limit(500), 'training_feedback'),
+    safeSelect(admin
+      .from('quiz_proctoring_events')
+      .select('employee_id, quiz_id, violation_type, severity, risk_score, occurred_at, metadata, profiles:employee_id(full_name,email,employee_id), quizzes:quiz_id(title,topic)')
+      .order('occurred_at', { ascending: false })
+      .limit(500), 'quiz_proctoring_events'),
   ])
 
   const data = {
-    quizzes: quizzes || [],
-    attempts: attempts || [],
-    profiles: profiles || [],
-    badges: badges || [],
-    certificates: certificates || [],
-    certificateRules: certificateRules || [],
-    attendance: attendance || [],
+    quizzes,
+    attempts,
+    profiles,
+    badges,
+    certificates,
+    certificateRules,
+    attendance,
+    assignments,
+    batches,
+    batchMembers,
+    sessions,
+    assessmentResults,
+    projectEvaluations,
+    feedback,
+    proctoringEvents,
   }
 
-  const deterministicAnswer = buildDeterministicAnswer(message, data)
+  const effectiveMessage = buildEffectiveMessage(message, history)
+  const reminderResult = await maybeExecuteReminderIntent(admin, auth, message, history, data)
+  if (reminderResult) {
+    return NextResponse.json({
+      message: reminderResult.error ? `Command failed: ${reminderResult.error}` : reminderResult.message,
+      provider: 'skilltest_ai_command',
+      command: reminderResult,
+    }, { status: reminderResult.error ? 400 : 200 })
+  }
+
+  const deterministicAnswer = buildDeterministicAnswer(effectiveMessage, data)
   if (deterministicAnswer) {
-    return NextResponse.json({ message: deterministicAnswer, provider: 'skilltest_ai_stats' })
+    return NextResponse.json({ message: deterministicAnswer, provider: 'skilltest_ai_copilot', intent: classifyCopilotIntent(effectiveMessage) })
   }
 
-  const docsAnswer = findAdminGuideAnswer(message)
+  const docsAnswer = isHowToRequest(message) ? findAdminGuideAnswer(message) : null
   if (docsAnswer) {
     return NextResponse.json({ message: docsAnswer, provider: 'skilltest_ai_docs' })
   }
@@ -105,26 +164,125 @@ export async function POST(request: NextRequest) {
       {
         role: 'system',
         content:
-          'You are SkillTest_AI Command Chat. Use only the provided database context and admin guide context. Never invent numbers, names, attempts, scores, or certificates. If exact data is missing, say so. For how-to questions, answer from the admin guide. Keep responses under 80 words, with at most 4 bullets. Use crisp plain text and avoid markdown decoration unless it improves readability.',
+          'You are SkillTest_AI Operations Copilot. First infer intent: DATA_RETRIEVAL, DATA_ANALYSIS, OPERATIONAL_ACTION, REPORT_GENERATION, or SYSTEM_EXPLANATION. Use only the provided SkillTest_AI database context and chat history. Never invent numbers, names, attempts, proctoring flags, scores, certificates, or emails. Do not give generic onboarding instructions unless the user explicitly asks how to use the app. If matching data is missing, say "I could not find any matching records" and ask one targeted clarification. Prefer concise KPI lines, compact tables, rankings, and recommendations.',
       },
       {
         role: 'user',
-        content: `DATABASE CONTEXT:\n${context}\n\nADMIN GUIDE CONTEXT:\n${docsContext}\n\nQUESTION:\n${message}`,
+        content: `DATABASE CONTEXT:\n${context}\n\nADMIN GUIDE CONTEXT:\n${docsContext}\n\nRECENT CHAT:\n${formatHistory(history)}\n\nQUESTION:\n${message}\n\nRESOLVED QUESTION:\n${effectiveMessage}`,
       },
-    ], { maxTokens: 180, temperature: 0.1 })
+    ], { maxTokens: 420, temperature: 0.1 })
 
     return NextResponse.json({ message: text, provider })
   } catch (error: any) {
     return NextResponse.json({
-      message: localFallback(message, attempts || [], profiles || []),
+      message: localFallback(message),
       provider: 'skilltest_ai_local',
       error: error.message,
     })
   }
 }
 
+type ChatHistoryEntry = { role?: string; content?: string }
 type CommandResult = { message?: string; error?: string; data?: any }
 type ParsedCommand = { action: string; args: Record<string, string>; source: 'explicit' | 'natural' }
+
+async function safeSelect(query: PromiseLike<{ data: any[] | null; error: any }>, label: string) {
+  const { data, error } = await query
+  if (error) {
+    console.warn(`[manager-chatbot] optional data load failed for ${label}:`, error.message)
+    return []
+  }
+  return data || []
+}
+
+function classifyCopilotIntent(message: string) {
+  const lower = normalize(message)
+  if (/\b(create|add|update|edit|delete|remove|assign|approve|reject|mark|send|remind|archive|extend|run|execute)\b/.test(lower)) return 'OPERATIONAL_ACTION'
+  if (/\b(report|summary|weekly|monthly|compliance|status)\b/.test(lower)) return 'REPORT_GENERATION'
+  if (/\b(why|explain|reason|blocked|failed|not generated|not issued)\b/.test(lower)) return 'SYSTEM_EXPLANATION'
+  if (/\b(compare|trend|struggling|poorly|highest|lowest|weak|risk|performing)\b/.test(lower)) return 'DATA_ANALYSIS'
+  return 'DATA_RETRIEVAL'
+}
+
+function isHowToRequest(message: string) {
+  const lower = normalize(message)
+  return /\b(how\s+(do|to|can)|steps?|guide|help|where\s+do|where\s+can|show\s+me\s+how)\b/.test(lower)
+}
+
+function formatHistory(history: ChatHistoryEntry[]) {
+  if (!Array.isArray(history) || !history.length) return 'none'
+  return history
+    .slice(-8)
+    .map((entry) => `${entry.role === 'assistant' ? 'assistant' : 'user'}: ${String(entry.content || '').slice(0, 500)}`)
+    .join('\n')
+}
+
+function buildEffectiveMessage(message: string, history: ChatHistoryEntry[]) {
+  const lower = normalize(message)
+  const lastUser = Array.isArray(history)
+    ? [...history].reverse().find((entry) => entry.role === 'user' && entry.content && entry.content.trim().toLowerCase() !== message.trim().toLowerCase())
+    : null
+  if (!lastUser?.content) return message
+
+  if (/^(only|filter|from|for|just)\b/.test(lower) || (/\b(data engineering|cloud|java|frontend|testing|ai|python|react|sql)\b/.test(lower) && lower.split(/\s+/).length <= 6)) {
+    return `${lastUser.content}. Follow-up filter: ${message}`
+  }
+
+  if (/\b(them|those|these|same employees|same learners|that batch|that quiz)\b/.test(lower)) {
+    return `${lastUser.content}. Follow-up request: ${message}`
+  }
+
+  return message
+}
+
+async function maybeExecuteReminderIntent(
+  admin: ReturnType<typeof createAdminClient>,
+  auth: { userId: string; role: string },
+  message: string,
+  history: ChatHistoryEntry[],
+  data: Record<string, any[]>,
+): Promise<CommandResult | null> {
+  const lower = normalize(message)
+  if (!/\b(send|queue|create)\b.*\b(reminder|reminders|notification|notifications)\b/.test(lower)) return null
+  if (auth.role !== 'admin') return { error: 'Reminder actions require admin access.' }
+
+  const targetQuestion = buildEffectiveMessage(message, history)
+  const targets = resolveEmployeeTargetsForReminder(targetQuestion, data)
+  if (!targets.length) {
+    return { error: 'I could not find matching employees to remind. Try: send reminder to employees who have not taken tests in 10 days.' }
+  }
+
+  const rows = targets.slice(0, 200).map((profile) => ({
+    recipient_user_id: profile.id,
+    title: 'Assessment reminder',
+    message: 'Please complete your pending SkillTest_AI assessment or training activity.',
+    audience: 'individual',
+    channel: 'email',
+    delivery_status: 'queued',
+    created_by: auth.userId,
+  }))
+
+  const { error } = await admin.from('training_notifications').insert(rows)
+  if (error) return { error: error.message }
+  revalidateManagerPaths()
+  return {
+    message: `Reminder queued for ${rows.length} employee(s).\nRecommendation: review /manager/notifications for delivery status before escalation.`,
+    data: { count: rows.length, recipients: targets.slice(0, 20).map((profile) => profile.email) },
+  }
+}
+
+function resolveEmployeeTargetsForReminder(message: string, data: Record<string, any[]>) {
+  const inactive = getInactiveEmployeeRows(message, data)
+  if (inactive.length) return inactive.map((item) => item.profile)
+
+  const failed = getFailedEmployees(message, data)
+  if (failed.length) return failed.map((item) => item.profile)
+
+  const low = getLowScoreEmployees(message, data)
+  if (low.length) return low.map((item) => item.profile)
+
+  return []
+}
 
 async function executeAdminCommand(admin: ReturnType<typeof createAdminClient>, actorId: string, command: ParsedCommand): Promise<CommandResult> {
   const { action, args } = command
@@ -1449,6 +1607,20 @@ function buildChatbotContext(data: Record<string, any[]>) {
   const certRuleSummary = data.certificateRules.slice(0, 80).map((rule) =>
     `${rule.quizzes?.title || rule.quiz_id}|${rule.quizzes?.topic || 'General'}|enabled=${rule.enabled}|min=${rule.min_score}|name=${rule.certificate_name || rule.title}`
   )
+  const assignmentSummary = data.assignments.slice(0, 100).map((assignment) => {
+    const profile = profileById.get(assignment.user_id)
+    return `${profile?.full_name || profile?.email || assignment.user_id}|${assignment.quizzes?.title || assignment.quiz_id}|due=${assignment.due_date || 'none'}|assigned=${assignment.assigned_at || 'unknown'}`
+  })
+  const batchSummary = data.batches.slice(0, 80).map((batch) => {
+    const members = data.batchMembers.filter((member) => member.batch_id === batch.id)
+    return `${batch.title}|${batch.domain || 'General'}|status=${batch.status}|members=${members.length}|start=${batch.start_date || 'none'}|end=${batch.end_date || 'none'}`
+  })
+  const assessmentSummary = data.assessmentResults.slice(0, 100).map((result) =>
+    `${result.candidate_name || result.candidate_email}|${result.test_name || result.quiz_id || 'Assessment'}|${result.percentage ?? result.test_score ?? 'N/A'}%|status=${result.test_status || 'unknown'}|proctor=${result.proctoring_flag || 'none'}`
+  )
+  const proctoringSummary = data.proctoringEvents.slice(0, 80).map((event) =>
+    `${event.profiles?.full_name || event.profiles?.email || event.employee_id}|${event.quizzes?.title || event.quiz_id}|${event.violation_type}|severity=${event.severity || 'unknown'}|risk=${event.risk_score || 0}|${event.occurred_at}`
+  )
 
   return [
     'ATTEMPTS name|empId|domain|quiz|topic|score|correct|points|focus|risk',
@@ -1461,11 +1633,49 @@ function buildChatbotContext(data: Record<string, any[]>) {
     certSummary.join('\n') || 'none',
     'CERTIFICATE_RULES quiz|topic|enabled|minScore|certificateName',
     certRuleSummary.join('\n') || 'none',
+    'ASSIGNMENTS name|quiz|due|assigned',
+    assignmentSummary.join('\n') || 'none',
+    'BATCHES title|domain|status|members|start|end',
+    batchSummary.join('\n') || 'none',
+    'IMPORTED_ASSESSMENTS candidate|test|score|status|proctor',
+    assessmentSummary.join('\n') || 'none',
+    'PROCTORING employee|quiz|violation|severity|risk|time',
+    proctoringSummary.join('\n') || 'none',
   ].join('\n')
 }
 
 function buildDeterministicAnswer(message: string, data: Record<string, any[]>) {
   const lower = normalize(message)
+  const inactiveEmployees = summarizeInactiveEmployees(message, data)
+  if (inactiveEmployees) return inactiveEmployees
+
+  const report = summarizeOperationsReport(message, data)
+  if (report) return report
+
+  const pending = summarizePendingAssessments(message, data)
+  if (pending) return pending
+
+  const failed = summarizeFailedEmployees(message, data)
+  if (failed) return failed
+
+  const lowScores = summarizeLowScores(message, data)
+  if (lowScores) return lowScores
+
+  const topPerformers = summarizeTopPerformers(message, data)
+  if (topPerformers) return topPerformers
+
+  const batchAnalysis = summarizeBatchOperations(message, data)
+  if (batchAnalysis) return batchAnalysis
+
+  const domainAnalysis = summarizeDomainPerformance(message, data)
+  if (domainAnalysis) return domainAnalysis
+
+  const attendance = summarizeAttendance(message, data)
+  if (attendance) return attendance
+
+  const proctoring = summarizeProctoring(message, data)
+  if (proctoring) return proctoring
+
   const roleTarget = extractRoleRecommendationTarget(message)
   if (roleTarget) {
     return summarizeRoleRecommendations(roleTarget, data)
@@ -1502,6 +1712,318 @@ function buildDeterministicAnswer(message: string, data: Record<string, any[]>) 
   }
 
   return null
+}
+
+function summarizeInactiveEmployees(message: string, data: Record<string, any[]>) {
+  const lower = normalize(message)
+  const asksForInactive =
+    /\b(not\s+(taken|attempted|completed)|no\s+(test|quiz|attempt)|never\s+(taken|attempted|completed)|inactive|idle|missed|haven't\s+(taken|attempted)|hasn't\s+(taken|attempted))\b/.test(lower)
+    && /\b(employee|employees|learner|learners|test|quiz|assessment|attempt)\b/.test(lower)
+
+  if (!asksForInactive) return null
+
+  const days = extractLookbackDays(message) ?? 10
+  const employees = data.profiles.filter((profile) => profile.role === 'employee')
+  if (!employees.length) return 'No employee profiles are available.'
+  const inactive = getInactiveEmployeeRows(message, data, days)
+
+  if (!inactive.length) {
+    return `All ${employees.length} employee(s) have completed at least one test in the past ${days} day(s).`
+  }
+
+  const visible = inactive.slice(0, 12)
+  const lines = visible.map((item, index) => {
+    const profile = item.profile
+    const lastSeen = item.latest?.completed_at ? formatDateTime(item.latest.completed_at) : 'never'
+    const lastQuiz = item.latest?.quizzes?.title ? `; last quiz: ${item.latest.quizzes.title}` : ''
+    const empId = profile.employee_id ? ` (${profile.employee_id})` : ''
+    const domain = profile.domain || profile.department ? ` - ${profile.domain || profile.department}` : ''
+    return `${index + 1}. ${displayName(profile)}${empId}${domain} - last test: ${lastSeen}${lastQuiz}`
+  })
+
+  return [
+    `${inactive.length} of ${employees.length} employee(s) have not taken any test in the past ${days} day(s).`,
+    ...lines,
+    inactive.length > visible.length ? `Showing first ${visible.length}; ${inactive.length - visible.length} more inactive employee(s) not shown.` : '',
+    `Next action: open /manager/employees to assign a quiz or send reminders.`,
+  ].filter(Boolean).join('\n')
+}
+
+function extractLookbackDays(message: string) {
+  const explicit = message.match(/\b(?:past|last|previous|in)\s+(\d{1,3})\s*(day|days|week|weeks|month|months)\b/i)
+  const loose = message.match(/\b(\d{1,3})\s*(day|days|week|weeks|month|months)\b/i)
+  const match = explicit || loose
+  if (!match) return null
+  const value = Number(match[1])
+  if (!Number.isFinite(value) || value <= 0) return null
+  const unit = match[2].toLowerCase()
+  if (unit.startsWith('week')) return value * 7
+  if (unit.startsWith('month')) return value * 30
+  return value
+}
+
+function getInactiveEmployeeRows(message: string, data: Record<string, any[]>, fallbackDays = 10) {
+  const days = extractLookbackDays(message) ?? fallbackDays
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - days)
+  const domainFilter = extractDomainFilter(message)
+  const attemptsByUser = groupBy(data.attempts, 'user_id')
+
+  return data.profiles
+    .filter((profile) => profile.role === 'employee')
+    .filter((profile) => matchesDomain(profile, domainFilter))
+    .map((profile) => {
+      const attempts = (attemptsByUser.get(profile.id) || []).slice().sort(byLatest)
+      const latest = attempts[0] || null
+      const hasRecentAttempt = attempts.some((attempt) => {
+        if (!attempt.completed_at) return false
+        const completed = new Date(attempt.completed_at)
+        return !Number.isNaN(completed.getTime()) && completed >= cutoff
+      })
+      return { profile, latest, attemptsCount: attempts.length, hasRecentAttempt }
+    })
+    .filter((item) => !item.hasRecentAttempt)
+    .sort((left, right) => {
+      if (!left.latest && right.latest) return -1
+      if (left.latest && !right.latest) return 1
+      return new Date(left.latest?.completed_at || 0).getTime() - new Date(right.latest?.completed_at || 0).getTime()
+    })
+}
+
+function summarizePendingAssessments(message: string, data: Record<string, any[]>) {
+  const lower = normalize(message)
+  if (!/\b(pending|due|overdue|not completed|incomplete|missed)\b.*\b(assessment|quiz|test|assignment)\b/.test(lower)) return null
+  const now = new Date()
+  const attempts = new Set(data.attempts.map((attempt) => `${attempt.quiz_id}:${attempt.user_id}`))
+  const rows = data.assignments
+    .filter((assignment) => !attempts.has(`${assignment.quiz_id}:${assignment.user_id}`))
+    .map((assignment) => ({
+      assignment,
+      profile: data.profiles.find((profile) => profile.id === assignment.user_id),
+      overdue: assignment.due_date ? new Date(assignment.due_date) < now : false,
+    }))
+    .filter((item) => item.profile?.role === 'employee')
+    .filter((item) => matchesDomain(item.profile, extractDomainFilter(message)))
+    .sort((left, right) => Number(right.overdue) - Number(left.overdue) || new Date(left.assignment.due_date || 8640000000000000).getTime() - new Date(right.assignment.due_date || 8640000000000000).getTime())
+
+  if (!rows.length) return 'I could not find any pending assessment assignments in the loaded records.'
+  const overdue = rows.filter((row) => row.overdue).length
+  return [
+    `Pending assessments: ${rows.length} employee assignment(s), ${overdue} overdue.`,
+    ...rows.slice(0, 12).map((row, index) => `${index + 1}. ${displayName(row.profile)} - ${row.assignment.quizzes?.title || 'Quiz'} - due ${row.assignment.due_date || 'not set'}${row.overdue ? ' - OVERDUE' : ''}`),
+    rows.length > 12 ? `Showing first 12; ${rows.length - 12} more pending assignment(s).` : '',
+    'Recommendation: send reminders for overdue items and review due dates for assignments without deadlines.',
+  ].filter(Boolean).join('\n')
+}
+
+function summarizeFailedEmployees(message: string, data: Record<string, any[]>) {
+  const lower = normalize(message)
+  if (!/\b(failed|failures|did not pass|below passing)\b/.test(lower)) return null
+  const rows = getFailedEmployees(message, data)
+  if (!rows.length) return 'I could not find any matching failed assessment records.'
+  return [
+    `${rows.length} employee(s) failed the matching assessment criteria.`,
+    ...rows.slice(0, 12).map((row, index) => `${index + 1}. ${displayName(row.profile)} - ${row.quizTitle} - ${row.score}% (pass ${row.passScore}%)`),
+    rows.length > 12 ? `Showing first 12; ${rows.length - 12} more failure record(s).` : '',
+    'Recommendation: assign a remedial quiz and notify the reporting trainer.',
+  ].filter(Boolean).join('\n')
+}
+
+function getFailedEmployees(message: string, data: Record<string, any[]>) {
+  const domainFilter = extractDomainFilter(message)
+  const quizFilter = extractTopicFilter(message, data)
+  return data.attempts
+    .map((attempt) => {
+      const profile = data.profiles.find((item) => item.id === attempt.user_id)
+      const quiz = data.quizzes.find((item) => item.id === attempt.quiz_id)
+      const passScore = Number(quiz?.passing_score || 60)
+      return { profile, attempt, quizTitle: attempt.quizzes?.title || quiz?.title || 'Quiz', quizTopic: attempt.quizzes?.topic || quiz?.topic || '', score: Number(attempt.score || 0), passScore }
+    })
+    .filter((row) => row.profile?.role === 'employee' && row.score < row.passScore)
+    .filter((row) => matchesDomain(row.profile, domainFilter))
+    .filter((row) => !quizFilter || normalize(`${row.quizTitle} ${row.quizTopic}`).includes(quizFilter))
+    .sort((left, right) => left.score - right.score)
+}
+
+function summarizeLowScores(message: string, data: Record<string, any[]>) {
+  const lower = normalize(message)
+  if (!/\b(low score|low scores|below|under|less than|scored below|need improvement)\b/.test(lower)) return null
+  const rows = getLowScoreEmployees(message, data)
+  if (!rows.length) return 'I could not find any matching low-score records.'
+  const threshold = extractScoreThreshold(message) ?? 70
+  return [
+    `${rows.length} employee(s) scored below ${threshold}%.`,
+    ...rows.slice(0, 12).map((row, index) => `${index + 1}. ${displayName(row.profile)} - ${row.quizTitle} - ${row.score}%`),
+    rows.length > 12 ? `Showing first 12; ${rows.length - 12} more low-score record(s).` : '',
+    'Recommendation: review weak topics and schedule a catch-up assessment.',
+  ].filter(Boolean).join('\n')
+}
+
+function getLowScoreEmployees(message: string, data: Record<string, any[]>) {
+  const threshold = extractScoreThreshold(message) ?? 70
+  const domainFilter = extractDomainFilter(message)
+  const quizFilter = extractTopicFilter(message, data)
+  return data.attempts
+    .map((attempt) => ({
+      profile: data.profiles.find((profile) => profile.id === attempt.user_id),
+      attempt,
+      quizTitle: attempt.quizzes?.title || 'Quiz',
+      quizTopic: attempt.quizzes?.topic || '',
+      score: Number(attempt.score || 0),
+    }))
+    .filter((row) => row.profile?.role === 'employee' && row.score < threshold)
+    .filter((row) => matchesDomain(row.profile, domainFilter))
+    .filter((row) => !quizFilter || normalize(`${row.quizTitle} ${row.quizTopic}`).includes(quizFilter))
+    .sort((left, right) => left.score - right.score)
+}
+
+function summarizeTopPerformers(message: string, data: Record<string, any[]>) {
+  const lower = normalize(message)
+  if (!/\b(top|best|highest|leaderboard|rank)\b/.test(lower) || !/\b(performer|performers|score|scorers|employees|learners)\b/.test(lower)) return null
+  const monthOnly = /\b(month|monthly|this month)\b/.test(lower)
+  const cutoff = new Date()
+  if (monthOnly) cutoff.setDate(cutoff.getDate() - 30)
+  const domainFilter = extractDomainFilter(message)
+  const attemptsByUser = groupBy(data.attempts.filter((attempt) => !monthOnly || new Date(attempt.completed_at || 0) >= cutoff), 'user_id')
+  const rows = data.profiles
+    .filter((profile) => profile.role === 'employee')
+    .filter((profile) => matchesDomain(profile, domainFilter))
+    .map((profile) => {
+      const attempts = attemptsByUser.get(profile.id) || []
+      return { profile, count: attempts.length, avg: average(attempts.map((attempt) => Number(attempt.score || 0))), best: Math.max(0, ...attempts.map((attempt) => Number(attempt.score || 0))) }
+    })
+    .filter((row) => row.count > 0)
+    .sort((left, right) => right.avg - left.avg || right.best - left.best)
+
+  if (!rows.length) return 'I could not find any completed attempts for top performer analysis.'
+  return [
+    `Top performers${monthOnly ? ' in the last 30 days' : ''}:`,
+    ...rows.slice(0, 10).map((row, index) => `${index + 1}. ${displayName(row.profile)} - avg ${row.avg}% across ${row.count} test(s), best ${row.best}%`),
+    'Recommendation: use these learners as peer mentors or shortlist them for advanced tracks.',
+  ].join('\n')
+}
+
+function summarizeBatchOperations(message: string, data: Record<string, any[]>) {
+  const lower = normalize(message)
+  if (!/\bbatch|batches\b/.test(lower) || !/\b(completion|highest|lowest|performing|poorly|status|summary|compare|at risk|risk)\b/.test(lower)) return null
+  if (!data.batches.length) return 'I could not find any matching batch records.'
+  const attemptsByUser = groupBy(data.attempts, 'user_id')
+  const rows = data.batches.map((batch) => {
+    const members = data.batchMembers.filter((member) => member.batch_id === batch.id)
+    const attempted = members.filter((member) => (attemptsByUser.get(member.user_id) || []).length > 0)
+    const scores = members.flatMap((member) => (attemptsByUser.get(member.user_id) || []).map((attempt) => Number(attempt.score || 0)))
+    const completion = members.length ? Math.round((attempted.length / members.length) * 100) : 0
+    const attendanceRate = attendanceRateForBatch(batch.id, data)
+    return { batch, members: members.length, completion, avg: average(scores), attendanceRate }
+  }).sort((left, right) => {
+    if (/\bhighest|best\b/.test(lower)) return right.completion - left.completion || right.avg - left.avg
+    if (/\blowest|poorly|worst|risk|at risk\b/.test(lower)) return left.completion - right.completion || left.avg - right.avg
+    return right.members - left.members
+  })
+
+  return [
+    `Batch operations summary (${rows.length} batch(es)):`,
+    ...rows.slice(0, 10).map((row, index) => `${index + 1}. ${row.batch.title} - status ${row.batch.status}, members ${row.members}, completion ${row.completion}%, avg score ${row.avg || 'N/A'}%, attendance ${row.attendanceRate}%`),
+    'Recommendation: prioritize batches with low completion plus low attendance for trainer follow-up.',
+  ].join('\n')
+}
+
+function summarizeDomainPerformance(message: string, data: Record<string, any[]>) {
+  const lower = normalize(message)
+  if (!/\b(domain|domains|department|departments|data engineering|cloud|java|frontend|testing|compare|struggling|weakest)\b/.test(lower)) return null
+  if (!/\b(compare|performance|performing|struggling|weakest|highest|lowest|trend|summary)\b/.test(lower)) return null
+  const attemptsByUser = groupBy(data.attempts, 'user_id')
+  const rows = new Map<string, { domain: string; employees: number; attempted: number; scores: number[] }>()
+  for (const profile of data.profiles.filter((item) => item.role === 'employee')) {
+    const domain = profile.domain || profile.department || 'Unassigned'
+    const row = rows.get(domain) || { domain, employees: 0, attempted: 0, scores: [] as number[] }
+    const attempts = attemptsByUser.get(profile.id) || []
+    row.employees += 1
+    if (attempts.length) row.attempted += 1
+    row.scores.push(...attempts.map((attempt) => Number(attempt.score || 0)))
+    rows.set(domain, row)
+  }
+  const ranked = [...rows.values()]
+    .map((row) => ({ ...row, avg: average(row.scores), completion: row.employees ? Math.round((row.attempted / row.employees) * 100) : 0 }))
+    .sort((left, right) => /\bstruggling|weakest|lowest\b/.test(lower) ? left.avg - right.avg : right.avg - left.avg)
+  if (!ranked.length) return 'I could not find domain performance data.'
+  return [
+    'Domain performance:',
+    ...ranked.slice(0, 10).map((row, index) => `${index + 1}. ${row.domain} - avg ${row.avg || 'N/A'}%, completion ${row.completion}%, employees ${row.employees}`),
+    `Recommendation: ${ranked[0].domain} needs the first review if you are looking at ${/\bstruggling|weakest|lowest\b/.test(lower) ? 'weakness' : 'performance leadership'}.`,
+  ].join('\n')
+}
+
+function summarizeAttendance(message: string, data: Record<string, any[]>) {
+  const lower = normalize(message)
+  if (!/\battendance|absent|absence|present|late\b/.test(lower)) return null
+  if (!data.attendance.length) return 'I could not find attendance records.'
+  const byUser = groupBy(data.attendance, 'user_id')
+  const rows = data.profiles
+    .filter((profile) => profile.role === 'employee')
+    .map((profile) => {
+      const records = byUser.get(profile.id) || []
+      const present = records.filter((item) => ['present', 'late', 'excused'].includes(String(item.status))).length
+      return { profile, total: records.length, rate: records.length ? Math.round((present / records.length) * 100) : 0, absent: records.filter((item) => item.status === 'absent').length }
+    })
+    .filter((row) => row.total > 0)
+    .sort((left, right) => left.rate - right.rate || right.absent - left.absent)
+  if (!rows.length) return 'I could not find attendance records linked to employees.'
+  const overall = Math.round(rows.reduce((sum, row) => sum + row.rate, 0) / rows.length)
+  return [
+    `Attendance summary: overall ${overall}% across ${rows.length} employee(s).`,
+    ...rows.slice(0, 10).map((row, index) => `${index + 1}. ${displayName(row.profile)} - ${row.rate}% attendance, ${row.absent} absent record(s)`),
+    'Recommendation: follow up with employees below 75% attendance.',
+  ].join('\n')
+}
+
+function summarizeProctoring(message: string, data: Record<string, any[]>) {
+  const lower = normalize(message)
+  if (!/\b(proctor|proctoring|flag|flags|violation|violations|security|integrity|risk|suspicious)\b/.test(lower)) return null
+  const rows = data.proctoringEvents
+  if (!rows.length) return 'I could not find any proctoring or integrity violation records.'
+  const highRisk = rows.filter((event) => ['high', 'critical'].includes(String(event.severity)))
+  const byEmployee = new Map<string, { profile: any; count: number; risk: number; latest: string; types: Set<string> }>()
+  for (const event of rows) {
+    const profile = event.profiles || data.profiles.find((item) => item.id === event.employee_id)
+    const key = event.employee_id || profile?.email || 'unknown'
+    const row = byEmployee.get(key) || { profile, count: 0, risk: 0, latest: event.occurred_at, types: new Set<string>() }
+    row.count += 1
+    row.risk += Number(event.risk_score || 0)
+    row.latest = new Date(event.occurred_at || 0) > new Date(row.latest || 0) ? event.occurred_at : row.latest
+    row.types.add(String(event.violation_type || 'violation'))
+    byEmployee.set(key, row)
+  }
+  const ranked = [...byEmployee.values()].sort((left, right) => right.risk - left.risk || right.count - left.count)
+  return [
+    `Proctoring integrity summary: ${rows.length} event(s), ${highRisk.length} high/critical event(s).`,
+    ...ranked.slice(0, 10).map((row, index) => `${index + 1}. ${displayName(row.profile)} - ${row.count} event(s), risk ${row.risk}, latest ${formatDateTime(row.latest)}, types: ${[...row.types].slice(0, 4).join(', ')}`),
+    'Recommendation: review high-risk attempts before issuing certificates or final results.',
+  ].join('\n')
+}
+
+function summarizeOperationsReport(message: string, data: Record<string, any[]>) {
+  const lower = normalize(message)
+  if (!/\b(report|summary|weekly|monthly|compliance|ops|operations)\b/.test(lower)) return null
+  const employees = data.profiles.filter((profile) => profile.role === 'employee')
+  const attemptedUsers = new Set(data.attempts.map((attempt) => attempt.user_id))
+  const avgScore = average(data.attempts.map((attempt) => Number(attempt.score || 0)))
+  const pending = summarizePendingCount(data)
+  const attendanceRate = overallAttendanceRate(data.attendance)
+  const highRisk = data.proctoringEvents.filter((event) => ['high', 'critical'].includes(String(event.severity))).length
+  return [
+    'SkillTest_AI Operations Report',
+    `KPI | Value`,
+    `Employees | ${employees.length}`,
+    `Completed Attempts | ${data.attempts.length}`,
+    `Employee Coverage | ${employees.length ? Math.round((attemptedUsers.size / employees.length) * 100) : 0}%`,
+    `Average Score | ${avgScore || 'N/A'}%`,
+    `Pending Assignments | ${pending}`,
+    `Batches | ${data.batches.length}`,
+    `Attendance | ${attendanceRate}%`,
+    `High/Critical Proctoring Events | ${highRisk}`,
+    'Recommendation: clear pending assignments first, then review low-score domains and high-risk proctoring cases.',
+  ].join('\n')
 }
 
 function extractRoleRecommendationTarget(message: string) {
@@ -1740,6 +2262,69 @@ function findQuiz(query: string, quizzes: any[], attempts: any[]) {
   })
 }
 
+function groupBy(items: any[], key: string) {
+  const groups = new Map<string, any[]>()
+  for (const item of items || []) {
+    const value = item?.[key]
+    if (!value) continue
+    const rows = groups.get(value) || []
+    rows.push(item)
+    groups.set(value, rows)
+  }
+  return groups
+}
+
+function extractDomainFilter(message: string) {
+  const lower = normalize(message)
+  const known = ['data engineering', 'cloud', 'java', 'frontend', 'testing', 'ai', 'python', 'react', 'sql']
+    .find((domain) => lower.includes(domain))
+  if (known) return known
+  const match = message.match(/\b(?:from|in|for|domain|department)\s+([A-Za-z][A-Za-z0-9 ._-]{2,40})(?:\s+team|\s+domain|\s+department|,|\.|\?|$)/i)?.[1]
+  return match ? normalize(match) : null
+}
+
+function matchesDomain(profile: any, domainFilter: string | null) {
+  if (!domainFilter) return true
+  const haystack = normalize([profile?.domain, profile?.department].filter(Boolean).join(' '))
+  return haystack.includes(domainFilter)
+}
+
+function extractTopicFilter(message: string, data: Record<string, any[]>) {
+  const lower = normalize(message)
+  const knownTopic = ROLE_FAMILY_KEYWORDS.flatMap((item) => [item.family, ...item.terms])
+    .sort((a, b) => b.length - a.length)
+    .find((term) => lower.includes(normalize(term)))
+  if (knownTopic) return normalize(knownTopic)
+
+  const quiz = findQuiz(lower, data.quizzes, data.attempts)
+  if (quiz) return normalize([quiz.title, quiz.topic].filter(Boolean).join(' '))
+  return null
+}
+
+function extractScoreThreshold(message: string) {
+  const match = message.match(/\b(?:below|under|less than|score[d]? below|<)\s*(\d{1,3})\b/i) || message.match(/\b(\d{1,3})\s*%\b/)
+  if (!match) return null
+  const score = Number(match[1])
+  return Number.isFinite(score) ? Math.min(100, Math.max(0, score)) : null
+}
+
+function summarizePendingCount(data: Record<string, any[]>) {
+  const attempts = new Set(data.attempts.map((attempt) => `${attempt.quiz_id}:${attempt.user_id}`))
+  return data.assignments.filter((assignment) => !attempts.has(`${assignment.quiz_id}:${assignment.user_id}`)).length
+}
+
+function overallAttendanceRate(attendance: any[]) {
+  if (!attendance.length) return 0
+  const present = attendance.filter((item) => ['present', 'late', 'excused'].includes(String(item.status))).length
+  return Math.round((present / attendance.length) * 100)
+}
+
+function attendanceRateForBatch(batchId: string, data: Record<string, any[]>) {
+  const sessionIds = new Set(data.sessions.filter((session) => session.batch_id === batchId && session.attendance_required).map((session) => session.id))
+  const rows = data.attendance.filter((item) => sessionIds.has(item.session?.id) || item.session?.batch_id === batchId)
+  return overallAttendanceRate(rows)
+}
+
 function significantTokens(value: string) {
   const stop = new Set(['score', 'scores', 'marks', 'result', 'results', 'analysis', 'average', 'avg', 'quiz', 'test', 'latest', 'last', 'recent', 'attempt', 'of', 'in', 'his', 'her', 'for', 'the', 'and', 'performance', 'show', 'tell', 'me', 'what', 'is'])
   return normalize(value).split(/\s+/).filter((token) => token && !stop.has(token))
@@ -1786,15 +2371,6 @@ function uniqueBy(items: any[], key: string) {
   })
 }
 
-function localFallback(message: string, attempts: any[], profiles: any[]) {
-  const profileById = new Map(profiles.map((profile) => [profile.id, profile]))
-  const top = attempts
-    .slice()
-    .sort((a, b) => Number(b.score || 0) - Number(a.score || 0))
-    .slice(0, 5)
-    .map((attempt, index) => {
-      const profile = profileById.get(attempt.user_id)
-      return `${index + 1}. ${profile?.full_name || profile?.email || 'Unknown'} scored ${attempt.score}% in ${attempt.quizzes?.title || 'quiz'}.`
-    })
-  return `Current performance summary for "${message}":\n\n${top.join('\n') || 'No completed attempts found in the loaded records.'}`
+function localFallback(message: string) {
+  return `I could not find any exact matching records for "${message}". Ask a more specific question, for example: "low scores below 70", "pending assessments", "proctoring flags", or "batch completion".`
 }

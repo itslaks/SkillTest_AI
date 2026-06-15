@@ -25,11 +25,11 @@ type ChatMessage = {
 }
 
 const quickPrompts = [
+  'List employees who have not taken any test for past 10 days',
+  'Which employees never attempted a quiz?',
   'Which employees are eligible for certificates but not issued yet?',
   'Show quiz-wise pass rate and weak domains.',
   'Who scored below 70 in the latest quiz?',
-  'Compare Java and Data Engineering performance.',
-  'Which certificate rules are enabled and what are their thresholds?',
 ]
 
 const commandTemplates = [
@@ -110,7 +110,7 @@ export function ManagerCommandChatbot() {
     {
       role: 'assistant',
       content:
-        'Admin assistant ready. Ask for insights, or open Admin Ops and send a run command to create, update, delete, approve, assign, or mark attendance.',
+        'Admin assistant ready. Ask for live insights like inactive employees, weak scores, certificate gaps, or open Admin Ops to execute changes.',
     },
   ])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -133,7 +133,7 @@ export function ManagerCommandChatbot() {
       const response = await fetch('/api/manager-chatbot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: trimmed }),
+        body: JSON.stringify({ message: trimmed, history: messages.slice(-8) }),
       })
       const payload = await response.json()
       if (payload.provider === 'skilltest_ai_command' && !payload.error && !payload.message?.startsWith('Command failed')) {

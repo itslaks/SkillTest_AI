@@ -30,11 +30,12 @@ const commandPacks = [
     title: 'People',
     icon: Users,
     prompts: [
+      'List employees who have not taken any test for past 10 days',
+      'Which employees never attempted a quiz?',
       'run create employee email=person@company.com name="Person Name" employee_id=EMP001 domain=Java department=Engineering',
       'run update employee email=person@company.com domain=React department=Frontend',
       'run create trainer email=trainer@company.com name="Trainer Name" domain=Java',
       'run approve trainer email=trainer@company.com',
-      'run delete employee email=person@company.com',
     ],
   },
   {
@@ -109,7 +110,7 @@ export function AICommandConsole() {
       const response = await fetch('/api/manager-chatbot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: trimmed }),
+        body: JSON.stringify({ message: trimmed, history: messages.slice(-8) }),
       })
       const payload = await response.json()
       const ok = response.ok && !payload.message?.startsWith('Command failed')
@@ -132,13 +133,13 @@ export function AICommandConsole() {
   return (
     <RuixenMoonChat
       title="SkillTest_AI Command"
-      subtitle={`Ask for insights or execute ${active.title.toLowerCase()} operations in real time.`}
+      subtitle={`Ask for live insights or execute ${active.title.toLowerCase()} operations in real time.`}
       value={input}
       loading={loading}
       onChange={setInput}
       onSubmit={() => void runCommand(input)}
       onKeyDown={keydown}
-      placeholder='Ask, or run: create employee email=... name="..." employee_id=... domain=...'
+      placeholder='Ask: inactive employees, weak scores, certificate gaps - or run: create employee email=...'
       utilityActions={
         <div className="hidden flex-wrap items-center justify-end gap-2 md:flex">
           {moduleLinks.map((link) => {
@@ -181,7 +182,7 @@ export function AICommandConsole() {
       <div className="space-y-3">
         <div className="mb-3 grid gap-2 rounded-xl border border-sky-200/10 bg-slate-950/55 p-3 text-xs text-sky-100/80 sm:grid-cols-2">
           <StatusNote icon={<CheckCircle2 className="h-4 w-4 text-emerald-300" />} label="Realtime execution" text="Create, update, delete, assign, approve, and mark attendance from chat." />
-          <StatusNote icon={<Sparkles className="h-4 w-4 text-sky-200" />} label="Natural language" text="Example: delete all feedback forms, approve trainer by email, or create a batch." />
+          <StatusNote icon={<Sparkles className="h-4 w-4 text-sky-200" />} label="Live analytics" text="Ask for inactive employees, weak areas, certificate gaps, top scorers, or role shortlists." />
         </div>
 
         {messages.map((message, index) => (
