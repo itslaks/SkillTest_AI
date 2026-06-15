@@ -399,6 +399,11 @@ Core behavior:
 
 - Data questions are answered from SkillTest_AI records instead of returning onboarding help.
 - Follow-up prompts such as "only Data Engineering", "send reminder to them", and "export this" reuse the current chat context.
+- Multi-step planning combines attendance, assessments, scores, pending assignments, inactivity, and proctoring risk.
+- Executive mode responds to `/exec` or "Executive Summary" with organization KPIs and leadership recommendations.
+- Anomaly detection handles prompts such as "Anything unusual this week?" across scores, attendance, proctoring, inactivity, and certificates.
+- Root-cause explanations trace business rules for blocked users, missing certificates, failed assessments, and hidden quizzes.
+- Proactive briefing loads when the console opens with critical items and recommended actions.
 - Any data-changing or message-sending action creates a server-side preview first.
 - Confirm / Cancel is required before employee deletes, quiz assignments, reminders, schedule creation, and other operational mutations execute.
 - Pending confirmations expire after 15 minutes and cannot be confirmed by another user.

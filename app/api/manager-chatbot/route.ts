@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
   ] = await Promise.all([
     safeSelect(admin
       .from('quizzes')
-      .select('id, title, topic, difficulty, passing_score, created_by, batch_id')
+      .select('id, title, topic, difficulty, passing_score, created_by, batch_id, status, is_active')
       .or(`created_by.eq.${auth.userId}${batchIds.length ? `,batch_id.in.(${batchIds.join(',')})` : ''}`)
       .limit(120), 'quizzes'),
     safeSelect(admin
@@ -2196,6 +2196,27 @@ function buildChatbotContext(data: Record<string, any[]>) {
 
 function buildDeterministicAnswer(message: string, data: Record<string, any[]>) {
   const lower = normalize(message)
+  const proactive = summarizeProactiveBriefing(message, data)
+  if (proactive) return proactive
+
+  const executive = summarizeExecutiveMode(message, data)
+  if (executive) return executive
+
+  const riskPlan = summarizeTrainingRiskReport(message, data)
+  if (riskPlan) return riskPlan
+
+  const anomalies = summarizeAnomalies(message, data)
+  if (anomalies) return anomalies
+
+  const recovery = summarizeRecoveryPlan(message, data)
+  if (recovery) return recovery
+
+  const rootCause = explainBusinessRuleQuestion(message, data)
+  if (rootCause) return rootCause
+
+  const insights = summarizeInsightsEngine(message, data)
+  if (insights) return insights
+
   const inactiveEmployees = summarizeInactiveEmployees(message, data)
   if (inactiveEmployees) return inactiveEmployees
 
@@ -2296,6 +2317,210 @@ function summarizeInactiveEmployees(message: string, data: Record<string, any[]>
     ...lines,
     inactive.length > visible.length ? `Showing first ${visible.length}; ${inactive.length - visible.length} more inactive employee(s) not shown.` : '',
     `Next action: open /manager/employees to assign a quiz or send reminders.`,
+  ].filter(Boolean).join('\n')
+}
+
+function summarizeProactiveBriefing(message: string, data: Record<string, any[]>) {
+  const lower = normalize(message)
+  if (!/^\/?(briefing|proactive|morning brief|good morning|daily brief)\b/.test(lower)) return null
+  const inactive = getInactiveEmployeeRows('inactive employees past 10 days', data, 10)
+  const tomorrow = new Date()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  const tomorrowKey = tomorrow.toISOString().slice(0, 10)
+  const attempts = new Set(data.attempts.map((attempt) => `${attempt.quiz_id}:${attempt.user_id}`))
+  const expiring = data.assignments.filter((assignment) =>
+    assignment.due_date?.slice(0, 10) === tomorrowKey && !attempts.has(`${assignment.quiz_id}:${assignment.user_id}`)
+  )
+  const highRisk = data.proctoringEvents.filter((event) => ['high', 'critical'].includes(String(event.severity)))
+  const atRisk = getEmployeeRiskRows(data).filter((row) => row.risk >= 70)
+
+  return [
+    'Good morning.',
+    '',
+    `${inactive.length || expiring.length || highRisk.length || atRisk.length ? 'Critical items need attention:' : 'No critical training operations alerts found in the loaded data.'}`,
+    `KPI | Value`,
+    `Inactive > 10 days | ${inactive.length}`,
+    `Assessments expiring tomorrow | ${expiring.length}`,
+    `High-risk proctoring incidents | ${highRisk.length}`,
+    `Employees at critical training risk | ${atRisk.length}`,
+    '',
+    'Recommended actions:',
+    inactive.length ? '- Send reminders to inactive employees' : '- No inactivity reminder needed',
+    expiring.length ? '- Review or extend assignments expiring tomorrow' : '- No assignment deadline action needed for tomorrow',
+    highRisk.length ? '- Review integrity incidents before certificate issuance' : '- No high-risk proctoring review queue found',
+  ].join('\n')
+}
+
+function summarizeExecutiveMode(message: string, data: Record<string, any[]>) {
+  const lower = normalize(message)
+  if (!(/^\/exec\b/.test(lower) || /\b(executive summary|entire training organization|c-level|leadership summary|organization summary)\b/.test(lower))) return null
+  const employees = data.profiles.filter((profile) => profile.role === 'employee')
+  const activeWindow = new Date()
+  activeWindow.setDate(activeWindow.getDate() - 30)
+  const activeLearners = new Set(data.attempts.filter((attempt) => new Date(attempt.completed_at || 0) >= activeWindow).map((attempt) => attempt.user_id))
+  const inactive = getInactiveEmployeeRows('inactive employees past 10 days', data, 10)
+  const attemptedUsers = new Set(data.attempts.map((attempt) => attempt.user_id))
+  const riskRows = getEmployeeRiskRows(data)
+  const critical = riskRows.filter((row) => row.risk >= 70)
+  const domainRows = getDomainHealthRows(data)
+  const topDomain = domainRows.slice().sort((a, b) => b.avg - a.avg || b.completion - a.completion)[0]
+  const weakDomain = domainRows.slice().sort((a, b) => a.avg - b.avg || a.completion - b.completion)[0]
+  const highRiskEvents = data.proctoringEvents.filter((event) => ['high', 'critical'].includes(String(event.severity))).length
+  const pending = summarizePendingCount(data)
+  const completionRate = employees.length ? Math.round((attemptedUsers.size / employees.length) * 100) : 0
+
+  return [
+    'Executive Summary',
+    `KPI | Value`,
+    `Total learners | ${employees.length}`,
+    `Active learners, 30 days | ${activeLearners.size}`,
+    `Inactive learners > 10 days | ${inactive.length}`,
+    `Assessment completion coverage | ${completionRate}%`,
+    `Average score | ${average(data.attempts.map((attempt) => Number(attempt.score || 0))) || 'N/A'}%`,
+    `Pending assignments | ${pending}`,
+    `Critical at-risk employees | ${critical.length}`,
+    `Top domain | ${topDomain ? `${topDomain.domain} (${topDomain.avg}% avg, ${topDomain.completion}% completion)` : 'N/A'}`,
+    `Weakest domain | ${weakDomain ? `${weakDomain.domain} (${weakDomain.avg}% avg, ${weakDomain.completion}% completion)` : 'N/A'}`,
+    `High/Critical proctoring events | ${highRiskEvents}`,
+    '',
+    'Insight:',
+    buildExecutiveInsight(domainRows, inactive, data),
+    '',
+    'Recommendations:',
+    '- Clear overdue and pending assignments before adding new assessments.',
+    '- Review critical at-risk employees with trainer notes and attendance evidence.',
+    '- Resolve high-risk proctoring events before issuing final outcomes.',
+  ].join('\n')
+}
+
+function summarizeTrainingRiskReport(message: string, data: Record<string, any[]>) {
+  const lower = normalize(message)
+  if (!/\b(at risk|risk of failing|failing.*training goals|training goals|likely to fail|risk report)\b/.test(lower)) return null
+  const rows = getEmployeeRiskRows(data).filter((row) => row.risk > 0).sort((a, b) => b.risk - a.risk)
+  if (!rows.length) return 'No employees show measurable training risk in the loaded data.'
+  const critical = rows.filter((row) => row.risk >= 70).length
+  const high = rows.filter((row) => row.risk >= 50 && row.risk < 70).length
+  return [
+    `Training Goal Risk Report: ${rows.length} employee(s) have at least one risk signal.`,
+    `KPI | Value`,
+    `Critical risk | ${critical}`,
+    `High risk | ${high}`,
+    `Medium risk | ${rows.filter((row) => row.risk >= 30 && row.risk < 50).length}`,
+    '',
+    `Rank | Employee | Risk | Key drivers`,
+    ...rows.slice(0, 15).map((row, index) => `${index + 1} | ${displayName(row.profile)} | ${row.risk}% | ${row.reasons.slice(0, 4).join('; ')}`),
+    '',
+    'Planning steps used: attendance, assessment attempts, scores, pending assignments, inactivity, and proctoring risk.',
+    'Recommendation: start with critical-risk employees, then create recovery groups by domain and weakest assessment topic.',
+  ].join('\n')
+}
+
+function summarizeAnomalies(message: string, data: Record<string, any[]>) {
+  const lower = normalize(message)
+  if (!/\b(anything unusual|unusual|anomal|red flag|red flags|what changed|this week|problem this week)\b/.test(lower)) return null
+  const now = new Date()
+  const weekAgo = daysAgo(7)
+  const twoWeeksAgo = daysAgo(14)
+  const thisWeekAttempts = data.attempts.filter((attempt) => dateBetween(attempt.completed_at, weekAgo, now))
+  const previousAttempts = data.attempts.filter((attempt) => dateBetween(attempt.completed_at, twoWeeksAgo, weekAgo))
+  const thisWeekAvg = average(thisWeekAttempts.map((attempt) => Number(attempt.score || 0)))
+  const previousAvg = average(previousAttempts.map((attempt) => Number(attempt.score || 0)))
+  const thisWeekAttendance = data.attendance.filter((item) => dateBetween(item.session?.session_date, weekAgo, now))
+  const previousAttendance = data.attendance.filter((item) => dateBetween(item.session?.session_date, twoWeeksAgo, weekAgo))
+  const thisAttendanceRate = overallAttendanceRate(thisWeekAttendance)
+  const prevAttendanceRate = overallAttendanceRate(previousAttendance)
+  const thisWeekProctoring = data.proctoringEvents.filter((event) => dateBetween(event.occurred_at, weekAgo, now))
+  const previousProctoring = data.proctoringEvents.filter((event) => dateBetween(event.occurred_at, twoWeeksAgo, weekAgo))
+  const inactive = getInactiveEmployeeRows('inactive employees past 10 days', data, 10)
+  const certGap = getCertificateGapRows(data).length
+  const findings: string[] = []
+
+  if (previousAvg && thisWeekAvg && previousAvg - thisWeekAvg >= 10) findings.push(`Score drop: average fell from ${previousAvg}% to ${thisWeekAvg}% this week.`)
+  if (prevAttendanceRate && thisAttendanceRate && prevAttendanceRate - thisAttendanceRate >= 12) findings.push(`Attendance drop: attendance fell from ${prevAttendanceRate}% to ${thisAttendanceRate}%.`)
+  if (thisWeekProctoring.length >= Math.max(3, previousProctoring.length * 2)) findings.push(`Proctoring spike: ${thisWeekProctoring.length} event(s) this week vs ${previousProctoring.length} in the previous week.`)
+  if (inactive.length >= 10) findings.push(`Inactivity concentration: ${inactive.length} employee(s) inactive for more than 10 days.`)
+  if (certGap >= 5) findings.push(`Certificate gap: ${certGap} eligible certificate(s) not issued.`)
+
+  if (!findings.length) {
+    return [
+      'Anomaly Scan',
+      'No major unusual pattern was detected in the loaded weekly data.',
+      `Signals checked: score movement, attendance movement, proctoring spikes, inactivity, and certificate gaps.`,
+    ].join('\n')
+  }
+
+  return [
+    'Anomaly Scan',
+    ...findings.map((finding) => `- ${finding}`),
+    '',
+    'Recommendation:',
+    'Investigate the largest movement first, then generate a focused recovery plan for the affected domain or quiz.',
+  ].join('\n')
+}
+
+function summarizeRecoveryPlan(message: string, data: Record<string, any[]>) {
+  const lower = normalize(message)
+  if (!/\b(recovery plan|remediation plan|catch-up plan|improvement plan)\b/.test(lower)) return null
+  const threshold = extractScoreThreshold(message) ?? 50
+  const rows = getLowScoreEmployees(`below ${threshold}`, data)
+  if (!rows.length) return `No employees below ${threshold}% were found in the loaded records.`
+  const grouped = new Map<string, typeof rows>()
+  for (const row of rows) {
+    const key = row.profile.domain || row.profile.department || 'Unassigned'
+    grouped.set(key, [...(grouped.get(key) || []), row])
+  }
+  const groups = [...grouped.entries()].sort((a, b) => b[1].length - a[1].length)
+  return [
+    `Recovery Plan for Employees Below ${threshold}%`,
+    `KPI | Value`,
+    `Employees needing recovery | ${rows.length}`,
+    `Domains affected | ${groups.length}`,
+    `Lowest score | ${Math.min(...rows.map((row) => row.score))}%`,
+    '',
+    'Recovery groups:',
+    ...groups.slice(0, 8).map(([domain, items]) => `- ${domain}: ${items.length} employee(s), avg ${average(items.map((item) => item.score))}%`),
+    '',
+    'Recommended workflow:',
+    '1. Send reminder and support note to the recovery group.',
+    '2. Assign a remedial assessment for the weakest topic.',
+    '3. Schedule a catch-up session within 3 working days.',
+    '4. Re-test and review proctoring flags before certificate decisions.',
+    '',
+    'To execute messaging safely, ask: "Send reminder to employees below 50%" and confirm the preview.',
+  ].join('\n')
+}
+
+function explainBusinessRuleQuestion(message: string, data: Record<string, any[]>) {
+  const lower = normalize(message)
+  if (!/\bwhy\b/.test(lower)) return null
+  if (/\b(blocked|cannot login|access denied|pending approval)\b/.test(lower)) return explainUserAccess(message, data)
+  if (/\bcertificate|cert\b/.test(lower)) return explainCertificateIssue(message, data)
+  if (/\b(assessment|test|quiz|attempt)\b.*\b(fail|failed|not pass|rejected)\b/.test(lower)) return explainAssessmentFailure(message, data)
+  if (/\bquiz\b.*\b(hidden|not visible|invisible|draft|unavailable)\b/.test(lower)) return explainQuizVisibility(message, data)
+  return null
+}
+
+function summarizeInsightsEngine(message: string, data: Record<string, any[]>) {
+  const lower = normalize(message)
+  if (!/\b(insight|insights|root cause|potential cause|recommendation|recommendations|why is .*performing poorly|struggling most)\b/.test(lower)) return null
+  const domainRows = getDomainHealthRows(data)
+  if (!domainRows.length) return 'I could not find enough domain data to generate insights.'
+  const weakest = domainRows.slice().sort((a, b) => a.avg - b.avg || a.completion - b.completion)[0]
+  const strongest = domainRows.slice().sort((a, b) => b.avg - a.avg || b.completion - a.completion)[0]
+  const inactiveByDomain = new Map<string, number>()
+  for (const item of getInactiveEmployeeRows('inactive employees past 10 days', data, 10)) {
+    const domain = item.profile.domain || item.profile.department || 'Unassigned'
+    inactiveByDomain.set(domain, (inactiveByDomain.get(domain) || 0) + 1)
+  }
+  const mostInactive = [...inactiveByDomain.entries()].sort((a, b) => b[1] - a[1])[0]
+  const weakTopic = getWeakestTopic(data.attempts)
+  return [
+    'AI Insights',
+    `Insight: ${weakest.domain} is the weakest loaded domain at ${weakest.avg || 'N/A'}% average and ${weakest.completion}% completion.`,
+    strongest && strongest.domain !== weakest.domain ? `Benchmark: ${strongest.domain} is leading at ${strongest.avg || 'N/A'}% average and ${strongest.completion}% completion.` : '',
+    mostInactive ? `Inactivity signal: ${mostInactive[0]} has the highest inactive count (${mostInactive[1]} learner(s) inactive > 10 days).` : '',
+    weakTopic ? `Potential cause: ${weakTopic.topic} is the weakest assessment topic (${weakTopic.avg}% avg across ${weakTopic.count} attempt(s)).` : '',
+    'Recommendation: combine reminders with a targeted catch-up session, then re-assess only the weak topic instead of re-running the full program.',
   ].filter(Boolean).join('\n')
 }
 
@@ -2812,6 +3037,189 @@ function findQuiz(query: string, quizzes: any[], attempts: any[]) {
   })
 }
 
+function getEmployeeRiskRows(data: Record<string, any[]>) {
+  const attemptsByUser = groupBy(data.attempts, 'user_id')
+  const attendanceByUser = groupBy(data.attendance, 'user_id')
+  const proctoringByUser = groupBy(data.proctoringEvents, 'employee_id')
+  const completedAssignmentKeys = new Set(data.attempts.map((attempt) => `${attempt.quiz_id}:${attempt.user_id}`))
+  const now = new Date()
+  const assignmentsByUser = groupBy(data.assignments, 'user_id')
+
+  return data.profiles
+    .filter((profile) => profile.role === 'employee')
+    .map((profile) => {
+      const attempts = (attemptsByUser.get(profile.id) || []).slice().sort(byLatest)
+      const latest = attempts[0]
+      const scores = attempts.map((attempt) => Number(attempt.score || 0))
+      const avg = average(scores)
+      const latestScore = latest ? Number(latest.score || 0) : 0
+      const latestDate = latest?.completed_at ? new Date(latest.completed_at) : null
+      const inactiveDays = latestDate && !Number.isNaN(latestDate.getTime())
+        ? Math.floor((now.getTime() - latestDate.getTime()) / 86400000)
+        : 999
+      const assignments = assignmentsByUser.get(profile.id) || []
+      const pending = assignments.filter((assignment) => !completedAssignmentKeys.has(`${assignment.quiz_id}:${assignment.user_id}`))
+      const overdue = pending.filter((assignment) => assignment.due_date && new Date(assignment.due_date) < now)
+      const attendanceRows = attendanceByUser.get(profile.id) || []
+      const attendanceRate = attendanceRows.length
+        ? Math.round((attendanceRows.filter((row) => ['present', 'late', 'excused'].includes(String(row.status))).length / attendanceRows.length) * 100)
+        : 100
+      const proctoring = proctoringByUser.get(profile.id) || []
+      const highRiskEvents = proctoring.filter((event) => ['high', 'critical'].includes(String(event.severity))).length
+      const reasons: string[] = []
+      let risk = 0
+
+      if (!attempts.length) { risk += 25; reasons.push('no completed assessments') }
+      if (inactiveDays > 10) { risk += inactiveDays > 30 ? 25 : 15; reasons.push(`inactive ${inactiveDays === 999 ? 'never attempted' : `${inactiveDays} days`}`) }
+      if (attempts.length && avg < 60) { risk += 25; reasons.push(`average score ${avg}%`) }
+      if (latest && latestScore < 50) { risk += 20; reasons.push(`latest score ${latestScore}%`) }
+      if (attendanceRows.length && attendanceRate < 75) { risk += 15; reasons.push(`attendance ${attendanceRate}%`) }
+      if (pending.length) { risk += Math.min(20, pending.length * 5); reasons.push(`${pending.length} pending assignment(s)`) }
+      if (overdue.length) { risk += 15; reasons.push(`${overdue.length} overdue assignment(s)`) }
+      if (highRiskEvents) { risk += Math.min(25, highRiskEvents * 12); reasons.push(`${highRiskEvents} high-risk proctoring event(s)`) }
+
+      return {
+        profile,
+        risk: clampNumber(risk, 0, 100, 0),
+        reasons,
+        avg,
+        latestScore,
+        inactiveDays,
+        pending: pending.length,
+        overdue: overdue.length,
+        attendanceRate,
+        highRiskEvents,
+      }
+    })
+}
+
+function getDomainHealthRows(data: Record<string, any[]>) {
+  const attemptsByUser = groupBy(data.attempts, 'user_id')
+  const rows = new Map<string, { domain: string; employees: number; attempted: number; scores: number[] }>()
+  for (const profile of data.profiles.filter((item) => item.role === 'employee')) {
+    const domain = profile.domain || profile.department || 'Unassigned'
+    const row = rows.get(domain) || { domain, employees: 0, attempted: 0, scores: [] as number[] }
+    const attempts = attemptsByUser.get(profile.id) || []
+    row.employees += 1
+    if (attempts.length) row.attempted += 1
+    row.scores.push(...attempts.map((attempt) => Number(attempt.score || 0)))
+    rows.set(domain, row)
+  }
+  return [...rows.values()].map((row) => ({
+    ...row,
+    avg: average(row.scores),
+    completion: row.employees ? Math.round((row.attempted / row.employees) * 100) : 0,
+  }))
+}
+
+function buildExecutiveInsight(domainRows: Array<{ domain: string; avg: number; completion: number }>, inactive: any[], data: Record<string, any[]>) {
+  const weakest = domainRows.slice().sort((a, b) => a.avg - b.avg || a.completion - b.completion)[0]
+  const inactiveByDomain = new Map<string, number>()
+  for (const item of inactive) {
+    const domain = item.profile.domain || item.profile.department || 'Unassigned'
+    inactiveByDomain.set(domain, (inactiveByDomain.get(domain) || 0) + 1)
+  }
+  const mostInactive = [...inactiveByDomain.entries()].sort((a, b) => b[1] - a[1])[0]
+  const weakTopic = getWeakestTopic(data.attempts)
+  const parts = []
+  if (weakest) parts.push(`${weakest.domain} needs attention because it has ${weakest.avg || 'N/A'}% average and ${weakest.completion}% completion.`)
+  if (mostInactive) parts.push(`${mostInactive[0]} has the highest inactivity concentration (${mostInactive[1]} learner(s)).`)
+  if (weakTopic) parts.push(`${weakTopic.topic} is the weakest assessment topic.`)
+  return parts.join(' ') || 'No dominant risk pattern was visible in the loaded records.'
+}
+
+function getWeakestTopic(attempts: any[]) {
+  const byTopic = new Map<string, number[]>()
+  for (const attempt of attempts) {
+    const topic = attempt.quizzes?.topic || attempt.quizzes?.title || 'General'
+    byTopic.set(topic, [...(byTopic.get(topic) || []), Number(attempt.score || 0)])
+  }
+  return [...byTopic.entries()]
+    .map(([topic, scores]) => ({ topic, avg: average(scores), count: scores.length }))
+    .filter((row) => row.count >= 1)
+    .sort((a, b) => a.avg - b.avg)[0] || null
+}
+
+function getCertificateGapRows(data: Record<string, any[]>) {
+  const enabledRules = data.certificateRules.filter((rule) => rule.enabled)
+  const certKeys = new Set(data.certificates.map((cert) => `${cert.quiz_id}:${cert.user_id}`))
+  return data.attempts.filter((attempt) => {
+    const rule = enabledRules.find((item) => item.quiz_id === attempt.quiz_id)
+    return rule && Number(attempt.score || 0) >= Number(rule.min_score || 0) && !certKeys.has(`${attempt.quiz_id}:${attempt.user_id}`)
+  })
+}
+
+function explainUserAccess(message: string, data: Record<string, any[]>) {
+  const profile = findProfile(normalize(message), data.profiles)
+  if (!profile) return 'I could not identify the employee/user in that access question.'
+  const reasons = []
+  if (profile.approval_status && !['approved', 'active'].includes(String(profile.approval_status))) reasons.push(`approval_status is ${profile.approval_status}`)
+  if (profile.role === 'employee' && !profile.employee_id) reasons.push('employee_id is missing')
+  if (!reasons.length) reasons.push('profile looks active in the loaded application records; check Supabase Auth email confirmation or disabled user state if login is still blocked')
+  return [
+    `Access explanation for ${displayName(profile)}:`,
+    ...reasons.map((reason) => `- ${reason}`),
+    'Recommendation: verify profile status, role, employee ID, and Supabase Auth confirmation state.',
+  ].join('\n')
+}
+
+function explainCertificateIssue(message: string, data: Record<string, any[]>) {
+  const profile = findProfile(normalize(message), data.profiles)
+  const quiz = findQuiz(normalize(message), data.quizzes, data.attempts)
+  const attempts = data.attempts.filter((attempt) => (!profile || attempt.user_id === profile.id) && (!quiz || attempt.quiz_id === quiz.id)).sort(byLatest)
+  const attempt = attempts[0]
+  if (!attempt) return 'Certificate explanation: no matching completed attempt was found for the employee/quiz in the loaded data.'
+  const rule = data.certificateRules.find((item) => item.quiz_id === attempt.quiz_id)
+  const cert = data.certificates.find((item) => item.quiz_id === attempt.quiz_id && item.user_id === attempt.user_id)
+  const owner = profile || data.profiles.find((item) => item.id === attempt.user_id)
+  const quizTitle = quiz?.title || attempt.quizzes?.title || 'the quiz'
+  const reasons = []
+  if (cert) reasons.push('certificate already exists')
+  if (!rule) reasons.push('no certificate rule exists for this quiz')
+  if (rule && !rule.enabled) reasons.push('certificate rule is disabled')
+  if (rule && Number(attempt.score || 0) < Number(rule.min_score || 0)) reasons.push(`score ${attempt.score}% is below certificate threshold ${rule.min_score}%`)
+  if (!reasons.length) reasons.push('employee appears eligible; certificate issuance job or manual review may not have run yet')
+  return [
+    `Certificate explanation for ${displayName(owner)} in ${quizTitle}:`,
+    ...reasons.map((reason) => `- ${reason}`),
+    'Recommendation: enable the certificate rule, verify minimum score, then regenerate/issue certificate if eligible.',
+  ].join('\n')
+}
+
+function explainAssessmentFailure(message: string, data: Record<string, any[]>) {
+  const profile = findProfile(normalize(message), data.profiles)
+  const quiz = findQuiz(normalize(message), data.quizzes, data.attempts)
+  const attempts = data.attempts.filter((attempt) => (!profile || attempt.user_id === profile.id) && (!quiz || attempt.quiz_id === quiz.id)).sort(byLatest)
+  const attempt = attempts[0]
+  if (!attempt) return 'Assessment explanation: no matching completed attempt was found.'
+  const quizRow = quiz || data.quizzes.find((item) => item.id === attempt.quiz_id)
+  const passScore = Number(quizRow?.passing_score || 60)
+  const proctoring = data.proctoringEvents.filter((event) => event.employee_id === attempt.user_id && event.quiz_id === attempt.quiz_id)
+  return [
+    `Assessment explanation for ${displayName(profile || data.profiles.find((item) => item.id === attempt.user_id))}:`,
+    `- Score was ${attempt.score}% against passing score ${passScore}%.`,
+    Number(attempt.score || 0) < passScore ? '- Result failed because score is below the configured passing score.' : '- Score meets the passing threshold; check integrity review or certificate logic if status still shows failed.',
+    proctoring.length ? `- ${proctoring.length} proctoring event(s) exist for this quiz attempt context.` : '- No proctoring events were found for this quiz context.',
+    'Recommendation: review answer breakdown, retry policy, and integrity status before retest assignment.',
+  ].join('\n')
+}
+
+function explainQuizVisibility(message: string, data: Record<string, any[]>) {
+  const quiz = findQuiz(normalize(message), data.quizzes, data.attempts)
+  if (!quiz) return 'Quiz visibility explanation: no matching quiz was found.'
+  const assignedCount = data.assignments.filter((assignment) => assignment.quiz_id === quiz.id).length
+  const reasons = []
+  if (quiz.is_active === false) reasons.push('is_active is false')
+  if (quiz.status && !['active', 'published'].includes(String(quiz.status))) reasons.push(`status is ${quiz.status}`)
+  if (!assignedCount) reasons.push('no loaded employee assignments exist for this quiz')
+  if (!reasons.length) reasons.push('quiz appears active and assigned in loaded data; check route permissions or employee batch scope')
+  return [
+    `Quiz visibility explanation for "${quiz.title}":`,
+    ...reasons.map((reason) => `- ${reason}`),
+    'Recommendation: activate/publish the quiz and verify assignments for the intended employees.',
+  ].join('\n')
+}
+
 function groupBy(items: any[], key: string) {
   const groups = new Map<string, any[]>()
   for (const item of items || []) {
@@ -2873,6 +3281,18 @@ function attendanceRateForBatch(batchId: string, data: Record<string, any[]>) {
   const sessionIds = new Set(data.sessions.filter((session) => session.batch_id === batchId && session.attendance_required).map((session) => session.id))
   const rows = data.attendance.filter((item) => sessionIds.has(item.session?.id) || item.session?.batch_id === batchId)
   return overallAttendanceRate(rows)
+}
+
+function daysAgo(days: number) {
+  const date = new Date()
+  date.setDate(date.getDate() - days)
+  return date
+}
+
+function dateBetween(value: string | null | undefined, start: Date, end: Date) {
+  if (!value) return false
+  const date = new Date(value)
+  return !Number.isNaN(date.getTime()) && date >= start && date < end
 }
 
 function significantTokens(value: string) {

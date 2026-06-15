@@ -58,6 +58,9 @@ const commandPacks = [
       'Employees with no tests in last 10 days',
       'Low performers below 60%',
       'High-risk proctoring summary',
+      'Executive Summary',
+      'Anything unusual this week?',
+      'Which employees are at risk of failing this month training goals?',
       'Which employees never attempted a quiz?',
       'run create employee email=person@company.com name="Person Name" employee_id=EMP001 domain=Java department=Engineering',
       'run update employee email=person@company.com domain=React department=Frontend',
@@ -113,6 +116,10 @@ const templatePrompts = [
   'Overdue assessments',
   'Domain performance comparison',
   'Certificate eligibility report',
+  'Executive Summary',
+  'Anything unusual this week?',
+  'Create a recovery plan for all employees below 50%',
+  'Which employees are at risk of failing this month training goals?',
 ]
 
 const moduleLinks = [
@@ -135,11 +142,39 @@ export function AICommandConsole() {
     },
   ])
   const scrollRef = useRef<HTMLDivElement>(null)
+  const didLoadBriefing = useRef(false)
   const active = useMemo(() => commandPacks.find((pack) => pack.title === activePack) || commandPacks[0], [activePack])
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' })
   }, [messages, loading])
+
+  async function loadProactiveBriefing() {
+    try {
+      const response = await fetch('/api/manager-chatbot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: '/briefing', history: [] }),
+      })
+      const payload = await response.json()
+      if (!response.ok || !payload.message) return
+      setMessages((previous) => [...previous, {
+        role: 'assistant',
+        content: payload.message,
+        ok: true,
+        preview: payload.preview,
+        exportPayload: payload.export,
+      }])
+    } catch {
+      // The command console remains usable if the proactive brief cannot load.
+    }
+  }
+
+  useEffect(() => {
+    if (didLoadBriefing.current) return
+    didLoadBriefing.current = true
+    void loadProactiveBriefing()
+  }, [])
 
   async function runCommand(value: string) {
     const trimmed = value.trim()
