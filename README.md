@@ -384,9 +384,50 @@ Private. All rights reserved.
 
 | Area | Change |
 |------|--------|
+| AI Command | Added confirmation previews, audit logs, CSV/PDF chat exports, saved templates, schedule storage, scoped data access, and recent-command history. |
 | Readiness | Quiz readiness and predicted score now use direct topic history, related domain evidence, difficulty, recency, streak, and training tenure. The UI shows confidence and evidence count so predictions are not presented as random values. |
 | AI Command | Admin AI Command can shortlist candidates for role openings such as Java, RAG/data engineering, cloud, frontend, AI, and testing using assessment evidence, domain fit, credentials, attendance, and recency. |
 | Profiles | `avatar-01` is now a neutral default avatar for users who have not selected a profile image; users can change it from profile settings. |
+
+---
+
+## AI Command Operations Copilot
+
+AI Command is now designed as a safe operations copilot, not a generic help bot.
+
+Core behavior:
+
+- Data questions are answered from SkillTest_AI records instead of returning onboarding help.
+- Follow-up prompts such as "only Data Engineering", "send reminder to them", and "export this" reuse the current chat context.
+- Any data-changing or message-sending action creates a server-side preview first.
+- Confirm / Cancel is required before employee deletes, quiz assignments, reminders, schedule creation, and other operational mutations execute.
+- Pending confirmations expire after 15 minutes and cannot be confirmed by another user.
+- Admins have full access; trainers, managers, and coordinators are scoped to assigned batches/employees/domains; employees cannot access AI Command.
+
+Audit and export:
+
+- `ai_command_audit_logs` records prompt, detected intent, action type, status, affected entities, result summary, and errors.
+- `ai_command_pending_actions` stores pending action previews and confirmation tokens server-side.
+- `ai_command_schedules` stores daily/weekly/monthly recurring command definitions.
+- Chat responses can be exported with "export this as CSV" or "download this report as PDF".
+- Exports include title, generated date, requester, filters, and response content.
+
+Default templates:
+
+- Weekly inactive employees
+- Employees with no tests in last 10 days
+- Failed employees by quiz
+- Low performers below 60%
+- High-risk proctoring summary
+- Batch performance report
+- Pending assessments
+- Overdue assessments
+- Domain performance comparison
+- Certificate eligibility report
+
+Scheduler deployment note:
+
+The app stores recurring AI command schedules in `ai_command_schedules`. To execute them automatically in production, add a Vercel Cron or external worker that reads enabled schedules due at `next_run_at`, runs the stored `command_text` through the same scoped AI Command service, writes an audit log, and updates `last_run_at` / `next_run_at`. Message-sending scheduled commands must still create audit records for each execution.
 
 ---
 

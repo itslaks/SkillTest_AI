@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
   const auth = await requireTrainingStaffForApi()
   if (auth instanceof NextResponse) return auth
 
-  const { message, history = [] } = await request.json()
+  const { message, history = [], confirmToken, decision } = await request.json()
   if (!message || typeof message !== 'string') {
     return NextResponse.json({ error: 'Message is required.' }, { status: 400 })
   }
@@ -21,17 +21,52 @@ export async function POST(request: NextRequest) {
   const admin = createAdminClient()
   const batchIds = await getAccessibleTrainingBatchIds(auth.userId, auth.role)
 
+  if (confirmToken && typeof confirmToken === 'string') {
+    const result = await handlePendingActionDecision(
+      admin,
+      auth,
+      confirmToken,
+      decision === 'cancel' ? 'cancel' : 'confirm',
+    )
+    return NextResponse.json({
+      message: result.error ? `Command failed: ${result.error}` : result.message,
+      provider: result.error ? 'skilltest_ai_error' : 'skilltest_ai_command',
+      result,
+    }, { status: result.error ? 400 : 200 })
+  }
+
+  if (isExportRequest(message)) {
+    const exportPayload = buildExportPayload(message, history, auth.userId)
+    await logAiCommand(admin, {
+      userId: auth.userId,
+      role: auth.role,
+      originalPrompt: message,
+      detectedIntent: 'REPORT_GENERATION',
+      actionType: 'export',
+      actionStatus: 'previewed',
+      affectedEntityType: 'chat_response',
+      affectedCount: 1,
+      resultSummary: `Prepared ${exportPayload.format.toUpperCase()} export from chat context.`,
+      metadata: exportPayload,
+    })
+    return NextResponse.json({
+      message: `Export ready: ${exportPayload.title}\nUse the download button to save this as ${exportPayload.format.toUpperCase()}.`,
+      provider: 'skilltest_ai_export',
+      export: exportPayload,
+    })
+  }
+
   const adminCommand = resolveAdminCommand(message)
   if (adminCommand) {
     if (auth.role !== 'admin') {
       return NextResponse.json({ error: 'AI Command mutations require admin access.' }, { status: 403 })
     }
-    const result = await executeAdminCommand(admin, auth.userId, adminCommand)
+    const preview = await createActionPreview(admin, auth, message, adminCommand)
     return NextResponse.json({
-      message: result.error ? `Command failed: ${result.error}` : result.message,
-      provider: 'skilltest_ai_command',
-      command: result,
-    }, { status: result.error ? 400 : 200 })
+      message: preview.error ? `Command failed: ${preview.error}` : preview.message,
+      provider: 'skilltest_ai_preview',
+      preview,
+    }, { status: preview.error ? 400 : 200 })
   }
 
   const [
@@ -118,7 +153,7 @@ export async function POST(request: NextRequest) {
       .limit(500), 'quiz_proctoring_events'),
   ])
 
-  const data = {
+  const data = scopeCopilotData({
     quizzes,
     attempts,
     profiles,
@@ -134,15 +169,24 @@ export async function POST(request: NextRequest) {
     projectEvaluations,
     feedback,
     proctoringEvents,
-  }
+  }, auth, batchIds)
 
   const effectiveMessage = buildEffectiveMessage(message, history)
+  const schedulePreview = await maybeCreateSchedulePreview(admin, auth, message)
+  if (schedulePreview) {
+    return NextResponse.json({
+      message: schedulePreview.error ? `Command failed: ${schedulePreview.error}` : schedulePreview.message,
+      provider: 'skilltest_ai_preview',
+      preview: schedulePreview,
+    }, { status: schedulePreview.error ? 400 : 200 })
+  }
+
   const reminderResult = await maybeExecuteReminderIntent(admin, auth, message, history, data)
   if (reminderResult) {
     return NextResponse.json({
       message: reminderResult.error ? `Command failed: ${reminderResult.error}` : reminderResult.message,
-      provider: 'skilltest_ai_command',
-      command: reminderResult,
+      provider: 'skilltest_ai_preview',
+      preview: reminderResult,
     }, { status: reminderResult.error ? 400 : 200 })
   }
 
@@ -185,6 +229,16 @@ export async function POST(request: NextRequest) {
 type ChatHistoryEntry = { role?: string; content?: string }
 type CommandResult = { message?: string; error?: string; data?: any }
 type ParsedCommand = { action: string; args: Record<string, string>; source: 'explicit' | 'natural' }
+type AiActionPreview = CommandResult & {
+  requiresConfirmation?: boolean
+  confirmToken?: string
+  actionType?: string
+  affectedCount?: number
+  affectedEntityType?: string
+  messagePreview?: string
+  riskLevel?: 'low' | 'medium' | 'high' | 'critical'
+  affected?: Array<{ id: string; label: string; detail?: string }>
+}
 
 async function safeSelect(query: PromiseLike<{ data: any[] | null; error: any }>, label: string) {
   const { data, error } = await query
@@ -202,6 +256,467 @@ function classifyCopilotIntent(message: string) {
   if (/\b(why|explain|reason|blocked|failed|not generated|not issued)\b/.test(lower)) return 'SYSTEM_EXPLANATION'
   if (/\b(compare|trend|struggling|poorly|highest|lowest|weak|risk|performing)\b/.test(lower)) return 'DATA_ANALYSIS'
   return 'DATA_RETRIEVAL'
+}
+
+async function logAiCommand(admin: ReturnType<typeof createAdminClient>, input: {
+  userId: string
+  role: string
+  originalPrompt: string
+  detectedIntent: string
+  actionType?: string
+  actionStatus: 'previewed' | 'confirmed' | 'executed' | 'failed' | 'cancelled' | 'expired'
+  affectedEntityType?: string
+  affectedEntityIds?: string[]
+  affectedCount?: number
+  resultSummary?: string
+  errorMessage?: string
+  metadata?: Record<string, any>
+}) {
+  try {
+    const { data, error } = await admin.from('ai_command_audit_logs').insert({
+      user_id: input.userId,
+      role: input.role,
+      original_prompt: input.originalPrompt,
+      detected_intent: input.detectedIntent,
+      action_type: input.actionType || null,
+      action_status: input.actionStatus,
+      affected_entity_type: input.affectedEntityType || null,
+      affected_entity_ids: input.affectedEntityIds || [],
+      affected_count: input.affectedCount || 0,
+      result_summary: input.resultSummary || null,
+      error_message: input.errorMessage || null,
+      metadata: input.metadata || {},
+    }).select('id').maybeSingle()
+    if (error) {
+      console.warn('[manager-chatbot] audit log write failed:', error.message)
+      return undefined
+    }
+    return data?.id as string | undefined
+  } catch (error: any) {
+    console.warn('[manager-chatbot] audit log write failed:', error?.message || error)
+    return undefined
+  }
+}
+
+function isExportRequest(message: string) {
+  const lower = normalize(message)
+  return /\b(export|download)\b/.test(lower) && /\b(csv|pdf|report|this|list|employees|summary)\b/.test(lower)
+}
+
+function buildExportPayload(message: string, history: ChatHistoryEntry[], requestedBy: string) {
+  const lower = normalize(message)
+  const format = /\bpdf\b/.test(lower) ? 'pdf' : 'csv'
+  const lastAssistant = Array.isArray(history)
+    ? [...history].reverse().find((entry) => entry.role === 'assistant' && entry.content?.trim())
+    : null
+  const content = lastAssistant?.content?.trim() || 'No previous AI response was available to export.'
+  const title = lower.includes('inactive')
+    ? 'Inactive Employees'
+    : lower.includes('failed')
+      ? 'Failed Employees'
+      : lower.includes('proctor')
+        ? 'Proctoring Summary'
+        : 'AI Command Export'
+  return {
+    id: crypto.randomUUID(),
+    format,
+    title,
+    generatedAt: new Date().toISOString(),
+    requestedBy,
+    filters: inferExportFilters(message),
+    content,
+  }
+}
+
+function inferExportFilters(message: string) {
+  const filters: Record<string, string> = {}
+  const days = message.match(/\b(\d+)\s+days?\b/i)?.[1]
+  if (days) filters.days = days
+  const domain = message.match(/\b(?:from|domain)\s+([A-Za-z][A-Za-z\s&+-]{1,40})/i)?.[1]?.trim()
+  if (domain) filters.domain = domain
+  return filters
+}
+
+function scopeCopilotData(data: Record<string, any[]>, auth: { userId: string; role: string }, batchIds: string[]) {
+  if (auth.role === 'admin') return data
+  const batchSet = new Set(batchIds)
+  const scopedMembers = (data.batchMembers || []).filter((member) => batchSet.has(member.batch_id))
+  const employeeIds = new Set(scopedMembers.map((member) => member.user_id).filter(Boolean))
+  employeeIds.add(auth.userId)
+  const employeeEmails = new Set((data.profiles || []).filter((profile) => employeeIds.has(profile.id)).map((profile) => normalize(profile.email || '')))
+
+  return {
+    ...data,
+    profiles: (data.profiles || []).filter((profile) => employeeIds.has(profile.id) || profile.id === auth.userId),
+    attempts: (data.attempts || []).filter((attempt) => employeeIds.has(attempt.user_id)),
+    badges: (data.badges || []).filter((badge) => employeeIds.has(badge.user_id)),
+    certificates: (data.certificates || []).filter((certificate) => employeeIds.has(certificate.user_id)),
+    attendance: (data.attendance || []).filter((item) => employeeIds.has(item.user_id) || batchSet.has(item.session?.batch_id)),
+    assignments: (data.assignments || []).filter((assignment) => employeeIds.has(assignment.user_id)),
+    batches: (data.batches || []).filter((batch) => batchSet.has(batch.id)),
+    batchMembers: scopedMembers,
+    sessions: (data.sessions || []).filter((session) => batchSet.has(session.batch_id)),
+    assessmentResults: (data.assessmentResults || []).filter((result) => batchSet.has(result.batch_id) || employeeEmails.has(normalize(result.candidate_email || ''))),
+    projectEvaluations: (data.projectEvaluations || []).filter((evaluation) => batchSet.has(evaluation.batch_id) || employeeIds.has(evaluation.user_id)),
+    feedback: (data.feedback || []).filter((item) => batchSet.has(item.batch_id) || employeeIds.has(item.user_id)),
+    proctoringEvents: (data.proctoringEvents || []).filter((event) => employeeIds.has(event.employee_id)),
+  }
+}
+
+async function maybeCreateSchedulePreview(
+  admin: ReturnType<typeof createAdminClient>,
+  auth: { userId: string; role: string },
+  message: string,
+): Promise<AiActionPreview | null> {
+  const schedule = parseScheduleRequest(message)
+  if (!schedule) return null
+  if (auth.role !== 'admin') return { error: 'Scheduled AI commands require admin access.' }
+
+  const token = crypto.randomUUID()
+  const auditLogId = await logAiCommand(admin, {
+    userId: auth.userId,
+    role: auth.role,
+    originalPrompt: message,
+    detectedIntent: 'OPERATIONAL_ACTION',
+    actionType: 'create schedule',
+    actionStatus: 'previewed',
+    affectedEntityType: 'ai_command_schedule',
+    affectedCount: 1,
+    resultSummary: `Schedule preview: ${schedule.title}`,
+    metadata: { schedule },
+  })
+
+  const { error } = await admin.from('ai_command_pending_actions').insert({
+    token,
+    user_id: auth.userId,
+    role: auth.role,
+    original_prompt: message,
+    detected_intent: 'OPERATIONAL_ACTION',
+    action_type: 'create schedule',
+    action_payload: { schedule },
+    affected_entity_type: 'ai_command_schedule',
+    affected_entity_ids: [],
+    affected_count: 1,
+    preview_summary: `Create recurring AI command: ${schedule.title}`,
+    message_preview: schedule.commandText,
+    risk_level: schedule.commandText.match(/\b(send|delete|assign|archive|extend|approve|reject)\b/i) ? 'high' : 'medium',
+    audit_log_id: auditLogId || null,
+  })
+  if (error) return { error: `Could not create schedule preview: ${error.message}` }
+
+  return {
+    message: [
+      `Schedule preview: ${schedule.title}`,
+      `Cadence: ${schedule.cadence}${schedule.dayLabel ? ` (${schedule.dayLabel})` : ''} at ${schedule.timeOfDay} ${schedule.timezone}`,
+      `Command: ${schedule.commandText}`,
+      'Confirm creating this recurring command?',
+    ].join('\n'),
+    requiresConfirmation: true,
+    confirmToken: token,
+    actionType: 'create schedule',
+    affectedCount: 1,
+    affectedEntityType: 'ai_command_schedule',
+    messagePreview: schedule.commandText,
+    riskLevel: schedule.commandText.match(/\b(send|delete|assign|archive|extend|approve|reject)\b/i) ? 'high' : 'medium',
+  }
+}
+
+function parseScheduleRequest(message: string) {
+  const lower = normalize(message)
+  if (!/\b(every|daily|weekly|monthly)\b/.test(lower)) return null
+  if (!/\b(send|generate|show|list|report|reminder|command)\b/.test(lower)) return null
+
+  const dayMap: Record<string, number> = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 }
+  const dayName = Object.keys(dayMap).find((day) => lower.includes(day))
+  const cadence = lower.includes('monthly') ? 'monthly' : lower.includes('daily') ? 'daily' : 'weekly'
+  const timeMatch = message.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i)
+  let hour = timeMatch ? Number(timeMatch[1]) : 9
+  const minute = timeMatch?.[2] ? Number(timeMatch[2]) : 0
+  const meridiem = timeMatch?.[3]?.toLowerCase()
+  if (meridiem === 'pm' && hour < 12) hour += 12
+  if (meridiem === 'am' && hour === 12) hour = 0
+  const timeOfDay = `${String(Math.min(Math.max(hour, 0), 23)).padStart(2, '0')}:${String(Math.min(Math.max(minute, 0), 59)).padStart(2, '0')}`
+  const commandText = message
+    .replace(/\bevery\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i, '')
+    .replace(/\b(daily|weekly|monthly)\b/i, '')
+    .replace(/\b\d{1,2}(?::\d{2})?\s*(am|pm)?\b/i, '')
+    .replace(/^[,\s]+/, '')
+    .trim() || 'Generate SkillTest_AI operations summary'
+  const title = commandText.length > 72 ? `${commandText.slice(0, 69)}...` : commandText
+  return {
+    title,
+    commandText,
+    cadence,
+    dayOfWeek: cadence === 'weekly' ? dayMap[dayName || 'monday'] : null,
+    dayOfMonth: cadence === 'monthly' ? 1 : null,
+    dayLabel: cadence === 'weekly' ? (dayName || 'monday') : undefined,
+    timeOfDay,
+    timezone: 'Asia/Calcutta',
+  }
+}
+
+async function handlePendingActionDecision(
+  admin: ReturnType<typeof createAdminClient>,
+  auth: { userId: string; role: string },
+  token: string,
+  decision: 'confirm' | 'cancel',
+): Promise<CommandResult> {
+  const { data: pending, error } = await admin
+    .from('ai_command_pending_actions')
+    .select('*')
+    .eq('token', token)
+    .maybeSingle()
+  if (error) return { error: `Could not load pending action: ${error.message}` }
+  if (!pending) return { error: 'Confirmation expired or was not found.' }
+  if (pending.user_id !== auth.userId) return { error: 'This confirmation belongs to another user session.' }
+  if (pending.status !== 'pending') return { error: `This action is already ${pending.status}.` }
+  if (new Date(pending.expires_at).getTime() < Date.now()) {
+    await updatePendingAction(admin, pending.id, 'expired', 'Confirmation expired before execution.')
+    await logAiCommand(admin, {
+      userId: auth.userId,
+      role: auth.role,
+      originalPrompt: pending.original_prompt,
+      detectedIntent: pending.detected_intent,
+      actionType: pending.action_type,
+      actionStatus: 'expired',
+      affectedEntityType: pending.affected_entity_type,
+      affectedEntityIds: pending.affected_entity_ids || [],
+      affectedCount: pending.affected_count || 0,
+      resultSummary: 'Pending action expired.',
+    })
+    return { error: 'Confirmation expired. Please run the command again.' }
+  }
+
+  if (decision === 'cancel') {
+    await updatePendingAction(admin, pending.id, 'cancelled', 'Cancelled by user.')
+    await logAiCommand(admin, {
+      userId: auth.userId,
+      role: auth.role,
+      originalPrompt: pending.original_prompt,
+      detectedIntent: pending.detected_intent,
+      actionType: pending.action_type,
+      actionStatus: 'cancelled',
+      affectedEntityType: pending.affected_entity_type,
+      affectedEntityIds: pending.affected_entity_ids || [],
+      affectedCount: pending.affected_count || 0,
+      resultSummary: 'Action cancelled before execution.',
+    })
+    return { message: 'Action cancelled. No changes were made.' }
+  }
+
+  if (auth.role !== 'admin') return { error: 'Only admins can confirm data-changing AI actions.' }
+
+  await updatePendingAction(admin, pending.id, 'confirmed', 'Confirmed by user.')
+  const result = await executePendingAction(admin, auth.userId, pending)
+  if (result.error) {
+    await updatePendingAction(admin, pending.id, 'failed', result.error)
+    await logAiCommand(admin, {
+      userId: auth.userId,
+      role: auth.role,
+      originalPrompt: pending.original_prompt,
+      detectedIntent: pending.detected_intent,
+      actionType: pending.action_type,
+      actionStatus: 'failed',
+      affectedEntityType: pending.affected_entity_type,
+      affectedEntityIds: pending.affected_entity_ids || [],
+      affectedCount: pending.affected_count || 0,
+      errorMessage: result.error,
+    })
+    return result
+  }
+
+  await updatePendingAction(admin, pending.id, 'executed', result.message || 'Executed.')
+  await logAiCommand(admin, {
+    userId: auth.userId,
+    role: auth.role,
+    originalPrompt: pending.original_prompt,
+    detectedIntent: pending.detected_intent,
+    actionType: pending.action_type,
+    actionStatus: 'executed',
+    affectedEntityType: pending.affected_entity_type,
+    affectedEntityIds: pending.affected_entity_ids || [],
+    affectedCount: pending.affected_count || 0,
+    resultSummary: result.message || 'Action executed.',
+  })
+  return result
+}
+
+async function updatePendingAction(admin: ReturnType<typeof createAdminClient>, id: string, status: string, summary: string) {
+  await admin
+    .from('ai_command_pending_actions')
+    .update({ status, preview_summary: summary, updated_at: new Date().toISOString() })
+    .eq('id', id)
+}
+
+async function executePendingAction(admin: ReturnType<typeof createAdminClient>, actorId: string, pending: any): Promise<CommandResult> {
+  if (pending.action_type === 'send reminder') {
+    const ids = Array.isArray(pending.affected_entity_ids) ? pending.affected_entity_ids : []
+    if (!ids.length) return { error: 'No reminder recipients remained available.' }
+    const rows = ids.map((userId: string) => ({
+      recipient_user_id: userId,
+      title: 'SkillTest_AI reminder',
+      message: pending.action_payload?.messagePreview || 'Please complete your pending SkillTest_AI assessment or training activity.',
+      audience: 'individual',
+      channel: 'in_app',
+      delivery_status: 'sent',
+      sent_at: new Date().toISOString(),
+      created_by: actorId,
+    }))
+    const { error } = await admin.from('training_notifications').insert(rows)
+    if (error) return { error: error.message }
+    revalidatePath('/manager/ai-command')
+    return { message: `Reminder sent to ${rows.length} employee(s).` }
+  }
+
+  if (pending.action_type === 'create schedule') {
+    const schedule = pending.action_payload?.schedule
+    if (!schedule?.commandText || !schedule?.cadence) return { error: 'Schedule payload is incomplete.' }
+    const { error } = await admin.from('ai_command_schedules').insert({
+      created_by: actorId,
+      role: pending.role,
+      title: schedule.title || schedule.commandText,
+      command_text: schedule.commandText,
+      cadence: schedule.cadence,
+      day_of_week: schedule.dayOfWeek,
+      day_of_month: schedule.dayOfMonth,
+      time_of_day: schedule.timeOfDay || '09:00',
+      timezone: schedule.timezone || 'Asia/Calcutta',
+      enabled: true,
+      metadata: { source: 'ai_command' },
+    })
+    if (error) return { error: error.message }
+    revalidatePath('/manager/ai-command')
+    return { message: `Scheduled command created: ${schedule.title || schedule.commandText}.` }
+  }
+
+  const command = pending.action_payload?.command as ParsedCommand | undefined
+  if (!command?.action) return { error: 'Pending command payload is incomplete.' }
+  const result = await executeAdminCommand(admin, actorId, command)
+  if (!result.error) revalidatePath('/manager/ai-command')
+  return result
+}
+
+async function createActionPreview(
+  admin: ReturnType<typeof createAdminClient>,
+  auth: { userId: string; role: string },
+  prompt: string,
+  command: ParsedCommand,
+): Promise<AiActionPreview> {
+  const meta = await describeAdminCommandImpact(admin, command)
+  if (meta.error) {
+    await logAiCommand(admin, {
+      userId: auth.userId,
+      role: auth.role,
+      originalPrompt: prompt,
+      detectedIntent: 'OPERATIONAL_ACTION',
+      actionType: command.action,
+      actionStatus: 'failed',
+      errorMessage: meta.error,
+    })
+    return { error: meta.error }
+  }
+
+  const token = crypto.randomUUID()
+  const auditLogId = await logAiCommand(admin, {
+    userId: auth.userId,
+    role: auth.role,
+    originalPrompt: prompt,
+    detectedIntent: 'OPERATIONAL_ACTION',
+    actionType: command.action,
+    actionStatus: 'previewed',
+    affectedEntityType: meta.affectedEntityType,
+    affectedEntityIds: meta.affectedIds,
+    affectedCount: meta.affectedCount,
+    resultSummary: meta.summary,
+    metadata: { command, preview: meta },
+  })
+
+  const { error } = await admin.from('ai_command_pending_actions').insert({
+    token,
+    user_id: auth.userId,
+    role: auth.role,
+    original_prompt: prompt,
+    detected_intent: 'OPERATIONAL_ACTION',
+    action_type: command.action,
+    action_payload: { command },
+    affected_entity_type: meta.affectedEntityType,
+    affected_entity_ids: meta.affectedIds,
+    affected_count: meta.affectedCount,
+    preview_summary: meta.summary,
+    message_preview: meta.messagePreview || null,
+    risk_level: meta.riskLevel,
+    audit_log_id: auditLogId || null,
+  })
+  if (error) return { error: `Could not create action preview: ${error.message}` }
+
+  return {
+    message: [
+      `Action preview: ${meta.summary}`,
+      meta.messagePreview ? `Message preview: ${meta.messagePreview}` : '',
+      meta.riskLevel === 'critical' || meta.riskLevel === 'high' ? `Risk: ${meta.riskLevel.toUpperCase()} - confirm only if you are sure.` : `Risk: ${meta.riskLevel}`,
+      `Confirm this action?`,
+    ].filter(Boolean).join('\n'),
+    requiresConfirmation: true,
+    confirmToken: token,
+    actionType: command.action,
+    affectedCount: meta.affectedCount,
+    affectedEntityType: meta.affectedEntityType,
+    messagePreview: meta.messagePreview,
+    riskLevel: meta.riskLevel,
+    affected: meta.affected,
+  }
+}
+
+async function describeAdminCommandImpact(admin: ReturnType<typeof createAdminClient>, command: ParsedCommand) {
+  const { action, args } = command
+  if (action.includes('employee')) {
+    const profile = await findProfileByArgs(admin, args)
+    const count = profile ? 1 : action.startsWith('create') ? 1 : 0
+    if (!profile && !action.startsWith('create')) return { error: 'No matching employee/profile found for preview.' }
+    return {
+      summary: `${action} ${profile?.full_name || args.name || args.email || 'new employee'}`,
+      affectedEntityType: 'profile',
+      affectedIds: profile?.id ? [profile.id] : [],
+      affectedCount: count,
+      affected: profile ? [{ id: profile.id, label: profile.full_name || profile.email, detail: profile.email }] : [],
+      riskLevel: action.includes('delete') ? 'critical' as const : 'medium' as const,
+      messagePreview: action.startsWith('create') ? 'Employee setup email may be sent after confirmation.' : undefined,
+    }
+  }
+
+  if (action.includes('quiz') || action.includes('question')) {
+    const quiz = await findQuizByArgs(admin, args)
+    const affectedEmails = splitList(args.employee_emails || args.employees || args.email)
+    return {
+      summary: `${action}${quiz ? ` "${quiz.title}"` : ''}${affectedEmails.length ? ` for ${affectedEmails.length} employee(s)` : ''}`,
+      affectedEntityType: action.includes('assign') ? 'quiz_assignment' : 'quiz',
+      affectedIds: quiz?.id ? [quiz.id] : [],
+      affectedCount: Math.max(affectedEmails.length, quiz ? 1 : 0),
+      affected: quiz ? [{ id: quiz.id, label: quiz.title, detail: quiz.topic }] : [],
+      riskLevel: action.includes('delete') ? 'critical' as const : affectedEmails.length > 1 ? 'high' as const : 'medium' as const,
+    }
+  }
+
+  if (action.includes('batch') || action.includes('session') || action.includes('feedback') || action.includes('training') || action.includes('scheduled')) {
+    const batch = await findBatchByArgs(admin, args)
+    return {
+      summary: `${action}${batch ? ` "${batch.title}"` : ''}`,
+      affectedEntityType: 'training_operation',
+      affectedIds: batch?.id ? [batch.id] : [],
+      affectedCount: batch ? 1 : 0,
+      affected: batch ? [{ id: batch.id, label: batch.title, detail: batch.domain || batch.status }] : [],
+      riskLevel: /\b(delete|clear|remove)\b/.test(action) ? 'critical' as const : 'medium' as const,
+    }
+  }
+
+  return {
+    summary: action,
+    affectedEntityType: 'operation',
+    affectedIds: [],
+    affectedCount: 0,
+    affected: [],
+    riskLevel: 'medium' as const,
+  }
 }
 
 function isHowToRequest(message: string) {
@@ -241,7 +756,7 @@ async function maybeExecuteReminderIntent(
   message: string,
   history: ChatHistoryEntry[],
   data: Record<string, any[]>,
-): Promise<CommandResult | null> {
+): Promise<AiActionPreview | null> {
   const lower = normalize(message)
   if (!/\b(send|queue|create)\b.*\b(reminder|reminders|notification|notifications)\b/.test(lower)) return null
   if (auth.role !== 'admin') return { error: 'Reminder actions require admin access.' }
@@ -252,22 +767,57 @@ async function maybeExecuteReminderIntent(
     return { error: 'I could not find matching employees to remind. Try: send reminder to employees who have not taken tests in 10 days.' }
   }
 
-  const rows = targets.slice(0, 200).map((profile) => ({
-    recipient_user_id: profile.id,
-    title: 'Assessment reminder',
-    message: 'Please complete your pending SkillTest_AI assessment or training activity.',
-    audience: 'individual',
-    channel: 'email',
-    delivery_status: 'queued',
-    created_by: auth.userId,
-  }))
+  const limitedTargets = targets.slice(0, 200)
+  const messagePreview = 'Please complete your pending SkillTest_AI assessment or training activity.'
+  const token = crypto.randomUUID()
+  const auditLogId = await logAiCommand(admin, {
+    userId: auth.userId,
+    role: auth.role,
+    originalPrompt: message,
+    detectedIntent: 'OPERATIONAL_ACTION',
+    actionType: 'send reminder',
+    actionStatus: 'previewed',
+    affectedEntityType: 'profile',
+    affectedEntityIds: limitedTargets.map((profile) => profile.id),
+    affectedCount: limitedTargets.length,
+    resultSummary: `Reminder preview for ${limitedTargets.length} employee(s).`,
+    metadata: { targetQuestion },
+  })
 
-  const { error } = await admin.from('training_notifications').insert(rows)
+  const { error } = await admin.from('ai_command_pending_actions').insert({
+    token,
+    user_id: auth.userId,
+    role: auth.role,
+    original_prompt: message,
+    detected_intent: 'OPERATIONAL_ACTION',
+    action_type: 'send reminder',
+    action_payload: { targetQuestion, messagePreview },
+    affected_entity_type: 'profile',
+    affected_entity_ids: limitedTargets.map((profile) => profile.id),
+    affected_count: limitedTargets.length,
+    preview_summary: `Send reminder to ${limitedTargets.length} employee(s).`,
+    message_preview: messagePreview,
+    risk_level: limitedTargets.length > 1 ? 'high' : 'medium',
+    audit_log_id: auditLogId || null,
+  })
   if (error) return { error: error.message }
-  revalidateManagerPaths()
+
   return {
-    message: `Reminder queued for ${rows.length} employee(s).\nRecommendation: review /manager/notifications for delivery status before escalation.`,
-    data: { count: rows.length, recipients: targets.slice(0, 20).map((profile) => profile.email) },
+    message: [
+      `Action preview: send reminder to ${limitedTargets.length} employee(s).`,
+      ...limitedTargets.slice(0, 8).map((profile, index) => `${index + 1}. ${displayName(profile)} - ${profile.email}`),
+      limitedTargets.length > 8 ? `Showing first 8; ${limitedTargets.length - 8} more recipient(s).` : '',
+      `Message preview: ${messagePreview}`,
+      'Confirm sending this reminder?',
+    ].filter(Boolean).join('\n'),
+    requiresConfirmation: true,
+    confirmToken: token,
+    actionType: 'send reminder',
+    affectedCount: limitedTargets.length,
+    affectedEntityType: 'profile',
+    messagePreview,
+    riskLevel: limitedTargets.length > 1 ? 'high' : 'medium',
+    affected: limitedTargets.slice(0, 12).map((profile) => ({ id: profile.id, label: displayName(profile), detail: profile.email })),
   }
 }
 

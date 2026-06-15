@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ClipboardList,
   FileQuestion,
+  Download,
   Loader2,
   MessageSquareText,
   ShieldCheck,
@@ -23,6 +24,29 @@ type ChatMessage = {
   role: 'user' | 'assistant'
   content: string
   ok?: boolean
+  preview?: AiActionPreview
+  exportPayload?: AiExportPayload
+}
+
+type AiActionPreview = {
+  requiresConfirmation?: boolean
+  confirmToken?: string
+  actionType?: string
+  affectedCount?: number
+  affectedEntityType?: string
+  messagePreview?: string
+  riskLevel?: 'low' | 'medium' | 'high' | 'critical'
+  affected?: Array<{ id: string; label: string; detail?: string }>
+}
+
+type AiExportPayload = {
+  id: string
+  format: 'csv' | 'pdf'
+  title: string
+  generatedAt: string
+  requestedBy: string
+  filters?: Record<string, string>
+  content: string
 }
 
 const commandPacks = [
@@ -31,6 +55,9 @@ const commandPacks = [
     icon: Users,
     prompts: [
       'List employees who have not taken any test for past 10 days',
+      'Employees with no tests in last 10 days',
+      'Low performers below 60%',
+      'High-risk proctoring summary',
       'Which employees never attempted a quiz?',
       'run create employee email=person@company.com name="Person Name" employee_id=EMP001 domain=Java department=Engineering',
       'run update employee email=person@company.com domain=React department=Frontend',
@@ -69,8 +96,23 @@ const commandPacks = [
       'run delete feedback form title="Week 1 Feedback"',
       'delete all feedback forms',
       'Which employees are eligible for certificates but not issued yet?',
+      'Weekly inactive employees',
+      'Batch performance report',
     ],
   },
+]
+
+const templatePrompts = [
+  'Weekly inactive employees',
+  'Employees with no tests in last 10 days',
+  'Failed employees by quiz',
+  'Low performers below 60%',
+  'High-risk proctoring summary',
+  'Batch performance report',
+  'Pending assessments',
+  'Overdue assessments',
+  'Domain performance comparison',
+  'Certificate eligibility report',
 ]
 
 const moduleLinks = [
@@ -89,7 +131,7 @@ export function AICommandConsole() {
     {
       role: 'assistant',
       ok: true,
-      content: 'AI Command is live. Tell me the operation and I will execute it against the application data when the command has enough details.',
+      content: 'AI Command is live. Ask for live operations data, reports, exports, or actions. Risky actions are previewed first and run only after confirmation.',
     },
   ])
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -114,12 +156,66 @@ export function AICommandConsole() {
       })
       const payload = await response.json()
       const ok = response.ok && !payload.message?.startsWith('Command failed')
-      setMessages((previous) => [...previous, { role: 'assistant', content: payload.message || payload.error || 'No response returned.', ok }])
+      setMessages((previous) => [...previous, {
+        role: 'assistant',
+        content: payload.message || payload.error || 'No response returned.',
+        ok,
+        preview: payload.preview,
+        exportPayload: payload.export,
+      }])
       if (payload.provider === 'skilltest_ai_command' && ok) router.refresh()
     } catch {
       setMessages((previous) => [...previous, { role: 'assistant', content: 'AI Command could not reach the server. Refresh and try again.', ok: false }])
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function decidePreview(preview: AiActionPreview, decision: 'confirm' | 'cancel') {
+    if (!preview.confirmToken || loading) return
+    setLoading(true)
+    setMessages((previous) => [...previous, { role: 'user', content: decision === 'confirm' ? 'Confirm' : 'Cancel' }])
+    try {
+      const response = await fetch('/api/manager-chatbot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: decision,
+          confirmToken: preview.confirmToken,
+          decision,
+          history: messages.slice(-8),
+        }),
+      })
+      const payload = await response.json()
+      const ok = response.ok && !payload.message?.startsWith('Command failed')
+      setMessages((previous) => [...previous, { role: 'assistant', content: payload.message || payload.error || 'No response returned.', ok }])
+      if (ok) router.refresh()
+    } catch {
+      setMessages((previous) => [...previous, { role: 'assistant', content: 'AI Command could not confirm the action. Try again.', ok: false }])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function downloadExport(payload: AiExportPayload) {
+    try {
+      const response = await fetch('/api/manager-chatbot/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!response.ok) throw new Error('Export failed')
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${payload.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.${payload.format}`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } catch {
+      setMessages((previous) => [...previous, { role: 'assistant', content: 'Export failed. Please try again.', ok: false }])
     }
   }
 
@@ -176,13 +272,22 @@ export function AICommandConsole() {
               onClick={() => setInput(prompt)}
             />
           ))}
+          {templatePrompts.slice(0, 10).map((prompt) => (
+            <CommandChip
+              key={`template-${prompt}`}
+              icon={<Sparkles className="h-4 w-4" />}
+              label={prompt}
+              compact
+              onClick={() => void runCommand(prompt)}
+            />
+          ))}
         </>
       }
     >
       <div className="space-y-3">
         <div className="mb-3 grid gap-2 rounded-xl border border-sky-200/10 bg-slate-950/55 p-3 text-xs text-sky-100/80 sm:grid-cols-2">
-          <StatusNote icon={<CheckCircle2 className="h-4 w-4 text-emerald-300" />} label="Realtime execution" text="Create, update, delete, assign, approve, and mark attendance from chat." />
-          <StatusNote icon={<Sparkles className="h-4 w-4 text-sky-200" />} label="Live analytics" text="Ask for inactive employees, weak areas, certificate gaps, top scorers, or role shortlists." />
+          <StatusNote icon={<CheckCircle2 className="h-4 w-4 text-emerald-300" />} label="Safe execution" text="Actions are previewed first and require confirmation before anything changes." />
+          <StatusNote icon={<Sparkles className="h-4 w-4 text-sky-200" />} label="Operations intelligence" text="Ask for inactive employees, weak areas, proctoring risk, exports, templates, or schedules." />
         </div>
 
         {messages.map((message, index) => (
@@ -199,6 +304,19 @@ export function AICommandConsole() {
                 {message.role === 'user' ? 'Admin command' : message.ok === false ? 'Execution issue' : 'System reply'}
               </div>
               <FormattedText value={message.content} />
+              {message.preview?.requiresConfirmation && (
+                <ActionPreviewCard preview={message.preview} onDecision={(decision) => void decidePreview(message.preview!, decision)} />
+              )}
+              {message.exportPayload && (
+                <Button
+                  type="button"
+                  onClick={() => void downloadExport(message.exportPayload!)}
+                  className="mt-3 h-9 rounded-full bg-white text-slate-950 hover:bg-sky-100"
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Download {message.exportPayload.format.toUpperCase()}
+                </Button>
+              )}
             </div>
           </div>
         ))}
@@ -212,6 +330,86 @@ export function AICommandConsole() {
         <div ref={scrollRef} />
       </div>
     </RuixenMoonChat>
+  )
+}
+
+export function AICommandHistory({ logs, schedules }: { logs: any[]; schedules: any[] }) {
+  return (
+    <div className="mx-auto mt-6 grid w-full max-w-7xl gap-4 px-4 pb-8 lg:grid-cols-[1.2fr_0.8fr]">
+      <section className="rounded-2xl border border-slate-200/10 bg-slate-950/80 p-4 text-slate-100 shadow-xl">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-bold uppercase tracking-[0.22em] text-sky-100">Recent AI Command Audit</h2>
+          <span className="rounded-full border border-sky-200/20 px-2 py-1 text-[10px] text-sky-100">{logs.length} logged</span>
+        </div>
+        <div className="mt-3 overflow-hidden rounded-xl border border-white/10">
+          {logs.length ? logs.map((log) => (
+            <div key={log.id} className="grid gap-2 border-b border-white/10 p-3 text-xs last:border-b-0 md:grid-cols-[1fr_auto_auto]">
+              <div>
+                <p className="font-semibold text-white">{log.original_prompt}</p>
+                <p className="mt-1 text-slate-300">{log.result_summary || log.error_message || log.detected_intent}</p>
+              </div>
+              <span className="h-fit rounded-full border border-white/10 px-2 py-1 uppercase text-sky-100">{log.action_status}</span>
+              <span className="text-slate-400">{new Date(log.created_at).toLocaleString('en-IN')}</span>
+            </div>
+          )) : (
+            <p className="p-3 text-sm text-slate-300">No AI command audit records yet.</p>
+          )}
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-slate-200/10 bg-slate-950/80 p-4 text-slate-100 shadow-xl">
+        <h2 className="text-sm font-bold uppercase tracking-[0.22em] text-sky-100">Scheduled Commands</h2>
+        <p className="mt-2 text-xs leading-relaxed text-slate-300">Schedules are stored for Vercel Cron or another worker to execute safely with audit logging.</p>
+        <div className="mt-3 space-y-2">
+          {schedules.length ? schedules.map((schedule) => (
+            <div key={schedule.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs">
+              <p className="font-semibold text-white">{schedule.title}</p>
+              <p className="mt-1 text-slate-300">{schedule.cadence} at {schedule.time_of_day} · {schedule.enabled ? 'enabled' : 'disabled'}</p>
+            </div>
+          )) : (
+            <p className="rounded-xl border border-white/10 p-3 text-sm text-slate-300">No recurring commands configured.</p>
+          )}
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function ActionPreviewCard({ preview, onDecision }: { preview: AiActionPreview; onDecision: (decision: 'confirm' | 'cancel') => void }) {
+  const riskTone = preview.riskLevel === 'critical' || preview.riskLevel === 'high'
+    ? 'border-red-300/30 bg-red-950/35 text-red-50'
+    : 'border-amber-200/30 bg-amber-950/25 text-amber-50'
+  return (
+    <div className={`mt-3 rounded-xl border p-3 ${riskTone}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.2em]">Action Preview</p>
+          <p className="mt-1 font-semibold">{preview.actionType || 'AI action'} · {preview.affectedCount || 0} affected</p>
+        </div>
+        <span className="rounded-full border border-white/20 px-2 py-1 text-[10px] font-bold uppercase">{preview.riskLevel || 'medium'} risk</span>
+      </div>
+      {preview.messagePreview && <p className="mt-2 rounded-lg bg-black/20 p-2 text-xs">{preview.messagePreview}</p>}
+      {!!preview.affected?.length && (
+        <div className="mt-2 grid gap-1 text-xs">
+          {preview.affected.slice(0, 5).map((item) => (
+            <div key={item.id} className="flex justify-between gap-3 rounded-lg bg-white/5 px-2 py-1">
+              <span className="font-medium">{item.label}</span>
+              {item.detail && <span className="truncate opacity-75">{item.detail}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button type="button" size="sm" onClick={() => onDecision('confirm')} className="rounded-full bg-emerald-300 text-emerald-950 hover:bg-emerald-200">
+          <CheckCircle2 className="mr-2 h-4 w-4" />
+          Confirm
+        </Button>
+        <Button type="button" size="sm" variant="outline" onClick={() => onDecision('cancel')} className="rounded-full border-white/20 bg-black/20 text-white hover:bg-white/10">
+          <XCircle className="mr-2 h-4 w-4" />
+          Cancel
+        </Button>
+      </div>
+    </div>
   )
 }
 
@@ -246,11 +444,44 @@ function StatusNote({ icon, label, text }: { icon: ReactNode; label: string; tex
 }
 
 function FormattedText({ value }: { value: string }) {
+  const blocks = value.split('\n\n')
   return (
-    <div className="space-y-1.5">
-      {value.split('\n').map((line, index) => (
-        line.trim() ? <p key={index}>{line}</p> : <div key={index} className="h-1" />
-      ))}
+    <div className="space-y-2">
+      {blocks.map((block, blockIndex) => {
+        const lines = block.split('\n').filter((line) => line.trim())
+        if (lines.length >= 2 && lines.every((line) => line.trim().startsWith('|')) && lines.some((line) => /^[-|\s:]+$/.test(line.replace(/\|/g, '')))) {
+          const tableRows = lines
+            .filter((line) => !/^[-|\s:]+$/.test(line.replace(/\|/g, '')))
+            .map((line) => line.split('|').map((cell) => cell.trim()).filter(Boolean))
+          const [head, ...body] = tableRows
+          return (
+            <div key={blockIndex} className="overflow-x-auto rounded-xl border border-white/10">
+              <table className="min-w-full text-left text-xs">
+                <thead className="bg-white/10 text-white">
+                  <tr>{head.map((cell) => <th key={cell} className="px-3 py-2 font-semibold">{cell}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {body.map((row, rowIndex) => (
+                    <tr key={rowIndex} className="border-t border-white/10">
+                      {row.map((cell, cellIndex) => <td key={`${rowIndex}-${cellIndex}`} className="px-3 py-2 text-sky-50/90">{cell}</td>)}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+
+        const joined = lines.join('\n')
+        const highlighted = /^(recommendation|suggested actions|warning|risk):?/i.test(joined.trim())
+        return (
+          <div key={blockIndex} className={highlighted ? 'rounded-xl border border-white/10 bg-white/10 p-2' : 'space-y-1.5'}>
+            {lines.map((line, index) => (
+              <p key={index}>{line}</p>
+            ))}
+          </div>
+        )
+      })}
     </div>
   )
 }
