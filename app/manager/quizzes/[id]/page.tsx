@@ -163,7 +163,7 @@ export default async function QuizDetailPage({ params, searchParams }: { params:
                 <div>
                   <h3 className="font-medium text-blue-800 dark:text-violet-200">Add Questions</h3>
                   <p className="text-sm text-blue-700/80 dark:text-violet-300/80">
-                    Upload PDF, DOCX, or Excel files to generate questions with AI
+                    Upload TXT, PDF, DOCX, or Excel files to generate questions with AI
                   </p>
                 </div>
               </div>

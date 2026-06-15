@@ -119,7 +119,7 @@ SkillTest_AI/
 │
 ├── 📂 hooks/                      ← Custom React hooks
 ├── 📂 public/                     ← Static assets & import templates
-│   └── 📂 templates/              ← CSV/XLSX import templates
+│   └── 📂 templates/              ← CSV/TXT/XLSX import templates
 ├── 📂 styles/                     ← Global CSS
 └── README.md                      ← Project overview
 ```

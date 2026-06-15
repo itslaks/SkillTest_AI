@@ -69,8 +69,8 @@ export function ContentQuestionGenerator({
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (file) {
-      if (!/\.(csv|xlsx|xls|json|xml|pdf|docx)$/i.test(file.name)) {
-        setError('Please upload CSV, XLSX, DOCX, PDF, XML, or JSON content.')
+      if (!/\.(csv|txt|xlsx|xls|json|xml|pdf|docx)$/i.test(file.name)) {
+        setError('Please upload CSV, TXT, XLSX, DOCX, PDF, XML, or JSON content.')
         return
       }
       
@@ -181,7 +181,7 @@ export function ContentQuestionGenerator({
           Generate Questions from Content
         </CardTitle>
         <CardDescription>
-          Upload CSV, XLSX, DOCX, PDF, XML, or JSON content, or paste text to generate quiz questions with AI
+          Upload CSV, TXT, XLSX, DOCX, PDF, XML, or JSON content, or paste text to generate quiz questions with AI
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -234,7 +234,7 @@ export function ContentQuestionGenerator({
                     {selectedFile ? selectedFile.name : 'Click to upload or drag and drop'}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    CSV, XLSX, DOCX, PDF, XML, or JSON
+                    CSV, TXT, XLSX, DOCX, PDF, XML, or JSON
                   </p>
                 </label>
               </div>

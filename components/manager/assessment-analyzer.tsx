@@ -263,7 +263,7 @@ export function AssessmentAnalyzer({ quizId, quizTitle }: AssessmentAnalyzerProp
                     <Upload className="h-7 w-7 text-muted-foreground group-hover:text-primary transition-colors" />
                   </div>
                   <h3 className="text-[15px] font-semibold mb-1.5">Drop your files here</h3>
-                  <p className="text-sm text-muted-foreground mb-3">or click to browse - supports CSV, XLSX, DOCX, PDF, XML, and JSON</p>
+                  <p className="text-sm text-muted-foreground mb-3">or click to browse - supports CSV, TXT, XLSX, DOCX, PDF, XML, and JSON</p>
                   <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground/70">
                     <span className="flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> Multiple files</span>
                     <span className="flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> Auto-detect columns</span>

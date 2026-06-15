@@ -99,7 +99,7 @@ export function EmployeeImporter() {
       }
     } catch (err: any) {
       console.error('Employee import parse failed:', err)
-      setError(err?.message || 'Failed to parse file. Use CSV, XLSX, DOCX, PDF, XML, or JSON with employee records.')
+      setError(err?.message || 'Failed to parse file. Use CSV, TXT, XLSX, DOCX, PDF, XML, or JSON with employee records.')
     }
   }
 

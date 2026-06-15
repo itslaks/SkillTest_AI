@@ -678,7 +678,7 @@ export default function NewQuizPage() {
                 <div className="grid grid-cols-3 gap-3">
                   {[
                     { id: 'ai', icon: Wand2, label: 'AI Generate', desc: 'Auto-create from topic', color: 'text-violet-600', bg: 'bg-violet-50', border: 'border-violet-200', activeBg: 'bg-violet-500' },
-                    { id: 'upload', icon: Upload, label: 'Upload File', desc: 'Excel, JSON, PDF, DOCX', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', activeBg: 'bg-blue-500' },
+                    { id: 'upload', icon: Upload, label: 'Upload File', desc: 'TXT, Excel, JSON, PDF, DOCX', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', activeBg: 'bg-blue-500' },
                     { id: 'both', icon: Zap, label: 'Both', desc: 'Combine AI + upload', color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200', activeBg: 'bg-amber-500' },
                   ].map(opt => (
                     <button
@@ -763,7 +763,7 @@ export default function NewQuizPage() {
                       ) : (
                         <div className="space-y-2">
                           <Upload className="h-10 w-10 text-muted-foreground/50 mx-auto" />
-                          <p className="font-medium text-sm">Drop CSV, XLSX, DOCX, PDF, XML, or JSON here</p>
+                          <p className="font-medium text-sm">Drop CSV, TXT, XLSX, DOCX, PDF, XML, or JSON here</p>
                           <p className="text-xs text-muted-foreground">Structured files import directly; documents are converted into questions with AI.</p>
                         </div>
                       )}

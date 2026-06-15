@@ -66,7 +66,7 @@ It is built for training managers and HR teams who need **execution evidence**, 
 | 🧠 AI Insights | Batch health, trainer performance, and quiz outcome coaching |
 | 📊 Assessment Analyzer | Upload score sheets and chat with AI about weak areas |
 | 🤖 Command Chatbot | "Create quiz on Python, assign to Ram" → quiz created |
-| 📥 Import Workflows | Employees, quiz questions, attendance, scores — CSV/XLSX/DOCX/PDF/XML/JSON |
+| 📥 Import Workflows | Employees, quiz questions, attendance, scores — CSV/TXT/XLSX/DOCX/PDF/XML/JSON |
 | 📄 Reports | Excel + PDF exports for attendance, assessment, feedback, toppers |
 | 🧾 BRD Evidence Pack | Downloadable compliance workbook for judges / clients |
 

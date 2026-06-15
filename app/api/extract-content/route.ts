@@ -43,11 +43,11 @@ export async function POST(request: NextRequest) {
         extractedText = spreadsheetBufferToText(buffer)
       } else if (fileName.endsWith('.doc')) {
         return NextResponse.json({
-          error: 'DOC files are not supported yet. Please use DOCX, PDF, XLSX, XLS, CSV, XML, or JSON.'
+          error: 'DOC files are not supported yet. Please use TXT, DOCX, PDF, XLSX, XLS, CSV, XML, or JSON.'
         }, { status: 400 })
       } else {
         return NextResponse.json({
-          error: 'Unsupported file type. Please upload PDF, DOCX, XLSX, XLS, CSV, XML, or JSON files.'
+          error: 'Unsupported file type. Please upload TXT, PDF, DOCX, XLSX, XLS, CSV, XML, or JSON files.'
         }, { status: 400 })
       }
     } else {
