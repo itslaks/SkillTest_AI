@@ -12,6 +12,7 @@
     "fixtures:contest": "node scripts/generate-contest-demo-fixtures.js",
     "fixtures:tms": "node scripts/generate-tms-upload-fixtures.js",
     "assets:avatars": "node scripts/generate-memoji-avatar-assets.mjs",
+    "avatars:reset-employees": "node scripts/set-all-employee-avatars-to-avatar-01.mjs",
     "test:scale": "npm run fixtures:tms -- 20000 && node scripts/validate-tms-import-scale.js 20000"
   },
   "dependencies": {
