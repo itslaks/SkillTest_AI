@@ -113,7 +113,7 @@ export function QuizImporter({
       }).filter((q: ParsedQuestion) => q.question_text && q.option_a && q.option_b)
 
       if (questions.length === 0) {
-        setError('No valid questions found. Ensure columns include: question_text, option_a, option_b, option_c, option_d, correct_answer')
+        setError('No valid questions found. Use columns question_text, option_a, option_b, option_c, option_d, correct_answer, or Markdown MCQ format with numbered questions, A-D options, and Correct Answer.')
         return
       }
 

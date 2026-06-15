@@ -147,17 +147,24 @@ export default function NewQuizPage() {
 
       const rows = await parseUniversalRowsFile(file) as any[]
 
-      const questions = rows.map((r: any) => ({
-        question_text: rowCell(r, ['question_text', 'Question', 'question', 'prompt']),
-        option_a: rowCell(r, ['option_a', 'Option A', 'A', 'choice_a', 'answer_a']),
-        option_b: rowCell(r, ['option_b', 'Option B', 'B', 'choice_b', 'answer_b']),
-        option_c: rowCell(r, ['option_c', 'Option C', 'C', 'choice_c', 'answer_c']),
-        option_d: rowCell(r, ['option_d', 'Option D', 'D', 'choice_d', 'answer_d']),
-        correct_answer: rowCell(r, ['correct_answer', 'Correct Answer', 'Answer', 'answer', 'key']) || 'a',
-        difficulty: normalizeDifficulty(rowCell(r, ['difficulty', 'Difficulty', 'level']), difficulty),
-        explanation: rowCell(r, ['explanation', 'Explanation', 'reason', 'rationale']),
-      })).filter((q: any) => q.question_text)
-      if (questions.length === 0) throw new Error('No valid questions found. Check column headers.')
+      const questions = rows.map((r: any) => {
+        const optionA = rowCell(r, ['option_a', 'Option A', 'A', 'choice_a', 'answer_a'])
+        const optionB = rowCell(r, ['option_b', 'Option B', 'B', 'choice_b', 'answer_b'])
+        const optionC = rowCell(r, ['option_c', 'Option C', 'C', 'choice_c', 'answer_c'])
+        const optionD = rowCell(r, ['option_d', 'Option D', 'D', 'choice_d', 'answer_d'])
+        const correctIndex = normalizeCorrectAnswer(rowCell(r, ['correct_answer', 'Correct Answer', 'Answer', 'answer', 'key']), [optionA, optionB, optionC, optionD])
+        return {
+          question_text: rowCell(r, ['question_text', 'Question', 'question', 'prompt']),
+          option_a: optionA,
+          option_b: optionB,
+          option_c: optionC,
+          option_d: optionD,
+          correct_answer: correctIndex >= 0 ? ['a', 'b', 'c', 'd'][correctIndex] : 'a',
+          difficulty: normalizeDifficulty(rowCell(r, ['difficulty', 'Difficulty', 'level']), difficulty),
+          explanation: rowCell(r, ['explanation', 'Explanation', 'reason', 'rationale']),
+        }
+      }).filter((q: any) => q.question_text && q.option_a && q.option_b && q.option_c && q.option_d)
+      if (questions.length === 0) throw new Error('No valid questions found. Use columns or Markdown MCQ format: numbered question, A-D options, and Correct Answer.')
       setParsedQuestions(questions)
     } catch (err: any) {
       setUploadError(err.message || 'Failed to parse file')

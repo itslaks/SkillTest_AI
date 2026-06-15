@@ -165,6 +165,89 @@ export function parseKeyValueText(text: string) {
   }).filter((row) => Object.keys(row).length > 0)
 }
 
+export function parseMarkdownMcqText(text: string) {
+  const cleaned = text
+    .replace(/\r\n/g, '\n')
+    .replace(/\u00a0/g, ' ')
+    .replace(/[✅✔✓]/g, ' [correct]')
+    .trim()
+
+  if (!cleaned) return []
+
+  const questionBlocks = cleaned
+    .split(/\n\s*---+\s*\n|\n(?=\s*(?:\*\*)?\d{1,3}[.)]\s+)/g)
+    .map((block) => block.trim())
+    .filter(Boolean)
+
+  const rows: Record<string, string>[] = []
+
+  for (const block of questionBlocks) {
+    const lines = block
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+
+    const questionIndex = lines.findIndex((line) => /^(?:\*\*)?\d{1,3}[.)]\s+/.test(line))
+    if (questionIndex < 0) continue
+
+    const questionText = stripMarkdown(lines[questionIndex].replace(/^(?:\*\*)?\d{1,3}[.)]\s+/, ''))
+    const optionMap: Record<string, string> = {}
+    let correctAnswer = ''
+    let explanation = ''
+
+    for (const line of lines.slice(questionIndex + 1)) {
+      const plainLine = stripMarkdown(line)
+      const option = plainLine.match(/^([A-Da-d])[.)]\s+(.+)$/)
+      if (option) {
+        const key = option[1].toUpperCase()
+        const value = stripMarkdown(option[2].replace(/\s*\[correct\]\s*/i, ''))
+        optionMap[key] = value
+        if (/\[correct\]/i.test(line)) correctAnswer = key
+        continue
+      }
+
+      const correct = plainLine.match(/^Correct\s+Answer\s*[:\-]\s*([A-Da-d])(?:[.)])?\s*(.*)$/i)
+      if (correct) {
+        correctAnswer = correct[1].toUpperCase()
+        continue
+      }
+
+      const answer = plainLine.match(/^Answer\s*[:\-]\s*([A-Da-d])(?:[.)])?\s*(.*)$/i)
+      if (answer) {
+        correctAnswer = answer[1].toUpperCase()
+        continue
+      }
+
+      const reason = plainLine.match(/^(?:Explanation|Reason|Rationale)\s*[:\-]\s*(.+)$/i)
+      if (reason) explanation = stripMarkdown(reason[1])
+    }
+
+    if (!questionText || !optionMap.A || !optionMap.B || !optionMap.C || !optionMap.D) continue
+
+    rows.push({
+      question_text: questionText,
+      question: questionText,
+      option_a: optionMap.A,
+      option_b: optionMap.B,
+      option_c: optionMap.C,
+      option_d: optionMap.D,
+      correct_answer: correctAnswer || 'A',
+      explanation,
+    })
+  }
+
+  return rows
+}
+
+function stripMarkdown(value: string) {
+  return value
+    .replace(/\s*\[correct\]\s*/gi, '')
+    .replace(/^\*\*|\*\*$/g, '')
+    .replace(/\*\*/g, '')
+    .replace(/^["']|["']$/g, '')
+    .trim()
+}
+
 export async function parseUniversalRowsFile(file: File) {
   const fileName = file.name.toLowerCase()
 
@@ -174,6 +257,8 @@ export async function parseUniversalRowsFile(file: File) {
 
   if (TEXT_EXTENSIONS.some((extension) => fileName.endsWith(extension))) {
     const text = await file.text()
+    const mcqRows = parseMarkdownMcqText(text)
+    if (mcqRows.length > 0) return mcqRows
     const rows = parseTextToRows(text)
     return rows.length > 0 ? rows : parseKeyValueText(text)
   }
@@ -188,6 +273,8 @@ export async function parseUniversalRowsFile(file: File) {
 
   if (DOCUMENT_EXTENSIONS.some((extension) => fileName.endsWith(extension))) {
     const text = await extractTextFromFile(file)
+    const mcqRows = parseMarkdownMcqText(text)
+    if (mcqRows.length > 0) return mcqRows
     const rows = parseTextToRows(text)
     if (rows.length > 0) return rows
     return parseKeyValueText(text)

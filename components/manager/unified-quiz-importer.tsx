@@ -200,7 +200,7 @@ export function UnifiedQuizImporter({
       const { questions, errors } = parseRows(jsonData)
 
       if (questions.length === 0) {
-        setError(`No valid questions found. Required columns: question_text, option_a, option_b, option_c, option_d, correct_answer. ${errors.slice(0, 3).join('; ')}`)
+        setError(`No valid questions found. Use columns question_text, option_a, option_b, option_c, option_d, correct_answer, or Markdown MCQ format with numbered questions, A-D options, and Correct Answer. ${errors.slice(0, 3).join('; ')}`)
         return
       }
 
