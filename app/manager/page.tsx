@@ -143,6 +143,12 @@ export default async function ManagerDashboard() {
   ]
 
   const priorityAction = actionItems.find((item) => item.count > 0)
+  const dailyBriefingItems = [
+    inactiveEmployees.length ? `${inactiveEmployees.length} employee(s) not yet engaged` : '',
+    lowScoreAttempts.length ? `${lowScoreAttempts.length} attempt(s) below 50%` : '',
+    quietActiveQuizzes.length ? `${quietActiveQuizzes.length} active quiz(es) with no completions` : '',
+    tmsSummary && tmsSummary.absenceAlerts ? `${tmsSummary.absenceAlerts} attendance risk alert(s)` : '',
+  ].filter(Boolean)
 
   const statCards = [
     {
@@ -255,6 +261,39 @@ export default async function ManagerDashboard() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+        <Card className="xl:col-span-2 border-cyan-200 bg-cyan-50/80 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-cyan-950">
+              <Brain className="h-5 w-5" />
+              Manager Daily Briefing
+            </CardTitle>
+            <CardDescription className="text-cyan-800">
+              AI Command summary generated from current quiz, learner, attendance, and batch signals.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
+            <div className="space-y-2 text-sm text-cyan-950">
+              {dailyBriefingItems.length ? dailyBriefingItems.map((item) => (
+                <p key={item} className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  {item}
+                </p>
+              )) : (
+                <p className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  No critical training operations items in the current dashboard scope.
+                </p>
+              )}
+            </div>
+            <Button asChild className="rounded-full bg-cyan-950 text-white hover:bg-cyan-900">
+              <Link href="/manager/ai-command">
+                Open AI Command
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
         <Card className="signal-shell glass-panel spotlight-card border-black/5 shadow-[0_30px_80px_rgba(15,23,42,0.08)]">
           <CardHeader>
             <CardTitle className="text-lg">Manager Command Summary</CardTitle>

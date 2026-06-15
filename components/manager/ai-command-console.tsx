@@ -9,6 +9,7 @@ import {
   FileQuestion,
   Download,
   Loader2,
+  Mic,
   MessageSquareText,
   ShieldCheck,
   Sparkles,
@@ -133,6 +134,7 @@ export function AICommandConsole() {
   const router = useRouter()
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [listening, setListening] = useState(false)
   const [activePack, setActivePack] = useState(commandPacks[0].title)
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -206,7 +208,7 @@ export function AICommandConsole() {
     }
   }
 
-  async function decidePreview(preview: AiActionPreview, decision: 'confirm' | 'cancel') {
+  async function decidePreview(preview: AiActionPreview, decision: 'confirm' | 'cancel', messageOverride?: string) {
     if (!preview.confirmToken || loading) return
     setLoading(true)
     setMessages((previous) => [...previous, { role: 'user', content: decision === 'confirm' ? 'Confirm' : 'Cancel' }])
@@ -218,6 +220,7 @@ export function AICommandConsole() {
           message: decision,
           confirmToken: preview.confirmToken,
           decision,
+          messageOverride,
           history: messages.slice(-8),
         }),
       })
@@ -230,6 +233,29 @@ export function AICommandConsole() {
     } finally {
       setLoading(false)
     }
+  }
+
+  function startVoiceCommand() {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      setMessages((previous) => [...previous, { role: 'assistant', content: 'Voice command is not supported in this browser. Please type the command instead.', ok: false }])
+      return
+    }
+    const recognition = new SpeechRecognition()
+    recognition.lang = 'en-IN'
+    recognition.interimResults = false
+    recognition.maxAlternatives = 1
+    recognition.onstart = () => setListening(true)
+    recognition.onend = () => setListening(false)
+    recognition.onerror = () => {
+      setListening(false)
+      setMessages((previous) => [...previous, { role: 'assistant', content: 'Voice command could not hear clearly. Try again or type the request.', ok: false }])
+    }
+    recognition.onresult = (event: any) => {
+      const transcript = String(event.results?.[0]?.[0]?.transcript || '').trim()
+      if (transcript) setInput(transcript)
+    }
+    recognition.start()
   }
 
   async function downloadExport(payload: AiExportPayload) {
@@ -273,6 +299,15 @@ export function AICommandConsole() {
       placeholder='Ask: inactive employees, weak scores, certificate gaps - or run: create employee email=...'
       utilityActions={
         <div className="hidden flex-wrap items-center justify-end gap-2 md:flex">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={startVoiceCommand}
+            className="rounded-full border-sky-200/20 bg-slate-950/45 px-3 py-1.5 text-xs font-semibold text-sky-100 hover:border-sky-200/40 hover:bg-sky-200/10"
+          >
+            <Mic className="mr-2 h-3.5 w-3.5" />
+            {listening ? 'Listening...' : 'Voice'}
+          </Button>
           {moduleLinks.map((link) => {
             const Icon = link.icon
             return (
@@ -340,7 +375,7 @@ export function AICommandConsole() {
               </div>
               <FormattedText value={message.content} />
               {message.preview?.requiresConfirmation && (
-                <ActionPreviewCard preview={message.preview} onDecision={(decision) => void decidePreview(message.preview!, decision)} />
+                <ActionPreviewCard preview={message.preview} onDecision={(decision, draft) => void decidePreview(message.preview!, decision, draft)} />
               )}
               {message.exportPayload && (
                 <Button
@@ -351,6 +386,9 @@ export function AICommandConsole() {
                   <Download className="mr-2 h-4 w-4" />
                   Download {message.exportPayload.format.toUpperCase()}
                 </Button>
+              )}
+              {message.role === 'assistant' && message.ok !== false && (
+                <SuggestedActionButtons content={message.content} onRun={(prompt) => void runCommand(prompt)} onExport={() => void runCommand('Export this as CSV')} />
               )}
             </div>
           </div>
@@ -410,7 +448,8 @@ export function AICommandHistory({ logs, schedules }: { logs: any[]; schedules: 
   )
 }
 
-function ActionPreviewCard({ preview, onDecision }: { preview: AiActionPreview; onDecision: (decision: 'confirm' | 'cancel') => void }) {
+function ActionPreviewCard({ preview, onDecision }: { preview: AiActionPreview; onDecision: (decision: 'confirm' | 'cancel', draft?: string) => void }) {
+  const [draft, setDraft] = useState(preview.messagePreview || '')
   const riskTone = preview.riskLevel === 'critical' || preview.riskLevel === 'high'
     ? 'border-red-300/30 bg-red-950/35 text-red-50'
     : 'border-amber-200/30 bg-amber-950/25 text-amber-50'
@@ -423,7 +462,16 @@ function ActionPreviewCard({ preview, onDecision }: { preview: AiActionPreview; 
         </div>
         <span className="rounded-full border border-white/20 px-2 py-1 text-[10px] font-bold uppercase">{preview.riskLevel || 'medium'} risk</span>
       </div>
-      {preview.messagePreview && <p className="mt-2 rounded-lg bg-black/20 p-2 text-xs">{preview.messagePreview}</p>}
+      {preview.messagePreview && (
+        <div className="mt-2">
+          <label className="text-[10px] font-bold uppercase tracking-[0.18em] opacity-80">Editable draft</label>
+          <textarea
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            className="mt-1 min-h-20 w-full rounded-lg border border-white/10 bg-black/25 p-2 text-xs text-white outline-none focus:border-white/40"
+          />
+        </div>
+      )}
       {!!preview.affected?.length && (
         <div className="mt-2 grid gap-1 text-xs">
           {preview.affected.slice(0, 5).map((item) => (
@@ -435,7 +483,7 @@ function ActionPreviewCard({ preview, onDecision }: { preview: AiActionPreview; 
         </div>
       )}
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button type="button" size="sm" onClick={() => onDecision('confirm')} className="rounded-full bg-emerald-300 text-emerald-950 hover:bg-emerald-200">
+        <Button type="button" size="sm" onClick={() => onDecision('confirm', draft)} className="rounded-full bg-emerald-300 text-emerald-950 hover:bg-emerald-200">
           <CheckCircle2 className="mr-2 h-4 w-4" />
           Confirm
         </Button>
@@ -446,6 +494,46 @@ function ActionPreviewCard({ preview, onDecision }: { preview: AiActionPreview; 
       </div>
     </div>
   )
+}
+
+function SuggestedActionButtons({ content, onRun, onExport }: { content: string; onRun: (prompt: string) => void; onExport: () => void }) {
+  const actions = buildSuggestedActions(content)
+  if (!actions.length) return null
+  return (
+    <div className="mt-3 flex flex-wrap gap-2">
+      {actions.map((action) => (
+        <Button
+          key={action.label}
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => action.kind === 'export' ? onExport() : onRun(action.prompt)}
+          className="rounded-full border-white/15 bg-white/10 text-xs text-white hover:bg-white/20"
+        >
+          {action.label}
+        </Button>
+      ))}
+    </div>
+  )
+}
+
+function buildSuggestedActions(content: string) {
+  const lower = content.toLowerCase()
+  const actions: Array<{ label: string; prompt: string; kind?: 'export' }> = []
+  if (/\binactive|pending|overdue|low-score|low score|risk|recovery/i.test(content)) {
+    actions.push({ label: 'Why?', prompt: 'Why is this happening? Explain the exact records behind this metric.' })
+  }
+  if (/\binactive|pending|overdue|below|low score|risk/i.test(lower)) {
+    actions.push({ label: 'Send Reminder', prompt: 'Send reminder to them' })
+  }
+  if (/\bfailed|below 50|below 60|recovery/i.test(lower)) {
+    actions.push({ label: 'Assign Retest', prompt: 'Assign retest to them' })
+  }
+  if (/\bbatch|domain|training|recovery/i.test(lower)) {
+    actions.push({ label: 'Create Batch', prompt: 'Create a catch-up batch for this group' })
+  }
+  actions.push({ label: 'Export', prompt: 'Export this as CSV', kind: 'export' })
+  return actions.slice(0, 4)
 }
 
 function CommandChip({ active, compact, icon, label, onClick }: { active?: boolean; compact?: boolean; icon: ReactNode; label: string; onClick: () => void }) {

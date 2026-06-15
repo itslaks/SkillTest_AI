@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
   const auth = await requireTrainingStaffForApi()
   if (auth instanceof NextResponse) return auth
 
-  const { message, history = [], confirmToken, decision } = await request.json()
+  const { message, history = [], confirmToken, decision, messageOverride } = await request.json()
   if (!message || typeof message !== 'string') {
     return NextResponse.json({ error: 'Message is required.' }, { status: 400 })
   }
@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
       auth,
       confirmToken,
       decision === 'cancel' ? 'cancel' : 'confirm',
+      typeof messageOverride === 'string' ? messageOverride : undefined,
     )
     return NextResponse.json({
       message: result.error ? `Command failed: ${result.error}` : result.message,
@@ -460,6 +461,7 @@ async function handlePendingActionDecision(
   auth: { userId: string; role: string },
   token: string,
   decision: 'confirm' | 'cancel',
+  messageOverride?: string,
 ): Promise<CommandResult> {
   const { data: pending, error } = await admin
     .from('ai_command_pending_actions')
@@ -507,7 +509,7 @@ async function handlePendingActionDecision(
   if (auth.role !== 'admin') return { error: 'Only admins can confirm data-changing AI actions.' }
 
   await updatePendingAction(admin, pending.id, 'confirmed', 'Confirmed by user.')
-  const result = await executePendingAction(admin, auth.userId, pending)
+  const result = await executePendingAction(admin, auth.userId, pending, messageOverride)
   if (result.error) {
     await updatePendingAction(admin, pending.id, 'failed', result.error)
     await logAiCommand(admin, {
@@ -548,14 +550,15 @@ async function updatePendingAction(admin: ReturnType<typeof createAdminClient>, 
     .eq('id', id)
 }
 
-async function executePendingAction(admin: ReturnType<typeof createAdminClient>, actorId: string, pending: any): Promise<CommandResult> {
+async function executePendingAction(admin: ReturnType<typeof createAdminClient>, actorId: string, pending: any, messageOverride?: string): Promise<CommandResult> {
   if (pending.action_type === 'send reminder') {
     const ids = Array.isArray(pending.affected_entity_ids) ? pending.affected_entity_ids : []
     if (!ids.length) return { error: 'No reminder recipients remained available.' }
+    const reminderText = messageOverride?.trim() || pending.action_payload?.messagePreview || 'Please complete your pending SkillTest_AI assessment or training activity.'
     const rows = ids.map((userId: string) => ({
       recipient_user_id: userId,
       title: 'SkillTest_AI reminder',
-      message: pending.action_payload?.messagePreview || 'Please complete your pending SkillTest_AI assessment or training activity.',
+      message: reminderText,
       audience: 'individual',
       channel: 'in_app',
       delivery_status: 'sent',
@@ -745,6 +748,13 @@ function buildEffectiveMessage(message: string, history: ChatHistoryEntry[]) {
 
   if (/\b(them|those|these|same employees|same learners|that batch|that quiz)\b/.test(lower)) {
     return `${lastUser.content}. Follow-up request: ${message}`
+  }
+
+  const lastAssistant = Array.isArray(history)
+    ? [...history].reverse().find((entry) => entry.role === 'assistant' && entry.content)
+    : null
+  if (/^(why|explain|drill down|show records|what records|how did you calculate)\b/.test(lower) && lastAssistant?.content) {
+    return `${lastUser.content}. Previous answer: ${lastAssistant.content}. Follow-up drill-down: ${message}`
   }
 
   return message
@@ -2214,6 +2224,15 @@ function buildDeterministicAnswer(message: string, data: Record<string, any[]>) 
   const rootCause = explainBusinessRuleQuestion(message, data)
   if (rootCause) return rootCause
 
+  const safeQuery = summarizeSafeQueryBuilder(message, data)
+  if (safeQuery) return safeQuery
+
+  const dataQuality = summarizeDataQualityChecks(message, data)
+  if (dataQuality) return dataQuality
+
+  const employeeRisk = summarizeEmployeeRiskScore(message, data)
+  if (employeeRisk) return employeeRisk
+
   const insights = summarizeInsightsEngine(message, data)
   if (insights) return insights
 
@@ -2522,6 +2541,69 @@ function summarizeInsightsEngine(message: string, data: Record<string, any[]>) {
     weakTopic ? `Potential cause: ${weakTopic.topic} is the weakest assessment topic (${weakTopic.avg}% avg across ${weakTopic.count} attempt(s)).` : '',
     'Recommendation: combine reminders with a targeted catch-up session, then re-assess only the weak topic instead of re-running the full program.',
   ].filter(Boolean).join('\n')
+}
+
+function summarizeSafeQueryBuilder(message: string, data: Record<string, any[]>) {
+  const lower = normalize(message)
+  if (!/\b(safe query|query builder|predefined quer|available quer|natural language query)\b/.test(lower)) return null
+  const templates = [
+    { name: 'inactive_employees_10_days', prompt: 'employees inactive for 10 days', count: getInactiveEmployeeRows('inactive employees past 10 days', data, 10).length },
+    { name: 'low_performers_below_60', prompt: 'employees below 60%', count: getLowScoreEmployees('below 60', data).length },
+    { name: 'pending_assessments', prompt: 'pending assessments', count: summarizePendingCount(data) },
+    { name: 'high_risk_proctoring', prompt: 'high risk proctoring violations', count: data.proctoringEvents.filter((event) => ['high', 'critical'].includes(String(event.severity))).length },
+    { name: 'data_quality_issues', prompt: 'data quality checks', count: getDataQualityIssues(data).length },
+  ]
+  return [
+    'Safe Query Builder',
+    'AI Command does not execute raw SQL from chat. It maps natural language to predefined scoped query templates.',
+    `Template | Natural language | Current count`,
+    ...templates.map((item) => `${item.name} | ${item.prompt} | ${item.count}`),
+    '',
+    'Use any natural-language prompt above, for example: "show employees inactive for 10 days".',
+  ].join('\n')
+}
+
+function summarizeDataQualityChecks(message: string, data: Record<string, any[]>) {
+  const lower = normalize(message)
+  if (!/\b(data quality|duplicates?|missing domain|invalid employee|orphan|bad data|clean data|hygiene)\b/.test(lower)) return null
+  const issues = getDataQualityIssues(data)
+  if (!issues.length) return 'Data Quality Scan: no duplicate employee emails, missing domains, invalid employee IDs, or orphan employee references were found in the loaded records.'
+  const grouped = groupBy(issues, 'type')
+  return [
+    'Data Quality Scan',
+    `KPI | Value`,
+    `Total issues | ${issues.length}`,
+    `Duplicate emails | ${grouped.get('duplicate_email')?.length || 0}`,
+    `Missing domains | ${grouped.get('missing_domain')?.length || 0}`,
+    `Invalid employee IDs | ${grouped.get('invalid_employee_id')?.length || 0}`,
+    `Orphan references | ${grouped.get('orphan_reference')?.length || 0}`,
+    '',
+    ...issues.slice(0, 15).map((issue, index) => `${index + 1}. ${issue.type} - ${issue.label} - ${issue.detail}`),
+    issues.length > 15 ? `Showing first 15; ${issues.length - 15} more issue(s).` : '',
+    'Recommendation: fix profile records first, then rerun invite/auth cleanup only for orphan user cases.',
+  ].filter(Boolean).join('\n')
+}
+
+function summarizeEmployeeRiskScore(message: string, data: Record<string, any[]>) {
+  const lower = normalize(message)
+  if (!/\b(risk score|employee risk|risk for|risk of)\b/.test(lower)) return null
+  const profile = findProfile(lower, data.profiles)
+  const rows = getEmployeeRiskRows(data).sort((a, b) => b.risk - a.risk)
+  if (profile) {
+    const row = rows.find((item) => item.profile.id === profile.id)
+    if (!row) return `No risk score could be calculated for ${displayName(profile)}.`
+    return [
+      `Risk score for ${displayName(profile)}: ${row.risk}%`,
+      `Drivers: ${row.reasons.length ? row.reasons.join('; ') : 'no major risk signals'}`,
+      `Metrics: avg ${row.avg || 'N/A'}%, latest ${row.latestScore || 'N/A'}%, attendance ${row.attendanceRate}%, pending ${row.pending}, overdue ${row.overdue}, high-risk proctoring ${row.highRiskEvents}.`,
+      'Recommendation: use drill-down with "Why?" or ask for a recovery plan if score is above 50%.',
+    ].join('\n')
+  }
+  return [
+    'Employee Risk Scores',
+    `Rank | Employee | Risk | Drivers`,
+    ...rows.filter((row) => row.risk > 0).slice(0, 15).map((row, index) => `${index + 1} | ${displayName(row.profile)} | ${row.risk}% | ${row.reasons.slice(0, 3).join('; ') || 'low risk'}`),
+  ].join('\n')
 }
 
 function extractLookbackDays(message: string) {
@@ -3147,6 +3229,41 @@ function getCertificateGapRows(data: Record<string, any[]>) {
     const rule = enabledRules.find((item) => item.quiz_id === attempt.quiz_id)
     return rule && Number(attempt.score || 0) >= Number(rule.min_score || 0) && !certKeys.has(`${attempt.quiz_id}:${attempt.user_id}`)
   })
+}
+
+function getDataQualityIssues(data: Record<string, any[]>) {
+  const issues: Array<{ type: string; label: string; detail: string; id?: string }> = []
+  const emailMap = new Map<string, any[]>()
+  for (const profile of data.profiles || []) {
+    const email = normalize(profile.email || '')
+    if (email) emailMap.set(email, [...(emailMap.get(email) || []), profile])
+    if (profile.role === 'employee' && !profile.domain && !profile.department) {
+      issues.push({ type: 'missing_domain', label: displayName(profile), detail: profile.email || 'missing email', id: profile.id })
+    }
+    if (profile.role === 'employee') {
+      const employeeId = String(profile.employee_id || '').trim()
+      if (!employeeId || !/^[A-Za-z0-9_-]{3,32}$/.test(employeeId)) {
+        issues.push({ type: 'invalid_employee_id', label: displayName(profile), detail: employeeId || 'missing employee_id', id: profile.id })
+      }
+    }
+  }
+  for (const [email, profiles] of emailMap.entries()) {
+    if (profiles.length > 1) {
+      issues.push({ type: 'duplicate_email', label: email, detail: `${profiles.length} profile records share this email`, id: profiles[0].id })
+    }
+  }
+  const profileIds = new Set((data.profiles || []).map((profile) => profile.id))
+  for (const assignment of data.assignments || []) {
+    if (assignment.user_id && !profileIds.has(assignment.user_id)) {
+      issues.push({ type: 'orphan_reference', label: `assignment ${assignment.quiz_id}`, detail: `missing profile ${assignment.user_id}` })
+    }
+  }
+  for (const attempt of data.attempts || []) {
+    if (attempt.user_id && !profileIds.has(attempt.user_id)) {
+      issues.push({ type: 'orphan_reference', label: `attempt ${attempt.quiz_id}`, detail: `missing profile ${attempt.user_id}` })
+    }
+  }
+  return issues
 }
 
 function explainUserAccess(message: string, data: Record<string, any[]>) {

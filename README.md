@@ -404,6 +404,10 @@ Core behavior:
 - Anomaly detection handles prompts such as "Anything unusual this week?" across scores, attendance, proctoring, inactivity, and certificates.
 - Root-cause explanations trace business rules for blocked users, missing certificates, failed assessments, and hidden quizzes.
 - Proactive briefing loads when the console opens with critical items and recommended actions.
+- Safe query builder maps natural language to predefined scoped templates instead of raw SQL.
+- Drill-down actions, one-click follow-ups, editable reminder drafts, and browser voice input are available in the AI Command console.
+- Data-quality scans flag duplicate emails, missing domains, invalid employee IDs, and orphan references.
+- Manager dashboard includes a daily AI briefing card for quick action routing.
 - Any data-changing or message-sending action creates a server-side preview first.
 - Confirm / Cancel is required before employee deletes, quiz assignments, reminders, schedule creation, and other operational mutations execute.
 - Pending confirmations expire after 15 minutes and cannot be confirmed by another user.
