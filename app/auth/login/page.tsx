@@ -18,7 +18,13 @@ function LoginContent() {
   const searchParams = useSearchParams()
   const verificationRequired = searchParams.get('verified') === 'required'
   const emailFromQuery = searchParams.get('email') || ''
-  const [error, setError] = useState<string | null>(verificationRequired ? 'Please verify your email before logging in.' : null)
+  const approvalState = searchParams.get('approval')
+  const initialError = verificationRequired
+    ? 'Please verify your email before logging in.'
+    : approvalState === 'rejected'
+      ? 'Your trainer account request was rejected. Please contact the admin for more information.'
+      : null
+  const [error, setError] = useState<string | null>(initialError)
   const [isPending, startTransition] = useTransition()
   const [showPassword, setShowPassword] = useState(false)
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(verificationRequired && emailFromQuery ? emailFromQuery : null)

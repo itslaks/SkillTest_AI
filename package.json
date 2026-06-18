@@ -47,7 +47,7 @@
     "@radix-ui/react-toggle-group": "1.1.1",
     "@radix-ui/react-tooltip": "1.1.6",
     "@react-three/drei": "^10.7.7",
-    "@react-three/fiber": "9.5.0",
+    "@react-three/fiber": "^9.6.1",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.106.2",
     "@tensorflow-models/coco-ssd": "^2.2.3",
@@ -84,7 +84,7 @@
     "sonner": "^1.7.4",
     "tailwind-merge": "^3.6.0",
     "tailwindcss-animate": "^1.0.7",
-    "three": "0.183.2",
+    "three": "^0.184.0",
     "vaul": "^1.1.2",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "3.25.76"

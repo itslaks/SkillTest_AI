@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { authCallbackSchema } from '@/lib/security/validation'
 
@@ -37,6 +37,20 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const admin = createAdminClient()
+        const { data: profile } = await admin
+          .from('profiles')
+          .select('role, approval_status')
+          .eq('id', user.id)
+          .maybeSingle()
+
+        if (profile?.role === 'trainer' && profile.approval_status !== 'approved') {
+          await supabase.auth.signOut()
+          return NextResponse.redirect(`${origin}${profile.approval_status === 'rejected' ? '/auth/login?approval=rejected' : '/auth/pending-approval'}`)
+        }
+      }
       // Ensure redirect stays on the same origin (prevent open redirect)
       return NextResponse.redirect(`${origin}${next}`)
     }

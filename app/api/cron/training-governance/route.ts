@@ -6,6 +6,8 @@ const RUN_TYPES: TrainingAutomationRunType[] = [
   'absence_streak',
   'assessment_reminder',
   'feedback_reminder',
+  'quiz_reminder',
+  'ai_command_reminder',
 ]
 
 export async function GET(request: NextRequest) {

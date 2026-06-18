@@ -7,11 +7,138 @@ import nodemailer from 'nodemailer'
 import { PRODUCT_EMAIL_FROM, PRODUCT_NAME, PRODUCT_TMS_LABEL } from '@/lib/branding'
 import { getSiteUrl } from '@/lib/security/env'
 
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
-const smtpConfigured = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS)
+let resendClient: Resend | null | undefined
+let smtpTransporter: nodemailer.Transporter | null = null
+let smtpCooldownUntil = 0
+let smtpLastError: string | null = null
+let smtpLastCheckedAt: string | null = null
+let emailLastProvider: 'smtp' | 'resend' | 'none' = 'none'
+let emailLastStatus: 'connected' | 'failing' | 'rate_limited' | 'not_configured' = 'not_configured'
+
+const SMTP_INVALID_AUTH_COOLDOWN_MS = 15 * 60 * 1000
+const SMTP_RATE_LIMIT_COOLDOWN_MS = 5 * 60 * 1000
+const SMTP_RETRY_DELAYS_MS = [750, 2000]
 
 function isProductionRuntime() {
   return process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production'
+}
+
+function getResendClient() {
+  if (!process.env.RESEND_API_KEY) return null
+  if (resendClient === undefined) resendClient = new Resend(process.env.RESEND_API_KEY)
+  return resendClient
+}
+
+function smtpConfigured() {
+  return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS)
+}
+
+function getSmtpTransporter() {
+  if (!smtpConfigured()) return null
+  if (!smtpTransporter) {
+    smtpTransporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT || 587),
+      secure: process.env.SMTP_SECURE === 'true',
+      pool: true,
+      maxConnections: Number(process.env.SMTP_MAX_CONNECTIONS || 2),
+      maxMessages: Number(process.env.SMTP_MAX_MESSAGES || 40),
+      rateDelta: Number(process.env.SMTP_RATE_DELTA_MS || 1000),
+      rateLimit: Number(process.env.SMTP_RATE_LIMIT || 4),
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    })
+  }
+  return smtpTransporter
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function smtpErrorKind(error: any): 'invalid_auth' | 'rate_limited' | 'transient' {
+  const message = String(error?.message || error?.response || '')
+  const code = String(error?.code || '')
+  const responseCode = Number(error?.responseCode || 0)
+  if (responseCode === 535 || code === 'EAUTH' || /invalid login|authentication failed|username and password not accepted/i.test(message)) {
+    return 'invalid_auth'
+  }
+  if (responseCode === 454 || /too many login attempts|rate limit|temporarily rejected|try again later/i.test(message)) {
+    return 'rate_limited'
+  }
+  return 'transient'
+}
+
+function rememberEmailFailure(provider: 'smtp' | 'resend' | 'none', error: string, status: typeof emailLastStatus = 'failing') {
+  emailLastProvider = provider
+  emailLastStatus = status
+  smtpLastError = error
+  smtpLastCheckedAt = new Date().toISOString()
+}
+
+function rememberEmailSuccess(provider: 'smtp' | 'resend') {
+  emailLastProvider = provider
+  emailLastStatus = 'connected'
+  smtpLastError = null
+  smtpLastCheckedAt = new Date().toISOString()
+}
+
+export function validateEmailConfiguration(): { valid: boolean; provider: 'smtp' | 'resend' | 'none'; errors: string[]; warnings: string[] } {
+  const errors: string[] = []
+  const warnings: string[] = []
+  const hasResend = Boolean(process.env.RESEND_API_KEY)
+  const smtpKeys = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'EMAIL_FROM'] as const
+  const missingSmtp = smtpKeys.filter((key) => !process.env[key])
+
+  if (smtpConfigured()) {
+    const port = Number(process.env.SMTP_PORT || 587)
+    if (!Number.isInteger(port) || port <= 0 || port > 65535) errors.push('SMTP_PORT must be a valid TCP port.')
+    if (!process.env.EMAIL_FROM) warnings.push('EMAIL_FROM is missing; default product sender will be used.')
+    if (/gmail\.com$/i.test(String(process.env.SMTP_HOST)) && !/app password|xxxx| /i.test(String(process.env.SMTP_PASS)) && String(process.env.SMTP_PASS).length < 16) {
+      warnings.push('Gmail SMTP should use a Google App Password, not the account password.')
+    }
+    return { valid: errors.length === 0, provider: 'smtp', errors, warnings }
+  }
+
+  if (hasResend) {
+    if (!process.env.EMAIL_FROM) warnings.push('EMAIL_FROM is missing; Resend may reject unverified default sender domains.')
+    return { valid: true, provider: 'resend', errors, warnings }
+  }
+
+  errors.push(`Email provider is not configured. Set RESEND_API_KEY or ${missingSmtp.join(', ')}.`)
+  return { valid: false, provider: 'none', errors, warnings }
+}
+
+export async function getEmailHealth() {
+  const config = validateEmailConfiguration()
+  if (!config.valid) {
+    return {
+      provider: config.provider,
+      status: 'not_configured' as const,
+      lastError: config.errors.join(' '),
+      lastCheckedAt: smtpLastCheckedAt,
+      warnings: config.warnings,
+    }
+  }
+  if (config.provider === 'smtp' && Date.now() < smtpCooldownUntil) {
+    return {
+      provider: 'smtp' as const,
+      status: 'rate_limited' as const,
+      lastError: smtpLastError,
+      lastCheckedAt: smtpLastCheckedAt,
+      cooldownUntil: new Date(smtpCooldownUntil).toISOString(),
+      warnings: config.warnings,
+    }
+  }
+  return {
+    provider: config.provider,
+    status: emailLastProvider === config.provider ? emailLastStatus : 'connected',
+    lastError: smtpLastError,
+    lastCheckedAt: smtpLastCheckedAt,
+    warnings: config.warnings,
+  }
 }
 
 export interface SendEmailOptions {
@@ -38,47 +165,74 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ success: b
   const from = options.from ?? (process.env.EMAIL_FROM ?? PRODUCT_EMAIL_FROM)
   const text = options.text ?? htmlToText(options.html)
   const replyTo = options.replyTo ?? process.env.EMAIL_REPLY_TO
+  const config = validateEmailConfiguration()
 
-  if (smtpConfigured) {
-    try {
-      const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: Number(process.env.SMTP_PORT || 587),
-        secure: process.env.SMTP_SECURE === 'true',
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        },
-      })
-
-      await transporter.sendMail({
-        from,
-        to: Array.isArray(options.to) ? options.to.join(',') : options.to,
-        subject: options.subject,
-        text,
-        html: options.html,
-        replyTo,
-        headers: options.headers,
-      })
-      return { success: true }
-    } catch (err: any) {
-      console.error('[SMTP EMAIL ERROR]', err)
-      return { success: false, error: err.message }
-    }
-  }
-
-  if (!resend) {
+  if (!config.valid) {
+    rememberEmailFailure('none', config.errors.join(' '), 'not_configured')
     if (isProductionRuntime()) {
-      console.error('[EMAIL CONFIG ERROR] No production email provider configured. Set RESEND_API_KEY or SMTP_* env vars.')
-      return { success: false, error: 'Email provider is not configured.' }
+      console.error('[EMAIL CONFIG ERROR]', config.errors.join(' '))
+      return { success: false, error: config.errors.join(' ') }
     }
 
-    console.log('[EMAIL - no RESEND_API_KEY]', {
+    console.log('[EMAIL - no provider]', {
       from,
       to: options.to,
       subject: options.subject,
     })
     return { success: true }
+  }
+
+  if (config.provider === 'smtp') {
+    if (Date.now() < smtpCooldownUntil) {
+      const error = `SMTP is cooling down after a previous authentication/rate-limit failure until ${new Date(smtpCooldownUntil).toISOString()}.`
+      rememberEmailFailure('smtp', error, 'rate_limited')
+      return { success: false, error }
+    }
+
+    const transporter = getSmtpTransporter()
+    if (!transporter) return { success: false, error: 'SMTP transporter is not configured.' }
+
+    for (let attempt = 0; attempt <= SMTP_RETRY_DELAYS_MS.length; attempt++) {
+      try {
+        await transporter.sendMail({
+          from,
+          to: Array.isArray(options.to) ? options.to.join(',') : options.to,
+          subject: options.subject,
+          text,
+          html: options.html,
+          replyTo,
+          headers: options.headers,
+        })
+        rememberEmailSuccess('smtp')
+        return { success: true }
+      } catch (err: any) {
+        const kind = smtpErrorKind(err)
+        const message = err?.message || 'SMTP delivery failed.'
+        console.error('[SMTP EMAIL ERROR]', message)
+
+        if (kind === 'invalid_auth' || kind === 'rate_limited') {
+          smtpTransporter?.close()
+          smtpTransporter = null
+          smtpCooldownUntil = Date.now() + (kind === 'invalid_auth' ? SMTP_INVALID_AUTH_COOLDOWN_MS : SMTP_RATE_LIMIT_COOLDOWN_MS)
+          rememberEmailFailure('smtp', message, 'rate_limited')
+          return { success: false, error: message }
+        }
+
+        if (attempt < SMTP_RETRY_DELAYS_MS.length) {
+          await sleep(SMTP_RETRY_DELAYS_MS[attempt])
+          continue
+        }
+
+        rememberEmailFailure('smtp', message)
+        return { success: false, error: message }
+      }
+    }
+  }
+
+  const resend = getResendClient()
+  if (!resend) {
+    rememberEmailFailure('none', 'Email provider is not configured.', 'not_configured')
+    return { success: false, error: 'Email provider is not configured.' }
   }
 
   try {
@@ -91,10 +245,15 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ success: b
       replyTo,
       headers: options.headers,
     } as any)
-    if (error) return { success: false, error: error.message }
+    if (error) {
+      rememberEmailFailure('resend', error.message)
+      return { success: false, error: error.message }
+    }
+    rememberEmailSuccess('resend')
     return { success: true }
   } catch (err: any) {
     console.error('[EMAIL ERROR]', err)
+    rememberEmailFailure('resend', err.message)
     return { success: false, error: err.message }
   }
 }

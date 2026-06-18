@@ -9,6 +9,15 @@ export async function register() {
   // Only meaningful on the Node.js server runtime, not the edge runtime.
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     const { validateRequiredEnvVars } = await import('@/lib/security/env')
+    const { validateEmailConfiguration } = await import('@/lib/email')
     validateRequiredEnvVars()
+    const emailConfig = validateEmailConfiguration()
+    if (!emailConfig.valid) {
+      console.error(`[EMAIL CONFIG ERROR] ${emailConfig.errors.join(' ')}`)
+      if (process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production') {
+        throw new Error(`Invalid email configuration: ${emailConfig.errors.join(' ')}`)
+      }
+    }
+    for (const warning of emailConfig.warnings) console.warn(`[EMAIL CONFIG WARNING] ${warning}`)
   }
 }

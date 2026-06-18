@@ -18,8 +18,8 @@ export function HeroCommandScene() {
         className="!absolute !inset-0 !h-full !w-full"
         style={{ position: 'absolute', inset: 0, height: '100%', width: '100%' }}
         camera={{ position: [0, 0.35, 6.5], fov: 45 }}
-        dpr={[1, 1.7]}
-        gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true }}
+        dpr={[1, 1.5]}
+        gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
       >
         <color attach="background" args={['#06080d']} />
         <ambientLight intensity={0.62} />
@@ -61,6 +61,7 @@ export function HeroCommandScene() {
 function CommandLattice() {
   const group = useRef<THREE.Group>(null)
   const ring = useRef<THREE.Group>(null)
+  const elapsedRef = useRef(0)
   const lineGeometry = useMemo(() => {
     const points: number[] = []
     for (let i = 0; i < nodes.length - 1; i += 1) {
@@ -72,8 +73,9 @@ function CommandLattice() {
     return geometry
   }, [])
 
-  useFrame(({ clock, pointer }) => {
-    const elapsed = clock.getElapsedTime()
+  useFrame(({ pointer }, delta) => {
+    elapsedRef.current += delta
+    const elapsed = elapsedRef.current
     if (group.current) {
       group.current.rotation.y = Math.sin(elapsed * 0.22) * 0.18 + pointer.x * 0.12
       group.current.rotation.x = -0.12 + Math.sin(elapsed * 0.18) * 0.05 - pointer.y * 0.06
@@ -128,9 +130,11 @@ function SignalNode({
   index: number
 }) {
   const node = useRef<THREE.Group>(null)
+  const elapsedRef = useRef(0)
 
-  useFrame(({ clock }) => {
-    const elapsed = clock.getElapsedTime()
+  useFrame((_, delta) => {
+    elapsedRef.current += delta
+    const elapsed = elapsedRef.current
     if (node.current) {
       node.current.position.y = position[1] + Math.sin(elapsed * 1.15 + index) * 0.08
       node.current.rotation.y = elapsed * 0.38 + index

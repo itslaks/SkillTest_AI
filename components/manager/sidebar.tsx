@@ -29,6 +29,7 @@ import {
   Settings,
   UserCog,
   Workflow,
+  ServerCog,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { LogoutForm } from '@/components/auth/logout-form'
@@ -111,6 +112,7 @@ const navigation = [
       { name: 'Users', href: '/manager/admin', icon: UserCog, color: 'text-yellow-400', bg: 'bg-yellow-400/10', activeBg: 'bg-yellow-500', description: 'Accounts' },
       { name: 'Roles', href: '/manager/admin', icon: Crown, color: 'text-orange-300', bg: 'bg-orange-300/10', activeBg: 'bg-orange-400', description: 'Access control' },
       { name: 'Templates', href: '/manager/docs', icon: BookOpen, color: 'text-emerald-300', bg: 'bg-emerald-300/10', activeBg: 'bg-emerald-400', description: 'Guides & files' },
+      { name: 'Diagnostics', href: '/manager/diagnostics', icon: ServerCog, color: 'text-cyan-300', bg: 'bg-cyan-300/10', activeBg: 'bg-cyan-400', description: 'System health' },
       { name: 'Settings', href: '/manager/settings', icon: Settings, color: 'text-slate-300', bg: 'bg-slate-300/10', activeBg: 'bg-slate-400', description: 'Workspace config' },
     ]
   },

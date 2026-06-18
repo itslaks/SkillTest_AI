@@ -10,7 +10,7 @@ import { AUTHENTICATED_RATE_LIMIT, checkUserRateLimit, rateLimitResponse } from 
 
 export type RBACRole = UserRole
 
-export async function getCurrentUserRole(): Promise<{ userId: string; role: RBACRole } | null> {
+export async function getCurrentUserRole(): Promise<{ userId: string; role: RBACRole; approvalStatus: string | null } | null> {
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return null
@@ -18,22 +18,28 @@ export async function getCurrentUserRole(): Promise<{ userId: string; role: RBAC
   const adminClient = createAdminClient()
   const { data: profile } = await adminClient
     .from("profiles")
-    .select("role")
+    .select("role, approval_status")
     .eq("id", user.id)
     .single()
 
   const role = (profile?.role || user.user_metadata?.role || "employee") as RBACRole
+  const approvalStatus = profile?.approval_status || null
 
   if (profile && !profile.role && user.user_metadata?.role) {
     await adminClient.from("profiles").update({ role: user.user_metadata.role }).eq("id", user.id)
   }
 
-  return { userId: user.id, role }
+  return { userId: user.id, role, approvalStatus }
 }
 
 export async function requireRole(...allowedRoles: RBACRole[]): Promise<{ userId: string; role: RBACRole }> {
+  const supabase = await createClient()
   const result = await getCurrentUserRole()
   if (!result) redirect("/auth/login")
+  if (result.role === "trainer" && result.approvalStatus !== "approved") {
+    await supabase.auth.signOut()
+    redirect(result.approvalStatus === "rejected" ? "/auth/login?approval=rejected" : "/auth/pending-approval")
+  }
   if (!allowedRoles.includes(result.role)) redirect(result.role === "employee" ? "/employee" : "/manager")
   return result
 }

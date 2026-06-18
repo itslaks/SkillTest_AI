@@ -167,17 +167,11 @@ export async function signUp(formData: FormData) {
     return { error: 'This email is already registered. Please sign in, reset your password, or resend the verification email from the login page.' }
   }
 
-  if ((role === 'employee' || role === 'trainer') && (signUpData.session || signUpUser.email_confirmed_at)) {
-    await supabase.auth.signOut()
-    console.error('[auth] signup produced a verified/session user before email confirmation; enable Supabase Confirm Email.')
-    return { error: 'Email verification is not enabled for signup. Please contact admin before continuing.' }
-  }
-
   await supabase.auth.signOut()
 
   // After sign up, update the profile with role and approval_status.
   if (signUpData?.user) {
-    await adminClient
+    const { error: profileUpdateError } = await adminClient
       .from('profiles')
       .update({
         role: role as UserRole,
@@ -190,6 +184,11 @@ export async function signUp(formData: FormData) {
         updated_at: new Date().toISOString(),
       })
       .eq('id', signUpData.user.id)
+
+    if (profileUpdateError) {
+      console.error('[auth] signup profile update failed:', profileUpdateError.message)
+      return { error: 'Account was created, but profile setup failed. Please contact admin before logging in.' }
+    }
   }
 
   if (role === 'trainer') {
@@ -291,7 +290,7 @@ export async function signIn(formData: FormData) {
   // Block trainer login if pending approval
   if (role === 'trainer' && approvalStatus === 'pending') {
     await supabase.auth.signOut()
-    return { error: 'Your trainer account is pending admin approval. You will be notified once approved.' }
+    return { error: 'Your account is awaiting approval.' }
   }
 
   // Block if rejected

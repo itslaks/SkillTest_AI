@@ -12,8 +12,8 @@ export function HeroVisual3D() {
       <Canvas
         className="!absolute !inset-0 !h-full !w-full"
         camera={{ position: [0, 0.15, 7.5], fov: 42 }}
-        dpr={[1, 1.6]}
-        gl={{ antialias: true, alpha: true }}
+        dpr={[1, 1.5]}
+        gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
       >
         <ambientLight intensity={0.7} />
         <pointLight position={[-3, 2, 3]} intensity={2.2} color="#3B82F6" />
@@ -40,6 +40,7 @@ export function HeroVisual3D() {
 
 function SignalWave() {
   const group = useRef<THREE.Group>(null)
+  const elapsedRef = useRef(0)
   const curves = useMemo(() => {
     return Array.from({ length: 9 }).map((_, row) => {
       const points: THREE.Vector3[] = []
@@ -54,9 +55,10 @@ function SignalWave() {
     })
   }, [])
 
-  useFrame(({ clock, pointer }) => {
+  useFrame(({ pointer }, delta) => {
     if (!group.current) return
-    const elapsed = clock.getElapsedTime()
+    elapsedRef.current += delta
+    const elapsed = elapsedRef.current
     group.current.rotation.y = Math.sin(elapsed * 0.48) * 0.2 + pointer.x * 0.08
     group.current.rotation.x = -0.08 - pointer.y * 0.04 + Math.sin(elapsed * 0.34) * 0.035
     group.current.position.x = Math.sin(elapsed * 0.42) * 0.18
@@ -85,6 +87,7 @@ function SignalWave() {
 
 function NeuralFoam() {
   const group = useRef<THREE.Group>(null)
+  const elapsedRef = useRef(0)
   const nodes = useMemo(() => Array.from({ length: 36 }).map((_, index) => {
     const x = -3.6 + (index % 12) * 0.65
     const row = Math.floor(index / 12)
@@ -96,9 +99,10 @@ function NeuralFoam() {
     }
   }), [])
 
-  useFrame(({ clock }) => {
+  useFrame((_, delta) => {
     if (!group.current) return
-    const elapsed = clock.getElapsedTime()
+    elapsedRef.current += delta
+    const elapsed = elapsedRef.current
     group.current.rotation.y = Math.sin(elapsed * 0.36) * 0.12
     group.current.position.x = Math.sin(elapsed * 0.9) * 0.22
     group.current.position.y = Math.cos(elapsed * 0.72) * 0.1
@@ -133,6 +137,7 @@ function NeuralFoam() {
 
 function DataStreamMesh() {
   const mesh = useRef<THREE.Points>(null)
+  const elapsedRef = useRef(0)
   const { positions, colors } = useMemo(() => {
     const count = 420
     const positions = new Float32Array(count * 3)
@@ -152,11 +157,13 @@ function DataStreamMesh() {
     return { positions, colors }
   }, [])
 
-  useFrame(({ clock }) => {
+  useFrame((_, delta) => {
     if (!mesh.current) return
-    mesh.current.rotation.z = Math.sin(clock.getElapsedTime() * 0.38) * 0.06
-    mesh.current.rotation.y = clock.getElapsedTime() * 0.11
-    mesh.current.position.x = Math.sin(clock.getElapsedTime() * 0.62) * 0.2
+    elapsedRef.current += delta
+    const elapsed = elapsedRef.current
+    mesh.current.rotation.z = Math.sin(elapsed * 0.38) * 0.06
+    mesh.current.rotation.y = elapsed * 0.11
+    mesh.current.position.x = Math.sin(elapsed * 0.62) * 0.2
   })
 
   return (
@@ -172,10 +179,13 @@ function DataStreamMesh() {
 
 function ParticleField() {
   const group = useRef<THREE.Group>(null)
-  useFrame(({ clock }) => {
+  const elapsedRef = useRef(0)
+  useFrame((_, delta) => {
     if (!group.current) return
-    group.current.rotation.y = -clock.getElapsedTime() * 0.085
-    group.current.position.y = Math.sin(clock.getElapsedTime() * 0.7) * 0.08
+    elapsedRef.current += delta
+    const elapsed = elapsedRef.current
+    group.current.rotation.y = -elapsed * 0.085
+    group.current.position.y = Math.sin(elapsed * 0.7) * 0.08
   })
 
   return (

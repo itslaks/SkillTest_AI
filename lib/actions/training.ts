@@ -162,6 +162,42 @@ async function finalizeEmailNotification(
     .eq('id', notificationId)
 }
 
+async function activeBatchMemberCount(admin: ReturnType<typeof createAdminClient>, batchId: string) {
+  const { count } = await admin
+    .from('batch_members')
+    .select('id', { count: 'exact', head: true })
+    .eq('batch_id', batchId)
+    .in('enrollment_status', ['invited', 'active', 'onboarded'])
+  return count || 0
+}
+
+async function attendanceRowsForSession(admin: ReturnType<typeof createAdminClient>, sessionId: string) {
+  const { count } = await admin
+    .from('session_attendance')
+    .select('id', { count: 'exact', head: true })
+    .eq('session_id', sessionId)
+  return count || 0
+}
+
+function buildPlainReminderEmail(opts: { title: string; message: string; href?: string }) {
+  const href = opts.href || `${getSiteBaseUrl()}/employee`
+  return `
+  <div style="font-family:system-ui,sans-serif;max-width:620px;margin:0 auto;padding:24px;background:#f8fafc;">
+    <div style="background:#111827;color:#fff;padding:22px;border-radius:16px 16px 0 0;">
+      <p style="margin:0;color:#38bdf8;font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;">SkillTest_AI Reminder</p>
+      <h1 style="margin:10px 0 0;font-size:22px;">${opts.title}</h1>
+    </div>
+    <div style="background:#fff;border:1px solid #e5e7eb;border-top:0;padding:22px;border-radius:0 0 16px 16px;">
+      <p style="color:#374151;line-height:1.6;">${opts.message}</p>
+      <a href="${href}" style="display:inline-block;background:#111827;color:#fff;padding:12px 18px;border-radius:999px;text-decoration:none;font-weight:700;margin-top:10px;">Open SkillTest_AI</a>
+    </div>
+  </div>`
+}
+
+function getSiteBaseUrl() {
+  return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') || 'http://localhost:3000'
+}
+
 export async function getTrainingOpsManagerData() {
   const { userId, role } = await requireTrainingStaff()
   const admin = createAdminClient()
@@ -373,7 +409,7 @@ export async function getTrainingOpsManagerData() {
   const attendance = attendanceRes.data || []
 
   const totalAttendance = attendance.length
-  const positiveAttendance = attendance.filter((entry: any) => entry.status === 'present' || entry.status === 'late').length
+  const positiveAttendance = attendance.filter((entry: any) => ['present', 'late', 'excused'].includes(String(entry.status))).length
   const attendanceRate = totalAttendance > 0 ? Math.round((positiveAttendance / totalAttendance) * 100) : 0
   const today = new Date()
   const todayKey = today.toISOString().slice(0, 10)
@@ -383,8 +419,9 @@ export async function getTrainingOpsManagerData() {
     const sessionDate = new Date(session.session_date)
     if (sessionDate.toISOString().slice(0, 10) !== todayKey) return false
     if (now < attendanceCutoffForTime(sessionDate, governanceSettings.attendanceCutoffTime)) return false
+    const expectedMembers = members.filter((member: any) => member.batch_id === session.batch_id && ['invited', 'active', 'onboarded'].includes(member.enrollment_status)).length
     const records = attendance.filter((entry: any) => entry.session_id === session.id)
-    return records.length === 0 || records.every((entry: any) => entry.status === 'absent' && !entry.check_in_time)
+    return expectedMembers > 0 ? records.length < expectedMembers : records.length === 0
   }).length
 
   const sessionsByBatch = new Map<string, any[]>()
@@ -403,6 +440,7 @@ export async function getTrainingOpsManagerData() {
   for (const member of members) {
     const batchSessions = (sessionsByBatch.get(member.batch_id) || [])
       .filter((session: any) => session.attendance_required && session.status !== 'cancelled')
+      .filter((session: any) => new Date(session.session_date) <= now)
       .sort((a: any, b: any) => new Date(b.session_date).getTime() - new Date(a.session_date).getTime())
       .slice(0, governanceSettings.absenceAlertDays)
     if (batchSessions.length < governanceSettings.absenceAlertDays) continue
@@ -1688,7 +1726,7 @@ export async function deleteProjectEvaluation(formData: FormData): Promise<ApiRe
   return { data: true }
 }
 
-export type TrainingAutomationRunType = 'attendance_cutoff' | 'absence_streak' | 'assessment_reminder' | 'feedback_reminder'
+export type TrainingAutomationRunType = 'attendance_cutoff' | 'absence_streak' | 'assessment_reminder' | 'feedback_reminder' | 'quiz_reminder' | 'ai_command_reminder'
 
 export async function runTrainingAutomationSweep({
   runType = 'attendance_cutoff',
@@ -1710,33 +1748,36 @@ export async function runTrainingAutomationSweep({
   const now = new Date()
   let notificationsCreated = 0
 
-  const { data: sessions } = await admin
+  let sessionQuery = admin
     .from('training_sessions')
     .select('id, title, batch_id, session_date, attendance_required, status, batch:batch_id(title, coordinator_id)')
-    .eq(batchId ? 'batch_id' : 'attendance_required', batchId || true)
+    .eq('attendance_required', true)
     .neq('status', 'cancelled')
+    .lte('session_date', now.toISOString())
     .limit(100)
+  if (batchId) sessionQuery = sessionQuery.eq('batch_id', batchId)
+  const { data: sessions } = await sessionQuery
 
   if (runType === 'attendance_cutoff') {
     for (const session of sessions || []) {
       const sessionDate = new Date(session.session_date)
       if (now < attendanceCutoffForTime(sessionDate, settings.attendanceCutoffTime)) continue
-      const { count } = await admin
-        .from('session_attendance')
-        .select('id', { count: 'exact', head: true })
-        .eq('session_id', session.id)
-        .in('status', ['present', 'late'])
-      if ((count || 0) > 0) continue
+      const expectedMembers = await activeBatchMemberCount(admin, session.batch_id)
+      const recordedRows = await attendanceRowsForSession(admin, session.id)
+      if (expectedMembers > 0 ? recordedRows >= expectedMembers : recordedRows > 0) continue
 
       const { data: notif } = await admin.from('training_notifications').insert({
         batch_id: session.batch_id,
         session_id: session.id,
         title: `Attendance cut-off missed: ${session.title}`,
-        message: `No positive attendance was found after ${settings.attendanceCutoffTime}. Coordinator follow-up required.`,
+        message: expectedMembers > 0
+          ? `Attendance has ${recordedRows}/${expectedMembers} expected learner record(s) after ${settings.attendanceCutoffTime}. Coordinator follow-up required.`
+          : `No attendance records were found after ${settings.attendanceCutoffTime}. Coordinator follow-up required.`,
         audience: 'coordinators',
         channel: 'email',
         delivery_status: 'queued',
         created_by: actorId,
+        metadata: { category: 'attendance_cutoff', expectedMembers, recordedRows },
       }).select('id').single()
 
       // Send real email to coordinator
@@ -1790,6 +1831,7 @@ export async function runTrainingAutomationSweep({
         channel: 'email',
         delivery_status: 'queued',
         created_by: actorId,
+        metadata: { category: 'assessment_reminder', assessmentSetupId: setup.id, scheduledAt: setup.scheduled_at },
       }).select('id').single()
 
       // Email every batch member
@@ -1835,6 +1877,7 @@ export async function runTrainingAutomationSweep({
         .eq('batch_id', targetBatchId)
         .eq('attendance_required', true)
         .neq('status', 'cancelled')
+        .lte('session_date', now.toISOString())
         .order('session_date', { ascending: false })
         .limit(settings.absenceAlertDays)
       if (!batchSessions || batchSessions.length < settings.absenceAlertDays) continue
@@ -1865,6 +1908,7 @@ export async function runTrainingAutomationSweep({
           channel: 'email',
           delivery_status: 'queued',
           created_by: actorId,
+          metadata: { category: 'absence_streak', absenceDays: settings.absenceAlertDays, userId: member.user_id },
         }).select('id').single()
 
         // Email coordinator
@@ -1920,6 +1964,7 @@ export async function runTrainingAutomationSweep({
         channel: 'email',
         delivery_status: 'queued',
         created_by: actorId,
+        metadata: { category: 'feedback_reminder', feedbackWindowId: window.id, closesAt: window.closes_at },
       }).select('id').single()
 
       // Email every batch member
@@ -1949,6 +1994,110 @@ export async function runTrainingAutomationSweep({
             channel: 'email',
             provider_status: emailResult.success ? 'sent' : 'failed',
             provider_message: emailResult.error || 'Sent via Resend',
+          })
+        }
+      }
+      await finalizeEmailNotification(admin, notif?.id, sendAttempts, sendFailures)
+      notificationsCreated++
+    }
+  }
+
+  if (runType === 'quiz_reminder') {
+    const dueSoon = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    const { data: assignments } = await admin
+      .from('quiz_assignments')
+      .select('quiz_id, user_id, due_date, quizzes:quiz_id(title, topic), profile:user_id(full_name, email)')
+      .not('due_date', 'is', null)
+      .lte('due_date', dueSoon)
+      .limit(200)
+    const assignedQuizIds = (assignments || []).map((assignment: any) => assignment.quiz_id).filter(Boolean)
+    const { data: attempts } = assignedQuizIds.length
+      ? await admin
+          .from('quiz_attempts')
+          .select('quiz_id, user_id')
+          .in('quiz_id', assignedQuizIds)
+      : { data: [] }
+    const completed = new Set((attempts || []).map((attempt: any) => `${attempt.quiz_id}:${attempt.user_id}`))
+    for (const assignment of assignments || []) {
+      if (completed.has(`${assignment.quiz_id}:${assignment.user_id}`)) continue
+      const profile = (assignment as any).profile
+      const quiz = (assignment as any).quizzes
+      const { data: notif } = await admin.from('training_notifications').insert({
+        recipient_user_id: assignment.user_id,
+        title: `Quiz reminder: ${quiz?.title || 'Assigned quiz'}`,
+        message: `Your assigned quiz is due ${new Date(assignment.due_date).toLocaleString()}.`,
+        audience: 'individual',
+        channel: 'email',
+        delivery_status: 'queued',
+        created_by: actorId,
+        metadata: { category: 'quiz_reminder', quizId: assignment.quiz_id, dueDate: assignment.due_date },
+      }).select('id').single()
+
+      let sendAttempts = 0
+      let sendFailures = 0
+      if (profile?.email) {
+        const html = buildPlainReminderEmail({
+          title: `Quiz due: ${quiz?.title || 'Assigned quiz'}`,
+          message: `Please complete ${quiz?.title || 'your assigned quiz'} before ${new Date(assignment.due_date).toLocaleString()}.`,
+          href: `${getSiteBaseUrl()}/employee/quizzes`,
+        })
+        const emailResult = await sendEmail({ to: profile.email, subject: `Quiz Reminder - ${quiz?.title || 'SkillTest_AI'}`, html })
+        sendAttempts++
+        if (!emailResult.success) sendFailures++
+        if (notif?.id) {
+          await admin.from('training_notification_dispatch_log').insert({
+            notification_id: notif.id,
+            recipient_email: profile.email,
+            channel: 'email',
+            provider_status: emailResult.success ? 'sent' : 'failed',
+            provider_message: emailResult.error || 'Sent',
+          })
+        }
+      }
+      await finalizeEmailNotification(admin, notif?.id, sendAttempts, sendFailures)
+      notificationsCreated++
+    }
+  }
+
+  if (runType === 'ai_command_reminder') {
+    const { data: schedules } = await admin
+      .from('ai_command_schedules')
+      .select('id, title, command_text, next_run_at, created_by, owner:created_by(full_name, email)')
+      .eq('enabled', true)
+      .lte('next_run_at', now.toISOString())
+      .limit(100)
+
+    for (const schedule of schedules || []) {
+      const owner = (schedule as any).owner
+      const { data: notif } = await admin.from('training_notifications').insert({
+        recipient_user_id: schedule.created_by,
+        title: `AI Command schedule due: ${schedule.title || 'Scheduled command'}`,
+        message: `Scheduled AI command is due for review/execution: ${schedule.command_text}`,
+        audience: 'individual',
+        channel: 'email',
+        delivery_status: 'queued',
+        created_by: actorId,
+        metadata: { category: 'ai_command_reminder', scheduleId: schedule.id, nextRunAt: schedule.next_run_at },
+      }).select('id').single()
+
+      let sendAttempts = 0
+      let sendFailures = 0
+      if (owner?.email) {
+        const html = buildPlainReminderEmail({
+          title: schedule.title || 'AI Command schedule due',
+          message: `Your scheduled AI Command is due: ${schedule.command_text}`,
+          href: `${getSiteBaseUrl()}/manager/ai-command`,
+        })
+        const emailResult = await sendEmail({ to: owner.email, subject: `AI Command Schedule Due - ${schedule.title || 'SkillTest_AI'}`, html })
+        sendAttempts++
+        if (!emailResult.success) sendFailures++
+        if (notif?.id) {
+          await admin.from('training_notification_dispatch_log').insert({
+            notification_id: notif.id,
+            recipient_email: owner.email,
+            channel: 'email',
+            provider_status: emailResult.success ? 'sent' : 'failed',
+            provider_message: emailResult.error || 'Sent',
           })
         }
       }

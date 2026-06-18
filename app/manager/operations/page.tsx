@@ -414,7 +414,7 @@ export default async function ManagerOperationsPage({
     quizAttempts,
   }).slice(0, 6)
 
-  const automationRunTypes = ['attendance_cutoff', 'absence_streak', 'assessment_reminder', 'feedback_reminder'] as const
+  const automationRunTypes = ['attendance_cutoff', 'absence_streak', 'assessment_reminder', 'feedback_reminder', 'quiz_reminder', 'ai_command_reminder'] as const
   const notificationById = new Map(notifications.map((item: any) => [item.id, item]))
   const dispatchHealth = {
     sent: notificationDispatchLogs.filter((item: any) => item.provider_status === 'sent').length,
