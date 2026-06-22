@@ -181,7 +181,7 @@ export default async function AdminConsolePage() {
       </Card>
 
       {/* ── USER ROLE MANAGEMENT + TMS CONTROLS ── */}
-      <Card className="border-teal-100 bg-white shadow-sm">
+      <Card id="feedback-review" className="scroll-mt-24 border-teal-100 bg-white shadow-sm">
         <CardHeader className="border-b border-teal-50 bg-teal-50/70">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>

@@ -47,6 +47,9 @@ export default async function ManagerLayout({
               <CmdAction href="/manager/operations#attendance" label="Attendance" icon={ClipboardCheck} />
               <CmdAction href="/manager/operations#assessment" label="Scores" icon={FileSpreadsheet} />
               <CmdAction href="/manager/operations#feedback" label="Feedback" icon={MessageSquareText} />
+              {profile?.role === 'admin' ? (
+                <CmdAction href="/manager/admin#feedback-review" label="Review Feedback" icon={MessageSquareText} />
+              ) : null}
               <CmdAction href="/manager/docs" label="Docs" icon={BookOpenCheck} />
               <CmdAction href="/manager/integrity" label="Integrity" icon={ShieldAlert} />
 <CmdAction href="/manager/reports" label="Reports" icon={Download} />
