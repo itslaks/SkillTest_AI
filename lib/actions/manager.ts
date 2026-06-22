@@ -68,6 +68,100 @@ export async function getAdminAuditLogs() {
   return { data: data || [] }
 }
 
+export async function getAdminFeedbackReviews() {
+  await requireAdmin()
+  const admin = createAdminClient()
+  const { data, error } = await admin
+    .from('training_feedback')
+    .select(`
+      *,
+      batch:batch_id(id, title, domain, status),
+      session:session_id(id, title, session_date),
+      trainee:user_id(id, full_name, email, employee_id, department, domain),
+      reviewer:reviewed_by(id, full_name, email)
+    `)
+    .order('created_at', { ascending: false })
+    .limit(100)
+
+  if (error) return { error: error.message, data: [] }
+  return { data: data || [] }
+}
+
+export async function updateAdminFeedbackReview(formData: FormData): Promise<ApiResponse<boolean>> {
+  const { userId } = await requireAdmin()
+  const admin = createAdminClient()
+  const feedbackId = String(formData.get('feedback_id') || '').trim()
+  const reviewStatus = String(formData.get('quick_status') || formData.get('review_status') || '').trim()
+  const reviewNotes = String(formData.get('review_notes') || '').trim()
+  const actionItem = String(formData.get('action_item') || '').trim()
+
+  if (!feedbackId) return { error: 'Feedback record is required.' }
+  if (!['pending', 'reviewed', 'dismissed'].includes(reviewStatus)) {
+    return { error: 'Choose a valid review status.' }
+  }
+
+  const reviewedAt = reviewStatus === 'pending' ? null : new Date().toISOString()
+  const reviewerId = reviewStatus === 'pending' ? null : userId
+
+  const { error } = await admin
+    .from('training_feedback')
+    .update({
+      review_status: reviewStatus,
+      review_notes: reviewNotes || null,
+      action_item: actionItem || null,
+      reviewed_by: reviewerId,
+      reviewed_at: reviewedAt,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', feedbackId)
+
+  if (error) return { error: error.message }
+
+  await admin.from('training_admin_audit').insert({
+    actor_id: userId,
+    action: `feedback_${reviewStatus}`,
+    target_table: 'training_feedback',
+    target_id: feedbackId,
+    details: { review_status: reviewStatus, review_notes: reviewNotes || null, action_item: actionItem || null },
+  })
+
+  revalidatePath('/manager/admin')
+  revalidatePath('/manager/operations')
+  return { data: true }
+}
+
+export async function deleteAdminFeedbackReview(formData: FormData): Promise<ApiResponse<boolean>> {
+  const { userId } = await requireAdmin()
+  const admin = createAdminClient()
+  const feedbackId = String(formData.get('feedback_id') || '').trim()
+  if (!feedbackId) return { error: 'Feedback record is required.' }
+
+  const { data: previous } = await admin
+    .from('training_feedback')
+    .select('id, user_id, batch_id, session_id, rating, sentiment, review_status')
+    .eq('id', feedbackId)
+    .maybeSingle()
+
+  const { error } = await admin
+    .from('training_feedback')
+    .delete()
+    .eq('id', feedbackId)
+
+  if (error) return { error: error.message }
+
+  await admin.from('training_admin_audit').insert({
+    actor_id: userId,
+    action: 'feedback_delete',
+    target_table: 'training_feedback',
+    target_id: feedbackId,
+    details: previous || {},
+  })
+
+  revalidatePath('/manager/admin')
+  revalidatePath('/manager/operations')
+  return { data: true }
+}
+
 function isMissingTrainerAssignmentsTable(error: any) {
   const message = String(error?.message || '').toLowerCase()
   return error?.code === '42P01' || message.includes('trainer_employee_assignments') || message.includes('does not exist')

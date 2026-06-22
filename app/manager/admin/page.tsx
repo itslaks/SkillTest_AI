@@ -4,8 +4,11 @@ import {
   getAdminUsers,
   updateUserRole,
   getPendingTrainerSignups,
+  getAdminFeedbackReviews,
   approveTrainerSignup,
   rejectTrainerSignup,
+  updateAdminFeedbackReview,
+  deleteAdminFeedbackReview,
   getCertificateRulesForAdmin,
   getTrainerEmployeeAssignmentData,
   removeTrainerEmployeeAssignment,
@@ -17,7 +20,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { CertificatePreview } from '@/components/certificates/certificate-preview'
-import { Clock, ShieldCheck, Trophy, Users, CheckCircle2, XCircle, UserCheck, AlertTriangle, Medal, UserCog, Link2Off } from 'lucide-react'
+import { Clock, ShieldCheck, Trophy, Users, CheckCircle2, XCircle, UserCheck, AlertTriangle, Medal, UserCog, Link2Off, MessageSquareText, Star, Trash2 } from 'lucide-react'
 
 async function updateRoleAction(formData: FormData) {
   'use server'
@@ -54,25 +57,40 @@ async function removeTrainerEmployeeAssignmentAction(formData: FormData) {
   await removeTrainerEmployeeAssignment(formData)
 }
 
+async function updateFeedbackReviewAction(formData: FormData) {
+  'use server'
+  await updateAdminFeedbackReview(formData)
+}
+
+async function deleteFeedbackReviewAction(formData: FormData) {
+  'use server'
+  await deleteAdminFeedbackReview(formData)
+}
+
 export default async function AdminConsolePage() {
   // The manager layout admits all training staff (including trainers).
   // The admin console must be restricted further: managers/coordinators/admins
   // only. Mutating actions additionally verify the admin role server-side.
   await requireManager()
 
-  const [{ data: users }, { data: auditLogs }, governance, { data: pendingTrainers }, { data: certificateQuizzes }, { data: trainerEmployeeData }] = await Promise.all([
+  const [{ data: users }, { data: auditLogs }, governance, { data: pendingTrainers }, { data: certificateQuizzes }, { data: trainerEmployeeData }, { data: feedbackReviews }] = await Promise.all([
     getAdminUsers(),
     getAdminAuditLogs(),
     getTrainingGovernanceSettings(),
     getPendingTrainerSignups(),
     getCertificateRulesForAdmin(),
     getTrainerEmployeeAssignmentData(),
+    getAdminFeedbackReviews(),
   ])
   const trainerEmployeeAssignments = trainerEmployeeData?.assignments || []
   const assignmentCountsByTrainer = new Map<string, number>()
   for (const assignment of trainerEmployeeAssignments) {
     assignmentCountsByTrainer.set(assignment.trainer_id, (assignmentCountsByTrainer.get(assignment.trainer_id) || 0) + 1)
   }
+  const feedbackItems = feedbackReviews || []
+  const pendingFeedbackCount = feedbackItems.filter((item: any) => (item.review_status || 'pending') === 'pending').length
+  const reviewedFeedbackCount = feedbackItems.filter((item: any) => item.review_status === 'reviewed').length
+  const dismissedFeedbackCount = feedbackItems.filter((item: any) => item.review_status === 'dismissed').length
 
   return (
     <div className="space-y-8">
@@ -163,6 +181,115 @@ export default async function AdminConsolePage() {
       </Card>
 
       {/* ── USER ROLE MANAGEMENT + TMS CONTROLS ── */}
+      <Card className="border-teal-100 bg-white shadow-sm">
+        <CardHeader className="border-b border-teal-50 bg-teal-50/70">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <MessageSquareText className="h-5 w-5 text-teal-700" />
+                Feedback Review Desk
+              </CardTitle>
+              <CardDescription className="mt-1">
+                View every employee feedback response, mark it reviewed, dismiss it, edit action items, or delete records that should be removed.
+              </CardDescription>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">{pendingFeedbackCount} pending</Badge>
+              <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-800">{reviewedFeedbackCount} reviewed</Badge>
+              <Badge variant="outline" className="border-zinc-200 bg-white text-zinc-700">{dismissedFeedbackCount} dismissed</Badge>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {feedbackItems.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 p-8 text-center">
+              <MessageSquareText className="mx-auto h-10 w-10 text-zinc-400" />
+              <p className="mt-3 font-semibold text-zinc-700">No employee feedback collected yet</p>
+              <p className="mt-1 text-sm text-zinc-500">Submitted learner feedback will appear here for admin review.</p>
+            </div>
+          ) : (
+            feedbackItems.map((item: any) => {
+              const status = item.review_status || 'pending'
+              const statusClass = status === 'reviewed'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                : status === 'dismissed'
+                  ? 'border-zinc-200 bg-zinc-50 text-zinc-700'
+                  : 'border-amber-200 bg-amber-50 text-amber-800'
+
+              return (
+                <div key={item.id} className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+                  <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,0.85fr)]">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-zinc-950">{item.trainee?.full_name || item.trainee?.email || 'Employee'}</p>
+                        <Badge variant="outline" className={`capitalize ${statusClass}`}>{status}</Badge>
+                        <Badge variant="outline" className="capitalize">{item.sentiment}</Badge>
+                      </div>
+                      <p className="mt-1 text-sm text-zinc-500">
+                        {item.trainee?.employee_id || 'No ID'} - {item.trainee?.department || item.trainee?.domain || 'No department'} - {item.trainee?.email}
+                      </p>
+                      <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-teal-700">
+                        {item.batch?.title || 'Unassigned batch'}{item.session?.title ? ` - ${item.session.title}` : ''}
+                      </p>
+                      <p className="mt-3 rounded-2xl border border-zinc-100 bg-zinc-50 p-3 text-sm leading-6 text-zinc-700">{item.feedback_text}</p>
+                      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                        <FeedbackRating label="Overall" value={item.rating} />
+                        <FeedbackRating label="Content" value={item.content_quality_rating || item.rating} />
+                        <FeedbackRating label="Trainer" value={item.trainer_effectiveness_rating || item.rating} />
+                      </div>
+                      <p className="mt-3 text-xs text-zinc-400">
+                        Submitted {new Date(item.created_at).toLocaleString('en-IN')}
+                        {item.reviewer ? ` - ${status} by ${item.reviewer.full_name || item.reviewer.email}` : ''}
+                      </p>
+                    </div>
+
+                    <div className="space-y-3 rounded-2xl border border-teal-100 bg-teal-50/40 p-3">
+                      <form action={updateFeedbackReviewAction} className="space-y-3">
+                        <input type="hidden" name="feedback_id" value={item.id} />
+                        <label className="grid gap-1 text-sm">
+                          <span className="font-medium text-zinc-800">Review status</span>
+                          <select name="review_status" defaultValue={status} className="h-10 rounded-xl border border-teal-100 bg-white px-3">
+                            <option value="pending">Pending review</option>
+                            <option value="reviewed">Reviewed</option>
+                            <option value="dismissed">Dismissed</option>
+                          </select>
+                        </label>
+                        <label className="grid gap-1 text-sm">
+                          <span className="font-medium text-zinc-800">Admin review notes</span>
+                          <textarea name="review_notes" rows={3} defaultValue={item.review_notes || ''} className="rounded-xl border border-teal-100 bg-white px-3 py-2" placeholder="Record the review decision, follow-up, or dismissal reason." />
+                        </label>
+                        <label className="grid gap-1 text-sm">
+                          <span className="font-medium text-zinc-800">Action item</span>
+                          <input name="action_item" defaultValue={item.action_item || ''} className="h-10 rounded-xl border border-teal-100 bg-white px-3" placeholder="Optional trainer/coordinator follow-up" />
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          <Button type="submit" size="sm" className="rounded-full bg-teal-700 text-white hover:bg-teal-800">
+                            Save review
+                          </Button>
+                          <Button type="submit" size="sm" variant="outline" name="quick_status" value="reviewed" className="rounded-full border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100">
+                            Mark reviewed
+                          </Button>
+                          <Button type="submit" size="sm" variant="outline" name="quick_status" value="dismissed" className="rounded-full border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50">
+                            Dismiss
+                          </Button>
+                        </div>
+                      </form>
+                      <form action={deleteFeedbackReviewAction}>
+                        <input type="hidden" name="feedback_id" value={item.id} />
+                        <Button type="submit" size="sm" variant="outline" className="rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">
+                          <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                          Delete feedback
+                        </Button>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </CardContent>
+      </Card>
+
       <Card className="border-blue-100 bg-white shadow-sm">
         <CardHeader className="border-b border-blue-50 bg-blue-50/60">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -476,6 +603,18 @@ export default async function AdminConsolePage() {
           ))}
         </CardContent>
       </Card>
+    </div>
+  )
+}
+
+function FeedbackRating({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-xl border border-zinc-100 bg-white px-3 py-2">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">{label}</p>
+      <p className="mt-1 flex items-center gap-1 text-sm font-bold text-zinc-950">
+        <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+        {value}/5
+      </p>
     </div>
   )
 }

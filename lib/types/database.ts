@@ -247,7 +247,12 @@ export interface TrainingFeedback {
   action_item: string | null
   content_quality_rating: number | null
   trainer_effectiveness_rating: number | null
+  review_status: 'pending' | 'reviewed' | 'dismissed'
+  review_notes: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
   created_at: string
+  updated_at: string
 }
 
 export type TrainingAssessmentType = 'sprint_review' | 'api_coding' | 'coding' | 'project' | 'other'
