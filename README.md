@@ -365,6 +365,7 @@ Admin is the only unrestricted governance role. Manager, coordinator, and traine
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Full architecture with Mermaid flow diagrams |
 | [docs/TECHNICAL_OVERVIEW.md](docs/TECHNICAL_OVERVIEW.md) | Technical reference: routes, API, deployment |
 | [docs/PROCTORING.md](docs/PROCTORING.md) | AI proctoring deep-dive: vision, risk, evidence, review |
+| [docs/FINAL_REVIEW_AUDIT.md](docs/FINAL_REVIEW_AUDIT.md) | Final review audit: feature coverage, endpoint inventory, validation results, caveats |
 | [database/README.md](database/README.md) | Migration guide and SQL file index |
 
 ---
@@ -396,6 +397,7 @@ Private. All rights reserved.
 | Area | Change |
 |------|--------|
 | AI Command | Added confirmation previews, audit logs, CSV/PDF chat exports, saved templates, schedule storage, scoped data access, and recent-command history. |
+| AI Command | Parser moved into a tested library and now handles broken-English quiz prompts such as "plz make hard python quiz 12 mcq give to Ram by tomorrow". |
 | Readiness | Quiz readiness and predicted score now use direct topic history, related domain evidence, difficulty, recency, streak, and training tenure. The UI shows confidence and evidence count so predictions are not presented as random values. |
 | AI Command | Admin AI Command can shortlist candidates for role openings such as Java, RAG/data engineering, cloud, frontend, AI, and testing using assessment evidence, domain fit, credentials, attendance, and recency. |
 | Profiles | `avatar-01` is now a neutral default avatar for users who have not selected a profile image; users can change it from profile settings. |
