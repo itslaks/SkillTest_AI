@@ -1,4 +1,4 @@
-# SkillTest AI — Presentation Script
+# SkillTest AI - Presentation Script
 
 **Duration:** 10-12 minutes  
 **Audience:** Technical + non-technical stakeholders  
@@ -8,11 +8,11 @@
 
 ## Slide 1: Title Slide (30 seconds)
 
-**Visual:** SkillTest AI logo with gradient accent (violet → cyan)
+**Visual:** SkillTest AI logo with gradient accent (violet -> cyan)
 
 **Script:**
 
-> "Good [morning/afternoon]. I'm presenting **SkillTest AI** — an AI-powered training management system that doesn't just track data, it actually thinks with you to improve training outcomes.
+> "Good [morning/afternoon]. I'm presenting **SkillTest AI** - an AI-powered training management system that doesn't just track data, it actually thinks with you to improve training outcomes.
 >
 > Unlike traditional LMS platforms that bolt AI on as an afterthought, SkillTest AI was built from the ground up with intelligent automation at every step: quiz generation, coaching insights, assessment analysis, and personalized learning recommendations."
 
@@ -20,7 +20,7 @@
 
 ## Slide 2: The Problem (1 minute)
 
-**Visual:** Split screen — cluttered spreadsheets vs modern TMS dashboard
+**Visual:** Split screen - cluttered spreadsheets vs modern TMS dashboard
 
 **Script:**
 
@@ -38,7 +38,7 @@
 
 ## Slide 3: The Solution Overview (1 minute)
 
-**Visual:** System architecture diagram — 4 pillars: AI Engine, TMS Core, Analytics, Gamification
+**Visual:** System architecture diagram - 4 pillars: AI Engine, TMS Core, Analytics, Gamification
 
 **Script:**
 
@@ -46,9 +46,9 @@
 >
 > **AI Engine:** Powered by OpenAI GPT-4o-mini with Gemini as fallback. Generates quiz questions, provides coaching insights, analyzes assessment data, and gives personalized recommendations.
 >
-> **TMS Core:** Full training lifecycle management — batches, sessions, attendance tracking with cut-off enforcement, score imports, project evaluations.
+> **TMS Core:** Full training lifecycle management - batches, sessions, attendance tracking with cut-off enforcement, score imports, project evaluations.
 >
-> **Analytics:** Real-time dashboards for trainers and managers, with AI-generated action items. Not just charts — actual recommendations.
+> **Analytics:** Real-time dashboards for trainers and managers, with AI-generated action items. Not just charts - actual recommendations.
 >
 > **Gamification:** Points, streaks, badges, and leaderboards keep learners engaged.
 >
@@ -56,7 +56,7 @@
 
 ---
 
-## Slide 4: AI Feature #1 — Quiz Generation (2 minutes)
+## Slide 4: AI Feature #1 - Quiz Generation (2 minutes)
 
 **Visual:** Screen recording or screenshots showing quiz generation flow
 
@@ -72,13 +72,13 @@
 > **Scenario 2: Content-based generation.**  
 > A trainer uploads a 30-page PDF training manual. SkillTest AI reads the document, extracts key concepts, and generates difficulty-appropriate questions based strictly on the content.
 >
-> The AI doesn't hallucinate — questions are grounded in what's actually in the document. And if AI fails for any reason, the system gracefully falls back to template-based generation, so the user experience never breaks."
+> The AI doesn't hallucinate - questions are grounded in what's actually in the document. And if AI fails for any reason, the system gracefully falls back to template-based generation, so the user experience never breaks."
 
 **Demo tip:** Open `/manager/quizzes`, click "Create Quiz", show both generation methods
 
 ---
 
-## Slide 5: AI Feature #2 — Manager Coaching Insights (1.5 minutes)
+## Slide 5: AI Feature #2 - Manager Coaching Insights (1.5 minutes)
 
 **Visual:** Manager dashboard with AI insight card highlighted
 
@@ -94,7 +94,7 @@
 >
 > Then it gives a 2-sentence actionable recommendation. For example:
 >
-> *'3 trainers missed the attendance cut-off yesterday — set a daily 9 AM reminder. With 87% attendance across 5 batches, focus coaching on the 2 batches below 80%.'*
+> *'3 trainers missed the attendance cut-off yesterday - set a daily 9 AM reminder. With 87% attendance across 5 batches, focus coaching on the 2 batches below 80%.'*
 >
 > This is capped at 200 tokens per request, so it's lightning-fast and cost-effective. Managers get intelligence, not just metrics."
 
@@ -102,7 +102,7 @@
 
 ---
 
-## Slide 6: AI Feature #3 — Employee Learning Coach (1.5 minutes)
+## Slide 6: AI Feature #3 - Employee Learning Coach (1.5 minutes)
 
 **Visual:** Employee dashboard with AI recommendation widget
 
@@ -118,7 +118,7 @@
 >
 > Then it gives specific, encouraging advice. For example:
 >
-> *'Your 7-day streak is strong—keep it going by tackling JavaScript Basics next. With 85% pass rate, you're ready for medium difficulty.'*
+> *'Your 7-day streak is strong - keep it going by tackling JavaScript Basics next. With 85% pass rate, you're ready for medium difficulty.'*
 >
 > This is capped at 150 tokens and runs in under 1 second. Learners feel supported, not overwhelmed."
 
@@ -126,7 +126,7 @@
 
 ---
 
-## Slide 7: AI Feature #4 — Assessment Analysis Chat (1.5 minutes)
+## Slide 7: AI Feature #4 - Assessment Analysis Chat (1.5 minutes)
 
 **Visual:** Analytics page with AI chat interface + uploaded Excel data
 
@@ -174,7 +174,7 @@
 
 **Script:**
 
-> "Our users — trainers, coordinators, learners — often have zero technical background. So we redesigned every screen with plain language.
+> "Our users - trainers, coordinators, learners - often have zero technical background. So we redesigned every screen with plain language.
 >
 > **Before:** 'Anti-gaming pattern detected. Retention pressure escalation.'  
 > **After:** 'You're doing well! This quiz includes some harder questions to keep you growing.'
@@ -198,7 +198,7 @@
 
 > "Built on modern, scalable infrastructure:
 >
-> - **Next.js 14** with App Router and React Server Components for performance
+> - **Next.js 16** with App Router and React Server Components for performance
 > - **Supabase** for PostgreSQL database with Row-Level Security built in
 > - **OpenAI + Gemini** for AI with automatic fallback
 > - **Tailwind + shadcn/ui** for beautiful, accessible design
@@ -224,7 +224,7 @@
 > - Service role keys never exposed to client
 > - Attendance cut-off enforcement with full audit trail
 > - Email via **Resend**, which is GDPR-compliant
-> - No personally identifiable data sent to AI models — only anonymized stats
+> - No personally identifiable data sent to AI models - only anonymized stats
 >
 > We follow enterprise security best practices throughout."
 
@@ -239,19 +239,19 @@
 > **As a Manager:**
 > 1. I create a new training batch
 > 2. I assign candidates and a trainer
-> 3. I generate a quiz using AI — watch it create 15 questions in 3 seconds
+> 3. I generate a quiz using AI - watch it create 15 questions in 3 seconds
 > 4. I download a PDF report of trainer performance
 >
 > **As an Employee:**
 > 1. I log in and see my personalized AI coach recommendation
-> 2. I open my next quiz — readiness meter tells me I'm ready
+> 2. I open my next quiz - readiness meter tells me I'm ready
 > 3. I complete the quiz and see my updated streak
 >
 > **As a Trainer:**
 > 1. I see my 3-step workflow card
 > 2. I upload today's attendance Excel file
 > 3. I upload assessment scores
-> 4. Done — the system handles the rest
+> 4. Done - the system handles the rest
 >
 > All of this happens with zero technical friction."
 
@@ -259,7 +259,7 @@
 
 ## Slide 13: Results & Impact (45 seconds)
 
-**Visual:** Key metrics — time saved, accuracy, engagement
+**Visual:** Key metrics - time saved, accuracy, engagement
 
 **Script:**
 
@@ -270,7 +270,7 @@
 > - **Learner engagement:** 40% increase in completion rates thanks to gamification + AI coaching
 > - **Trainer productivity:** 3-step workflow reduces daily admin time by 60%
 >
-> SkillTest AI doesn't just automate tasks — it multiplies your team's effectiveness."
+> SkillTest AI doesn't just automate tasks - it multiplies your team's effectiveness."
 
 ---
 
@@ -298,7 +298,7 @@
 
 **Script:**
 
-> "To recap: SkillTest AI delivers real AI-powered training management — not buzzwords, actual intelligent automation at every step.
+> "To recap: SkillTest AI delivers real AI-powered training management - not buzzwords, actual intelligent automation at every step.
 >
 > If you're tired of juggling spreadsheets and want your training team to work smarter, let's talk.
 >
@@ -312,25 +312,25 @@
 
 **Q: How much does AI usage cost per month?**  
 **A:** For a 100-employee organization with moderate usage:
-- Quiz generation: ~$20/month (200 quizzes × $0.10 each)
-- Coaching insights: ~$10/month (3,000 requests × 200 tokens × $0.001)
-- Assessment chat: ~$15/month (500 conversations × 600 tokens × $0.0015)
+- Quiz generation: ~$20/month (200 quizzes x $0.10 each)
+- Coaching insights: ~$10/month (3,000 requests x 200 tokens x $0.001)
+- Assessment chat: ~$15/month (500 conversations x 600 tokens x $0.0015)
 - Total: **~$45/month** with OpenAI. Costs scale linearly with usage.
 
 **Q: What happens if OpenAI is down?**  
-**A:** We automatically fail over to Google Gemini. If both are unavailable, quiz generation falls back to template-based mode. Users never see an error — the system degrades gracefully.
+**A:** We automatically fail over to Google Gemini. If both are unavailable, quiz generation falls back to template-based mode. Users never see an error - the system degrades gracefully.
 
 **Q: Can trainers with zero tech experience use this?**  
 **A:** Yes. We tested with actual trainers who had never used an LMS before. They completed full workflows without any training documentation. The 3-step workflow card and plain-English labels make it intuitive.
 
 **Q: How do you handle data privacy?**  
-**A:** We never send PII to AI models. Assessment chat uses anonymized stats (name, score, time — no email, no identifiers). All data stays in your Supabase instance. AI providers see only aggregated, non-identifiable metrics.
+**A:** We never send PII to AI models. Assessment chat uses anonymized stats (name, score, time - no email, no identifiers). All data stays in your Supabase instance. AI providers see only aggregated, non-identifiable metrics.
 
 **Q: Can we self-host this?**  
 **A:** Yes. The entire stack (Next.js + Supabase) can run on your infrastructure. You control the database, and AI calls are yours (bring your own OpenAI key).
 
 **Q: What's the difference between this and [competitor LMS]?**  
-**A:** Most LMS platforms add AI as a chatbot feature. We built AI into the core operations: quiz generation, coaching insights, assessment analysis, and learning recommendations. It's not a bolt-on — it's the foundation.
+**A:** Most LMS platforms add AI as a chatbot feature. We built AI into the core operations: quiz generation, coaching insights, assessment analysis, and learning recommendations. It's not a bolt-on - it's the foundation.
 
 ---
 

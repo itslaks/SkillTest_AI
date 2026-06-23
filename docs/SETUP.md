@@ -11,13 +11,13 @@
 | Node.js | 20.9+ | Next.js runtime |
 | npm | 9+ | Package manager |
 | Git | any | Clone the repo |
-| Supabase account | — | Database + Auth |
-| AI provider key (one of) | — | Quiz generation |
-| Email provider (optional) | — | Completion emails |
+| Supabase account | - | Database + Auth |
+| AI provider key (one of) | - | Quiz generation |
+| Email provider (optional) | - | Completion emails |
 
 ---
 
-## Step 1 — Clone & Install
+## Step 1 - Clone & Install
 
 ```bash
 git clone https://github.com/itslaks/SkillTest_AI.git
@@ -27,17 +27,17 @@ npm install
 
 ---
 
-## Step 2 — Create a Supabase Project
+## Step 2 - Create a Supabase Project
 
-1. Go to [supabase.com](https://supabase.com) → **New project**
+1. Go to [supabase.com](https://supabase.com) -> **New project**
 2. Note down:
    - **Project URL** (`https://xxxx.supabase.co`)
-   - **Anon/public key** (under Settings → API)
-   - **Service role key** (under Settings → API — keep secret!)
+   - **Anon/public key** (under Settings -> API)
+   - **Service role key** (under Settings -> API - keep secret!)
 
 ---
 
-## Step 3 — Configure Environment Variables
+## Step 3 - Configure Environment Variables
 
 Copy the template:
 
@@ -48,22 +48,22 @@ cp .env.local.example .env.local
 Fill in `.env.local`:
 
 ```env
-# ── Supabase (required) ──────────────────────────────────────────
+# -- Supabase (required) ------------------------------------------
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
-# ── App URL (required for emails) ───────────────────────────────
+# -- App URL (required for emails) -------------------------------
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ADMIN_ALERT_EMAIL=skilltestai01@gmail.com
 ADMIN_LOGIN_EMAIL=skilltestai01@gmail.com
 
-# ── AI Provider — pick ONE ──────────────────────────────────────
+# -- AI Provider - pick ONE --------------------------------------
 OPENAI_API_KEY=sk-...
 # GROQ_API_KEY=gsk_...
 # GOOGLE_GEMINI_API_KEY=...
 
-# ── Email — pick ONE (optional) ─────────────────────────────────
+# -- Email - pick ONE (optional) ---------------------------------
 # Option A: SMTP
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
@@ -75,7 +75,7 @@ SMTP_FROM=SkillTest_AI <you@gmail.com>
 # RESEND_API_KEY=re_...
 # RESEND_FROM=SkillTest_AI <noreply@yourdomain.com>
 
-# ── Optional ────────────────────────────────────────────────────
+# -- Optional ----------------------------------------------------
 CRON_SECRET=your-random-secret          # Required for /api/cron
 SEED_ADMIN_EMAIL=skilltestai01@gmail.com
 SEED_TRAINER_EMAIL=trainer@skilltest.ai
@@ -85,7 +85,7 @@ SEED_TRAINER_PASSWORD=changeme123!
 
 ---
 
-## Step 4 — Run Database Migrations
+## Step 4 - Run Database Migrations
 
 Open the **Supabase SQL Editor** and run each file in `database/migrations/` in order:
 
@@ -100,13 +100,13 @@ Open the **Supabase SQL Editor** and run each file in `database/migrations/` in 
 
 ### Create the Proctoring Storage Bucket
 
-In Supabase → **Storage** → New bucket:
+In Supabase -> **Storage** -> New bucket:
 - Name: `quiz-proctoring-evidence`
 - Public: **No** (must be private)
 
 ---
 
-## Step 5 — Seed Initial Users (Optional)
+## Step 5 - Seed Initial Users (Optional)
 
 ```bash
 node database/seeds/seed_admin.js
@@ -116,7 +116,7 @@ This creates a default admin and trainer account using the passwords from `.env.
 
 ---
 
-## Step 6 — Start the Dev Server
+## Step 6 - Start the Dev Server
 
 ```bash
 npm run dev
@@ -126,7 +126,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ---
 
-## Step 7 — First Login
+## Step 7 - First Login
 
 | Role | Default email | Password |
 |------|--------------|---------|
@@ -141,8 +141,8 @@ Open [http://localhost:3000](http://localhost:3000).
 
 1. Push code to GitHub
 2. Connect repo to [Vercel](https://vercel.com)
-3. Add all env vars in Vercel → Settings → Environment Variables
-4. Add your Vercel domain to Supabase → Auth → Redirect URLs
+3. Add all env vars in Vercel -> Settings -> Environment Variables
+4. Add your Vercel domain to Supabase -> Auth -> Redirect URLs
 5. Set `NEXT_PUBLIC_APP_URL` to your production URL
 6. Deploy from `main` branch
 

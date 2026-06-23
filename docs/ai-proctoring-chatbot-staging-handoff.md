@@ -27,10 +27,10 @@
 
 ## 2. Supabase Migration Checklist
 
-- Exact migration files to run:
-  - `scripts/038_add_normalized_quiz_proctoring.sql`
-  - `scripts/039_proctoring_notifications_realtime.sql`
-  - `scripts/040_suspicious_attempt_review_gate.sql`
+- Exact migration files to run for current deployments:
+  - Run every file in `database/migrations/` in numeric order, from `001_create_profiles.sql` through `050_proctoring_validation_program.sql`.
+  - The original proctoring rollout is covered by `038_add_normalized_quiz_proctoring.sql`, `039_proctoring_notifications_realtime.sql`, `040_suspicious_attempt_review_gate.sql`, `041_proctoring_server_authorization.sql`, and `042_proctoring_baseline_and_event_metadata.sql`.
+  - Do not use the old `scripts/` SQL path; migration SQL now lives under `database/migrations/`.
 - SQL verification queries:
 
 ```sql
