@@ -9,7 +9,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
-import { Users, TrendingUp, Award } from 'lucide-react'
+import { Users, TrendingUp, Award, type LucideIcon } from 'lucide-react'
 
 interface TrainerMetric {
   id: string
@@ -26,13 +26,27 @@ interface TrainerPerformancePanelProps {
   trainers: TrainerMetric[]
 }
 
-function CustomTooltip({ active, payload, label }: any) {
+type TooltipPayloadItem = {
+  name?: string | number
+  value?: string | number
+  fill?: string
+}
+
+function CustomTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean
+  payload?: TooltipPayloadItem[]
+  label?: string | number
+}) {
   if (!active || !payload?.length) return null
   return (
     <div className="rounded-xl border border-zinc-200 bg-white px-3 py-2 shadow-lg text-xs text-zinc-900 space-y-1">
       <p className="font-semibold truncate max-w-[160px]">{label}</p>
-      {payload.map((item: any) => (
-        <div key={item.name} className="flex items-center gap-2">
+      {payload.map((item) => (
+        <div key={String(item.name)} className="flex items-center gap-2">
           <span className="h-2 w-2 rounded-full" style={{ background: item.fill }} />
           <span className="text-zinc-600">{item.name}:</span>
           <span className="font-bold">{item.value}{item.name !== 'Batches' ? '%' : ''}</span>
@@ -159,7 +173,7 @@ export function TrainerPerformancePanel({ trainers }: TrainerPerformancePanelPro
 }
 
 function SummaryCard({ label, value, sub, icon: Icon, tone }: {
-  label: string; value: string; sub?: string; icon: any; tone: string
+  label: string; value: string; sub?: string; icon: LucideIcon; tone: string
 }) {
   return (
     <div className={`rounded-2xl border p-4 ${tone}`}>

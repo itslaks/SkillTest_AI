@@ -93,7 +93,7 @@ Open the **Supabase SQL Editor** and run each file in `database/migrations/` in 
 001_create_profiles.sql
 002_create_quizzes.sql
 ...
-040_suspicious_attempt_review_gate.sql
+048_feedback_admin_review_workflow.sql
 ```
 
 > Run them one by one, in numeric order. Do not skip any.
@@ -148,7 +148,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ### Production Checklist
 
-- [ ] All 40 migrations applied
+- [ ] All 48 migrations applied
 - [ ] `quiz-proctoring-evidence` bucket is **private**
 - [ ] Real Supabase keys configured (not local)
 - [ ] AI provider key set

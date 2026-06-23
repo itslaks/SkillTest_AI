@@ -41,7 +41,10 @@ export function isTopper(score: number, weights?: Partial<TopperWeights>) {
 }
 
 export function averageScore(values: Array<number | null | undefined>) {
-  const clean = values.map((value) => Number(value)).filter((value) => Number.isFinite(value))
+  const clean = values
+    .filter((value) => value !== null && value !== undefined)
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value))
   return clean.length ? Math.round(clean.reduce((sum, value) => sum + value, 0) / clean.length) : 0
 }
 

@@ -1,7 +1,7 @@
 # SkillTest_AI — Mavericks Execution Platform
 
-> AI-powered Training Management System for enterprise learning teams.  
-> Quizzes · AI Proctoring · Certificates · Attendance · Reports · Gamification — in one Next.js app.
+> AI-powered Training Management System for enterprise learning teams.
+> Quizzes · Evidence Packs · Compliance Reporting · Optional AI Proctoring · Certificates · Attendance — in one Next.js app.
 
 ---
 
@@ -30,7 +30,7 @@ Onboard employees → Assign quizzes → Run proctored tests
 → Auto-score → Issue certificates → Generate reports → Prove compliance
 ```
 
-It is built for training managers and HR teams who need **execution evidence**, not just a quiz screen.
+It is built for training managers and HR teams who need **training execution evidence**, not just a quiz screen.
 
 ---
 
@@ -52,7 +52,7 @@ It is built for training managers and HR teams who need **execution evidence**, 
 | Feature | Description |
 |---------|-------------|
 | 🎯 Adaptive Quiz Engine | Questions reorder by difficulty based on live performance signals |
-| 🛡️ AI Proctoring | Camera · baseline face identity · multiple-face detection · gadget detection · gaze tracking · browser lock |
+| 🛡️ Optional AI Proctoring | Camera · baseline face identity · multiple-face detection · gadget detection · gaze tracking · browser lock, with staff review for false-positive handling |
 | 🏅 Certificates | Auto-issued on pass; downloadable with custom title, message, and template |
 | 🎖️ Badge Universe | 250+ badges across 12 categories earned from quiz performance and streaks |
 | 🏆 Leaderboard | Live and cumulative rankings with points and streaks |
@@ -68,7 +68,7 @@ It is built for training managers and HR teams who need **execution evidence**, 
 | 🤖 Command Chatbot | "Create quiz on Python, assign to Ram" → quiz created |
 | 📥 Import Workflows | Employees, quiz questions, attendance, scores — CSV/TXT/XLSX/DOCX/PDF/XML/JSON |
 | 📄 Reports | Excel + PDF exports for attendance, assessment, feedback, toppers |
-| 🧾 BRD Evidence Pack | Downloadable compliance workbook for judges / clients |
+| 🧾 Compliance Evidence Pack | Downloadable workbook that packages attendance, assessment, feedback, notification, audit, and BRD coverage evidence |
 
 ### 🟡 Training Operations
 | Feature | Description |
@@ -132,7 +132,7 @@ SkillTest_AI/
 │   └── rbac.ts                ← Role access control
 │
 ├── 📂 database/               🟢 DATABASE — All SQL and seed files
-│   ├── migrations/            ← 001–040 sequential schema migrations
+│   ├── migrations/            ← 001-048 sequential schema migrations
 │   ├── seeds/                 ← Seed data and fixture generators
 │   └── fixes/                 ← One-off patches (already applied)
 │
@@ -233,6 +233,8 @@ Employee opens quiz
 
 Pre-check now captures a baseline face only when camera permission is active, lighting is acceptable, exactly one face is visible, and the face is centered. The baseline stores a browser-generated FaceMesh geometry signature and metadata on `proctoring_sessions`; the quiz will not start if zero faces or multiple faces are visible.
 
+AI proctoring is an assistive integrity signal, not a standalone fraud verdict. Camera quality, lighting, browser performance, model loading, accessibility needs, and device differences can create false positives or false negatives, so production rollouts should pilot with real users/devices and keep manager review, retest, and appeal workflows enabled.
+
 During the quiz, TensorFlow.js runs in the browser and sends structured events through `/api/proctoring/events`:
 
 | Rule | Warning | Evidence / metadata |
@@ -284,6 +286,8 @@ cp .env.local.example .env.local
 #    database/migrations/002_create_quizzes.sql
 #    ... through ...
 #    database/migrations/042_proctoring_baseline_and_event_metadata.sql
+#    ... through ...
+#    database/migrations/048_feedback_admin_review_workflow.sql
 
 # 5. Seed (optional)
 node database/seeds/seed_admin.js

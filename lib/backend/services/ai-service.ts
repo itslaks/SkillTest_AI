@@ -5,6 +5,7 @@ import type {
   AIProviderName,
   AIProviderStatus,
   InsightType,
+  JsonLike,
   LearnerRecommendationInput,
 } from '@/lib/backend/entities/ai.entity'
 
@@ -36,7 +37,7 @@ export function getAIProviderStatus(): AIProviderStatus {
   }
 }
 
-export async function generateManagerInsight(type: InsightType, data: any): Promise<AIInsightResult> {
+export async function generateManagerInsight(type: InsightType, data: JsonLike | unknown): Promise<AIInsightResult> {
   const context = buildInsightContext(type, data)
   const fallback = buildLocalManagerInsight(type, data)
   return callAIWithFallback(
@@ -67,8 +68,8 @@ export async function generateLearnerRecommendation(input: LearnerRecommendation
 
 export async function generateAssessmentChatReply(args: {
   message: string
-  assessmentData?: any[]
-  loadedAssessmentResults?: any[]
+  assessmentData?: Record<string, unknown>[]
+  loadedAssessmentResults?: Record<string, unknown>[]
 }): Promise<AIChatResult> {
   const context =
     args.assessmentData?.length
@@ -93,7 +94,7 @@ Rules: identify patterns, give actionable advice, format numbers cleanly, max 3 
   return { message: result.insight, provider: result.provider }
 }
 
-function buildInsightContext(type: InsightType, data: any) {
+function buildInsightContext(type: InsightType, data: JsonLike | unknown) {
   if (type === 'quiz_results' && Array.isArray(data)) return buildCompactAssessmentContext(data)
   if (typeof data === 'object') return JSON.stringify(data, null, 0)
   return String(data)
@@ -125,8 +126,8 @@ function buildLearnerContext({ stats, quizzes, retentionRisk }: LearnerRecommend
   const points = stats?.stats?.total_points ?? 0
   const streak = stats?.stats?.current_streak ?? 0
   const completed = stats?.stats?.tests_completed ?? 0
-  const open = quizzes?.filter((q: any) => q.attemptStatus !== 'completed').length ?? 0
-  const nextQuiz = quizzes?.find((q: any) => q.attemptStatus !== 'completed')
+  const open = quizzes?.filter((quiz) => quiz.attemptStatus !== 'completed').length ?? 0
+  const nextQuiz = quizzes?.find((quiz) => quiz.attemptStatus !== 'completed')
   const passRate = stats?.stats?.pass_rate ?? 0
   return `learner: points=${points}, streak=${streak}d, completed=${completed}, open=${open}, passRate=${passRate}%${retentionRisk ? `, retention risk: ${retentionRisk.topic} (${retentionRisk.daysSinceLastAssessment} days)` : ''}${nextQuiz ? `, next quiz: "${nextQuiz.title}" (${nextQuiz.topic})` : ''}`
 }
@@ -134,7 +135,7 @@ function buildLearnerContext({ stats, quizzes, retentionRisk }: LearnerRecommend
 function buildLocalLearnerRecommendation({ stats, quizzes, retentionRisk }: LearnerRecommendationInput) {
   const streak = stats?.stats?.current_streak ?? 0
   const passRate = stats?.stats?.pass_rate ?? 0
-  const nextQuiz = quizzes?.find((q: any) => q.attemptStatus !== 'completed')
+  const nextQuiz = quizzes?.find((quiz) => quiz.attemptStatus !== 'completed')
   if (retentionRisk?.status === 'critical') {
     return `SkillTest_AI sees retention risk in ${retentionRisk.topic}. Review the last weak concepts for 15 minutes, then attempt one focused practice quiz.`
   }
@@ -149,28 +150,28 @@ function buildLocalLearnerRecommendation({ stats, quizzes, retentionRisk }: Lear
     : 'SkillTest_AI recommends one small action today: complete a short quiz or review note to restart your learning rhythm.'
 }
 
-function buildLocalManagerInsight(type: InsightType, data: any) {
+function buildLocalManagerInsight(type: InsightType, data: unknown) {
   if (type === 'attendance') {
-    const rows = Array.isArray(data) ? data : Object.values(data || {})
-    const absent = rows.filter((item: any) => String(item?.status || '').toLowerCase() === 'absent').length
+    const rows = arrayFromUnknown(data)
+    const absent = rows.filter((item) => String(item.status || '').toLowerCase() === 'absent').length
     return absent
       ? `SkillTest_AI detected ${absent} absence signal(s). Prioritize coordinator follow-up for repeated absences before assessment readiness drops.`
       : 'SkillTest_AI sees no dominant absence spike in this snapshot. Keep the cut-off reminder active and watch late submissions.'
   }
 
   if (type === 'trainer_performance') {
-    const rows = Array.isArray(data) ? data : []
+    const rows = arrayFromUnknown(data)
     const sorted = rows
-      .filter((item: any) => typeof item?.impactScore === 'number' || typeof item?.averageScore === 'number')
-      .sort((a: any, b: any) => (b.impactScore ?? b.averageScore ?? 0) - (a.impactScore ?? a.averageScore ?? 0))
+      .filter((item) => typeof item.impactScore === 'number' || typeof item.averageScore === 'number' || typeof item.scoreVal === 'number')
+      .sort((a, b) => numericMetric(b) - numericMetric(a))
     if (sorted.length) {
-      return `SkillTest_AI ranks ${sorted[0].trainerName || 'the leading trainer'} strongest in this view. Pair lower-impact sessions with their pattern and review topic-level gaps.`
+      return `SkillTest_AI ranks ${String(sorted[0].trainerName || sorted[0].name || 'the leading trainer')} strongest in this view. Pair lower-impact sessions with their pattern and review topic-level gaps.`
     }
   }
 
   if (type === 'quiz_results') {
-    const rows = Array.isArray(data) ? data : []
-    const scores = rows.map((item: any) => Number(item.percentage ?? item.score ?? 0)).filter(Number.isFinite)
+    const rows = arrayFromUnknown(data)
+    const scores = rows.map((item) => Number(item.percentage ?? item.score ?? 0)).filter(Number.isFinite)
     const avg = scores.length ? Math.round(scores.reduce((sum, value) => sum + value, 0) / scores.length) : 0
     return avg < 65
       ? `SkillTest_AI flags quiz readiness risk: average score is ${avg}%. Run remediation on the weakest topic before publishing the next assessment.`
@@ -180,8 +181,8 @@ function buildLocalManagerInsight(type: InsightType, data: any) {
   return 'SkillTest_AI recommends focusing on the largest operational gap first: batch health, attendance discipline, assessment clearance, or feedback closure.'
 }
 
-function buildLocalChatReply(message: string, rows: any[]) {
-  const scores = rows.map((item: any) => Number(item.percentage ?? item.score ?? 0)).filter(Number.isFinite)
+function buildLocalChatReply(message: string, rows: Record<string, unknown>[]) {
+  const scores = rows.map((item) => Number(item.percentage ?? item.score ?? 0)).filter(Number.isFinite)
   const avg = scores.length ? Math.round(scores.reduce((sum, value) => sum + value, 0) / scores.length) : null
   const lower = message.toLowerCase()
   if (!rows.length) {
@@ -194,4 +195,18 @@ function buildLocalChatReply(message: string, rows: any[]) {
     return `SkillTest_AI recommends using the top performers as peer anchors, but keep topper decisions tied to assessment score, project score, and attendance threshold.`
   }
   return `SkillTest_AI summary: ${rows.length} assessment row(s) loaded with average score ${avg}%. Next action: split candidates into remedial, ready, and stretch groups.`
+}
+
+function arrayFromUnknown(value: unknown): Record<string, unknown>[] {
+  if (Array.isArray(value)) return value.filter(isRecord)
+  if (isRecord(value)) return Object.values(value).filter(isRecord)
+  return []
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value))
+}
+
+function numericMetric(item: Record<string, unknown>) {
+  return Number(item.impactScore ?? item.averageScore ?? item.scoreVal ?? 0)
 }

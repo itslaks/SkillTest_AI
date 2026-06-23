@@ -1,11 +1,21 @@
 import { PRODUCT_NAME } from '@/lib/branding'
 import { averageScore, computeTopperScore } from '@/lib/topper'
-import type { BrdCoverageDataset, TrainingOpsDataset, TrainingOpsPdfSummary } from '@/lib/backend/entities/training-report.entity'
+import type {
+  BrdCoverageDataset,
+  SessionAttendanceRow,
+  TrainingAttemptRow,
+  TrainingBatchRow,
+  TrainingNotificationRow,
+  TrainingOpsDataset,
+  TrainingOpsPdfSummary,
+  TrainingOpsSettings,
+  TrainingProjectEvaluationRow,
+} from '@/lib/backend/entities/training-report.entity'
 import * as XLSX from 'xlsx'
 
 export function buildTrainingOpsEvidenceWorkbook(data: TrainingOpsDataset) {
   const wb = XLSX.utils.book_new()
-  const notificationsById = new Map(data.notifications.map((item: any) => [item.id, item]))
+  const notificationsById = new Map(data.notifications.map((item) => [item.id, item]))
   const membersByBatch = groupBy(data.members, 'batch_id')
   const sessionsByBatch = groupBy(data.sessions, 'batch_id')
   const quizzesByBatch = groupBy(data.quizzes, 'batch_id')
@@ -25,12 +35,12 @@ export function buildTrainingOpsEvidenceWorkbook(data: TrainingOpsDataset) {
   addSheet(
     wb,
     'Batch Summary',
-    data.batches.map((batch: any) => {
+    data.batches.map((batch) => {
       const batchMembers = membersByBatch.get(batch.id) || []
       const batchSessions = sessionsByBatch.get(batch.id) || []
       const batchQuizzes = quizzesByBatch.get(batch.id) || []
-      const batchAttendance = batchSessions.flatMap((session: any) => attendanceBySession.get(session.id) || [])
-      const present = batchAttendance.filter((entry: any) => ['present', 'late'].includes(entry.status)).length
+      const batchAttendance = batchSessions.flatMap((session) => attendanceBySession.get(session.id) || [])
+      const present = batchAttendance.filter((entry) => ['present', 'late'].includes(entry.status || '')).length
       const attendanceRate = batchAttendance.length ? Math.round((present / batchAttendance.length) * 100) : 0
       return {
         'Batch ID': batch.id,
@@ -39,8 +49,8 @@ export function buildTrainingOpsEvidenceWorkbook(data: TrainingOpsDataset) {
         Status: normalizeStatus(batch.status),
         'Start Date': batch.start_date || 'TBD',
         'End Date': batch.end_date || 'TBD',
-        Trainer: batch.trainer?.full_name || batch.trainer?.email || 'Unassigned',
-        Coordinator: batch.coordinator?.full_name || batch.coordinator?.email || 'Unassigned',
+        Trainer: profileLabel(batch.trainer, 'Unassigned'),
+        Coordinator: profileLabel(batch.coordinator, 'Unassigned'),
         Candidates: batchMembers.length,
         Sessions: batchSessions.length,
         Assessments: batchQuizzes.length,
@@ -50,7 +60,7 @@ export function buildTrainingOpsEvidenceWorkbook(data: TrainingOpsDataset) {
     }),
   )
 
-  addSheet(wb, 'Candidate Status', data.members.map((member: any) => ({
+  addSheet(wb, 'Candidate Status', data.members.map((member) => ({
     Batch: member.batch_id,
     'Candidate Name': member.profile?.full_name || 'Unknown',
     Email: member.profile?.email || '',
@@ -60,7 +70,7 @@ export function buildTrainingOpsEvidenceWorkbook(data: TrainingOpsDataset) {
     'Support Status': member.support_status,
     'Joined At': member.joined_at ? new Date(member.joined_at).toLocaleString() : 'N/A',
   })))
-  addSheet(wb, 'Attendance', data.attendance.map((entry: any) => ({
+  addSheet(wb, 'Attendance', data.attendance.map((entry) => ({
     Session: entry.session?.title || 'Session',
     'Session Date': entry.session?.session_date ? new Date(entry.session.session_date).toLocaleString() : 'N/A',
     'Candidate Name': entry.profile?.full_name || 'Unknown',
@@ -71,7 +81,7 @@ export function buildTrainingOpsEvidenceWorkbook(data: TrainingOpsDataset) {
     Notes: entry.notes || '',
     'Last Updated': entry.updated_at ? new Date(entry.updated_at).toLocaleString() : 'N/A',
   })))
-  addSheet(wb, 'Assessments', data.quizzes.map((quiz: any) => ({
+  addSheet(wb, 'Assessments', data.quizzes.map((quiz) => ({
     'Batch ID': quiz.batch_id,
     Assessment: quiz.title,
     Topic: quiz.topic,
@@ -79,7 +89,7 @@ export function buildTrainingOpsEvidenceWorkbook(data: TrainingOpsDataset) {
     'Passing Score': quiz.passing_score,
     Status: quiz.is_active ? 'Active' : 'Inactive',
   })))
-  addSheet(wb, 'Assessment Setup', data.assessmentSetups.map((setup: any) => ({
+  addSheet(wb, 'Assessment Setup', data.assessmentSetups.map((setup) => ({
     'Batch ID': setup.batch_id,
     Assessment: setup.title,
     Type: setup.assessment_type,
@@ -90,7 +100,7 @@ export function buildTrainingOpsEvidenceWorkbook(data: TrainingOpsDataset) {
     'Passing Score': setup.passing_score,
     Status: setup.status,
   })))
-  addSheet(wb, 'Attendance Uploads', data.uploads.map((upload: any) => ({
+  addSheet(wb, 'Attendance Uploads', data.uploads.map((upload) => ({
     Session: upload.session?.title || upload.session_id,
     'Uploaded By': upload.uploader?.full_name || upload.uploader?.email || 'Unknown',
     'File Name': upload.file_name || 'N/A',
@@ -111,7 +121,7 @@ export function buildTrainingOpsEvidenceWorkbook(data: TrainingOpsDataset) {
     },
   ])
   addSheet(wb, 'Topper Candidates', buildTopperRows(data.attempts, data.attendance, data.settings, data.projectEvaluations))
-  addSheet(wb, 'Project Evaluations', data.projectEvaluations.map((item: any) => ({
+  addSheet(wb, 'Project Evaluations', data.projectEvaluations.map((item) => ({
     'Batch ID': item.batch_id,
     Candidate: item.profile?.full_name || item.profile?.email || 'Unknown',
     'Employee ID': item.profile?.employee_id || 'N/A',
@@ -121,7 +131,7 @@ export function buildTrainingOpsEvidenceWorkbook(data: TrainingOpsDataset) {
     Evaluator: item.evaluator?.full_name || item.evaluator?.email || 'Unknown',
     Remarks: item.remarks || '',
   })))
-  addSheet(wb, 'Feedback', data.feedback.map((item: any) => ({
+  addSheet(wb, 'Feedback', data.feedback.map((item) => ({
     Batch: item.batch?.title || 'N/A',
     Session: item.session?.title || 'N/A',
     Candidate: item.trainee?.full_name || item.trainee?.email || 'Unknown',
@@ -131,7 +141,7 @@ export function buildTrainingOpsEvidenceWorkbook(data: TrainingOpsDataset) {
     'Action Item': item.action_item || '',
     'Submitted At': item.created_at ? new Date(item.created_at).toLocaleString() : 'N/A',
   })))
-  addSheet(wb, 'Notifications', data.notifications.map((item: any) => ({
+  addSheet(wb, 'Notifications', data.notifications.map((item) => ({
     Title: item.title,
     Batch: item.batch?.title || 'N/A',
     Session: item.session?.title || 'N/A',
@@ -142,8 +152,8 @@ export function buildTrainingOpsEvidenceWorkbook(data: TrainingOpsDataset) {
     'Sent At': item.sent_at ? new Date(item.sent_at).toLocaleString() : 'N/A',
     Message: item.message,
   })))
-  addSheet(wb, 'Notification Dispatch', data.notificationDispatchLogs.map((item: any) => {
-    const notification = notificationsById.get(item.notification_id) as any
+  addSheet(wb, 'Notification Dispatch', data.notificationDispatchLogs.map((item) => {
+    const notification = item.notification_id ? notificationsById.get(item.notification_id) : undefined
     return {
       Notification: notification?.title || item.notification_id,
       Batch: notification?.batch?.title || 'N/A',
@@ -154,7 +164,7 @@ export function buildTrainingOpsEvidenceWorkbook(data: TrainingOpsDataset) {
       'Attempted At': item.created_at ? new Date(item.created_at).toLocaleString() : 'N/A',
     }
   }))
-  addSheet(wb, 'Automation Runs', data.automationRuns.map((item: any) => ({
+  addSheet(wb, 'Automation Runs', data.automationRuns.map((item) => ({
     'Run Type': item.run_type,
     'Batch ID': item.batch_id || 'All',
     'Session ID': item.session_id || 'N/A',
@@ -183,29 +193,29 @@ export function buildTrainingOpsEvidenceWorkbook(data: TrainingOpsDataset) {
 }
 
 export function buildTrainingOpsPdf(summary: TrainingOpsPdfSummary) {
-  const dispatchSent = summary.dispatchLogs.filter((item: any) => item.provider_status === 'sent').length
-  const dispatchFailed = summary.dispatchLogs.filter((item: any) => item.provider_status === 'failed').length
-  const dispatchLogged = summary.dispatchLogs.filter((item: any) => item.provider_status === 'logged').length
+  const dispatchSent = summary.dispatchLogs.filter((item) => item.provider_status === 'sent').length
+  const dispatchFailed = summary.dispatchLogs.filter((item) => item.provider_status === 'failed').length
+  const dispatchLogged = summary.dispatchLogs.filter((item) => item.provider_status === 'logged').length
   const lines = [
     `${PRODUCT_NAME} - Training Ops PDF Report`,
     `Generated: ${new Date().toLocaleString()}`,
     '',
     `Batches covered: ${summary.batches.length}`,
     '',
-    ...summary.batches.flatMap((batch: any, index: number) => [
+    ...summary.batches.flatMap((batch, index) => [
       `${index + 1}. ${batch.title}`,
       `   Status: ${formatStatus(batch.status)}`,
       `   Dates: ${batch.start_date || 'TBD'} to ${batch.end_date || 'TBD'}`,
       `   Candidates: ${batch.batch_members?.[0]?.count || 0}`,
       `   Sessions: ${batch.training_sessions?.[0]?.count || 0}`,
-      `   Trainer: ${batch.trainer?.full_name || batch.trainer?.email || 'Unassigned'}`,
+      `   Trainer: ${profileLabel(batch.trainer, 'Unassigned')}`,
       '',
     ]),
     `Feedback responses: ${summary.feedback.length}`,
     `Project evaluations: ${summary.projectEvaluations.length}`,
     `Notifications: ${summary.notifications.length}`,
     `Dispatch evidence: ${dispatchSent} sent, ${dispatchFailed} failed, ${dispatchLogged} logged`,
-    `Automation notifications created: ${summary.automationRuns.reduce((sum: number, item: any) => sum + Number(item.notifications_created || 0), 0)}`,
+    `Automation notifications created: ${summary.automationRuns.reduce((sum, item) => sum + Number(item.notifications_created || 0), 0)}`,
     '',
     'Detailed attendance, assessment setup, feedback, topper, project, and notification sheets are available in the Excel export.',
   ]
@@ -273,11 +283,11 @@ function buildBrdCoverageRows(data: BrdCoverageDataset) {
   ]
 }
 
-function groupBy(items: any[], key: string) {
-  const grouped = new Map<string, any[]>()
+function groupBy<T extends Record<string, unknown>>(items: T[], key: keyof T) {
+  const grouped = new Map<string, T[]>()
   for (const item of items) {
     const groupKey = item[key]
-    if (!groupKey) continue
+    if (typeof groupKey !== 'string' || !groupKey) continue
     const group = grouped.get(groupKey) || []
     group.push(item)
     grouped.set(groupKey, group)
@@ -285,7 +295,7 @@ function groupBy(items: any[], key: string) {
   return grouped
 }
 
-function addSheet(wb: XLSX.WorkBook, name: string, rows: Record<string, any>[]) {
+function addSheet(wb: XLSX.WorkBook, name: string, rows: Record<string, string | number | boolean | null | undefined>[]) {
   const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{ Message: 'No data available yet' }])
   ws['!cols'] = Object.keys(rows[0] || { Message: '' }).map((key) => ({ wch: Math.max(14, Math.min(36, key.length + 8)) }))
   XLSX.utils.book_append_sheet(wb, ws, name)
@@ -301,12 +311,28 @@ function formatStatus(status: string) {
   return status.replace('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
-function buildTopperRows(attempts: any[], attendance: any[], settings: Record<string, any>, projectEvaluations: any[]) {
+function profileLabel(profile: TrainingBatchRow['trainer'], fallback: string) {
+  const row = Array.isArray(profile) ? profile[0] : profile
+  return row?.full_name || row?.email || fallback
+}
+
+function buildTopperRows(
+  attempts: TrainingAttemptRow[],
+  attendance: SessionAttendanceRow[],
+  settings: TrainingOpsSettings,
+  projectEvaluations: TrainingProjectEvaluationRow[],
+) {
   const assessmentWeight = Number(settings.topper_assessment_weight || 70)
   const projectWeight = Number(settings.topper_project_weight || 30)
   const minAttendance = Number(settings.topper_min_attendance || 75)
-  const byUser = new Map<string, any>()
+  const byUser = new Map<string, {
+    profile?: TrainingAttemptRow['profiles']
+    scores: number[]
+    points: number
+    time: number
+  }>()
   for (const attempt of attempts) {
+    if (!attempt.user_id) continue
     const current = byUser.get(attempt.user_id) || {
       profile: attempt.profiles,
       scores: [],
@@ -321,6 +347,7 @@ function buildTopperRows(attempts: any[], attendance: any[], settings: Record<st
 
   const attendanceByUser = new Map<string, { total: number; positive: number }>()
   for (const entry of attendance) {
+    if (!entry.user_id) continue
     const current = attendanceByUser.get(entry.user_id) || { total: 0, positive: 0 }
     current.total += 1
     if (entry.status === 'present' || entry.status === 'late') current.positive += 1
@@ -332,7 +359,7 @@ function buildTopperRows(attempts: any[], attendance: any[], settings: Record<st
       const attendanceStats = attendanceByUser.get(userId)
       const attendanceRate = attendanceStats?.total ? Math.round((attendanceStats.positive / attendanceStats.total) * 100) : 0
       const assessmentScore = averageScore(item.scores)
-      const projectScores = projectEvaluations.filter((item: any) => item.user_id === userId).map((item: any) => Number(item.score || 0))
+      const projectScores = projectEvaluations.filter((item) => item.user_id === userId).map((item) => Number(item.score || 0))
       const projectScore = averageScore(projectScores)
       const topperScore = computeTopperScore({
         assessmentAvg: assessmentScore,

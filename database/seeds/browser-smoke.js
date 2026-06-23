@@ -5,6 +5,19 @@ const http = require('http')
 const BASE_URL = process.env.SMOKE_BASE_URL || 'http://localhost:3000'
 let devServer = null
 
+function validateAutostartEnvironment() {
+  if (process.env.SMOKE_NO_AUTOSTART === '1' || process.env.SMOKE_BASE_URL) return
+
+  const required = ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY']
+  const missing = required.filter((key) => !process.env[key])
+  if (missing.length > 0) {
+    throw new Error(
+      `Cannot auto-start the smoke test server because required environment variables are missing: ${missing.join(', ')}.\n` +
+      'Create .env.local from .env.local.example, or set SMOKE_BASE_URL to a running environment.'
+    )
+  }
+}
+
 function waitForServer(url, timeoutMs = 45000) {
   const startedAt = Date.now()
   return new Promise((resolve, reject) => {
@@ -29,6 +42,8 @@ function waitForServer(url, timeoutMs = 45000) {
 }
 
 async function ensureServer() {
+  validateAutostartEnvironment()
+
   try {
     await waitForServer(BASE_URL, 1500)
     return

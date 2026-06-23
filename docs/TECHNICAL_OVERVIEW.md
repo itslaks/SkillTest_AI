@@ -61,7 +61,7 @@ SkillTest_AI: Mavericks Execution Platform is a Next.js training management and 
 | `lib/domain-options.ts` | Shared domain/vertical list |
 | `lib/avatar-options.ts` | 15 built-in Three.js 3D avatar preset IDs |
 | `components/avatar/` | Three.js avatar renderer, preset picker, and avatar view wrapper |
-| `database/migrations/` | Supabase SQL migrations 001–040 (run in order) |
+| `database/migrations/` | Supabase SQL migrations 001-048 (run in order) |
 | `database/seeds/` | Seed data and fixture generators |
 | `database/fixes/` | One-off SQL patches (already applied) |
 
@@ -173,8 +173,14 @@ Run SQL scripts in `scripts/` in numeric order. Current latest migration is:
 | `038_add_normalized_quiz_proctoring.sql` | Adds optional per-quiz proctoring flag, normalized sessions/events/evidence tables, private evidence bucket, RLS policies, and legacy inline-evidence cleanup |
 | `039_proctoring_notifications_realtime.sql` | Adds notification metadata compatibility, realtime publication safety, and unread notification indexing |
 | `040_suspicious_attempt_review_gate.sql` | Adds suspicious attempt/proctoring states and review indexes for score and certificate gating |
+| `041_trainer_employee_assignments.sql` | Adds trainer-to-employee assignment support |
+| `042_proctoring_baseline_and_event_metadata.sql` | Adds baseline face and event metadata fields for richer integrity review |
+| `043_migrate_memoji_avatar_presets.sql` through `045_set_all_employee_avatars_to_avatar_01.sql` | Migrates avatar presets and normalizes employee avatar defaults |
+| `046_ai_command_operations_copilot.sql` | Adds AI command operations copilot persistence |
+| `047_notification_health_and_reminder_types.sql` | Adds notification health and reminder classification fields |
+| `048_feedback_admin_review_workflow.sql` | Adds feedback review workflow support |
 
-If `030` is already executed, run `031` after saving certificate rules, then run `032` to harden badge awards, `033` to harden quiz-attempt and certificate RLS, `034` to reset badges from scratch, `035` to repair Training Ops schema compatibility, `036` through `038` to enable optional AI proctoring, `039` for realtime notification compatibility, and `040` for suspicious-attempt review gating. It is safe to run `031` again because it uses conflict update, and the proctoring migrations are designed to be rerunnable for staging validation.
+If `030` is already executed, continue with every later migration in numeric order through `048`. It is safe to run `031` again because it uses conflict update, and the proctoring migrations are designed to be rerunnable for staging validation.
 
 ## Verification
 
@@ -182,6 +188,9 @@ Recommended checks:
 
 ```bash
 npm run lint
+npm run typecheck
+npm run test:unit
+npm test
 npm run build
 npm run test:smoke
 ```
@@ -190,6 +199,9 @@ On this Windows workspace, direct Node paths may be needed if `npm` is not on PA
 
 ```powershell
 & 'C:\Program Files\nodejs\node.exe' .\node_modules\eslint\bin\eslint.js .
+& 'C:\Program Files\nodejs\node.exe' .\node_modules\typescript\bin\tsc --noEmit
 & 'C:\Program Files\nodejs\node.exe' .\node_modules\next\dist\bin\next build --webpack
-$env:PATH='C:\Program Files\nodejs;'+$env:PATH; node scripts\browser-smoke.js
+$env:PATH='C:\Program Files\nodejs;'+$env:PATH; node database\seeds\browser-smoke.js
 ```
+
+`npm test` runs lint, TypeScript, and fast unit tests. `npm run test:smoke` is the browser smoke test; it auto-starts `next dev` unless `SMOKE_BASE_URL` points at an already-running environment. Local auto-start requires `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env.local`. Use `npm run test:all` when the smoke-test environment is configured.

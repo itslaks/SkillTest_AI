@@ -106,7 +106,7 @@ SkillTest_AI/
 │   └── utils.ts                   ← Shared helpers
 │
 ├── 📂 database/                   ← All database files
-│   ├── 📂 migrations/             ← 001–040 SQL schema files
+│   ├── 📂 migrations/             ← 001-048 SQL schema files
 │   ├── 📂 seeds/                  ← Seed data & fixture generators
 │   └── 📂 fixes/                  ← One-off applied patches
 │

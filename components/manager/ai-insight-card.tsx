@@ -6,7 +6,7 @@ import type { InsightType } from '@/lib/backend/entities/ai.entity'
 
 interface AiInsightCardProps {
   type: InsightType
-  data: any
+  data: unknown
   /** Optional label shown above the insight */
   label?: string
   className?: string
@@ -15,7 +15,7 @@ interface AiInsightCardProps {
 /**
  * Lightweight AI insight card.
  * Calls /api/ai-insight on mount; shows a spinner while loading.
- * Caps response at 200 tokens server-side — minimal cost per render.
+ * Caps response at 200 tokens server-side for minimal cost per render.
  */
 export function AiInsightCard({ type, data, label, className = '' }: AiInsightCardProps) {
   const [insight, setInsight] = useState<string | null>(null)
@@ -35,8 +35,8 @@ export function AiInsightCard({ type, data, label, className = '' }: AiInsightCa
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'Failed')
       setInsight(json.insight)
-    } catch (e: any) {
-      setError(e.message)
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to load AI insight')
     } finally {
       setLoading(false)
     }
@@ -47,7 +47,7 @@ export function AiInsightCard({ type, data, label, className = '' }: AiInsightCa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  if (error) return null // fail silently — AI is optional enrichment
+  if (error) return null // AI is optional enrichment.
 
   return (
     <div className={`rounded-2xl border border-violet-100 bg-violet-50 p-4 ${className}`}>
@@ -76,3 +76,4 @@ export function AiInsightCard({ type, data, label, className = '' }: AiInsightCa
     </div>
   )
 }
+

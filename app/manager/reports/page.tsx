@@ -28,6 +28,111 @@ import { AiInsightCard } from '@/components/manager/ai-insight-card'
 import { averageScore, computeTopperScore } from '@/lib/topper'
 import { getAccessibleTrainingBatchIds } from '@/lib/training-access'
 
+type ProfileRef = {
+  id?: string | null
+  full_name?: string | null
+  email?: string | null
+  employee_id?: string | null
+  domain?: string | null
+}
+
+type MaybeRelation<T> = T | T[] | null | undefined
+
+type ReportBatch = {
+  id: string
+  title: string
+  status: string
+  trainer?: MaybeRelation<ProfileRef>
+}
+
+type BatchMember = {
+  batch_id: string
+  user_id: string
+  enrollment_status?: string | null
+  profile?: ProfileRef | null
+}
+
+type AttendanceRow = {
+  user_id?: string | null
+  status?: string | null
+  session?: { batch_id?: string | null } | null
+}
+
+type ProjectEvaluationRow = {
+  batch_id?: string | null
+  user_id?: string | null
+  score?: number | null
+}
+
+type TrainingAttemptRow = {
+  user_id?: string | null
+  score?: number | null
+  quizzes?: { batch_id?: string | null } | null
+}
+
+type TrainingFeedbackRow = {
+  batch_id?: string | null
+  trainer_effectiveness_rating?: number | null
+  sentiment?: string | null
+}
+
+type BatchTrainerRow = {
+  batch_id?: string | null
+  trainer?: MaybeRelation<ProfileRef>
+}
+
+type ImportedAssessmentRow = {
+  batch_id?: string | null
+  assessment_setup_id?: string | null
+  candidate_email?: string | null
+  percentage?: number | null
+  candidate_score?: number | null
+}
+
+type AssessmentSetupRow = {
+  id: string
+  batch_id?: string | null
+  title?: string | null
+  assessment_type?: string | null
+  passing_score?: number | null
+}
+
+type QuizRow = {
+  id: string
+  title: string
+  topic?: string | null
+  difficulty?: string | null
+  passing_score?: number | null
+  is_active?: boolean | null
+}
+
+type QuizAttemptSummaryRow = {
+  quiz_id: string
+  score: number | null
+}
+
+type EmployeeRow = {
+  id?: string
+  domain?: string | null
+}
+
+type GovernanceSettings = {
+  topperAssessmentWeight: number
+  topperProjectWeight: number
+  topperMinAttendance: number
+}
+
+type TrainerMetric = {
+  id: string
+  name: string
+  email: string
+  batchesCount: number
+  attendanceRate: number
+  avgScore: number
+  avgFeedback: string
+  scoreVal: number
+}
+
 export default async function ManagerReportsPage() {
   const { userId, role } = await requireManager()
 
@@ -42,11 +147,11 @@ export default async function ManagerReportsPage() {
   ])
 
   const stats = statsRes.data || { totalQuizzes: 0, totalAttempts: 0, averageScore: 0, uniqueEmployees: 0 }
-  const quizzes = quizzesRes.data || []
-  const employees = employeesRes.data || []
+  const quizzes = (quizzesRes.data || []) as QuizRow[]
+  const employees = (employeesRes.data || []) as EmployeeRow[]
 
   const accessibleBatchIds = await getAccessibleTrainingBatchIds(userId, role)
-  const { data: batches } = accessibleBatchIds.length
+  const { data: batchesData } = accessibleBatchIds.length
     ? await admin
         .from('training_batches')
         .select('id, title, status, trainer:trainer_id(id, full_name, email)')
@@ -54,7 +159,8 @@ export default async function ManagerReportsPage() {
         .order('created_at', { ascending: false })
     : { data: [] }
 
-  const batchIds = (batches || []).map((batch: any) => batch.id)
+  const batches = ((batchesData || []) as ReportBatch[]).map(normalizeReportBatch)
+  const batchIds = batches.map((batch) => batch.id)
   const [membersRes, attendanceRes, projectRes, attemptsRes, feedbackRes, batchTrainersRes, importResultsRes, assessmentSetupsRes] = await Promise.all([
     batchIds.length
       ? admin
@@ -106,52 +212,53 @@ export default async function ManagerReportsPage() {
       : Promise.resolve({ data: [] }),
   ])
 
-  const members = membersRes.data || []
-  const trainingAttendance = attendanceRes.data || []
-  const projectEvaluations = projectRes.data || []
-  const trainingAttempts = attemptsRes.data || []
-  const trainingFeedback = feedbackRes.data || []
-  const batchTrainersList = batchTrainersRes.data || []
-  const importedAssessments = importResultsRes.data || []
-  const assessmentSetups = assessmentSetupsRes.data || []
+  const members = (membersRes.data || []) as BatchMember[]
+  const trainingAttendance = (attendanceRes.data || []) as AttendanceRow[]
+  const projectEvaluations = (projectRes.data || []) as ProjectEvaluationRow[]
+  const trainingAttempts = (attemptsRes.data || []) as TrainingAttemptRow[]
+  const trainingFeedback = (feedbackRes.data || []) as TrainingFeedbackRow[]
+  const batchTrainersList = (batchTrainersRes.data || []) as BatchTrainerRow[]
+  const importedAssessments = (importResultsRes.data || []) as ImportedAssessmentRow[]
+  const assessmentSetups = (assessmentSetupsRes.data || []) as AssessmentSetupRow[]
   const statusCounts = {
-    discontinued: members.filter((member: any) => ['discontinued', 'dropped'].includes(member.enrollment_status)).length,
-    notCleared: members.filter((member: any) => member.enrollment_status === 'not_cleared').length,
-    offered: members.filter((member: any) => member.enrollment_status === 'offered').length,
-    onboarded: members.filter((member: any) => ['onboarded', 'active'].includes(member.enrollment_status)).length,
+    discontinued: members.filter((member) => ['discontinued', 'dropped'].includes(member.enrollment_status || '')).length,
+    notCleared: members.filter((member) => member.enrollment_status === 'not_cleared').length,
+    offered: members.filter((member) => member.enrollment_status === 'offered').length,
+    onboarded: members.filter((member) => ['onboarded', 'active'].includes(member.enrollment_status || '')).length,
   }
 
   const topperRows = buildTopperRows(members, trainingAttempts, projectEvaluations, trainingAttendance, importedAssessments, governance).slice(0, 10)
-  const trainerMetrics = buildTrainerMetrics(batches || [], batchTrainersList, trainingAttendance, trainingAttempts, trainingFeedback, projectEvaluations, importedAssessments)
-  const assessmentClearanceRows = buildAssessmentClearanceRows(batches || [], importedAssessments, assessmentSetups)
+  const trainerMetrics = buildTrainerMetrics(batches, batchTrainersList, trainingAttendance, trainingAttempts, trainingFeedback, projectEvaluations, importedAssessments)
+  const assessmentClearanceRows = buildAssessmentClearanceRows(batches, importedAssessments, assessmentSetups)
 
   // Get per-quiz attempt data
-  const quizIds = quizzes.map((q: any) => q.id)
-  let quizAttemptData: Record<string, { attempts: number; avgScore: number; passRate: number }> = {}
+  const quizIds = quizzes.map((quiz) => quiz.id)
+  const quizAttemptData: Record<string, { attempts: number; avgScore: number; passRate: number }> = {}
 
   if (quizIds.length > 0) {
-    const { data: attempts } = await supabase
+    const { data: attemptsData } = await supabase
       .from('quiz_attempts')
       .select('quiz_id, score, completed_at')
       .in('quiz_id', quizIds)
       .not('completed_at', 'is', null)
 
+    const attempts = (attemptsData || []) as QuizAttemptSummaryRow[]
     if (attempts) {
       for (const attempt of attempts) {
         if (!quizAttemptData[attempt.quiz_id]) {
           quizAttemptData[attempt.quiz_id] = { attempts: 0, avgScore: 0, passRate: 0 }
         }
         quizAttemptData[attempt.quiz_id].attempts++
-        quizAttemptData[attempt.quiz_id].avgScore += attempt.score
+        quizAttemptData[attempt.quiz_id].avgScore += Number(attempt.score || 0)
       }
 
       // Calculate averages and pass rates
       for (const qid of Object.keys(quizAttemptData)) {
-        const quiz = quizzes.find((q: any) => q.id === qid)
+        const quiz = quizzes.find((item) => item.id === qid)
         const passingScore = quiz?.passing_score || 70
         quizAttemptData[qid].avgScore = Math.round(quizAttemptData[qid].avgScore / quizAttemptData[qid].attempts)
 
-        const passCount = attempts.filter((a: any) => a.quiz_id === qid && a.score >= passingScore).length
+        const passCount = attempts.filter((attempt) => attempt.quiz_id === qid && Number(attempt.score || 0) >= passingScore).length
         quizAttemptData[qid].passRate = Math.round((passCount / quizAttemptData[qid].attempts) * 100)
       }
     }
@@ -160,7 +267,7 @@ export default async function ManagerReportsPage() {
   // Domain breakdown
   const domainCounts: Record<string, number> = {}
   for (const emp of employees) {
-    const domain = (emp as any).domain || 'Uncategorized'
+    const domain = emp.domain || 'Uncategorized'
     domainCounts[domain] = (domainCounts[domain] || 0) + 1
   }
 
@@ -248,11 +355,11 @@ export default async function ManagerReportsPage() {
       </Card>
 
       {/* Per-batch download section */}
-      {(batches || []).length > 0 && (
-        <TmsBatchDownloads batches={(batches || []).map((b: any) => ({ id: b.id, title: b.title, status: b.status }))} />
+      {batches.length > 0 && (
+        <TmsBatchDownloads batches={batches.map((batch) => ({ id: batch.id, title: batch.title, status: batch.status }))} />
       )}
 
-      {(batches || []).length > 0 && (
+      {batches.length > 0 && (
         <Card className="overflow-hidden border-zinc-900 bg-black text-white shadow-[0_28px_80px_rgba(0,0,0,0.32)]">
           <CardHeader className="border-b border-white/10">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -271,13 +378,13 @@ export default async function ManagerReportsPage() {
             </div>
           </CardHeader>
           <CardContent className="grid gap-3 p-5 md:grid-cols-2 xl:grid-cols-3">
-            {(batches || []).slice(0, 6).map((batch: any) => {
-              const batchFeedback = trainingFeedback.filter((item: any) => item.batch_id === batch.id)
+            {batches.slice(0, 6).map((batch) => {
+              const batchFeedback = trainingFeedback.filter((item) => item.batch_id === batch.id)
               const avgTrainer = batchFeedback.length
-                ? (batchFeedback.reduce((sum: number, item: any) => sum + Number(item.trainer_effectiveness_rating || 0), 0) / batchFeedback.length).toFixed(1)
+                ? (batchFeedback.reduce((sum, item) => sum + Number(item.trainer_effectiveness_rating || 0), 0) / batchFeedback.length).toFixed(1)
                 : '0.0'
-              const positive = batchFeedback.filter((item: any) => item.sentiment === 'positive').length
-              const negative = batchFeedback.filter((item: any) => item.sentiment === 'negative').length
+              const positive = batchFeedback.filter((item) => item.sentiment === 'positive').length
+              const negative = batchFeedback.filter((item) => item.sentiment === 'negative').length
               return (
                 <div key={batch.id} className="rounded-[1.35rem] border border-white/10 bg-white/[0.06] p-4">
                   <div className="flex items-start justify-between gap-3">
@@ -413,7 +520,12 @@ export default async function ManagerReportsPage() {
           <TrainerPerformancePanel trainers={trainerMetrics} />
           <AiInsightCard
             type="trainer_performance"
-            data={trainerMetrics.slice(0, 8).map((t: any) => ({ name: t.name, attendance: t.attendanceRate, avgScore: t.avgScore, sessions: t.sessionCount }))}
+            data={trainerMetrics.slice(0, 8).map((trainer) => ({
+              name: trainer.name,
+              attendance: trainer.attendanceRate,
+              avgScore: trainer.avgScore,
+              batches: trainer.batchesCount,
+            }))}
             label="AI Coaching Tip"
             className="mt-4"
           />
@@ -495,7 +607,7 @@ export default async function ManagerReportsPage() {
           </Card>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {quizzes.map((quiz: any) => {
+            {quizzes.map((quiz) => {
               const data = quizAttemptData[quiz.id]
               const hasAttempts = data && data.attempts > 0
               const difficultyColors: Record<string, string> = {
@@ -505,6 +617,7 @@ export default async function ManagerReportsPage() {
                 advanced: 'bg-orange-100 text-orange-700 border-orange-200',
                 hardcore: 'bg-red-100 text-red-700 border-red-200',
               }
+              const difficulty = quiz.difficulty || 'medium'
               return (
                 <Card key={quiz.id} className="flex flex-col">
                   <CardHeader className="pb-3">
@@ -513,8 +626,8 @@ export default async function ManagerReportsPage() {
                         <CardTitle className="text-base truncate">{quiz.title}</CardTitle>
                         <CardDescription className="truncate mt-0.5">{quiz.topic}</CardDescription>
                       </div>
-                      <Badge variant="outline" className={`shrink-0 text-xs ${difficultyColors[quiz.difficulty] || ''}`}>
-                        {quiz.difficulty}
+                      <Badge variant="outline" className={`shrink-0 text-xs ${difficultyColors[difficulty] || ''}`}>
+                        {difficulty}
                       </Badge>
                     </div>
                   </CardHeader>
@@ -680,20 +793,24 @@ function MetricChip({ label, value }: { label: string; value: string }) {
   )
 }
 
-function buildAssessmentClearanceRows(batches: any[], importedAssessments: any[], assessmentSetups: any[]) {
-  const setupById = new Map(assessmentSetups.map((setup: any) => [setup.id, setup]))
-  return batches.map((batch: any) => {
-    const batchResults = importedAssessments.filter((result: any) => result.batch_id === batch.id)
-    const batchSetups = assessmentSetups.filter((setup: any) => setup.batch_id === batch.id)
-    const cleared = batchResults.filter((result: any) => {
-      const setup = setupById.get(result.assessment_setup_id)
+function buildAssessmentClearanceRows(
+  batches: ReportBatch[],
+  importedAssessments: ImportedAssessmentRow[],
+  assessmentSetups: AssessmentSetupRow[],
+) {
+  const setupById = new Map(assessmentSetups.map((setup) => [setup.id, setup]))
+  return batches.map((batch) => {
+    const batchResults = importedAssessments.filter((result) => result.batch_id === batch.id)
+    const batchSetups = assessmentSetups.filter((setup) => setup.batch_id === batch.id)
+    const cleared = batchResults.filter((result) => {
+      const setup = result.assessment_setup_id ? setupById.get(result.assessment_setup_id) : undefined
       const threshold = Number(setup?.passing_score ?? 70)
       return Number(result.percentage ?? result.candidate_score ?? 0) >= threshold
     }).length
     const resultCount = batchResults.length
     const notCleared = Math.max(0, resultCount - cleared)
     const clearanceRate = resultCount ? Math.round((cleared / resultCount) * 100) : 0
-    const averageAssessmentScore = averageScore(batchResults.map((result: any) => Number(result.percentage ?? result.candidate_score ?? 0)))
+    const averageAssessmentScore = averageScore(batchResults.map((result) => Number(result.percentage ?? result.candidate_score ?? 0)))
     const signal = resultCount === 0
       ? 'Waiting for score upload.'
       : clearanceRate >= 80
@@ -717,31 +834,27 @@ function buildAssessmentClearanceRows(batches: any[], importedAssessments: any[]
 }
 
 function buildTopperRows(
-  members: any[],
-  attempts: any[],
-  projectEvaluations: any[],
-  attendance: any[],
-  importedAssessments: any[],
-  governance: {
-    topperAssessmentWeight: number
-    topperProjectWeight: number
-    topperMinAttendance: number
-  }
+  members: BatchMember[],
+  attempts: TrainingAttemptRow[],
+  projectEvaluations: ProjectEvaluationRow[],
+  attendance: AttendanceRow[],
+  importedAssessments: ImportedAssessmentRow[],
+  governance: GovernanceSettings,
 ) {
-  const memberByUser = new Map(members.map((member: any) => [member.user_id, member]))
+  const memberByUser = new Map(members.map((member) => [member.user_id, member]))
   const userIds = Array.from(memberByUser.keys())
 
   return userIds.map((userId) => {
     const profile = memberByUser.get(userId)?.profile
     const scores = [
-      ...attempts.filter((attempt: any) => attempt.user_id === userId).map((attempt: any) => Number(attempt.score || 0)),
+      ...attempts.filter((attempt) => attempt.user_id === userId).map((attempt) => Number(attempt.score || 0)),
       ...importedAssessments
-        .filter((result: any) => String(result.candidate_email || '').toLowerCase() === String(profile?.email || '').toLowerCase())
-        .map((result: any) => Number(result.percentage ?? result.candidate_score ?? 0)),
+        .filter((result) => String(result.candidate_email || '').toLowerCase() === String(profile?.email || '').toLowerCase())
+        .map((result) => Number(result.percentage ?? result.candidate_score ?? 0)),
     ]
-    const projects = projectEvaluations.filter((item: any) => item.user_id === userId).map((item: any) => Number(item.score || 0))
-    const attendanceRows = attendance.filter((item: any) => item.user_id === userId)
-    const positiveAttendance = attendanceRows.filter((item: any) => ['present', 'late'].includes(item.status)).length
+    const projects = projectEvaluations.filter((item) => item.user_id === userId).map((item) => Number(item.score || 0))
+    const attendanceRows = attendance.filter((item) => item.user_id === userId)
+    const positiveAttendance = attendanceRows.filter((item) => ['present', 'late'].includes(item.status || '')).length
     const attendanceRate = attendanceRows.length ? Math.round((positiveAttendance / attendanceRows.length) * 100) : 0
     const assessmentScore = averageScore(scores)
     const projectScore = averageScore(projects)
@@ -768,13 +881,13 @@ function buildTopperRows(
 }
 
 function buildTrainerMetrics(
-  batches: any[],
-  batchTrainersList: any[],
-  attendance: any[],
-  attempts: any[],
-  feedback: any[],
-  projectEvaluations: any[],
-  importedAssessments: any[]
+  batches: ReportBatch[],
+  batchTrainersList: BatchTrainerRow[],
+  attendance: AttendanceRow[],
+  attempts: TrainingAttemptRow[],
+  feedback: TrainingFeedbackRow[],
+  projectEvaluations: ProjectEvaluationRow[],
+  importedAssessments: ImportedAssessmentRow[],
 ) {
   const trainerMap = new Map<string, {
     id: string;
@@ -785,21 +898,33 @@ function buildTrainerMetrics(
 
   // Collect trainers from batches (lead)
   for (const b of batches) {
-    if (b.trainer) {
-      if (!trainerMap.has(b.trainer.id)) {
-        trainerMap.set(b.trainer.id, { id: b.trainer.id, name: b.trainer.full_name || b.trainer.email, email: b.trainer.email, batchIds: new Set() })
+    const trainer = firstRelation(b.trainer)
+    if (trainer?.id) {
+      if (!trainerMap.has(trainer.id)) {
+        trainerMap.set(trainer.id, {
+          id: trainer.id,
+          name: trainer.full_name || trainer.email || 'Trainer',
+          email: trainer.email || '',
+          batchIds: new Set(),
+        })
       }
-      trainerMap.get(b.trainer.id)!.batchIds.add(b.id)
+      trainerMap.get(trainer.id)!.batchIds.add(b.id)
     }
   }
 
   // Collect trainers from batchTrainersList (co-trainers)
   for (const bt of batchTrainersList) {
-    if (bt.trainer) {
-      if (!trainerMap.has(bt.trainer.id)) {
-        trainerMap.set(bt.trainer.id, { id: bt.trainer.id, name: bt.trainer.full_name || bt.trainer.email, email: bt.trainer.email, batchIds: new Set() })
+    const trainer = firstRelation(bt.trainer)
+    if (trainer?.id) {
+      if (!trainerMap.has(trainer.id)) {
+        trainerMap.set(trainer.id, {
+          id: trainer.id,
+          name: trainer.full_name || trainer.email || 'Trainer',
+          email: trainer.email || '',
+          batchIds: new Set(),
+        })
       }
-      trainerMap.get(bt.trainer.id)!.batchIds.add(bt.batch_id)
+      if (bt.batch_id) trainerMap.get(trainer.id)!.batchIds.add(bt.batch_id)
     }
   }
 
@@ -807,24 +932,24 @@ function buildTrainerMetrics(
     const bIds = Array.from(t.batchIds)
     
     // Attendance
-    const bAttendance = attendance.filter((a: any) => bIds.includes(a.session?.batch_id))
-    const positiveAtt = bAttendance.filter((a: any) => ['present', 'late'].includes(a.status)).length
+    const bAttendance = attendance.filter((item) => bIds.includes(item.session?.batch_id || ''))
+    const positiveAtt = bAttendance.filter((item) => ['present', 'late'].includes(item.status || '')).length
     const attendanceRate = bAttendance.length ? Math.round((positiveAtt / bAttendance.length) * 100) : 0
     
     // Assessment scores across quizzes, imported score sheets, and project evaluations
-    const bAttempts = attempts.filter((a: any) => bIds.includes(a.quizzes?.batch_id))
-    const bProjects = projectEvaluations.filter((item: any) => bIds.includes(item.batch_id))
-    const bImports = importedAssessments.filter((item: any) => bIds.includes(item.batch_id))
+    const bAttempts = attempts.filter((item) => bIds.includes(item.quizzes?.batch_id || ''))
+    const bProjects = projectEvaluations.filter((item) => bIds.includes(item.batch_id || ''))
+    const bImports = importedAssessments.filter((item) => bIds.includes(item.batch_id || ''))
     const scoreRows = [
-      ...bAttempts.map((a: any) => Number(a.score || 0)),
-      ...bProjects.map((item: any) => Number(item.score || 0)),
-      ...bImports.map((item: any) => Number(item.percentage ?? item.candidate_score ?? 0)),
+      ...bAttempts.map((item) => Number(item.score || 0)),
+      ...bProjects.map((item) => Number(item.score || 0)),
+      ...bImports.map((item) => Number(item.percentage ?? item.candidate_score ?? 0)),
     ]
     const avgScore = scoreRows.length ? Math.round(scoreRows.reduce((sum: number, score: number) => sum + score, 0) / scoreRows.length) : 0
     
     // Feedback rating
-    const bFeedback = feedback.filter((f: any) => bIds.includes(f.batch_id) && f.trainer_effectiveness_rating)
-    const avgFeedback = bFeedback.length ? (bFeedback.reduce((sum: number, f: any) => sum + Number(f.trainer_effectiveness_rating || 0), 0) / bFeedback.length).toFixed(1) : '0.0'
+    const bFeedback = feedback.filter((item) => bIds.includes(item.batch_id || '') && item.trainer_effectiveness_rating)
+    const avgFeedback = bFeedback.length ? (bFeedback.reduce((sum, item) => sum + Number(item.trainer_effectiveness_rating || 0), 0) / bFeedback.length).toFixed(1) : '0.0'
     
     // Total score (weighted average for sorting)
     const scoreVal = avgScore * 0.4 + attendanceRate * 0.4 + (Number(avgFeedback) * 20) * 0.2
@@ -842,3 +967,14 @@ function buildTrainerMetrics(
   return results.sort((a, b) => b.scoreVal - a.scoreVal)
 }
 
+function normalizeReportBatch(batch: ReportBatch): ReportBatch {
+  return {
+    ...batch,
+    trainer: firstRelation(batch.trainer),
+  }
+}
+
+function firstRelation<T>(relation: MaybeRelation<T>): T | null {
+  if (Array.isArray(relation)) return relation[0] || null
+  return relation || null
+}

@@ -6,14 +6,18 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run lint -- --quiet && npm run typecheck && npm run test:unit",
+    "test:all": "npm test && npm run test:smoke",
+    "test:unit": "node --experimental-strip-types --test tests/*.test.ts",
     "start": "next start",
     "cleanup:auth-user": "node --no-warnings --experimental-strip-types scripts/cleanup-orphan-auth-user-by-email.ts",
-    "test:smoke": "node scripts/browser-smoke.js",
-    "fixtures:contest": "node scripts/generate-contest-demo-fixtures.js",
-    "fixtures:tms": "node scripts/generate-tms-upload-fixtures.js",
+    "test:smoke": "node database/seeds/browser-smoke.js",
+    "fixtures:contest": "node database/seeds/generate-contest-demo-fixtures.js",
+    "fixtures:tms": "node database/seeds/generate-tms-upload-fixtures.js",
     "assets:avatars": "node scripts/generate-memoji-avatar-assets.mjs",
     "avatars:reset-employees": "node scripts/set-all-employee-avatars-to-avatar-01.mjs",
-    "test:scale": "npm run fixtures:tms -- 20000 && node scripts/validate-tms-import-scale.js 20000"
+    "test:scale": "npm run fixtures:tms -- 20000 && node database/seeds/validate-tms-import-scale.js 20000"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

@@ -9,7 +9,7 @@ import { generateAssessmentChatReply, generateLearnerRecommendation, generateMan
 import { requireManagerForApi } from '@/lib/rbac'
 import { createRequestDbClient } from '@/lib/backend/database/supabase'
 import { NextRequest, NextResponse } from 'next/server'
-import type { InsightType } from '@/lib/backend/entities/ai.entity'
+import type { InsightType, JsonLike } from '@/lib/backend/entities/ai.entity'
 
 export async function getAIStatus() {
   return NextResponse.json(getAIProviderStatus())
@@ -19,7 +19,7 @@ export async function createManagerInsight(request: NextRequest) {
   const auth = await requireManagerForApi()
   if (auth instanceof NextResponse) return auth
 
-  const { type, data } = (await request.json()) as { type: InsightType; data: any }
+  const { type, data } = (await request.json()) as { type: InsightType; data: JsonLike }
   if (!type || !data) {
     return NextResponse.json({ error: 'type and data are required' }, { status: 400 })
   }
@@ -64,15 +64,15 @@ export async function createAIChatReply(request: NextRequest) {
 
   await saveChatMessage({ sessionId: currentSessionId, role: 'user', content: message })
 
-  let loadedAssessmentResults: any[] = []
+  let loadedAssessmentResults: Record<string, unknown>[] = []
   if (!assessmentData?.length && quizId) {
     const { data } = await fetchAssessmentResultsForQuiz(quizId)
-    loadedAssessmentResults = data || []
+    loadedAssessmentResults = (data || []) as Record<string, unknown>[]
   }
 
   const result = await generateAssessmentChatReply({
     message,
-    assessmentData,
+    assessmentData: assessmentData as Record<string, unknown>[] | undefined,
     loadedAssessmentResults,
   })
 
