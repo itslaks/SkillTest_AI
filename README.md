@@ -38,10 +38,10 @@ It is built for training managers and HR teams who need **training execution evi
 
 | Role | Color | What they do |
 |------|-------|-------------|
-| 👑 Admin | 🔴 Red | Full platform control — user governance, approvals, all reports |
-| 🧑‍💼 Manager | 🟠 Orange | Create quizzes, assign employees, run analytics, review proctoring |
-| 🗂️ Training Coordinator | 🟡 Yellow | Manage batches, attendance, score uploads, feedback windows |
-| 🧑‍🏫 Trainer | 🟢 Green | Mark attendance, upload scores, submit evaluations for assigned batches |
+| Admin | Red | Full platform control: user governance, approvals, SaaS/billing/SSO setup, all reports |
+| Manager | Orange | Create and assign quizzes, manage employees, run analytics, review proctoring |
+| Training Coordinator | Yellow | Manage batches, attendance, score uploads, feedback windows, and scoped operations |
+| Trainer | Green | Use assigned training tools, create training assessments, run AI commands, review assigned risk, and update assigned learners |
 | 🧑‍🎓 Employee | 🔵 Blue | Take quizzes, earn badges, view certificates, track leaderboard |
 
 ---
@@ -313,7 +313,7 @@ npm run dev
 | `/employee/leaderboard` | Live + cumulative rankings |
 | `/employee/training` | Assigned training batches |
 
-### 🟠 Manager
+### Manager / Training Staff Console
 | Route | What it is |
 |-------|-----------|
 | `/manager/quizzes` | Quiz management (create, edit, assign) |
@@ -324,6 +324,8 @@ npm run dev
 | `/manager/operations` | Training batch management |
 | `/manager/reports` | Excel / PDF report downloads |
 | `/manager/compliance` | BRD evidence workbook |
+
+Quick Access in the sidebar intentionally repeats high-frequency routes such as Quiz Studio, AI Commands, Risk Center, and Employees. Visibility does not mean identical permissions: RBAC still scopes what each role can read or change.
 
 ### 🟡 Auth
 | Route | What it is |
@@ -336,17 +338,24 @@ npm run dev
 
 ## 🔐 Roles & Permissions
 
-| Area | 🔴 Admin | 🟠 Manager | 🟡 Coordinator | 🟢 Trainer | 🔵 Employee |
-|------|---------|-----------|---------------|-----------|------------|
-| User management | ✅ Full | ❌ | ❌ | ❌ | ❌ |
-| Quiz create/edit | ✅ | ✅ | ❌ | ❌ | ❌ |
-| Assign quizzes | ✅ | ✅ | ❌ | ❌ | ❌ |
-| Take quizzes | ❌ | ❌ | ❌ | ❌ | ✅ |
-| Proctoring review | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Training batches | ✅ | ✅ | ✅ | Assigned only | ❌ |
-| Attendance | ✅ | ✅ | ✅ | Assigned only | ❌ |
-| Reports | ✅ All | ✅ Scoped | ✅ Scoped | ❌ | ❌ |
-| Proctoring evidence | ✅ | ✅ | ✅ | ❌ | ❌ Never |
+RBAC is enforced by server actions, API guards, database policies, and scoped queries. Some roles see the same page names in Quick Access, but the available data and allowed actions are different.
+
+| Area | Admin | Manager | Coordinator | Trainer | Employee |
+|------|-------|---------|-------------|---------|----------|
+| Admin console / role governance | Full | No | No | No | No |
+| User management | Full | Scoped employee operations | Scoped operations | Assigned learners only | No |
+| Quiz Studio / create assessments | Full | Yes | Yes, training scope | Yes, training scope | No |
+| Edit/delete quizzes | Full | Own/scoped | Own/scoped | Own/scoped | No |
+| Assign quizzes | Full | Yes | Scoped | Assigned batch scope | No |
+| AI Commands | Full | Yes | Yes, scoped | Yes, scoped | No |
+| Risk Center / integrity review | Full | Scoped | Scoped | Assigned quizzes/batches only | No |
+| Training batches | Full | Scoped | Scoped | Assigned only | Assigned learner view |
+| Attendance | Full | Scoped | Scoped | Assigned only | No |
+| Reports | All | Scoped | Scoped | Assigned/scoped training data | No |
+| Proctoring evidence | Full | Scoped | Scoped | Assigned review scope | Never |
+| Billing, tenant, SSO settings | Full | No | No | No | No |
+
+Admin is the only unrestricted governance role. Manager, coordinator, and trainer share parts of the manager console for speed, but trainer access is limited to assigned batches, own/scoped quizzes, assigned learners, and assigned integrity evidence.
 
 ---
 
