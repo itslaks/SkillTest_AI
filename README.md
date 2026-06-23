@@ -132,7 +132,7 @@ SkillTest_AI/
 │   └── rbac.ts                ← Role access control
 │
 ├── 📂 database/               🟢 DATABASE — All SQL and seed files
-│   ├── migrations/            ← 001-048 sequential schema migrations
+│   ├── migrations/            ← 001-050 sequential schema migrations
 │   ├── seeds/                 ← Seed data and fixture generators
 │   └── fixes/                 ← One-off patches (already applied)
 │

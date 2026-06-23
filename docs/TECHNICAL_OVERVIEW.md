@@ -61,7 +61,7 @@ SkillTest_AI: Mavericks Execution Platform is a Next.js training management and 
 | `lib/domain-options.ts` | Shared domain/vertical list |
 | `lib/avatar-options.ts` | 15 built-in Three.js 3D avatar preset IDs |
 | `components/avatar/` | Three.js avatar renderer, preset picker, and avatar view wrapper |
-| `database/migrations/` | Supabase SQL migrations 001-048 (run in order) |
+| `database/migrations/` | Supabase SQL migrations 001-050 (run in order) |
 | `database/seeds/` | Seed data and fixture generators |
 | `database/fixes/` | One-off SQL patches (already applied) |
 
@@ -179,8 +179,10 @@ Run SQL scripts in `scripts/` in numeric order. Current latest migration is:
 | `046_ai_command_operations_copilot.sql` | Adds AI command operations copilot persistence |
 | `047_notification_health_and_reminder_types.sql` | Adds notification health and reminder classification fields |
 | `048_feedback_admin_review_workflow.sql` | Adds feedback review workflow support |
+| `049_saas_tenant_billing_sso_foundation.sql` | Adds organizations, memberships, domains, org settings, billing subscriptions, SSO connections, and nullable organization links |
+| `050_proctoring_validation_program.sql` | Adds real-device proctoring validation study/run tables with false-positive and false-negative tracking |
 
-If `030` is already executed, continue with every later migration in numeric order through `048`. It is safe to run `031` again because it uses conflict update, and the proctoring migrations are designed to be rerunnable for staging validation.
+If `030` is already executed, continue with every later migration in numeric order through `050`. It is safe to run `031` again because it uses conflict update, and the proctoring migrations are designed to be rerunnable for staging validation.
 
 ## Verification
 

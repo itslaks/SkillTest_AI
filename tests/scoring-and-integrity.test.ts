@@ -12,6 +12,7 @@ import {
   getProctoringRiskLevel,
   shouldAutoSubmitForIntegrity,
 } from '../lib/proctoring.ts'
+import { summarizeProctoringValidation } from '../lib/proctoring-validation.ts'
 import type { ProctoringEvent } from '../lib/types/database.ts'
 
 test('averageScore ignores nullish and non-finite values', () => {
@@ -74,6 +75,24 @@ test('proctoring auto-submit triggers on violation count, critical risk, or repe
     event('multiple_faces'),
   ], 1), true)
   assert.equal(shouldAutoSubmitForIntegrity([event('tab-hidden')], 1), false)
+})
+
+test('proctoring validation summary reports precision and recall', () => {
+  assert.deepEqual(
+    summarizeProctoringValidation([
+      { expectedViolation: true, observedViolation: true },
+      { expectedViolation: true, observedViolation: false },
+      { expectedViolation: false, observedViolation: true },
+      { expectedViolation: false, observedViolation: false },
+    ]),
+    {
+      totalRuns: 4,
+      falsePositives: 1,
+      falseNegatives: 1,
+      precision: 50,
+      recall: 50,
+    },
+  )
 })
 
 function event(type: ProctoringEvent['type']): ProctoringEvent {
