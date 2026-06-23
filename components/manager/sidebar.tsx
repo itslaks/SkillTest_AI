@@ -137,7 +137,7 @@ function canShowNavItem(item: { href: string }, role: Profile['role'] | undefine
   const itemPath = getNavItemPath(item)
 
   if (role === 'trainer') {
-    return ['/manager', '/manager/operations', '/manager/docs', '/manager/quizzes', '/manager/employees', '/manager/integrity', '/manager/notifications', '/manager/leaderboard', '/manager/reports', '/profiles'].includes(itemPath)
+    return ['/manager', '/manager/operations', '/manager/docs', '/manager/quizzes', '/manager/quizzes/new', '/manager/ai-command', '/manager/employees', '/manager/integrity', '/manager/notifications', '/manager/leaderboard', '/manager/reports', '/profiles'].includes(itemPath)
   }
 
   if (itemPath === '/manager/admin') return role === 'admin'
