@@ -89,6 +89,7 @@ The command chatbot is intentionally conservative:
 - It uses `analyzeAttemptPattern()` for behavioral analysis when an employee+quiz attempt is found.
 - It uses AI only after deterministic handlers cannot answer the question.
 - It parses quiz-creation commands before generic chat, so prompts like `Create quiz on LLM, difficulty medium and assign it to Ram` produce a structured quiz title, topic, difficulty, generated questions, and assignment when the employee matches.
+- Admin quiz creation requires complete command details before a mutation preview is created: topic, assignees/team, difficulty, question count, passing score, time limit, certificate threshold or disabled certificate decision, and AI proctoring enabled/disabled. Missing details return a clarification prompt; completed commands still require Confirm before execution.
 - AI prompts are instructed to use only supplied database context and keep responses under 60 words.
 - If exact data is not loaded or not found, it says so instead of inventing.
 - The UI hides internal scope, answer-mode, fallback, and provider labels so managers see polished admin insights only.
@@ -101,8 +102,8 @@ Examples it should handle:
 | `average score of rag quiz` | Returns computed average from completed attempts |
 | `certificate eligible employees` | Shows missing eligible certificates from enabled rules and completed attempts |
 | `weakest topic` | Returns lowest average topic from loaded attempts |
-| `Create quiz on LLM, difficulty medium and assign it to Ram` | Creates a structured `LLM Assessment`, generates questions, and assigns matching employee Ram |
-| `Generate 15 hard SQL questions for the Data Engineering team` | Creates a structured `SQL Assessment`, generates 15 hard questions, and assigns matching team/domain employees |
+| `Create quiz on LLM, difficulty medium and assign it to Ram` | Asks for missing passing score, time limit, certificate, proctoring, and question-count details before preview |
+| `Generate 15 hard SQL questions for the Data Engineering team passing_score=70 time_limit_minutes=30 certificate_min_score=70 proctoring_required=true` | Creates a confirmation preview for a structured `SQL Assessment`; execution happens only after Confirm |
 
 ## AI Proctoring Architecture
 

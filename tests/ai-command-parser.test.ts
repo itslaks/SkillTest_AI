@@ -8,7 +8,7 @@ import {
 } from '../lib/ai-command-parser.ts'
 
 test('AI Command understands broken-English quiz creation prompts', () => {
-  const command = resolveAdminCommand('plz make hard python quiz 12 mcq give to Ram by tomorrow')
+  const command = resolveAdminCommand('plz make hard python quiz 12 mcq give to Ram by tomorrow enable AI proctoring certificate above 20%')
 
   assert.equal(command?.action, 'create quiz')
   assert.equal(command?.source, 'natural')
@@ -18,6 +18,8 @@ test('AI Command understands broken-English quiz creation prompts', () => {
   assert.equal(command?.args.question_count, '12')
   assert.equal(command?.args.assigned_to, 'Ram')
   assert.equal(command?.args.due_date, 'tomorrow')
+  assert.equal(command?.args.proctoring_required, 'true')
+  assert.equal(command?.args.certificate_min_score, '20')
 })
 
 test('AI Command extracts loose quiz details without requiring perfect grammar', () => {
@@ -29,6 +31,20 @@ test('AI Command extracts loose quiz details without requiring perfect grammar',
   assert.equal(intent.difficulty, 'medium')
   assert.equal(intent.passing_score, '75')
   assert.equal(intent.due_date, 'friday')
+})
+
+test('AI Command extracts complete natural quiz command with multi-name assignment', () => {
+  const command = resolveAdminCommand('create quiz on the topic of sql window functions and assign it to lakshan, bala aditya, ashutosh assign certificate if the employee score more than 20%, 10 questions should be created in hard difficulty and enable AI proctoring')
+
+  assert.equal(command?.action, 'create quiz')
+  assert.equal(command?.args.topic, 'sql window functions')
+  assert.equal(command?.args.title, 'sql window functions Assessment')
+  assert.equal(command?.args.assigned_to, 'lakshan, bala aditya, ashutosh')
+  assert.equal(command?.args.question_count, '10')
+  assert.equal(command?.args.difficulty, 'hard')
+  assert.equal(command?.args.certificate_enabled, 'true')
+  assert.equal(command?.args.certificate_min_score, '20')
+  assert.equal(command?.args.proctoring_required, 'true')
 })
 
 test('AI Command keeps explicit admin command key-values intact', () => {

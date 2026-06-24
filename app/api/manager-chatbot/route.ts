@@ -63,6 +63,24 @@ export async function POST(request: NextRequest) {
     if (auth.role !== 'admin') {
       return NextResponse.json({ error: 'AI Command mutations require admin access.' }, { status: 403 })
     }
+    const clarification = buildCommandClarification(adminCommand)
+    if (clarification) {
+      await logAiCommand(admin, {
+        userId: auth.userId,
+        role: auth.role,
+        originalPrompt: message,
+        detectedIntent: 'OPERATIONAL_ACTION',
+        actionType: adminCommand.action,
+        actionStatus: 'previewed',
+        resultSummary: `Clarification required before ${adminCommand.action}: ${clarification.missingLabels.join(', ')}.`,
+        metadata: { command: adminCommand, missingFields: clarification.missingFields },
+      })
+      return NextResponse.json({
+        message: clarification.message,
+        provider: 'skilltest_ai_clarification',
+        clarification,
+      })
+    }
     const preview = await createActionPreview(admin, auth, message, adminCommand)
     return NextResponse.json({
       message: preview.error ? `Command failed: ${preview.error}` : preview.message,
@@ -591,6 +609,65 @@ async function executePendingAction(admin: ReturnType<typeof createAdminClient>,
   return result
 }
 
+function buildCommandClarification(command: ParsedCommand) {
+  if (command.action !== 'create quiz') return null
+  const args = command.args || {}
+  const missing: Array<{ field: string; label: string; example: string }> = []
+  const hasAssignmentTarget = Boolean(args.assigned_to || args.assigned_employee || args.employee || args.email || args.department || args.team)
+  const hasCertificateDecision = args.certificate_enabled === 'false'
+    || args.no_certificate === 'true'
+    || Boolean(args.certificate_min_score || args.certificate_score || args.certificate_threshold)
+  const hasProctoringDecision = args.proctoring_required === 'true' || args.proctoring_required === 'false'
+    || args.ai_proctoring === 'true' || args.ai_proctoring === 'false'
+
+  if (!args.topic && !args.domain) missing.push({ field: 'topic', label: 'quiz topic', example: 'topic=Java collections' })
+  if (!args.question_count && !args.questions) missing.push({ field: 'question_count', label: 'number of questions', example: 'question_count=10' })
+  if (!args.difficulty) missing.push({ field: 'difficulty', label: 'difficulty', example: 'difficulty=hard' })
+  if (!args.passing_score) missing.push({ field: 'passing_score', label: 'passing score', example: 'passing_score=70' })
+  if (!hasAssignmentTarget) missing.push({ field: 'assigned_to', label: 'assignee employee(s) or team', example: 'assigned_to=lakshan,bala aditya,ashutosh' })
+  if (!args.time_limit_minutes && !args.time_limit && !args.duration) missing.push({ field: 'time_limit_minutes', label: 'time limit', example: 'time_limit_minutes=30' })
+  if (!hasCertificateDecision) missing.push({ field: 'certificate_min_score', label: 'certificate rule', example: 'certificate_min_score=20 or certificate_enabled=false' })
+  if (!hasProctoringDecision) missing.push({ field: 'proctoring_required', label: 'AI proctoring decision', example: 'proctoring_required=true' })
+
+  if (!missing.length) return null
+
+  const known = [
+    args.topic || args.domain ? `topic=${args.topic || args.domain}` : '',
+    args.question_count || args.questions ? `question_count=${args.question_count || args.questions}` : '',
+    args.difficulty ? `difficulty=${args.difficulty}` : '',
+    args.passing_score ? `passing_score=${args.passing_score}` : '',
+    hasAssignmentTarget ? `assigned_to=${args.assigned_to || args.assigned_employee || args.employee || args.email || args.department || args.team}` : '',
+    args.time_limit_minutes || args.time_limit || args.duration ? `time_limit_minutes=${args.time_limit_minutes || args.time_limit || args.duration}` : '',
+    hasCertificateDecision ? `certificate_min_score=${args.certificate_min_score || args.certificate_score || args.certificate_threshold || 'disabled'}` : '',
+    hasProctoringDecision ? `proctoring_required=${args.proctoring_required || args.ai_proctoring}` : '',
+  ].filter(Boolean)
+
+  const example = [
+    `create quiz on ${args.topic || args.domain || 'Java'}`,
+    hasAssignmentTarget ? `assign to ${args.assigned_to || args.assigned_employee || args.employee || args.email || args.department || args.team}` : 'assign to lakshan, bala aditya, ashutosh',
+    args.difficulty ? `${args.difficulty} difficulty` : 'hard difficulty',
+    `${args.question_count || args.questions || 10} questions`,
+    `passing_score=${args.passing_score || 70}`,
+    `time_limit_minutes=${args.time_limit_minutes || args.time_limit || args.duration || 30}`,
+    hasCertificateDecision ? `certificate_min_score=${args.certificate_min_score || args.certificate_score || args.certificate_threshold || 'disabled'}` : 'certificate_min_score=20',
+    hasProctoringDecision ? `proctoring_required=${args.proctoring_required || args.ai_proctoring}` : 'proctoring_required=true',
+  ].join(' ')
+
+  return {
+    missingFields: missing.map((item) => item.field),
+    missingLabels: missing.map((item) => item.label),
+    knownFields: known,
+    message: [
+      'I can prepare that quiz, but I need a few details before I create the confirmation preview.',
+      `Missing: ${missing.map((item) => item.label).join(', ')}.`,
+      known.length ? `Already understood: ${known.join(', ')}.` : '',
+      'Reply with the missing details, for example:',
+      example,
+      'After that I will show a confirmation preview; nothing will be created or assigned until you confirm.',
+    ].filter(Boolean).join('\n'),
+  }
+}
+
 async function createActionPreview(
   admin: ReturnType<typeof createAdminClient>,
   auth: { userId: string; role: string },
@@ -681,7 +758,7 @@ async function describeAdminCommandImpact(admin: ReturnType<typeof createAdminCl
 
   if (action.includes('quiz') || action.includes('question')) {
     const quiz = await findQuizByArgs(admin, args)
-    const affectedEmails = splitList(args.employee_emails || args.employees || args.email)
+    const affectedEmails = splitList(args.employee_emails || args.employees || args.email || args.assigned_to || args.assigned_employee || args.employee)
     return {
       summary: `${action}${quiz ? ` "${quiz.title}"` : ''}${affectedEmails.length ? ` for ${affectedEmails.length} employee(s)` : ''}`,
       affectedEntityType: action.includes('assign') ? 'quiz_assignment' : 'quiz',
@@ -1054,6 +1131,8 @@ async function createQuizCommand(admin: ReturnType<typeof createAdminClient>, ac
   if (!title || !topic) return { error: 'Use: run create quiz title="..." topic="..." difficulty=medium question_count=10 passing_score=70' }
   const questionCount = clampNumber(Number(args.question_count || args.questions || 10), 1, 50, 10)
   const difficulty = normalizeDifficultyArg(args.difficulty)
+  const passingScore = clampNumber(Number(args.passing_score || 70), 0, 100, 70)
+  const proctoringRequired = parseBooleanArg(args.proctoring_required || args.ai_proctoring, false)
   const payload = {
     title,
     topic,
@@ -1061,7 +1140,8 @@ async function createQuizCommand(admin: ReturnType<typeof createAdminClient>, ac
     difficulty,
     question_count: questionCount,
     time_limit_minutes: clampNumber(Number(args.time_limit || args.time_limit_minutes || args.duration || 30), 1, 480, 30),
-    passing_score: clampNumber(Number(args.passing_score || 70), 0, 100, 70),
+    passing_score: passingScore,
+    proctoring_required: proctoringRequired,
     status: args.status || 'active',
     is_active: (args.status || 'active') !== 'draft' && (args.status || 'active') !== 'archived',
     created_by: actorId,
@@ -1079,7 +1159,7 @@ async function createQuizCommand(admin: ReturnType<typeof createAdminClient>, ac
   })
 
   let assignmentMessage = ''
-  const assignee = args.assigned_to || args.assigned_employee || args.employee || args.name || args.email
+  const assignee = args.assigned_to || args.assigned_employee || args.employee || args.email
   const dueDate = normalizeNaturalDueDate(args.due_date)
   if (assignee) {
     const assigned = await assignQuizToNaturalAssignee(admin, actorId, data.id, assignee, dueDate)
@@ -1089,10 +1169,28 @@ async function createQuizCommand(admin: ReturnType<typeof createAdminClient>, ac
     assignmentMessage = assigned.error ? ` Assignment skipped: ${assigned.error}` : ` Assigned to ${assigned.count} employee(s).`
   }
 
+  let certificateMessage = ''
+  const certificateEnabled = args.certificate_enabled !== 'false'
+    && (args.certificate_enabled === 'true' || Boolean(args.certificate_min_score || args.certificate_score || args.certificate_threshold))
+  if (certificateEnabled) {
+    const minScore = clampNumber(Number(args.certificate_min_score || args.certificate_score || args.certificate_threshold || passingScore), 0, 100, passingScore)
+    const { error: certificateError } = await admin.from('certificate_rules').upsert({
+      quiz_id: data.id,
+      enabled: true,
+      min_score: minScore,
+      title: args.certificate_title || 'Certificate of Achievement',
+      certificate_name: args.certificate_name || `${data.title} Certificate`,
+      message: args.certificate_message || null,
+      created_by: actorId,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'quiz_id' })
+    certificateMessage = certificateError ? ` Certificate rule skipped: ${certificateError.message}` : ` Certificate rule enabled at ${minScore}%.`
+  }
+
   revalidateManagerPaths()
   return {
-    message: `Quiz "${data.title}" created with ${generation.count} ${generation.method} question(s).${assignmentMessage}`,
-    data: { ...data, generated_questions: generation.count, generation_method: generation.method },
+    message: `Quiz "${data.title}" created with ${generation.count} ${generation.method} question(s). AI proctoring ${proctoringRequired ? 'enabled' : 'disabled'}.${certificateMessage}${assignmentMessage}`,
+    data: { ...data, generated_questions: generation.count, generation_method: generation.method, proctoring_required: proctoringRequired },
   }
 }
 
@@ -1550,6 +1648,14 @@ function splitList(value: string | undefined) {
   return (value || '').split(',').map((item) => item.trim()).filter(Boolean)
 }
 
+function parseBooleanArg(value: string | undefined, fallback: boolean) {
+  if (value === undefined) return fallback
+  const normalized = normalize(value)
+  if (['true', 'yes', 'y', 'on', 'enable', 'enabled', 'required'].includes(normalized)) return true
+  if (['false', 'no', 'n', 'off', 'disable', 'disabled', 'optional'].includes(normalized)) return false
+  return fallback
+}
+
 function clampNumber(value: number, min: number, max: number, fallback: number) {
   if (!Number.isFinite(value)) return fallback
   return Math.min(max, Math.max(min, Math.round(value)))
@@ -1697,6 +1803,21 @@ async function assignQuizToNaturalAssignee(
   assignee: string,
   dueDate?: string,
 ) {
+  const assigneeItems = splitList(assignee)
+  if (assigneeItems.length > 1) {
+    let count = 0
+    const errors: string[] = []
+    for (const item of assigneeItems) {
+      const result = await assignQuizToNaturalAssignee(admin, actorId, quizId, item, dueDate)
+      count += result.count || 0
+      if (result.error) errors.push(result.error)
+    }
+    return {
+      error: count ? undefined : errors.join(' '),
+      count,
+    }
+  }
+
   const emails = splitList(assignee).filter((item) => item.includes('@'))
   let employees: any[] | null = null
   if (emails.length) {

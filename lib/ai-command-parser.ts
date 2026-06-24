@@ -288,22 +288,40 @@ export function extractQuizCreationIntent(text: string) {
   const passing = lower.match(/\b(?:passing|pass)\s*(?:score|mark)?\s*(?:is|=|:)?\s*(\d{1,3})\b/)?.[1]
   if (passing) args.passing_score = passing
 
-  const due = text.match(/\b(?:due|by|before)\s+(.+?)(?:,|\.|$)/i)?.[1]?.trim()
+  const certificateScore = lower.match(/\b(?:assign|issue|enable|grant)?\s*(?:a\s+)?certificates?\b.*?\b(?:score|scores|scoring|more than|above|over|at least|>=)\s*(\d{1,3})\s*%?/)?.[1]
+    || lower.match(/\bcertificates?\b.*?\b(\d{1,3})\s*%/)?.[1]
+  if (certificateScore) {
+    args.certificate_enabled = 'true'
+    args.certificate_min_score = certificateScore
+  } else if (/\b(?:assign|issue|enable|grant)?\s*(?:a\s+)?certificates?\b/i.test(text)) {
+    args.certificate_enabled = 'true'
+  } else if (/\b(?:no|without|disable)\s+certificates?\b/i.test(text)) {
+    args.certificate_enabled = 'false'
+  }
+
+  if (/\b(?:enable|with|use|required?)\s+(?:ai\s+)?proctoring\b/i.test(text) || /\bproctored\b/i.test(text)) {
+    args.proctoring_required = 'true'
+  } else if (/\b(?:no|without|disable)\s+(?:ai\s+)?proctoring\b/i.test(text)) {
+    args.proctoring_required = 'false'
+  }
+
+  const due = text.match(/\b(?:due|by|before)\s+(.+?)(?:\s+(?:assign|issue|grant|enable|disable|with|without|certificates?|if|when|where)\b|,|\.|$)/i)?.[1]?.trim()
   if (due) args.due_date = due
 
   const department = text.match(/\bfor\s+(.+?)\s+(?:team|department)\b/i)?.[1]?.trim()
   if (department) args.department = cleanEntity(department)
 
-  const assigned = text.match(/\b(?:assign(?:ed)?|give|send)\s+(?:it\s+|quiz\s+|assessment\s+)?to\s+(.+?)(?:\s+(?:due|by|before)\b|,|\.|$)/i)?.[1]?.trim()
+  const assigned = text.match(/\b(?:assign(?:ed)?|give|send)\s+(?:it\s+|quiz\s+|assessment\s+)?to\s+(.+?)(?:\s+(?:assign|issue|grant|enable|disable|with|without|certificates?|if|when|where|due|by|before)\b|\.|$)/i)?.[1]?.trim()
     || text.match(/\bfor\s+([A-Z][\w .'-]{1,60})(?:\s+(?:due|by|before)\b|,|\.|$)/)?.[1]?.trim()
-  if (assigned && !/\b(team|department)\b/i.test(assigned)) args.assigned_to = cleanEntity(assigned)
+  if (assigned && !/\b(team|department)\b/i.test(assigned)) args.assigned_to = cleanAssigneeList(assigned)
 
   const topicPatterns = [
-    /\b(?:create|add|make|build|prepare)\s+(?:a\s+|an\s+)?(?:easy|medium|hard|advanced|hardcore)?\s*(?:quiz|assessment|test)\s+(?:on|about|for)\s+(.+?)(?:\s*,|\s+difficulty\b|\s+and\s+(?:assign|give)\b|\s+for\s+[A-Z]|\s+(?:due|by|before)\b|$)/i,
+    /\b(?:create|add|make|build|prepare)\s+(?:a\s+|an\s+)?(?:easy|medium|hard|advanced|hardcore)?\s*(?:quiz|assessment|test)\s+(?:on|about|for)\s+(?:the\s+)?(?:topic\s+)?(?:of\s+)?(.+?)(?:\s*,|\s+difficulty\b|\s+and\s+(?:assign|give|send|enable|issue|grant)\b|\s+assign\b|\s+enable\b|\s+for\s+[A-Z]|\s+(?:due|by|before)\b|$)/i,
+    /\btopic\s+(?:of|on|about|for)?\s+(.+?)(?:\s*,|\s+difficulty\b|\s+and\s+(?:assign|give|send|enable|issue|grant)\b|\s+assign\b|\s+enable\b|\s+(?:due|by|before)\b|$)/i,
     /\b(?:create|add|make|build|prepare)\s+(?:a\s+|an\s+)?(?:easy|medium|hard|advanced|hardcore)?\s*(.+?)\s+(?:quiz|assessment|test)\b/i,
     /\bgenerate\s+(?:\d{1,3}\s*)?(?:easy|medium|hard|advanced|hardcore)?\s*(.+?)\s+(?:questions?|mcqs?|mcq|qs)\b/i,
-    /\bgenerate\s+(?:\d{1,3}\s*)?(?:questions?|mcqs?|mcq|qs)\s+(?:on|about|for)\s+(.+?)(?:\s*,|\s+difficulty\b|\s+and\s+(?:assign|give)\b|\s+(?:due|by|before)\b|$)/i,
-    /\b(?:quiz|assessment|test)\s+(?:on|about|for)\s+(.+?)(?:\s*,|\s+difficulty\b|\s+and\s+(?:assign|give)\b|\s+(?:due|by|before)\b|$)/i,
+    /\bgenerate\s+(?:\d{1,3}\s*)?(?:questions?|mcqs?|mcq|qs)\s+(?:on|about|for)\s+(.+?)(?:\s*,|\s+difficulty\b|\s+and\s+(?:assign|give|send|enable|issue|grant)\b|\s+(?:due|by|before)\b|$)/i,
+    /\b(?:quiz|assessment|test)\s+(?:on|about|for)\s+(.+?)(?:\s*,|\s+difficulty\b|\s+and\s+(?:assign|give|send|enable|issue|grant)\b|\s+(?:due|by|before)\b|$)/i,
   ]
   for (const pattern of topicPatterns) {
     const topic = text.match(pattern)?.[1]?.trim()
@@ -323,6 +341,10 @@ export function extractQuizCreationIntent(text: string) {
 
 export function cleanTopic(value: string) {
   return cleanEntity(value)
+    .replace(/^topic\s+(?:of|on|about|for)\s+/i, '')
+    .replace(/\b(?:assign|issue|grant|enable|disable)\b.*$/i, '')
+    .replace(/\b(?:with|without)\s+(?:ai\s+)?proctoring\b.*$/i, '')
+    .replace(/\bcertificates?\b.*$/i, '')
     .replace(/\b\d{1,3}\s*(?:questions?|mcqs?|mcq|qs)\b/ig, '')
     .replace(/\b(?:passing|pass)\s*(?:score|mark)?\s*(?:is|=|:)?\s*\d{1,3}\b/ig, '')
     .replace(/\b\d{1,3}\s*(?:minutes?|mins?|min)\b/ig, '')
@@ -331,6 +353,20 @@ export function cleanTopic(value: string) {
     .replace(/\b(?:quiz|assessment|test|questions?|mcqs?|mcq|qs)\b/ig, '')
     .trim()
     .replace(/\s+/g, ' ')
+}
+
+export function cleanAssigneeList(value: string) {
+  return value
+    .replace(/^["']|["']$/g, '')
+    .replace(/\b(?:assign|issue|grant|enable|disable)\b.*$/i, '')
+    .replace(/\b(?:with|without)\s+(?:ai\s+)?proctoring\b.*$/i, '')
+    .replace(/\bcertificates?\b.*$/i, '')
+    .replace(/\bif\b.*$/i, '')
+    .replace(/\s+(?:and|&)\s+/ig, ', ')
+    .replace(/^(the|a|an)\s+/i, '')
+    .replace(/\s*,\s*/g, ', ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 export function cleanEntity(value: string) {

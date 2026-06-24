@@ -43,7 +43,7 @@ const commandTemplates = [
   },
   {
     label: 'Create quiz',
-    command: 'run create quiz title="Java Basics" topic=Java difficulty=medium question_count=10 passing_score=70',
+    command: 'run create quiz title="Java Basics" topic=Java difficulty=medium question_count=10 passing_score=70 time_limit_minutes=30 assigned_to=person@company.com certificate_min_score=70 proctoring_required=true',
   },
   {
     label: 'Delete quiz',

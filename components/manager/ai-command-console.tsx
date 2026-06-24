@@ -73,7 +73,7 @@ const commandPacks = [
     title: 'Quizzes',
     icon: FileQuestion,
     prompts: [
-      'run create quiz title="Java Basics" topic=Java difficulty=medium question_count=10 passing_score=70',
+      'run create quiz title="Java Basics" topic=Java difficulty=medium question_count=10 passing_score=70 time_limit_minutes=30 assigned_to=person@company.com certificate_min_score=70 proctoring_required=true',
       'run update quiz title="Java Basics" passing_score=80 time_limit=45',
       'run create question quiz="Java Basics" question="Which keyword creates a class?" option_a=class option_b=function option_c=let option_d=return correct_answer=A',
       'run assign quiz quiz="Java Basics" employee_emails=person@company.com due_date=2026-06-30',
