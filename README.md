@@ -399,6 +399,7 @@ Private. All rights reserved.
 |------|--------|
 | AI Command | Added confirmation previews, audit logs, CSV/PDF chat exports, saved templates, schedule storage, scoped data access, and recent-command history. |
 | AI Command | Quiz creation prompts now require complete compliance details before preview: assignees/team, difficulty, question count, passing score, time limit, certificate rule, and AI proctoring decision. |
+| AI Command | Added a numbered Quiz Launchpad for create-and-assign or existing-quiz assignment, with searchable bulk recipients, rule controls, review, and confirmation preview. |
 | AI Command | Parser moved into a tested library and now handles broken-English quiz prompts such as "plz make hard python quiz 12 mcq give to Ram by tomorrow". |
 | Readiness | Quiz readiness and predicted score now use direct topic history, related domain evidence, difficulty, recency, streak, and training tenure. The UI shows confidence and evidence count so predictions are not presented as random values. |
 | AI Command | Admin AI Command can shortlist candidates for role openings such as Java, RAG/data engineering, cloud, frontend, AI, and testing using assessment evidence, domain fit, credentials, attendance, and recency. |
@@ -424,6 +425,7 @@ Core behavior:
 - Data-quality scans flag duplicate emails, missing domains, invalid employee IDs, and orphan references.
 - Manager dashboard includes a daily AI briefing card for quick action routing.
 - Quiz creation commands ask for missing details before preview if the admin omits assignees/team, difficulty, question count, passing score, time limit, certificate threshold/disabled decision, or AI proctoring setting.
+- The full console provides a four-step Quiz Launchpad (`Quiz`, `People`, `Rules`, `Review`) so admins do not need to type command syntax.
 - Any data-changing or message-sending action creates a server-side preview first.
 - Confirm / Cancel is required before employee deletes, quiz assignments, reminders, schedule creation, and other operational mutations execute.
 - Pending confirmations expire after 15 minutes and cannot be confirmed by another user.

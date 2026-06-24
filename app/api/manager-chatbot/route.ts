@@ -614,7 +614,7 @@ function buildCommandClarification(command: ParsedCommand) {
   if (command.action !== 'create quiz') return null
   const args = command.args || {}
   const missing: Array<{ field: string; label: string; example: string }> = []
-  const hasAssignmentTarget = Boolean(args.assigned_to || args.assigned_employee || args.employee || args.email || args.department || args.team)
+  const hasAssignmentTarget = Boolean(args.assigned_to || args.assigned_employee || args.employee || args.email || args.employee_emails || args.employees || args.department || args.team)
   const hasCertificateDecision = args.certificate_enabled === 'false'
     || args.no_certificate === 'true'
     || Boolean(args.certificate_min_score || args.certificate_score || args.certificate_threshold)
@@ -637,7 +637,7 @@ function buildCommandClarification(command: ParsedCommand) {
     args.question_count || args.questions ? `question_count=${args.question_count || args.questions}` : '',
     args.difficulty ? `difficulty=${args.difficulty}` : '',
     args.passing_score ? `passing_score=${args.passing_score}` : '',
-    hasAssignmentTarget ? `assigned_to=${args.assigned_to || args.assigned_employee || args.employee || args.email || args.department || args.team}` : '',
+    hasAssignmentTarget ? `assigned_to=${args.assigned_to || args.assigned_employee || args.employee || args.email || args.employee_emails || args.employees || args.department || args.team}` : '',
     args.time_limit_minutes || args.time_limit || args.duration ? `time_limit_minutes=${args.time_limit_minutes || args.time_limit || args.duration}` : '',
     hasCertificateDecision ? `certificate_min_score=${args.certificate_min_score || args.certificate_score || args.certificate_threshold || 'disabled'}` : '',
     hasProctoringDecision ? `proctoring_required=${args.proctoring_required || args.ai_proctoring}` : '',
@@ -645,7 +645,7 @@ function buildCommandClarification(command: ParsedCommand) {
 
   const example = [
     `create quiz on ${args.topic || args.domain || 'Java'}`,
-    hasAssignmentTarget ? `assign to ${args.assigned_to || args.assigned_employee || args.employee || args.email || args.department || args.team}` : 'assign to lakshan, bala aditya, ashutosh',
+    hasAssignmentTarget ? `assign to ${args.assigned_to || args.assigned_employee || args.employee || args.email || args.employee_emails || args.employees || args.department || args.team}` : 'assign to lakshan, bala aditya, ashutosh',
     args.difficulty ? `${args.difficulty} difficulty` : 'hard difficulty',
     `${args.question_count || args.questions || 10} questions`,
     `passing_score=${args.passing_score || 70}`,
@@ -1160,7 +1160,7 @@ async function createQuizCommand(admin: ReturnType<typeof createAdminClient>, ac
   })
 
   let assignmentMessage = ''
-  const assignee = args.assigned_to || args.assigned_employee || args.employee || args.email
+  const assignee = args.assigned_to || args.assigned_employee || args.employee || args.email || args.employee_emails || args.employees
   const dueDate = normalizeNaturalDueDate(args.due_date)
   if (assignee) {
     const assigned = await assignQuizToNaturalAssignee(admin, actorId, data.id, assignee, dueDate)

@@ -60,6 +60,16 @@ test('AI Command keeps explicit admin command key-values intact', () => {
   })
 })
 
+test('AI Command preserves launchpad bulk quiz recipients and rules', () => {
+  const command = resolveAdminCommand('run create quiz title="SQL Window Functions" topic="SQL window functions" difficulty=hard question_count=10 passing_score=70 time_limit_minutes=30 assigned_to="lakshan@example.com,bala@example.com" certificate_min_score=20 proctoring_required=true due_date=2026-07-01')
+
+  assert.equal(command?.action, 'create quiz')
+  assert.equal(command?.args.assigned_to, 'lakshan@example.com,bala@example.com')
+  assert.equal(command?.args.certificate_min_score, '20')
+  assert.equal(command?.args.proctoring_required, 'true')
+  assert.equal(command?.args.due_date, '2026-07-01')
+})
+
 test('AI Command recognizes destructive natural-language training cleanup', () => {
   const command = resolveAdminCommand('please remove all training data now')
 

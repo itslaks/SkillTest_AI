@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   Bot,
   BrainCircuit,
+  CheckCircle2,
   Clipboard,
   DatabaseZap,
   ExternalLink,
@@ -22,6 +23,15 @@ type ChatMessage = {
   role: 'user' | 'assistant'
   content: string
   provider?: string
+  preview?: AiActionPreview
+}
+
+type AiActionPreview = {
+  requiresConfirmation?: boolean
+  confirmToken?: string
+  actionType?: string
+  affectedCount?: number
+  riskLevel?: 'low' | 'medium' | 'high' | 'critical'
 }
 
 const quickPrompts = [
@@ -144,6 +154,8 @@ export function ManagerCommandChatbot() {
         {
           role: 'assistant',
           content: payload.message || payload.error || 'I could not read that data yet.',
+          provider: payload.provider,
+          preview: payload.preview,
         },
       ])
     } catch {
@@ -157,6 +169,39 @@ export function ManagerCommandChatbot() {
     } finally {
       setLoading(false)
       textareaRef.current?.focus()
+    }
+  }
+
+  async function decidePreview(preview: AiActionPreview, decision: 'confirm' | 'cancel') {
+    if (!preview.confirmToken || loading) return
+    setLoading(true)
+    setMessages((previous) => [...previous, { role: 'user', content: decision === 'confirm' ? 'Confirm' : 'Cancel' }])
+    try {
+      const response = await fetch('/api/manager-chatbot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: decision,
+          confirmToken: preview.confirmToken,
+          decision,
+          history: messages.slice(-8),
+        }),
+      })
+      const payload = await response.json()
+      const ok = response.ok && !payload.message?.startsWith('Command failed')
+      setMessages((previous) => [...previous, {
+        role: 'assistant',
+        content: payload.message || payload.error || 'No response returned.',
+        provider: payload.provider,
+      }])
+      if (ok) router.refresh()
+    } catch {
+      setMessages((previous) => [...previous, {
+        role: 'assistant',
+        content: 'I could not confirm that action. Please try again.',
+      }])
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -288,6 +333,36 @@ export function ManagerCommandChatbot() {
                     {entry.role === 'user' ? 'Your question' : 'Admin insight'}
                   </div>
                   <FormattedMessage content={entry.content} />
+                  {entry.preview?.requiresConfirmation && (
+                    <div className="mt-3 border-t border-white/10 pt-3">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-100/70">
+                        {entry.preview.actionType || 'Action'} - {entry.preview.affectedCount || 0} affected
+                      </p>
+                      <div className="mt-2 flex gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => void decidePreview(entry.preview!, 'confirm')}
+                          disabled={loading}
+                          className="h-8 rounded-lg bg-emerald-300 px-3 text-xs font-semibold text-emerald-950 hover:bg-emerald-200"
+                        >
+                          <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                          Confirm
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => void decidePreview(entry.preview!, 'cancel')}
+                          disabled={loading}
+                          className="h-8 rounded-lg border-white/15 bg-transparent px-3 text-xs text-white hover:bg-white/10"
+                        >
+                          <X className="mr-1.5 h-3.5 w-3.5" />
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

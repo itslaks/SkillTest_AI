@@ -106,7 +106,7 @@ export default function RuixenMoonChat({
           </div>
 
           {children ? (
-            <div className="chatbot-scrollbar mt-8 max-h-[34vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-white/10 bg-slate-950/45 p-3 backdrop-blur-md">
+            <div className="chatbot-scrollbar mt-8 max-h-[52vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-white/10 bg-slate-950/45 p-3 backdrop-blur-md">
               {children}
             </div>
           ) : null}

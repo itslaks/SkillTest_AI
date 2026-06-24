@@ -4,16 +4,23 @@ import { KeyboardEvent, ReactNode, useEffect, useMemo, useRef, useState } from '
 import { useRouter } from 'next/navigation'
 import {
   Bot,
+  CalendarClock,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   ClipboardList,
   FileQuestion,
   Download,
+  GraduationCap,
   Loader2,
   Mic,
   MessageSquareText,
+  Rocket,
+  Search,
   ShieldCheck,
   Sparkles,
   TerminalSquare,
+  UserCheck,
   Users,
   Workflow,
   XCircle,
@@ -48,6 +55,23 @@ type AiExportPayload = {
   requestedBy: string
   filters?: Record<string, string>
   content: string
+}
+
+type CommandEmployee = {
+  id: string
+  full_name?: string | null
+  email: string
+  employee_id?: string | null
+  department?: string | null
+  domain?: string | null
+}
+
+type CommandQuiz = {
+  id: string
+  title: string
+  topic?: string | null
+  difficulty?: string | null
+  is_active?: boolean | null
 }
 
 const commandPacks = [
@@ -130,7 +154,7 @@ const moduleLinks = [
   { label: 'Admin Console', href: '/manager/admin', icon: ShieldCheck },
 ]
 
-export function AICommandConsole() {
+export function AICommandConsole({ employees = [], quizzes = [] }: { employees?: CommandEmployee[]; quizzes?: CommandQuiz[] }) {
   const router = useRouter()
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -355,6 +379,8 @@ export function AICommandConsole() {
       }
     >
       <div className="space-y-3">
+        <QuizLaunchpad employees={employees} quizzes={quizzes} loading={loading} onLaunch={(command) => void runCommand(command)} />
+
         <div className="mb-3 grid gap-2 rounded-xl border border-sky-200/10 bg-slate-950/55 p-3 text-xs text-sky-100/80 sm:grid-cols-2">
           <StatusNote icon={<CheckCircle2 className="h-4 w-4 text-emerald-300" />} label="Safe execution" text="Actions are previewed first and require confirmation before anything changes." />
           <StatusNote icon={<Sparkles className="h-4 w-4 text-sky-200" />} label="Operations intelligence" text="Ask for inactive employees, weak areas, proctoring risk, exports, templates, or schedules." />
@@ -404,6 +430,348 @@ export function AICommandConsole() {
       </div>
     </RuixenMoonChat>
   )
+}
+
+function QuizLaunchpad({
+  employees,
+  quizzes,
+  loading,
+  onLaunch,
+}: {
+  employees: CommandEmployee[]
+  quizzes: CommandQuiz[]
+  loading: boolean
+  onLaunch: (command: string) => void
+}) {
+  const [open, setOpen] = useState(true)
+  const [mode, setMode] = useState<'create' | 'assign'>('create')
+  const [step, setStep] = useState(1)
+  const [topic, setTopic] = useState('')
+  const [title, setTitle] = useState('')
+  const [quizId, setQuizId] = useState('')
+  const [difficulty, setDifficulty] = useState('medium')
+  const [questionCount, setQuestionCount] = useState(10)
+  const [passingScore, setPassingScore] = useState(70)
+  const [timeLimit, setTimeLimit] = useState(30)
+  const [dueDate, setDueDate] = useState('')
+  const [certificateEnabled, setCertificateEnabled] = useState(true)
+  const [certificateScore, setCertificateScore] = useState(70)
+  const [proctoringRequired, setProctoringRequired] = useState(true)
+  const [selectedEmails, setSelectedEmails] = useState<string[]>([])
+  const [employeeSearch, setEmployeeSearch] = useState('')
+
+  const selectedQuiz = quizzes.find((quiz) => quiz.id === quizId)
+  const filteredEmployees = useMemo(() => {
+    const term = employeeSearch.trim().toLowerCase()
+    if (!term) return employees
+    return employees.filter((employee) =>
+      [employee.full_name, employee.email, employee.employee_id, employee.department, employee.domain]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(term))
+    )
+  }, [employeeSearch, employees])
+
+  const steps = [
+    { number: 1, label: 'Quiz', icon: GraduationCap },
+    { number: 2, label: 'People', icon: UserCheck },
+    { number: 3, label: 'Rules', icon: ShieldCheck },
+    { number: 4, label: 'Review', icon: Rocket },
+  ]
+
+  const stepReady = step === 1
+    ? mode === 'create' ? Boolean(topic.trim() && title.trim()) : Boolean(quizId)
+    : step === 2
+      ? selectedEmails.length > 0
+      : true
+
+  function toggleEmployee(email: string) {
+    setSelectedEmails((current) => current.includes(email)
+      ? current.filter((item) => item !== email)
+      : [...current, email])
+  }
+
+  function buildCommand() {
+    const recipients = selectedEmails.join(',')
+    if (mode === 'assign' && selectedQuiz) {
+      return [
+        'run assign quiz',
+        `quiz=${commandValue(selectedQuiz.title)}`,
+        `employee_emails=${commandValue(recipients)}`,
+        dueDate ? `due_date=${dueDate}` : '',
+      ].filter(Boolean).join(' ')
+    }
+
+    return [
+      'run create quiz',
+      `title=${commandValue(title.trim())}`,
+      `topic=${commandValue(topic.trim())}`,
+      `difficulty=${difficulty}`,
+      `question_count=${questionCount}`,
+      `passing_score=${passingScore}`,
+      `time_limit_minutes=${timeLimit}`,
+      `assigned_to=${commandValue(recipients)}`,
+      certificateEnabled ? `certificate_min_score=${certificateScore}` : 'certificate_enabled=false',
+      `proctoring_required=${proctoringRequired}`,
+      dueDate ? `due_date=${dueDate}` : '',
+    ].filter(Boolean).join(' ')
+  }
+
+  function launch() {
+    if (!selectedEmails.length || (mode === 'create' && (!topic.trim() || !title.trim())) || (mode === 'assign' && !selectedQuiz)) return
+    onLaunch(buildCommand())
+  }
+
+  return (
+    <section className="mb-3 overflow-hidden rounded-lg border border-cyan-200/20 bg-slate-950/75">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left"
+      >
+        <span className="flex items-center gap-2">
+          <span className="grid h-8 w-8 place-items-center rounded-md bg-cyan-300 text-slate-950">
+            <Rocket className="h-4 w-4" />
+          </span>
+          <span>
+            <span className="block text-sm font-semibold text-white">Quiz Launchpad</span>
+            <span className="block text-[11px] text-sky-100/60">Four quick decisions, then a confirmation preview.</span>
+          </span>
+        </span>
+        <span className="text-xs font-semibold text-cyan-200">{open ? 'Hide' : 'Open'}</span>
+      </button>
+
+      {open && (
+        <div className="border-t border-white/10">
+          <div className="grid grid-cols-4 border-b border-white/10">
+            {steps.map((item) => {
+              const Icon = item.icon
+              const active = step === item.number
+              const complete = step > item.number
+              return (
+                <button
+                  key={item.number}
+                  type="button"
+                  onClick={() => setStep(item.number)}
+                  className={`relative flex min-w-0 items-center justify-center gap-1.5 px-2 py-3 text-xs font-semibold transition ${
+                    active ? 'bg-cyan-300 text-slate-950' : complete ? 'bg-emerald-300/10 text-emerald-200' : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border text-[10px] ${
+                    active ? 'border-slate-950/20 bg-slate-950/10' : 'border-current/30'
+                  }`}>
+                    {complete ? <CheckCircle2 className="h-3.5 w-3.5" /> : item.number}
+                  </span>
+                  <Icon className="hidden h-3.5 w-3.5 sm:block" />
+                  <span className="truncate">{item.label}</span>
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="min-h-64 p-3">
+            {step === 1 && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2 rounded-md bg-white/[0.04] p-1">
+                  <button
+                    type="button"
+                    onClick={() => { setMode('create'); setQuizId('') }}
+                    className={`h-9 rounded-md text-xs font-semibold ${mode === 'create' ? 'bg-white text-slate-950' : 'text-slate-300 hover:bg-white/5'}`}
+                  >
+                    Create + assign
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMode('assign')}
+                    className={`h-9 rounded-md text-xs font-semibold ${mode === 'assign' ? 'bg-white text-slate-950' : 'text-slate-300 hover:bg-white/5'}`}
+                  >
+                    Assign existing
+                  </button>
+                </div>
+
+                {mode === 'create' ? (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <LaunchField label="Quiz title">
+                      <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="SQL Window Functions" className={launchInputClass} />
+                    </LaunchField>
+                    <LaunchField label="Topic">
+                      <input value={topic} onChange={(event) => setTopic(event.target.value)} placeholder="SQL window functions" className={launchInputClass} />
+                    </LaunchField>
+                    <LaunchField label="Difficulty">
+                      <select value={difficulty} onChange={(event) => setDifficulty(event.target.value)} className={launchInputClass}>
+                        {['easy', 'medium', 'hard', 'advanced', 'hardcore'].map((value) => <option key={value} value={value}>{sentenceCase(value)}</option>)}
+                      </select>
+                    </LaunchField>
+                    <LaunchField label="Questions">
+                      <input type="number" min={1} max={50} value={questionCount} onChange={(event) => setQuestionCount(Number(event.target.value))} className={launchInputClass} />
+                    </LaunchField>
+                  </div>
+                ) : (
+                  <LaunchField label="Active quiz">
+                    <select value={quizId} onChange={(event) => setQuizId(event.target.value)} className={launchInputClass}>
+                      <option value="">Choose a quiz</option>
+                      {quizzes.map((quiz) => <option key={quiz.id} value={quiz.id}>{quiz.title} - {quiz.topic || 'General'}</option>)}
+                    </select>
+                  </LaunchField>
+                )}
+              </div>
+            )}
+
+            {step === 2 && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 rounded-md border border-white/10 bg-black/20 px-3">
+                  <Search className="h-4 w-4 text-slate-400" />
+                  <input
+                    value={employeeSearch}
+                    onChange={(event) => setEmployeeSearch(event.target.value)}
+                    placeholder="Search name, email, ID, department..."
+                    className="h-10 min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-slate-500"
+                  />
+                  <span className="text-xs font-semibold text-cyan-200">{selectedEmails.length} selected</span>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedEmails((current) => Array.from(new Set([...current, ...filteredEmployees.map((employee) => employee.email)])))}
+                    className="text-xs font-semibold text-cyan-200 hover:text-cyan-100"
+                  >
+                    Select shown
+                  </button>
+                  <button type="button" onClick={() => setSelectedEmails([])} className="text-xs font-semibold text-slate-400 hover:text-white">
+                    Clear
+                  </button>
+                </div>
+                <div className="grid max-h-48 gap-1 overflow-y-auto pr-1 sm:grid-cols-2">
+                  {filteredEmployees.map((employee) => {
+                    const selected = selectedEmails.includes(employee.email)
+                    return (
+                      <button
+                        key={employee.id}
+                        type="button"
+                        onClick={() => toggleEmployee(employee.email)}
+                        className={`flex min-w-0 items-center gap-2 rounded-md border px-2.5 py-2 text-left transition ${
+                          selected ? 'border-cyan-300/50 bg-cyan-300/10' : 'border-white/10 bg-white/[0.02] hover:border-white/25'
+                        }`}
+                      >
+                        <span className={`grid h-5 w-5 shrink-0 place-items-center rounded border ${selected ? 'border-cyan-300 bg-cyan-300 text-slate-950' : 'border-slate-600'}`}>
+                          {selected && <CheckCircle2 className="h-3.5 w-3.5" />}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-xs font-semibold text-white">{employee.full_name || employee.email}</span>
+                          <span className="block truncate text-[10px] text-slate-400">{employee.email} {employee.department ? `- ${employee.department}` : ''}</span>
+                        </span>
+                      </button>
+                    )
+                  })}
+                  {!filteredEmployees.length && <p className="py-8 text-center text-xs text-slate-400 sm:col-span-2">No employees match this search.</p>}
+                </div>
+              </div>
+            )}
+
+            {step === 3 && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {mode === 'create' && (
+                  <>
+                    <LaunchField label="Passing score (%)">
+                      <input type="number" min={0} max={100} value={passingScore} onChange={(event) => setPassingScore(Number(event.target.value))} className={launchInputClass} />
+                    </LaunchField>
+                    <LaunchField label="Time limit (minutes)">
+                      <input type="number" min={1} max={480} value={timeLimit} onChange={(event) => setTimeLimit(Number(event.target.value))} className={launchInputClass} />
+                    </LaunchField>
+                  </>
+                )}
+                <LaunchField label="Due date">
+                  <div className="relative">
+                    <CalendarClock className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                    <input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} className={`${launchInputClass} pl-9`} />
+                  </div>
+                </LaunchField>
+                {mode === 'create' && (
+                  <>
+                    <ToggleRow label="AI proctoring" checked={proctoringRequired} onChange={setProctoringRequired} />
+                    <ToggleRow label="Certificate" checked={certificateEnabled} onChange={setCertificateEnabled} />
+                    {certificateEnabled && (
+                      <LaunchField label="Certificate score (%)">
+                        <input type="number" min={0} max={100} value={certificateScore} onChange={(event) => setCertificateScore(Number(event.target.value))} className={launchInputClass} />
+                      </LaunchField>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {step === 4 && (
+              <div className="space-y-3">
+                <div className="grid gap-px overflow-hidden rounded-md border border-white/10 bg-white/10 sm:grid-cols-2">
+                  <ReviewLine label={mode === 'create' ? 'New quiz' : 'Quiz'} value={mode === 'create' ? title || 'Not set' : selectedQuiz?.title || 'Not selected'} />
+                  <ReviewLine label="Recipients" value={`${selectedEmails.length} employee${selectedEmails.length === 1 ? '' : 's'}`} />
+                  <ReviewLine label="Due date" value={dueDate || 'Not set'} />
+                  <ReviewLine label="Action" value={mode === 'create' ? `${questionCount} ${difficulty} questions` : 'Assign existing quiz'} />
+                  {mode === 'create' && <ReviewLine label="Pass / certificate" value={`${passingScore}% / ${certificateEnabled ? `${certificateScore}%` : 'Off'}`} />}
+                  {mode === 'create' && <ReviewLine label="AI proctoring" value={proctoringRequired ? 'Enabled' : 'Disabled'} />}
+                </div>
+                <p className="text-xs leading-relaxed text-slate-400">Launch creates an action preview only. Review the affected employees and press Confirm in the conversation to execute.</p>
+                <Button type="button" onClick={launch} disabled={loading || !selectedEmails.length} className="h-10 w-full rounded-md bg-cyan-300 font-semibold text-slate-950 hover:bg-cyan-200">
+                  {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Rocket className="mr-2 h-4 w-4" />}
+                  Build confirmation preview
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between border-t border-white/10 px-3 py-2.5">
+            <Button type="button" size="sm" variant="ghost" disabled={step === 1} onClick={() => setStep((current) => Math.max(1, current - 1))} className="rounded-md text-slate-300 hover:bg-white/10 hover:text-white">
+              <ChevronLeft className="mr-1 h-4 w-4" />
+              Back
+            </Button>
+            <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Step {step} of 4</span>
+            <Button type="button" size="sm" disabled={step === 4 || !stepReady} onClick={() => setStep((current) => Math.min(4, current + 1))} className="rounded-md bg-white text-slate-950 hover:bg-slate-100">
+              Next
+              <ChevronRight className="ml-1 h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
+const launchInputClass = 'h-10 w-full rounded-md border border-white/10 bg-black/20 px-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/50'
+
+function LaunchField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="block min-w-0">
+      <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">{label}</span>
+      {children}
+    </label>
+  )
+}
+
+function ToggleRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
+  return (
+    <button type="button" onClick={() => onChange(!checked)} className="flex h-[62px] items-center justify-between rounded-md border border-white/10 bg-white/[0.03] px-3 text-left">
+      <span className="text-sm font-semibold text-white">{label}</span>
+      <span className={`relative h-6 w-11 rounded-full transition ${checked ? 'bg-cyan-300' : 'bg-slate-700'}`}>
+        <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${checked ? 'left-6' : 'left-1'}`} />
+      </span>
+    </button>
+  )
+}
+
+function ReviewLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 bg-slate-950 px-3 py-2.5">
+      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">{label}</p>
+      <p className="mt-1 truncate text-sm font-semibold text-white">{value}</p>
+    </div>
+  )
+}
+
+function commandValue(value: string) {
+  return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+}
+
+function sentenceCase(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1)
 }
 
 export function AICommandHistory({ logs, schedules }: { logs: any[]; schedules: any[] }) {

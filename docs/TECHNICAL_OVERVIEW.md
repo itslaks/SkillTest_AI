@@ -90,6 +90,7 @@ The command chatbot is intentionally conservative:
 - It uses AI only after deterministic handlers cannot answer the question.
 - It parses quiz-creation commands before generic chat, so prompts like `Create quiz on LLM, difficulty medium and assign it to Ram` produce a structured quiz title, topic, difficulty, generated questions, and assignment when the employee matches.
 - Admin quiz creation requires complete command details before a mutation preview is created: topic, assignees/team, difficulty, question count, passing score, time limit, certificate threshold or disabled certificate decision, and AI proctoring enabled/disabled. Missing details return a clarification prompt; completed commands still require Confirm before execution.
+- The full AI Command console includes a numbered Quiz Launchpad that constructs validated create/assign commands from structured controls. The floating AI Command preserves pending-action previews and exposes Confirm/Cancel, so chat-initiated assignments can complete.
 - AI prompts are instructed to use only supplied database context and keep responses under 60 words.
 - If exact data is not loaded or not found, it says so instead of inventing.
 - The UI hides internal scope, answer-mode, fallback, and provider labels so managers see polished admin insights only.
