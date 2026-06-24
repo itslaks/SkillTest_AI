@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { CheckCircle2, FileSpreadsheet, Upload, XCircle, Download } from 'lucide-react'
-import { parseUniversalRowsFile, UNIVERSAL_UPLOAD_ACCEPT } from '@/lib/file-utils'
+import { EXCEL_WITH_OPTIONAL_TEXT_ACCEPT, parseUniversalRowsFile } from '@/lib/file-utils'
 
 type BatchOption = { id: string; title: string }
 type AssessmentOption = { id: string; batch_id: string; title: string; assessment_type: string }
@@ -44,7 +44,7 @@ export function AssessmentScoreImporter({
       }
       setRows(parsed)
     } catch (err: any) {
-      setError(err.message || 'Could not read this file. Use a supported upload format.')
+      setError(err.message || 'Could not read this file. Use the Excel assessment template.')
     }
   }
 
@@ -111,9 +111,9 @@ export function AssessmentScoreImporter({
         <div>
           <div className="flex items-center gap-2 font-semibold">
             <FileSpreadsheet className="h-4 w-4" />
-            Assessment score upload
+            Assessment score Excel upload
           </div>
-          <p className="mt-1 text-sm text-zinc-500">Upload XLSX, CSV, or TXT scores. Validates candidate existence, score ranges, duplicate rows, and logs upload errors.</p>
+          <p className="mt-1 text-sm text-zinc-500">Upload the XLSX assessment score template. CSV/TXT remain optional compatibility formats.</p>
         </div>
       </div>
 
@@ -137,8 +137,8 @@ export function AssessmentScoreImporter({
         </label>
         <label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-300 bg-white px-4 text-sm font-medium hover:bg-zinc-100 lg:self-end">
           <Upload className="h-4 w-4" />
-          Select file
-          <input type="file" accept={UNIVERSAL_UPLOAD_ACCEPT} className="hidden" onChange={(event) => event.target.files?.[0] && readFile(event.target.files[0])} />
+          Select Excel file
+          <input type="file" accept={EXCEL_WITH_OPTIONAL_TEXT_ACCEPT} className="hidden" onChange={(event) => event.target.files?.[0] && readFile(event.target.files[0])} />
         </label>
       </div>
 

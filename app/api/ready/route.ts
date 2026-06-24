@@ -3,7 +3,6 @@ import { getReadinessSnapshot } from '@/lib/readiness'
 
 export async function GET() {
   const snapshot = await getReadinessSnapshot()
-  return NextResponse.json(snapshot, {
-    status: snapshot.status === 'unhealthy' ? 503 : 200,
-  })
+  const ready = snapshot.status !== 'unhealthy'
+  return NextResponse.json({ ready, ...snapshot }, { status: ready ? 200 : 503 })
 }

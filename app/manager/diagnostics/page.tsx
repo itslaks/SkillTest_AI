@@ -28,8 +28,9 @@ export default async function DiagnosticsPage() {
         </div>
       </section>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <MetricCard icon={Mail} title="Email Status" rows={health.email} />
+        <MetricCard icon={Mail} title="BRD Email Delivery" rows={health.brdEmail} />
         <MetricCard icon={Bell} title="Reminder Status" rows={health.reminders} />
         <MetricCard icon={AlertTriangle} title="Attendance Alerts" rows={health.attendanceAlerts} />
         <Card className="border-zinc-200">

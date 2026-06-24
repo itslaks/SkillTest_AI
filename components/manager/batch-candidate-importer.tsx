@@ -96,9 +96,9 @@ export function BatchCandidateImporter({ batches }: { batches: BatchOption[] }) 
         <div>
           <div className="flex items-center gap-2 font-semibold">
             <FileSpreadsheet className="h-4 w-4" />
-            Batch candidate upload
+            Batch candidate Excel upload
           </div>
-          <p className="mt-1 text-sm text-zinc-500">Map candidate master rows into a batch without manual selection.</p>
+          <p className="mt-1 text-sm text-zinc-500">Map candidate master Excel rows into a batch without manual selection.</p>
         </div>
         <Button asChild variant="outline" className="rounded-full">
           <a href="/api/training/batch-candidate-template">Download template</a>
@@ -116,7 +116,7 @@ export function BatchCandidateImporter({ batches }: { batches: BatchOption[] }) 
         </label>
         <label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-300 bg-white px-4 text-sm font-medium hover:bg-zinc-100 lg:self-end">
           <Upload className="h-4 w-4" />
-          Select file
+          Select Excel file
           <input type="file" accept={UNIVERSAL_UPLOAD_ACCEPT} className="hidden" onChange={(event) => event.target.files?.[0] && readFile(event.target.files[0])} />
         </label>
       </div>

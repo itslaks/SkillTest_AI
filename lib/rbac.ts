@@ -78,6 +78,15 @@ export async function requireManagerForApi(): Promise<{ userId: string; role: RB
   return result
 }
 
+export async function requireAdminForApi(): Promise<{ userId: string; role: RBACRole } | NextResponse> {
+  const result = await getCurrentUserRole()
+  if (!result) return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+  if (result.role !== "admin") return NextResponse.json({ error: "Forbidden: admin role required" }, { status: 403 })
+  const rate = checkUserRateLimit(result.userId, AUTHENTICATED_RATE_LIMIT)
+  if (!rate.allowed) return rateLimitResponse(rate)
+  return result
+}
+
 export async function requireTrainingStaffForApi(): Promise<{ userId: string; role: RBACRole } | NextResponse> {
   const result = await getCurrentUserRole()
   if (!result) return NextResponse.json({ error: "Not authenticated" }, { status: 401 })

@@ -17,7 +17,7 @@ The clearest positioning is:
 | Public app | Landing page, public profiles, public certificate viewer |
 | Auth | Login, signup, reset password, update password, callback, pending approval, error page |
 | Employee workspace | Dashboard, quizzes, quiz player, results, badges, leaderboard, training, feedback |
-| Manager console | Mission Control, Quick Access, Quiz Studio, AI Command, Risk Center, Employees, Operations, Reports, Compliance, Diagnostics, Settings |
+| Manager console | Mission Control, Quiz Studio, AI Command, Risk Center, Employees, Operations, Reports, Compliance, Diagnostics, Settings |
 | Admin-heavy workflows | Role governance, quiz/certificate management, employee/trainer operations, billing/tenant/SSO configuration placeholders |
 | Training operations | Batches, sessions, attendance upload, candidate assignment import, assessment uploads, feedback windows, notifications |
 | Reporting/compliance | Excel/PDF exports, evidence images, consolidated reports, proctoring exports, BRD/compliance evidence pack |

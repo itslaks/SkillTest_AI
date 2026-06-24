@@ -1,7 +1,8 @@
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { requireTrainingStaffForApi } from '@/lib/rbac'
 import { NextRequest, NextResponse } from 'next/server'
-import { sendEmail, buildUploadConfirmationEmail } from '@/lib/email'
+import { buildUploadConfirmationEmail } from '@/lib/email'
+import { sendMandatoryBrdEmail } from '@/lib/brd-notifications'
 import { canTrainerAccessBatch } from '@/lib/training-access'
 
 export async function POST(request: NextRequest) {
@@ -16,7 +17,7 @@ export async function POST(request: NextRequest) {
     try {
       payload = await request.json()
     } catch {
-      return NextResponse.json({ error: 'Invalid assessment upload payload. Please retry with the assessment template.' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid assessment upload payload. Please retry with the Excel assessment template.' }, { status: 400 })
     }
 
     const { quizId, batchId, assessmentSetupId, records, fileName, chunkIndex, chunkTotal } = payload
@@ -136,7 +137,7 @@ export async function POST(request: NextRequest) {
       .insert({
         quiz_id: quizId || null,
         uploaded_by: userId,
-        file_name: fileName || 'assessment_import.csv',
+        file_name: fileName || 'assessment_import.xlsx',
         total_records: records.length,
         status: 'processing',
       })
@@ -224,7 +225,7 @@ export async function POST(request: NextRequest) {
         assessment_setup_id: assessmentSetupId || null,
         batch_id: batchId,
         uploaded_by: userId,
-        file_name: fileName || 'assessment_import.csv',
+        file_name: fileName || 'assessment_import.xlsx',
         total_records: records.length,
         successful_records: insertedCount,
         failed_records: errors.length,
@@ -253,8 +254,12 @@ export async function POST(request: NextRequest) {
           recordCount: records.length,
           errorCount: errors.length,
         })
-        await sendEmail({
+        await sendMandatoryBrdEmail({
+          admin: createAdminClient(),
+          eventType: 'assessment_upload_success',
           to: uploaderProfile.email,
+          recipientRole: role,
+          relatedBatchId: batchId || null,
           subject: `Assessment Upload Confirmed - ${insertedCount} records imported`,
           html: emailHtml,
         })

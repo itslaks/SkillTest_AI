@@ -17,7 +17,10 @@
     "fixtures:tms": "node database/seeds/generate-tms-upload-fixtures.js",
     "assets:avatars": "node scripts/generate-memoji-avatar-assets.mjs",
     "avatars:reset-employees": "node scripts/set-all-employee-avatars-to-avatar-01.mjs",
-    "test:scale": "npm run fixtures:tms -- 20000 && node database/seeds/validate-tms-import-scale.js 20000"
+    "test:scale": "npm run fixtures:tms -- 20000 && node database/seeds/validate-tms-import-scale.js 20000",
+    "brd:fixtures": "node scripts/generate-brd-upload-fixtures.mjs 20000",
+    "brd:upload-benchmark": "npm run brd:fixtures && node scripts/validate-brd-upload-scale.mjs 20000",
+    "brd:dashboard-benchmark": "node scripts/benchmark-dashboard-load.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

@@ -16,6 +16,7 @@ import { QuizAssignmentManager } from '@/components/manager/quiz-assignment-mana
 import { AssessmentAnalyzer } from '@/components/manager/assessment-analyzer'
 import { QuickDeleteButton } from '@/components/manager/quick-delete-button'
 import { SafeBackButton } from '@/components/navigation/safe-back-button'
+import { QuizTopicPerformanceChart } from '@/components/manager/quiz-topic-performance-chart'
 
 const difficultyColors: Record<string, string> = {
   easy: 'bg-green-100 text-green-700',
@@ -90,6 +91,14 @@ export default async function QuizDetailPage({ params, searchParams }: { params:
     .select('*', { count: 'exact', head: true })
     .eq('quiz_id', idResult.data)
     .not('completed_at', 'is', null)
+
+  const { data: completedAttempts } = await supabase
+    .from('quiz_attempts')
+    .select('answers')
+    .eq('quiz_id', idResult.data)
+    .eq('status', 'completed')
+
+  const questionPerformance = buildQuestionPerformance(questions || [], completedAttempts || [])
 
   const formatTime = (s: number) => `${Math.floor(s / 60)}m ${s % 60}s`
 
@@ -331,6 +340,22 @@ export default async function QuizDetailPage({ params, searchParams }: { params:
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Topic Performance Analysis</CardTitle>
+          <CardDescription>
+            Visualizes quiz performance for {quiz.topic || 'General'} and highlights questions that cross the 25% wrong-answer threshold.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <QuizTopicPerformanceChart
+            topic={quiz.topic || 'General'}
+            totalAttempts={(completedAttempts || []).length}
+            data={questionPerformance}
+          />
+        </CardContent>
+      </Card>
+
       {/* Assessment Data Analyzer */}
       <AssessmentAnalyzer quizId={quizId} quizTitle={quiz.title} />
 
@@ -390,4 +415,22 @@ export default async function QuizDetailPage({ params, searchParams }: { params:
       </Card>
     </div>
   )
+}
+
+function buildQuestionPerformance(questions: any[], attempts: any[]) {
+  return questions.map((question, index) => {
+    const answers = attempts
+      .flatMap((attempt) => Array.isArray(attempt.answers) ? attempt.answers : [])
+      .filter((answer) => answer?.questionId === question.id)
+    const attemptsCount = answers.length
+    const correct = answers.filter((answer) => answer.isCorrect === true).length
+    const correctRate = attemptsCount > 0 ? Math.round((correct / attemptsCount) * 100) : 0
+    return {
+      label: `Q${index + 1}`,
+      questionText: question.question_text,
+      correctRate,
+      wrongRate: attemptsCount > 0 ? 100 - correctRate : 0,
+      attempts: attemptsCount,
+    }
+  }).filter((item) => item.attempts > 0)
 }

@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireTrainingStaffForApi } from '@/lib/rbac'
-import { sendEmail, buildUploadConfirmationEmail } from '@/lib/email'
+import { buildUploadConfirmationEmail } from '@/lib/email'
+import { sendMandatoryBrdEmail } from '@/lib/brd-notifications'
 import { NextRequest, NextResponse } from 'next/server'
 
 const VALID_STATUSES = new Set(['present', 'absent', 'late', 'excused'])
@@ -261,7 +262,16 @@ export async function POST(request: NextRequest) {
       recordCount: rows.length,
       errorCount: errors.length,
     })
-    const emailResult = await sendEmail({ to: uploaderProfile.email, subject: `Attendance Upload Confirmed - ${(session.batch as any)?.title || session.title}`, html })
+    const emailResult = await sendMandatoryBrdEmail({
+      admin,
+      eventType: 'attendance_upload_success',
+      to: uploaderProfile.email,
+      recipientRole: role,
+      relatedBatchId: session.batch_id,
+      relatedNotificationId: notification?.id || null,
+      subject: `Attendance Upload Confirmed - ${(session.batch as any)?.title || session.title}`,
+      html,
+    })
     if (notification?.id) {
       await admin
         .from('training_notifications')

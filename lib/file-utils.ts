@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx'
 
 export const UNIVERSAL_UPLOAD_ACCEPT = '.csv,.txt,.xlsx,.xls,.json,.xml,.pdf,.docx'
 export const STRUCTURED_UPLOAD_ACCEPT = '.csv,.txt,.xlsx,.xls,.json,.xml'
+export const EXCEL_WITH_OPTIONAL_TEXT_ACCEPT = '.xlsx,.xls,.csv,.txt'
 export const DOCUMENT_UPLOAD_ACCEPT = '.pdf,.docx'
 
 const SPREADSHEET_EXTENSIONS = ['.xlsx', '.xls', '.csv']

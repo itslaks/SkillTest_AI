@@ -12,6 +12,7 @@ export type DiagnosticCheck = {
 
 export type OperationalHealth = {
   email: Record<string, number>
+  brdEmail: Record<string, number>
   reminders: Record<string, number>
   attendanceAlerts: Record<string, number>
   smtp: Awaited<ReturnType<typeof getEmailHealth>>
@@ -48,11 +49,14 @@ async function safeLatest(table: string, select = '*', orderColumn = 'created_at
 }
 
 export async function getOperationalHealth(): Promise<OperationalHealth> {
-  const [queued, sent, failed, logged, pendingReminders, deliveredReminders, failedReminders, attendanceGenerated, attendanceDelivered, attendanceFailed, latestDispatch, smtp] = await Promise.all([
+  const [queued, sent, failed, logged, brdPending, brdSent, brdFailed, pendingReminders, deliveredReminders, failedReminders, attendanceGenerated, attendanceDelivered, attendanceFailed, latestDispatch, latestBrdFailure, smtp] = await Promise.all([
     safeCount('training_notifications', (q) => q.eq('delivery_status', 'queued')),
     safeCount('training_notifications', (q) => q.eq('delivery_status', 'sent')),
     safeCount('training_notifications', (q) => q.eq('delivery_status', 'failed')),
     safeCount('training_notifications', (q) => q.eq('delivery_status', 'logged')),
+    safeCount('brd_email_notification_logs', (q) => q.eq('status', 'pending')),
+    safeCount('brd_email_notification_logs', (q) => q.eq('status', 'sent')),
+    safeCount('brd_email_notification_logs', (q) => q.eq('status', 'failed')),
     safeCount('training_notifications', (q) => q.in('delivery_status', ['queued', 'scheduled']).in('metadata->>category', ['assessment_reminder', 'feedback_reminder', 'quiz_reminder', 'ai_command_reminder'])),
     safeCount('training_notifications', (q) => q.eq('delivery_status', 'sent').in('metadata->>category', ['assessment_reminder', 'feedback_reminder', 'quiz_reminder', 'ai_command_reminder'])),
     safeCount('training_notifications', (q) => q.eq('delivery_status', 'failed').in('metadata->>category', ['assessment_reminder', 'feedback_reminder', 'quiz_reminder', 'ai_command_reminder'])),
@@ -60,6 +64,7 @@ export async function getOperationalHealth(): Promise<OperationalHealth> {
     safeCount('training_notifications', (q) => q.eq('delivery_status', 'sent').in('metadata->>category', ['attendance_cutoff', 'absence_streak'])),
     safeCount('training_notifications', (q) => q.eq('delivery_status', 'failed').in('metadata->>category', ['attendance_cutoff', 'absence_streak'])),
     safeLatest('training_notification_dispatch_log', 'provider_status, provider_message, created_at'),
+    safeLatest('brd_email_notification_logs', 'status, error_message, created_at'),
     getEmailHealth(),
   ])
 
@@ -69,6 +74,11 @@ export async function getOperationalHealth(): Promise<OperationalHealth> {
       sent: sent.count,
       failed: failed.count,
       logged: logged.count,
+    },
+    brdEmail: {
+      pending: brdPending.count,
+      sent: brdSent.count,
+      failed: brdFailed.count,
     },
     reminders: {
       pending: pendingReminders.count,
@@ -81,7 +91,9 @@ export async function getOperationalHealth(): Promise<OperationalHealth> {
       failed: attendanceFailed.count,
     },
     smtp,
-    lastError: (latestDispatch.data as any)?.provider_status === 'failed'
+    lastError: (latestBrdFailure.data as any)?.status === 'failed'
+      ? (latestBrdFailure.data as any).error_message
+      : (latestDispatch.data as any)?.provider_status === 'failed'
       ? (latestDispatch.data as any).provider_message
       : smtp.lastError || latestDispatch.error || null,
   }
@@ -89,9 +101,10 @@ export async function getOperationalHealth(): Promise<OperationalHealth> {
 
 export async function getSystemDiagnostics(): Promise<DiagnosticCheck[]> {
   const emailConfig = validateEmailConfiguration()
-  const [profiles, notifications, automationRuns, attendance, sessions, aiSchedules] = await Promise.all([
+  const [profiles, notifications, brdEmailLogs, automationRuns, attendance, sessions, aiSchedules] = await Promise.all([
     safeCount('profiles'),
     safeCount('training_notifications'),
+    safeCount('brd_email_notification_logs'),
     safeLatest('training_automation_runs', 'run_type, status, created_at'),
     safeCount('session_attendance'),
     safeCount('training_sessions'),
@@ -120,6 +133,11 @@ export async function getSystemDiagnostics(): Promise<DiagnosticCheck[]> {
       name: 'Notifications: queue table',
       status: notifications.error ? 'FAIL' : 'PASS',
       detail: notifications.error || `${notifications.count} notification record(s) reachable.`,
+    },
+    {
+      name: 'BRD mandatory email audit',
+      status: brdEmailLogs.error ? 'FAIL' : 'PASS',
+      detail: brdEmailLogs.error || `${brdEmailLogs.count} mandatory email delivery log record(s) reachable.`,
     },
     {
       name: 'Scheduler: governance automation',

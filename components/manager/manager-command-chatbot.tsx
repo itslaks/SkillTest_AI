@@ -192,7 +192,7 @@ export function ManagerCommandChatbot() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold leading-none">AI Command</p>
-                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">Quick admin access</p>
+                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">Admin assistant</p>
                 </div>
               </div>
               <div className="flex gap-1">

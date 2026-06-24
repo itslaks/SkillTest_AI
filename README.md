@@ -323,8 +323,6 @@ npm run dev
 | `/manager/reports` | Excel / PDF report downloads |
 | `/manager/compliance` | BRD evidence workbook |
 
-Quick Access in the sidebar intentionally repeats high-frequency routes such as Quiz Studio, AI Commands, Risk Center, and Employees. Visibility does not mean identical permissions: RBAC still scopes what each role can read or change.
-
 ### Auth
 | Route | What it is |
 |-------|-----------|
@@ -336,7 +334,7 @@ Quick Access in the sidebar intentionally repeats high-frequency routes such as 
 
 ## Roles & Permissions
 
-RBAC is enforced by server actions, API guards, database policies, and scoped queries. Some roles see the same page names in Quick Access, but the available data and allowed actions are different.
+RBAC is enforced by server actions, API guards, database policies, and scoped queries. Some roles see the same page names in the console, but the available data and allowed actions are different.
 
 | Area | Admin | Manager | Coordinator | Trainer | Employee |
 |------|-------|---------|-------------|---------|----------|
@@ -366,6 +364,9 @@ Admin is the only unrestricted governance role. Manager, coordinator, and traine
 | [docs/TECHNICAL_OVERVIEW.md](docs/TECHNICAL_OVERVIEW.md) | Technical reference: routes, API, deployment |
 | [docs/PROCTORING.md](docs/PROCTORING.md) | AI proctoring deep-dive: vision, risk, evidence, review |
 | [docs/FINAL_REVIEW_AUDIT.md](docs/FINAL_REVIEW_AUDIT.md) | Final review audit: feature coverage, endpoint inventory, validation results, caveats |
+| [docs/BRD_COMPLIANCE.md](docs/BRD_COMPLIANCE.md) | BRD requirement coverage, implementation references, and value-added features |
+| [docs/TEST_EVIDENCE.md](docs/TEST_EVIDENCE.md) | Acceptance checklist and benchmark/test evidence |
+| [docs/DEPLOYMENT_READINESS.md](docs/DEPLOYMENT_READINESS.md) | Health, readiness, uptime monitoring, and deployment checklist |
 | [database/README.md](database/README.md) | Migration guide and SQL file index |
 
 ---

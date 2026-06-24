@@ -10,6 +10,7 @@ import {
   buildAssessmentReminderEmail,
   buildFeedbackRequestEmail,
 } from '@/lib/email'
+import { sendMandatoryBrdEmail } from '@/lib/brd-notifications'
 import type {
   ApiResponse,
   AttendanceStatus,
@@ -525,6 +526,20 @@ export async function updateTrainingGovernanceSettings(formData: FormData): Prom
 
   const { error } = await admin.from('training_system_settings').upsert(rows, { onConflict: 'key' })
   if (error) return { error: error.message }
+
+  await admin.from('training_admin_audit').insert({
+    actor_id: userId,
+    action: 'governance_settings_update',
+    target_table: 'training_system_settings',
+    details: {
+      attendance_cutoff_time: cutoff,
+      absence_alert_days: absenceDays,
+      topper_assessment_weight: assessmentWeight,
+      topper_project_weight: projectWeight,
+      topper_min_attendance: minAttendance,
+      feedback_window_days: feedbackDays,
+    },
+  })
 
   revalidatePath('/manager/settings')
   revalidatePath('/manager/operations')
@@ -1794,7 +1809,16 @@ export async function runTrainingAutomationSweep({
             cutoffTime: settings.attendanceCutoffTime,
             coordinatorName: coord.full_name || coord.email,
           })
-          const emailResult = await sendEmail({ to: coord.email, subject: `Attendance Cut-off Missed - ${session.title}`, html })
+          const emailResult = await sendMandatoryBrdEmail({
+            admin,
+            eventType: 'attendance_cutoff_missed',
+            to: coord.email,
+            recipientRole: 'training_coordinator',
+            relatedBatchId: session.batch_id,
+            relatedNotificationId: notif?.id || null,
+            subject: `Attendance Cut-off Missed - ${session.title}`,
+            html,
+          })
           sendAttempts++
           if (!emailResult.success) sendFailures++
           if (notif?.id) {
@@ -1850,7 +1874,16 @@ export async function runTrainingAutomationSweep({
           scheduledAt: new Date(setup.scheduled_at).toLocaleString(),
           candidateName: profile.full_name || profile.email,
         })
-        const emailResult = await sendEmail({ to: profile.email, subject: `Upcoming Assessment: ${setup.title}`, html })
+        const emailResult = await sendMandatoryBrdEmail({
+          admin,
+          eventType: 'assessment_reminder',
+          to: profile.email,
+          recipientRole: 'employee',
+          relatedBatchId: setup.batch_id,
+          relatedNotificationId: notif?.id || null,
+          subject: `Upcoming Assessment: ${setup.title}`,
+          html,
+        })
         sendAttempts++
         if (!emailResult.success) sendFailures++
         if (notif?.id) {
@@ -1925,7 +1958,16 @@ export async function runTrainingAutomationSweep({
               absenceDays: settings.absenceAlertDays,
               coordinatorName: coord.full_name || coord.email,
             })
-            const emailResult = await sendEmail({ to: coord.email, subject: `Absence Alert - ${memberProfile?.full_name || memberProfile?.email}`, html })
+            const emailResult = await sendMandatoryBrdEmail({
+              admin,
+              eventType: 'absence_streak',
+              to: coord.email,
+              recipientRole: 'training_coordinator',
+              relatedBatchId: targetBatchId,
+              relatedNotificationId: notif?.id || null,
+              subject: `Absence Alert - ${memberProfile?.full_name || memberProfile?.email}`,
+              html,
+            })
             sendAttempts++
             if (!emailResult.success) sendFailures++
             if (notif?.id) {
@@ -1984,7 +2026,16 @@ export async function runTrainingAutomationSweep({
             windowId: window.id,
             candidateName: profile.full_name || profile.email,
           })
-        const emailResult = await sendEmail({ to: profile.email, subject: `Feedback Requested - ${(window.batch as any)?.title || window.title}`, html })
+        const emailResult = await sendMandatoryBrdEmail({
+          admin,
+          eventType: 'feedback_request',
+          to: profile.email,
+          recipientRole: 'employee',
+          relatedBatchId: window.batch_id,
+          relatedNotificationId: notif?.id || null,
+          subject: `Feedback Requested - ${(window.batch as any)?.title || window.title}`,
+          html,
+        })
         sendAttempts++
         if (!emailResult.success) sendFailures++
         if (notif?.id) {
@@ -2201,8 +2252,13 @@ export async function createFeedbackWindow(formData: FormData): Promise<ApiRespo
       windowId: window.id,
       candidateName: profile.full_name || profile.email,
     })
-    const emailResult = await sendEmail({
+    const emailResult = await sendMandatoryBrdEmail({
+      admin,
+      eventType: 'feedback_request',
       to: profile.email,
+      recipientRole: 'employee',
+      relatedBatchId: batchId,
+      relatedNotificationId: notification?.id || null,
       subject: `Feedback Requested - ${batchInfo?.title || title}`,
       html,
     })

@@ -23,6 +23,8 @@ import {
   sanitizeProctoringEvents,
 } from '@/lib/proctoring-server'
 
+const TOPIC_RISK_WRONG_THRESHOLD = 25
+
 // ─── Start a quiz attempt ─────────────────────────────────────────────
 export async function startQuizAttempt(quizId: string, precheck?: {
   cameraReady: boolean
@@ -464,6 +466,14 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
       }
     }
 
+    if (data.status === 'completed') {
+      try {
+        await analyzeAndNotifyTopicRisk(adminClient, quiz, user.id)
+      } catch (topicRiskError) {
+        console.warn('Topic risk analysis failed (non-fatal):', topicRiskError)
+      }
+    }
+
     console.log(`Quiz submission successful for user ${user.id}, quiz ${quiz_id}`)
     revalidatePath('/employee', 'layout')
     revalidatePath('/employee/quizzes')
@@ -478,6 +488,208 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
     console.error('Quiz submission unexpected error:', error)
     return { error: 'An unexpected error occurred during quiz submission' }
   }
+}
+
+async function analyzeAndNotifyTopicRisk(adminClient: any, quiz: any, fallbackCreatorId: string) {
+  const questions = Array.isArray(quiz.questions) ? quiz.questions : []
+  if (questions.length === 0) return
+
+  const { data: attempts, error: attemptsError } = await adminClient
+    .from('quiz_attempts')
+    .select('id, user_id, answers')
+    .eq('quiz_id', quiz.id)
+    .eq('status', 'completed')
+
+  if (attemptsError) throw attemptsError
+  const completedAttempts = attempts || []
+  const totalAttempts = completedAttempts.length
+  if (totalAttempts === 0) return
+
+  const questionById = new Map<string, any>(questions.map((question: any) => [question.id, question]))
+  const wrongByQuestion = new Map<string, { wrongAttempts: number; wrongUserIds: Set<string> }>()
+
+  for (const attempt of completedAttempts) {
+    const attemptAnswers = Array.isArray(attempt.answers) ? attempt.answers : []
+    for (const answer of attemptAnswers) {
+      if (answer?.isCorrect !== false || !questionById.has(answer.questionId)) continue
+      const current = wrongByQuestion.get(answer.questionId) || { wrongAttempts: 0, wrongUserIds: new Set<string>() }
+      current.wrongAttempts += 1
+      if (attempt.user_id) current.wrongUserIds.add(attempt.user_id)
+      wrongByQuestion.set(answer.questionId, current)
+    }
+  }
+
+  for (const [questionId, stats] of wrongByQuestion.entries()) {
+    const wrongRate = Number(((stats.wrongAttempts / totalAttempts) * 100).toFixed(2))
+    if (wrongRate <= TOPIC_RISK_WRONG_THRESHOLD) continue
+
+    const question = questionById.get(questionId)
+    const topic = String(quiz.topic || 'General').trim() || 'General'
+    const wrongUserIds = [...stats.wrongUserIds]
+    const metadata = {
+      category: 'quiz_topic_risk',
+      quiz_id: quiz.id,
+      quiz_title: quiz.title,
+      question_id: questionId,
+      topic,
+      wrong_rate: wrongRate,
+      total_attempts: totalAttempts,
+      wrong_attempts: stats.wrongAttempts,
+      threshold: TOPIC_RISK_WRONG_THRESHOLD,
+    }
+
+    const { data: existingAlert, error: existingAlertError } = await adminClient
+      .from('quiz_topic_risk_alerts')
+      .select('id')
+      .eq('quiz_id', quiz.id)
+      .eq('question_id', questionId)
+      .maybeSingle()
+
+    if (existingAlertError) throw existingAlertError
+
+    if (existingAlert?.id) {
+      await adminClient
+        .from('quiz_topic_risk_alerts')
+        .update({
+          topic,
+          question_text: question.question_text,
+          total_attempts: totalAttempts,
+          wrong_attempts: stats.wrongAttempts,
+          wrong_rate: wrongRate,
+          threshold: TOPIC_RISK_WRONG_THRESHOLD,
+          metadata,
+        })
+        .eq('id', existingAlert.id)
+      continue
+    }
+
+    const staffRecipientIds = await getTopicRiskStaffRecipientIds(adminClient, quiz)
+    const notifiedUserIds = [...new Set([...staffRecipientIds, ...wrongUserIds])]
+    const { data: alert, error: alertError } = await adminClient
+      .from('quiz_topic_risk_alerts')
+      .insert({
+        quiz_id: quiz.id,
+        question_id: questionId,
+        topic,
+        question_text: question.question_text,
+        total_attempts: totalAttempts,
+        wrong_attempts: stats.wrongAttempts,
+        wrong_rate: wrongRate,
+        threshold: TOPIC_RISK_WRONG_THRESHOLD,
+        notified_user_ids: notifiedUserIds,
+        metadata,
+      })
+      .select('id')
+      .maybeSingle()
+
+    if (alertError) {
+      if (alertError.code === '23505') continue
+      throw alertError
+    }
+
+    await createTopicRiskNotifications({
+      adminClient,
+      quiz,
+      topic,
+      questionText: question.question_text,
+      totalAttempts,
+      wrongAttempts: stats.wrongAttempts,
+      wrongRate,
+      staffRecipientIds,
+      employeeRecipientIds: wrongUserIds,
+      createdBy: quiz.created_by || fallbackCreatorId,
+      alertId: alert?.id || null,
+      metadata,
+    })
+  }
+}
+
+async function getTopicRiskStaffRecipientIds(adminClient: any, quiz: any) {
+  const recipientIds = new Set<string>()
+  if (quiz.created_by) recipientIds.add(quiz.created_by)
+
+  const [{ data: admins }, { data: batch }, { data: trainers }] = await Promise.all([
+    adminClient.from('profiles').select('id').eq('role', 'admin').eq('approval_status', 'approved'),
+    quiz.batch_id
+      ? adminClient.from('training_batches').select('trainer_id, coordinator_id').eq('id', quiz.batch_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    quiz.batch_id
+      ? adminClient.from('training_batch_trainers').select('trainer_id').eq('batch_id', quiz.batch_id)
+      : Promise.resolve({ data: [] }),
+  ])
+
+  for (const admin of admins || []) if (admin.id) recipientIds.add(admin.id)
+  if (batch?.trainer_id) recipientIds.add(batch.trainer_id)
+  if (batch?.coordinator_id) recipientIds.add(batch.coordinator_id)
+  for (const trainer of trainers || []) if (trainer.trainer_id) recipientIds.add(trainer.trainer_id)
+
+  return [...recipientIds]
+}
+
+async function createTopicRiskNotifications({
+  adminClient,
+  quiz,
+  topic,
+  questionText,
+  totalAttempts,
+  wrongAttempts,
+  wrongRate,
+  staffRecipientIds,
+  employeeRecipientIds,
+  createdBy,
+  alertId,
+  metadata,
+}: {
+  adminClient: any
+  quiz: any
+  topic: string
+  questionText: string
+  totalAttempts: number
+  wrongAttempts: number
+  wrongRate: number
+  staffRecipientIds: string[]
+  employeeRecipientIds: string[]
+  createdBy: string
+  alertId: string | null
+  metadata: Record<string, any>
+}) {
+  const questionSnippet = truncateText(questionText, 140)
+  const sharedMetadata = { ...metadata, alert_id: alertId }
+  const staffRows = [...new Set(staffRecipientIds)].map((recipientId) => ({
+    batch_id: quiz.batch_id || null,
+    recipient_user_id: recipientId,
+    title: `Topic risk detected: ${topic}`,
+    message: `${wrongAttempts}/${totalAttempts} employees (${wrongRate}%) answered a ${topic} question incorrectly in ${quiz.title}. Reinforce this topic; evidence question: "${questionSnippet}".`,
+    audience: 'individual',
+    channel: 'in_app',
+    delivery_status: 'logged',
+    sent_at: new Date().toISOString(),
+    created_by: createdBy,
+    metadata: { ...sharedMetadata, recipient_type: 'staff' },
+  }))
+  const employeeRows = [...new Set(employeeRecipientIds)].map((recipientId) => ({
+    batch_id: quiz.batch_id || null,
+    recipient_user_id: recipientId,
+    title: `Focus area: ${topic}`,
+    message: `A ${topic} question in ${quiz.title} was missed by more than ${TOPIC_RISK_WRONG_THRESHOLD}% of learners. Revisit this topic and review your result explanations before the next assessment.`,
+    audience: 'individual',
+    channel: 'in_app',
+    delivery_status: 'logged',
+    sent_at: new Date().toISOString(),
+    created_by: createdBy,
+    metadata: { ...sharedMetadata, recipient_type: 'employee' },
+  }))
+
+  const rows = [...staffRows, ...employeeRows]
+  if (rows.length === 0) return
+  const { error } = await adminClient.from('training_notifications').insert(rows)
+  if (error) throw error
+}
+
+function truncateText(value: string, maxLength: number) {
+  const clean = String(value || '').replace(/\s+/g, ' ').trim()
+  if (clean.length <= maxLength) return clean
+  return `${clean.slice(0, maxLength - 3)}...`
 }
 
 async function getProctoringAlertRecipients() {

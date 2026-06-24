@@ -54,15 +54,6 @@ const navigation = [
     ]
   },
   {
-    section: 'Quick Access',
-    items: [
-      { name: 'Quiz Studio', href: '/manager/quizzes/new', icon: Sparkles, color: 'text-fuchsia-300', bg: 'bg-fuchsia-300/10', activeBg: 'bg-fuchsia-400', description: 'Create assessments' },
-      { name: 'AI Commands', href: '/manager/ai-command', icon: TerminalSquare, color: 'text-amber-300', bg: 'bg-amber-300/10', activeBg: 'bg-amber-400', description: 'Command console' },
-      { name: 'Risk Center', href: '/manager/integrity', icon: AlertTriangle, color: 'text-red-300', bg: 'bg-red-300/10', activeBg: 'bg-red-400', description: 'Integrity review' },
-      { name: 'Employees', href: '/manager/employees', icon: Users, color: 'text-emerald-400', bg: 'bg-emerald-400/10', activeBg: 'bg-emerald-500', description: 'Learner roster' },
-    ]
-  },
-  {
     section: 'Training Operations',
     items: [
       { name: 'Batches', href: '/manager/operations', icon: CalendarDays, color: 'text-cyan-400', bg: 'bg-cyan-400/10', activeBg: 'bg-cyan-500', description: 'Lifecycle control' },
