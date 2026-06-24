@@ -43,3 +43,11 @@ test('per-quiz topic performance visualization is wired', () => {
   assert.match(page, /QuizTopicPerformanceChart/)
   assert.match(page, /buildQuestionPerformance/)
 })
+
+test('quiz assignment uses BRD mandatory email logging', () => {
+  const service = read('lib/quiz-assignment-notifications.ts')
+  assert.match(service, /eventType:\s*'quiz_assigned'/)
+  assert.match(service, /sendMandatoryBrdEmail/)
+  assert.match(read('lib/actions/manager.ts'), /notifyQuizAssigned/)
+  assert.match(read('app/api/manager-chatbot/route.ts'), /createQuizAssignmentsAndNotify/)
+})

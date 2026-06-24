@@ -8,6 +8,7 @@ import { buildAdminGuideSearchIndex, findAdminGuideAnswer } from '@/lib/manager-
 import { createEmployeeWithSetupEmail, deleteEmployeeAccount } from '@/lib/employee-onboarding'
 import type { DifficultyLevel, QuizAnswer } from '@/lib/types/database'
 import { cleanEntity, classifyCopilotIntent, normalizeDifficultyArg, resolveAdminCommand } from '@/lib/ai-command-parser'
+import { formatQuizAssignmentEmailSummary, notifyQuizAssigned } from '@/lib/quiz-assignment-notifications'
 import { revalidatePath } from 'next/cache'
 
 export async function POST(request: NextRequest) {
@@ -1147,7 +1148,7 @@ async function createQuizCommand(admin: ReturnType<typeof createAdminClient>, ac
     created_by: actorId,
     batch_id: args.batch_id || null,
   }
-  const { data, error } = await admin.from('quizzes').insert(payload).select('id, title').single()
+  const { data, error } = await admin.from('quizzes').insert(payload).select('id, title, batch_id').single()
   if (error) return { error: error.message }
 
   const generation = await generateQuestionsForChatbotQuiz(admin, {
@@ -1163,10 +1164,10 @@ async function createQuizCommand(admin: ReturnType<typeof createAdminClient>, ac
   const dueDate = normalizeNaturalDueDate(args.due_date)
   if (assignee) {
     const assigned = await assignQuizToNaturalAssignee(admin, actorId, data.id, assignee, dueDate)
-    assignmentMessage = assigned.error ? ` Assignment skipped: ${assigned.error}` : ` Assigned to ${assigned.count} employee(s).`
+    assignmentMessage = assigned.error ? ` Assignment skipped: ${assigned.error}` : ` Assigned to ${assigned.count} employee(s). ${formatQuizAssignmentEmailSummary(assigned.email)}`
   } else if (args.department || args.team) {
     const assigned = await assignQuizToDepartment(admin, actorId, data.id, args.department || args.team, dueDate)
-    assignmentMessage = assigned.error ? ` Assignment skipped: ${assigned.error}` : ` Assigned to ${assigned.count} employee(s).`
+    assignmentMessage = assigned.error ? ` Assignment skipped: ${assigned.error}` : ` Assigned to ${assigned.count} employee(s). ${formatQuizAssignmentEmailSummary(assigned.email)}`
   }
 
   let certificateMessage = ''
@@ -1286,18 +1287,57 @@ async function assignQuizCommand(admin: ReturnType<typeof createAdminClient>, ac
   const quiz = await findQuizByArgs(admin, args)
   const employeeEmails = splitList(args.employee_emails || args.employees || args.email)
   if (!quiz || !employeeEmails.length) return { error: 'Use: run assign quiz quiz="..." employee_emails=a@x.com,b@x.com due_date=2026-06-30' }
-  const { data: employees } = await admin.from('profiles').select('id, email').in('email', employeeEmails)
+  const { data: employees } = await admin.from('profiles').select('id, email, full_name').in('email', employeeEmails).eq('role', 'employee')
   if (!employees?.length) return { error: 'No employees matched the provided email(s).' }
-  const rows = employees.map((employee: any) => ({
+  const assignment = await createQuizAssignmentsAndNotify(admin, actorId, quiz, employees, args.due_date || null)
+  if (assignment.error) return { error: assignment.error }
+  revalidateManagerPaths()
+  return {
+    message: `Quiz "${quiz.title}" assigned to ${employees.length} employee(s). ${formatQuizAssignmentEmailSummary(assignment.email)}`,
+    data: assignment.rows,
+  }
+}
+
+async function createQuizAssignmentsAndNotify(
+  admin: ReturnType<typeof createAdminClient>,
+  actorId: string,
+  quiz: { id: string; title?: string | null; batch_id?: string | null },
+  employees: Array<{ id: string; email: string; full_name?: string | null }>,
+  dueDate?: string | null,
+) {
+  const { data: existingAssignments, error: existingError } = await admin
+    .from('quiz_assignments')
+    .select('user_id')
+    .eq('quiz_id', quiz.id)
+    .in('user_id', employees.map((employee) => employee.id))
+  if (existingError) return { error: existingError.message, rows: [], email: { attempted: 0, sent: 0, failed: 0, failures: [], logIds: [] } }
+
+  const existingUserIds = new Set((existingAssignments || []).map((assignment: any) => assignment.user_id))
+  const newlyAssignedEmployees = employees.filter((employee) => !existingUserIds.has(employee.id))
+  const rows = employees.map((employee) => ({
     quiz_id: quiz.id,
     user_id: employee.id,
     assigned_by: actorId,
-    due_date: args.due_date || null,
+    due_date: dueDate || null,
   }))
   const { error } = await admin.from('quiz_assignments').upsert(rows, { onConflict: 'quiz_id,user_id' })
-  if (error) return { error: error.message }
-  revalidateManagerPaths()
-  return { message: `Quiz "${quiz.title}" assigned to ${employees.length} employee(s).`, data: rows }
+  if (error) return { error: error.message, rows, email: { attempted: 0, sent: 0, failed: 0, failures: [], logIds: [] } }
+
+  const { data: assigner } = await admin
+    .from('profiles')
+    .select('id, full_name, email')
+    .eq('id', actorId)
+    .maybeSingle()
+
+  const email = await notifyQuizAssigned({
+    admin,
+    quiz,
+    recipients: newlyAssignedEmployees,
+    assignedBy: { id: actorId, name: assigner?.full_name, email: assigner?.email },
+    dueDate,
+  })
+
+  return { rows, email }
 }
 
 async function createBatchCommand(admin: ReturnType<typeof createAdminClient>, actorId: string, args: Record<string, string>) {
@@ -1803,38 +1843,45 @@ async function assignQuizToNaturalAssignee(
   assignee: string,
   dueDate?: string,
 ) {
+  const emptyEmail = { attempted: 0, sent: 0, failed: 0, failures: [], logIds: [] }
   const assigneeItems = splitList(assignee)
   if (assigneeItems.length > 1) {
     let count = 0
     const errors: string[] = []
+    const email = { ...emptyEmail, failures: [] as Array<{ email: string; error: string }>, logIds: [] as string[] }
     for (const item of assigneeItems) {
       const result = await assignQuizToNaturalAssignee(admin, actorId, quizId, item, dueDate)
       count += result.count || 0
       if (result.error) errors.push(result.error)
+      if (result.email) {
+        email.attempted += result.email.attempted
+        email.sent += result.email.sent
+        email.failed += result.email.failed
+        email.failures.push(...result.email.failures)
+        email.logIds.push(...result.email.logIds)
+      }
     }
     return {
       error: count ? undefined : errors.join(' '),
       count,
+      email,
     }
   }
 
   const emails = splitList(assignee).filter((item) => item.includes('@'))
   let employees: any[] | null = null
   if (emails.length) {
-    const { data } = await admin.from('profiles').select('id, email').in('email', emails).eq('role', 'employee')
+    const { data } = await admin.from('profiles').select('id, email, full_name').in('email', emails).eq('role', 'employee')
     employees = data || []
   } else {
-    const { data } = await admin.from('profiles').select('id, email').ilike('full_name', `%${assignee}%`).eq('role', 'employee').limit(10)
+    const { data } = await admin.from('profiles').select('id, email, full_name').ilike('full_name', `%${assignee}%`).eq('role', 'employee').limit(10)
     employees = data || []
   }
-  if (!employees.length) return { error: `No employee matched "${assignee}".`, count: 0 }
-  const { error } = await admin.from('quiz_assignments').upsert(employees.map((employee) => ({
-    quiz_id: quizId,
-    user_id: employee.id,
-    assigned_by: actorId,
-    due_date: dueDate || null,
-  })), { onConflict: 'quiz_id,user_id' })
-  return { error: error?.message, count: error ? 0 : employees.length }
+  if (!employees.length) return { error: `No employee matched "${assignee}".`, count: 0, email: emptyEmail }
+  const { data: quiz } = await admin.from('quizzes').select('id, title, batch_id').eq('id', quizId).maybeSingle()
+  if (!quiz) return { error: 'Quiz was not found for assignment notification.', count: 0, email: emptyEmail }
+  const assigned = await createQuizAssignmentsAndNotify(admin, actorId, quiz, employees, dueDate || null)
+  return { error: assigned.error, count: assigned.error ? 0 : employees.length, email: assigned.email }
 }
 
 async function assignQuizToDepartment(
@@ -1846,18 +1893,16 @@ async function assignQuizToDepartment(
 ) {
   const { data: employees } = await admin
     .from('profiles')
-    .select('id')
+    .select('id, email, full_name')
     .eq('role', 'employee')
     .or(`department.ilike.%${department}%,domain.ilike.%${department}%`)
     .limit(200)
-  if (!employees?.length) return { error: `No employees matched department/team "${department}".`, count: 0 }
-  const { error } = await admin.from('quiz_assignments').upsert(employees.map((employee: any) => ({
-    quiz_id: quizId,
-    user_id: employee.id,
-    assigned_by: actorId,
-    due_date: dueDate || null,
-  })), { onConflict: 'quiz_id,user_id' })
-  return { error: error?.message, count: error ? 0 : employees.length }
+  const emptyEmail = { attempted: 0, sent: 0, failed: 0, failures: [], logIds: [] }
+  if (!employees?.length) return { error: `No employees matched department/team "${department}".`, count: 0, email: emptyEmail }
+  const { data: quiz } = await admin.from('quizzes').select('id, title, batch_id').eq('id', quizId).maybeSingle()
+  if (!quiz) return { error: 'Quiz was not found for assignment notification.', count: 0, email: emptyEmail }
+  const assigned = await createQuizAssignmentsAndNotify(admin, actorId, quiz, employees, dueDate || null)
+  return { error: assigned.error, count: assigned.error ? 0 : employees.length, email: assigned.email }
 }
 
 function buildQuestionOptions(args: Record<string, string>) {

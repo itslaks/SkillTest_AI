@@ -27,6 +27,7 @@ npm run brd:dashboard-benchmark
 | 8 | Assessment Excel upload maps scores | `/api/assessment-import`, `assessment_results` |
 | 9 | Duplicate/invalid uploads rejected with error report | upload fingerprint checks, row-level errors, downloadable issue files |
 | 10 | Feedback email triggered and logged | `createFeedbackWindow`, `brd_email_notification_logs` |
+| 10a | Quiz assignment email triggered and logged | `notifyQuizAssigned`, `quiz_assigned` rows in `brd_email_notification_logs` |
 | 11 | Dashboard shows near real-time metrics | operations/report dashboards query live training tables |
 | 12 | Reports export in Excel and PDF | `app/api/export/*` |
 | 13 | Topper list uses configurable weights | `training_system_settings`, `lib/topper.ts` |
@@ -41,6 +42,7 @@ npm run brd:dashboard-benchmark
 - Added XLSX benchmark scripts for candidate, attendance, and assessment uploads.
 - Added dashboard benchmark script for candidate counts, attendance rate, assessment clearance, trainer performance, and batch comparisons.
 - Added mandatory email delivery audit and retry support.
+- Added quiz assignment mandatory email tests for `quiz_assigned` log creation, sent status, and failed status.
 
 ## Remaining Manual Validation
 

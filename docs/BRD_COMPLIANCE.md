@@ -17,6 +17,7 @@ The Maverick Execution Platform / TMS implements the BRD training lifecycle requ
 | Successful assessment upload email | Implemented | `app/api/assessment-import/route.ts` |
 | Assessment reminder email | Implemented | `runTrainingAutomationSweep` |
 | Feedback request email | Implemented | `createFeedbackWindow`, feedback reminder sweep |
+| Quiz assignment email | Implemented | `notifyQuizAssigned`, `brd_email_notification_logs.event_type = quiz_assigned` |
 | Feedback collection and reporting | Implemented | `training_feedback`, export routes |
 | Dashboard metrics | Implemented | `app/manager/operations/page.tsx`, `app/manager/reports/page.tsx` |
 | Excel/PDF reports | Implemented | `app/api/export/*`, `components/manager/tms-batch-downloads.tsx` |
@@ -29,6 +30,8 @@ The Maverick Execution Platform / TMS implements the BRD training lifecycle requ
 ## Mandatory Email
 
 BRD mandatory emails use `lib/brd-notifications.ts`. Every BRD event attempts email delivery and writes `brd_email_notification_logs` with event type, recipient, role, batch, provider, status, error, and timestamps. If SMTP or Resend is missing, the log is marked `failed` with a configuration error. Failed messages can be retried through `/api/cron/retry-brd-email`.
+
+Quiz assignment emails are routed through `lib/quiz-assignment-notifications.ts` for manager UI assignment, AI Command `assign quiz`, and AI Command create-and-assign flows. Each recipient gets one `brd_email_notification_logs` row with `event_type = quiz_assigned`, then the provider result updates the row to `sent` or `failed`.
 
 ## Value Added Features Beyond BRD
 

@@ -5,9 +5,9 @@ import { requireAdmin, requireManager, requireTrainingStaff } from '@/lib/rbac'
 import { revalidatePath } from 'next/cache'
 import type { ApiResponse, EmployeeImport, EmployeeImportError, EmployeeImportResult } from '@/lib/types/database'
 import { approveTrainer, rejectTrainer } from '@/lib/actions/auth'
-import { buildQuizAssignedEmail, sendEmail } from '@/lib/email'
 import { createEmployeeWithSetupEmail, sendEmployeeSetupEmail } from '@/lib/employee-onboarding'
 import { uuidSchema } from '@/lib/security/validation'
+import { formatQuizAssignmentEmailSummary, notifyQuizAssigned } from '@/lib/quiz-assignment-notifications'
 
 // ─── Pending Trainer Sign-Ups (Admin only) ────────────────────────────
 
@@ -563,7 +563,7 @@ export async function assignQuizToEmployees(quizId: string, employeeIds: string[
 
   let quizQuery = supabase
     .from('quizzes')
-    .select('id, title, topic, difficulty, created_by, is_active')
+    .select('id, title, topic, difficulty, created_by, is_active, batch_id')
     .eq('id', quizIdResult.data)
   if (role !== 'admin') quizQuery = quizQuery.eq('created_by', userId)
   const { data: quiz, error: quizError } = await quizQuery.maybeSingle()
@@ -587,6 +587,21 @@ export async function assignQuizToEmployees(quizId: string, employeeIds: string[
     assigned_by: userId,
   }))
 
+  const { data: existingAssignments, error: existingError } = await supabase
+    .from('quiz_assignments')
+    .select('user_id')
+    .eq('quiz_id', quizIdResult.data)
+    .in('user_id', employees.map((profile: any) => profile.id))
+
+  if (existingError) return { error: existingError.message }
+  const existingUserIds = new Set((existingAssignments || []).map((assignment: any) => assignment.user_id))
+  const newlyAssignedEmployees = employees.filter((profile: any) => !existingUserIds.has(profile.id))
+  const { data: assigner } = await supabase
+    .from('profiles')
+    .select('id, full_name, email')
+    .eq('id', userId)
+    .maybeSingle()
+
   const { error } = await supabase
     .from('quiz_assignments')
     .upsert(rows, { onConflict: 'quiz_id,user_id', ignoreDuplicates: true })
@@ -598,19 +613,16 @@ export async function assignQuizToEmployees(quizId: string, employeeIds: string[
   revalidatePath('/manager/quizzes', 'page')
   revalidatePath('/manager/employees', 'page')
 
+  let emailSummary = null
   if (successCount > 0) {
+    emailSummary = await notifyQuizAssigned({
+      admin: supabase,
+      quiz,
+      recipients: newlyAssignedEmployees,
+      assignedBy: { id: userId, name: assigner?.full_name, email: assigner?.email },
+    })
     await Promise.allSettled(employees.map((profile: any) =>
       Promise.allSettled([
-        sendEmail({
-          to: profile.email,
-          subject: `Quiz Assigned: ${quiz.title || 'SkillTest_AI Assessment'}`,
-          html: buildQuizAssignedEmail({
-            employeeName: profile.full_name,
-            quizTitle: quiz.title || 'SkillTest_AI Assessment',
-            topic: quiz.topic || 'General',
-            difficulty: quiz.difficulty || 'medium',
-          }),
-        }).catch((err) => console.warn('[assignQuizToEmployees] email failed:', err)),
         supabase.from('training_notifications').insert({
           recipient_user_id: profile.id,
           title: `Quiz assigned: ${quiz.title || 'SkillTest_AI Assessment'}`,
@@ -625,7 +637,12 @@ export async function assignQuizToEmployees(quizId: string, employeeIds: string[
     ))
   }
 
-  return { data: true, assigned: successCount }
+  return {
+    data: true,
+    assigned: successCount,
+    email: emailSummary,
+    emailSummary: emailSummary ? formatQuizAssignmentEmailSummary(emailSummary) : 'No new assignment emails were needed.',
+  }
 }
 
 // ─── Unassign a quiz from an employee ─────────────────────────────────

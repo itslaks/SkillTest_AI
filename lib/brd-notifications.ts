@@ -1,14 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { sendEmail, validateEmailConfiguration } from '@/lib/email'
-
-export type BrdEmailEventType =
-  | 'attendance_cutoff_missed'
-  | 'absence_streak'
-  | 'attendance_upload_success'
-  | 'assessment_upload_success'
-  | 'assessment_reminder'
-  | 'feedback_request'
-  | 'email_configuration_test'
+import { sendMandatoryBrdEmailCore, type BrdEmailConfiguration, type BrdEmailEventType, type BrdEmailTransport } from '@/lib/brd-notifications-core'
 
 type AdminClient = ReturnType<typeof createAdminClient>
 
@@ -22,72 +14,26 @@ type MandatoryEmailInput = {
   subject: string
   html: string
   text?: string
+  transport?: BrdEmailTransport
+  configuration?: BrdEmailConfiguration
 }
 
 export async function sendMandatoryBrdEmail(input: MandatoryEmailInput) {
   const admin = input.admin || createAdminClient()
-  const config = validateEmailConfiguration()
-  const provider = config.provider
-  const { data: log } = await admin
-    .from('brd_email_notification_logs')
-    .insert({
-      event_type: input.eventType,
-      recipient_email: input.to,
-      recipient_role: input.recipientRole,
-      related_batch_id: input.relatedBatchId || null,
-      related_notification_id: input.relatedNotificationId || null,
-      status: 'pending',
-      provider,
-      subject: input.subject,
-      html_body: input.html,
-      text_body: input.text || null,
-    })
-    .select('id')
-    .maybeSingle()
-
-  const logId = log?.id
-  const fail = async (message: string) => {
-    if (logId) {
-      await admin
-        .from('brd_email_notification_logs')
-        .update({
-          status: 'failed',
-          provider,
-          error_message: message,
-          attempt_count: 1,
-          last_attempted_at: new Date().toISOString(),
-        })
-        .eq('id', logId)
-    }
-    return { success: false, error: message, logId }
-  }
-
-  if (!config.valid) {
-    return fail(config.errors.join(' '))
-  }
-
-  const result = await sendEmail({
+  const config = input.configuration || validateEmailConfiguration()
+  return sendMandatoryBrdEmailCore({
+    admin,
+    eventType: input.eventType,
     to: input.to,
+    recipientRole: input.recipientRole,
+    relatedBatchId: input.relatedBatchId,
+    relatedNotificationId: input.relatedNotificationId,
     subject: input.subject,
     html: input.html,
     text: input.text,
+    transport: input.transport || sendEmail,
+    configuration: config,
   })
-
-  if (logId) {
-    await admin
-      .from('brd_email_notification_logs')
-      .update({
-        status: result.success ? 'sent' : 'failed',
-        provider,
-        error_message: result.error || null,
-        attempt_count: 1,
-        last_attempted_at: new Date().toISOString(),
-        sent_at: result.success ? new Date().toISOString() : null,
-      })
-      .eq('id', logId)
-  }
-
-  return { ...result, logId }
 }
 
 export async function retryFailedBrdEmailNotifications(limit = 50) {

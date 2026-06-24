@@ -120,7 +120,11 @@ export function QuizAssignmentManager({ quizzes, employees, assignments, autoOpe
               }))
             return [...newRows, ...current]
           })
-          toast({ title: 'Quiz assigned', description: `Assigned to ${employeeIdsToAssign.length} employee(s).` })
+          toast({
+            title: 'Quiz assigned',
+            description: `Assigned to ${employeeIdsToAssign.length} employee(s). ${result.emailSummary || ''}`.trim(),
+            variant: result.email?.failed ? 'destructive' : 'default',
+          })
           setSelectedEmployees([])
           setIsOpen(false)
         }
