@@ -13,7 +13,7 @@ database/
 
 ## Running Migrations
 
-Open the Supabase SQL Editor and run the files in `migrations/` in numeric order (`001` through `052`).
+Open the Supabase SQL Editor and run the files in `migrations/` in numeric order (`001` through `053`).
 
 | Range | What it creates |
 |-------|-----------------|
@@ -24,7 +24,7 @@ Open the Supabase SQL Editor and run the files in `migrations/` in numeric order
 | 027-032 | Attendance late reasons, notification statuses, quiz visibility, certificates, badge awards |
 | 033-040 | Proctoring schema, risk engine, normalized events, realtime notifications, suspicious gating |
 | 041-048 | Trainer assignment, proctoring baseline metadata, avatar migration, AI command copilot, notification health, feedback review |
-| 049-052 | SaaS tenancy/billing/SSO foundation, proctoring validation program, weak-topic alerts, BRD email logs and performance indexes |
+| 049-053 | SaaS tenancy/billing/SSO foundation, proctoring validation program, weak-topic alerts, BRD email logs, performance indexes, and session meeting links |
 
 ## Seeds (`seeds/`)
 

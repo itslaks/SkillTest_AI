@@ -1,8 +1,10 @@
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { OpsAutoRefresh } from '@/components/manager/ops-auto-refresh'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/rbac'
 import { getNotificationVerb, getStaffNotifications, type StaffNotification } from '@/lib/notifications'
-import { Bell, CheckCircle2, ClipboardList, Mail, Radio, UserRound } from 'lucide-react'
+import { ArrowUpRight, Bell, CheckCircle2, ClipboardList, Mail, Radio, UserRound } from 'lucide-react'
 
 export default async function ManagerNotificationsPage() {
   const { userId, role } = await requireRole('admin', 'trainer')
@@ -37,6 +39,8 @@ export default async function ManagerNotificationsPage() {
         </div>
       </div>
 
+      <OpsAutoRefresh intervalMs={15000} compact />
+
       <section className="rounded-[1.5rem] border border-zinc-200 bg-white shadow-sm">
         <div className="border-b border-zinc-100 px-5 py-4">
           <p className="text-sm font-semibold text-zinc-950">Recent events</p>
@@ -57,6 +61,7 @@ export default async function ManagerNotificationsPage() {
 function NotificationRow({ notification }: { notification: StaffNotification }) {
   const verb = getNotificationVerb(notification)
   const context = notification.batch?.title || notification.session?.title || notification.recipient?.full_name || 'General activity'
+  const meetingUrl = typeof notification.metadata?.meeting_url === 'string' ? notification.metadata.meeting_url : null
 
   return (
     <article className="grid gap-4 p-5 md:grid-cols-[minmax(0,1fr)_auto]">
@@ -73,6 +78,14 @@ function NotificationRow({ notification }: { notification: StaffNotification }) 
           <LogPill icon={UserRound} text={notification.creator?.full_name || notification.creator?.email || 'System'} />
           <LogPill icon={Mail} text={notification.channel || 'in_app'} />
         </div>
+        {meetingUrl ? (
+          <Button asChild size="sm" className="mt-4 rounded-full bg-zinc-950 text-white hover:bg-zinc-800">
+            <a href={meetingUrl} target="_blank" rel="noreferrer">
+              <ArrowUpRight className="mr-2 h-4 w-4" />
+              Open session link
+            </a>
+          </Button>
+        ) : null}
       </div>
       <div className="flex items-center gap-2 md:justify-end">
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-950 text-white">

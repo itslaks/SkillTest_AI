@@ -29,3 +29,33 @@ test('create quiz command accepts structured bulk recipient arguments', () => {
   assert.match(routeSource, /args\.employees/)
   assert.match(routeSource, /createQuizAssignmentsAndNotify/)
 })
+
+test('AI Command answers scoped employee-count prompts deterministically', () => {
+  const routeSource = read('app/api/manager-chatbot/route.ts')
+  assert.match(routeSource, /summarizeRosterCount\(message, data\)/)
+  assert.match(routeSource, /Employees in your current training scope/)
+  assert.match(routeSource, /Visible employee profiles/)
+})
+
+test('training session creation syncs trainer, learner attendance, meeting links, and notifications', () => {
+  const syncSource = read('lib/training-session-sync.ts')
+  const trainingActions = read('lib/actions/training.ts')
+  const chatbotRoute = read('app/api/manager-chatbot/route.ts')
+  const candidateImport = read('app/api/training/batch-candidate-import/route.ts')
+  const migration = read('database/migrations/053_training_session_meeting_links.sql')
+  const accessSource = read('lib/training-access.ts')
+
+  assert.match(syncSource, /syncTrainingSessionVisibility/)
+  assert.match(syncSource, /training_batch_trainers/)
+  assert.match(syncSource, /session_attendance/)
+  assert.match(syncSource, /buildSessionAllocationEmail/)
+  assert.match(syncSource, /recipient_role: 'employee'/)
+  assert.match(syncSource, /recipient_role: 'trainer'/)
+  assert.match(migration, /meeting_url TEXT/)
+  assert.match(accessSource, /from\('training_sessions'\)/)
+  assert.match(trainingActions, /syncTrainingSessionVisibility/)
+  assert.match(trainingActions, /meeting_url: meetingUrl/)
+  assert.match(chatbotRoute, /syncTrainingSessionVisibility/)
+  assert.match(chatbotRoute, /args\.meeting_url/)
+  assert.match(candidateImport, /backfillAttendanceForBatchMembers/)
+})

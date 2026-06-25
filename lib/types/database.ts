@@ -185,6 +185,7 @@ export interface TrainingSession {
   trainer_id: string | null
   title: string
   agenda: string | null
+  meeting_url: string | null
   session_date: string
   mode: SessionMode
   status: SessionStatus

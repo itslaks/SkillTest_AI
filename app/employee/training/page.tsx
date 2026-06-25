@@ -3,7 +3,9 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { DashboardSignalShowcase } from '@/components/insights/dashboard-signal-showcase'
+import { OpsAutoRefresh } from '@/components/manager/ops-auto-refresh'
 import {
+  ArrowUpRight,
   BellRing,
   CalendarDays,
   ClipboardCheck,
@@ -30,6 +32,15 @@ export default async function EmployeeTrainingPage() {
     feedbackWindows,
     quizzes,
   } = await getEmployeeTrainingData()
+  const trainerByBatch = new Map(
+    memberships.map((membership: any) => [
+      membership.batch_id,
+      membership.batch?.trainer?.full_name || membership.batch?.trainer?.email || null,
+    ])
+  )
+  const nextSessionTrainer = nextSession
+    ? nextSession.trainer?.full_name || nextSession.trainer?.email || trainerByBatch.get(nextSession.batch_id) || 'Trainer TBD'
+    : 'Trainer TBD'
 
   return (
     <div className="space-y-8">
@@ -58,6 +69,8 @@ export default async function EmployeeTrainingPage() {
           </div>
         </div>
       </section>
+
+      <OpsAutoRefresh intervalMs={15000} compact />
 
       <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <Card className="border-zinc-200 shadow-sm spotlight-card">
@@ -102,8 +115,20 @@ export default async function EmployeeTrainingPage() {
               </div>
               <p className="mt-3 text-lg font-medium text-blue-950">{nextSession?.title || 'No scheduled session yet'}</p>
               <p className="mt-1 text-sm text-blue-800">
-                {nextSession ? `${new Date(nextSession.session_date).toLocaleString()} - ${nextSession.mode} - ${nextSession.trainer?.full_name || nextSession.trainer?.email || 'Trainer TBD'}` : 'Your next session details will appear here as soon as your trainer schedules one.'}
+                {nextSession ? `${new Date(nextSession.session_date).toLocaleString()} - ${nextSession.mode} - ${nextSessionTrainer}` : 'Your next session details will appear here as soon as your trainer schedules one.'}
               </p>
+              {nextSession?.meeting_url ? (
+                <Button asChild className="mt-4 rounded-full bg-blue-950 text-white hover:bg-blue-900">
+                  <a href={nextSession.meeting_url} target="_blank" rel="noreferrer">
+                    <ArrowUpRight className="mr-2 h-4 w-4" />
+                    Join session
+                  </a>
+                </Button>
+              ) : nextSession ? (
+                <p className="mt-4 rounded-2xl border border-blue-200 bg-white/70 px-4 py-3 text-sm font-medium text-blue-900">
+                  Join link is pending. Your admin or trainer can add it before the session.
+                </p>
+              ) : null}
             </div>
           </CardContent>
         </Card>

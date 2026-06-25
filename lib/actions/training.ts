@@ -11,6 +11,7 @@ import {
   buildFeedbackRequestEmail,
 } from '@/lib/email'
 import { sendMandatoryBrdEmail } from '@/lib/brd-notifications'
+import { backfillAttendanceForBatchMembers, syncTrainingSessionVisibility } from '@/lib/training-session-sync'
 import type {
   ApiResponse,
   AttendanceStatus,
@@ -718,6 +719,11 @@ export async function createTrainingBatch(formData: FormData): Promise<ApiRespon
 
     const { error: memberError } = await admin.from('batch_members').upsert(memberRows, { onConflict: 'batch_id,user_id' })
     if (memberError) return { error: `Batch created, but learner enrollment failed: ${memberError.message}` }
+
+    const backfill = await backfillAttendanceForBatchMembers(admin, batch.id, employeeIds, userId)
+    if (backfill.warnings.length) {
+      return { error: `Batch created, but learner attendance wiring failed: ${backfill.warnings.join('; ')}` }
+    }
   }
 
   if (trainerIds.length > 0) {
@@ -1165,12 +1171,13 @@ export async function updateTrainingBatchDetails(formData: FormData): Promise<Ap
 }
 
 export async function updateTrainingSession(formData: FormData): Promise<ApiResponse<boolean>> {
-  const { userId, role } = await requireManager()
+  const { userId, role } = await requireTrainingStaff()
   const admin = createAdminClient()
 
   const sessionId = asRequiredString(formData.get('session_id'))
   const title = asRequiredString(formData.get('title'))
   const agenda = asOptionalString(formData.get('agenda'))
+  const meetingUrl = asOptionalString(formData.get('meeting_url'))
   const trainerId = asOptionalString(formData.get('trainer_id'))
   const sessionDate = asRequiredString(formData.get('session_date'))
   const mode = (asRequiredString(formData.get('mode'), 'virtual') || 'virtual') as SessionMode
@@ -1181,15 +1188,27 @@ export async function updateTrainingSession(formData: FormData): Promise<ApiResp
 
   const { data: previous } = await admin
     .from('training_sessions')
-    .select('*, batch:batch_id(created_by, coordinator_id)')
+    .select('*, batch:batch_id(created_by, coordinator_id, trainer_id)')
     .eq('id', sessionId)
     .maybeSingle()
   if (!previous) return { error: 'Training session was not found.' }
+
+  let trainerAssignment: any = null
+  if (role === 'trainer') {
+    const { data } = await admin
+      .from('training_batch_trainers')
+      .select('id')
+      .eq('batch_id', previous.batch_id)
+      .eq('trainer_id', userId)
+      .maybeSingle()
+    trainerAssignment = data
+  }
 
   const canUpdate = role === 'admin'
     || previous.created_by === userId
     || (previous.batch as any)?.created_by === userId
     || (previous.batch as any)?.coordinator_id === userId
+    || (role === 'trainer' && (previous.trainer_id === userId || (previous.batch as any)?.trainer_id === userId || Boolean(trainerAssignment)))
   if (!canUpdate) return { error: 'You do not have permission to update this session.' }
 
   const { data: updated, error } = await admin
@@ -1197,6 +1216,7 @@ export async function updateTrainingSession(formData: FormData): Promise<ApiResp
     .update({
       title,
       agenda,
+      meeting_url: meetingUrl,
       trainer_id: trainerId,
       session_date: sessionDate,
       mode,
@@ -1209,11 +1229,31 @@ export async function updateTrainingSession(formData: FormData): Promise<ApiResp
   if (error) return { error: error.message }
   if (!updated?.length) return { error: 'You do not have permission to update this session.' }
 
+  const allocationChanged = previous.title !== title
+    || previous.session_date !== sessionDate
+    || previous.mode !== mode
+    || previous.trainer_id !== trainerId
+    || (previous.meeting_url || null) !== (meetingUrl || null)
+  if (allocationChanged) {
+    const sync = await syncTrainingSessionVisibility(admin, {
+      batchId: previous.batch_id,
+      sessionId,
+      title,
+      sessionDate,
+      mode,
+      meetingUrl,
+      trainerId,
+      actorId: userId,
+      attendanceRequired,
+    })
+    if (sync.warnings.length) return { error: `Session updated, but allocation notification failed: ${sync.warnings.join('; ')}` }
+  }
+
   await admin.from('training_batch_change_audit').insert({
     batch_id: previous.batch_id,
     change_type: 'session_update',
     previous_value: previous,
-    new_value: { title, agenda, trainerId, sessionDate, mode, status, attendanceRequired },
+    new_value: { title, agenda, meetingUrl, trainerId, sessionDate, mode, status, attendanceRequired },
     changed_by: userId,
   }).select('id').maybeSingle()
 
@@ -1275,7 +1315,9 @@ export async function createTrainingSession(formData: FormData): Promise<ApiResp
   const batchId = asRequiredString(formData.get('batch_id'))
   const title = asRequiredString(formData.get('title'))
   const agenda = asOptionalString(formData.get('agenda'))
+  const meetingUrl = asOptionalString(formData.get('meeting_url'))
   const trainerId = asOptionalString(formData.get('trainer_id'))
+  const employeeIds = parseIds(formData.getAll('employee_ids'))
   const sessionDate = asRequiredString(formData.get('session_date'))
   const mode = (asRequiredString(formData.get('mode'), 'virtual') || 'virtual') as SessionMode
   const status = (asRequiredString(formData.get('status'), 'scheduled') || 'scheduled') as SessionStatus
@@ -1292,6 +1334,7 @@ export async function createTrainingSession(formData: FormData): Promise<ApiResp
       trainer_id: trainerId,
       title,
       agenda,
+      meeting_url: meetingUrl,
       session_date: sessionDate,
       mode,
       status,
@@ -1305,35 +1348,31 @@ export async function createTrainingSession(formData: FormData): Promise<ApiResp
     return { error: error?.message || 'Unable to create session.' }
   }
 
-  const { data: members } = await admin
-    .from('batch_members')
-    .select('user_id')
-    .eq('batch_id', batchId)
-
-  if (members && members.length > 0) {
-    const attendanceRows = members.map((member) => ({
-      session_id: session.id,
-      user_id: member.user_id,
-      status: 'absent',
-      updated_by: userId,
-    }))
-
-    const { error: attendanceError } = await admin.from('session_attendance').upsert(attendanceRows, { onConflict: 'session_id,user_id' })
-    if (attendanceError) return { error: `Session created, but attendance setup failed: ${attendanceError.message}` }
+  if (employeeIds.length > 0) {
+    const { error: memberError } = await admin.from('batch_members').upsert(
+      employeeIds.map((employeeId) => ({
+        batch_id: batchId,
+        user_id: employeeId,
+        enrollment_status: 'active',
+        support_status: 'on_track',
+      })),
+      { onConflict: 'batch_id,user_id' }
+    )
+    if (memberError) return { error: `Session created, but learner allocation failed: ${memberError.message}` }
   }
 
-  const { error: notificationError } = await admin.from('training_notifications').insert({
-    batch_id: batchId,
-    session_id: session.id,
-    title: `New session scheduled: ${title}`,
-    message: `A ${mode} session has been scheduled for ${new Date(sessionDate).toLocaleString()}.`,
-    audience: 'batch',
-    channel: 'in_app',
-    delivery_status: 'sent',
-    sent_at: new Date().toISOString(),
-    created_by: userId,
+  const sync = await syncTrainingSessionVisibility(admin, {
+    batchId,
+    sessionId: session.id,
+    title,
+    sessionDate,
+    mode,
+    meetingUrl,
+    trainerId,
+    actorId: userId,
+    attendanceRequired,
   })
-  if (notificationError) return { error: `Session created, but notification logging failed: ${notificationError.message}` }
+  if (sync.warnings.length) return { error: `Session created, but training ops wiring failed: ${sync.warnings.join('; ')}` }
 
   revalidatePath('/manager')
   revalidatePath('/manager/operations')

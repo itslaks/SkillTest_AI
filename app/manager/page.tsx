@@ -25,6 +25,7 @@ import {
 import { getQuizStats } from '@/lib/actions/quiz'
 import { getTrainingOpsManagerData } from '@/lib/actions/training'
 import { AiInsightCard } from '@/components/manager/ai-insight-card'
+import { OpsAutoRefresh } from '@/components/manager/ops-auto-refresh'
 
 export default async function ManagerDashboard() {
   const { userId, role } = await requireTrainingStaff()
@@ -195,6 +196,8 @@ export default async function ManagerDashboard() {
 
   return (
     <div className="space-y-8">
+      <OpsAutoRefresh intervalMs={15000} compact />
+
       {/* Welcome Section */}
       <div className="signal-shell relative overflow-hidden rounded-[2rem] border border-cyan-300/20 bg-black p-6 md:p-8 text-white shadow-[0_40px_120px_rgba(0,0,0,0.55)] dashboard-grid-bg">
         <div className="aura-ring -right-8 -top-8 h-72 w-72 bg-cyan-400/25" />

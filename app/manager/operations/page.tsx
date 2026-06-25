@@ -1247,19 +1247,21 @@ export default async function ManagerOperationsPage({
           badge={`${sessions.length} sessions`}
         >
           <CardContent className="space-y-6">
-            <form action={createTrainingSessionAction} className="grid gap-4">
-              <label className="grid gap-2 text-sm">
-                <span className="font-medium">Target batch</span>
-                <select name="batch_id" required className="h-11 rounded-xl border border-zinc-200 px-3">
-                  <option value="">Select batch</option>
-                  {batches.map((batch: any) => (
-                    <option key={batch.id} value={batch.id}>
-                      {batch.title}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="grid gap-4 md:grid-cols-2">
+            {canCoordinate ? (
+              <>
+                <form action={createTrainingSessionAction} className="grid gap-4">
+                  <label className="grid gap-2 text-sm">
+                    <span className="font-medium">Target batch</span>
+                    <select name="batch_id" required className="h-11 rounded-xl border border-zinc-200 px-3">
+                      <option value="">Select batch</option>
+                      {batches.map((batch: any) => (
+                        <option key={batch.id} value={batch.id}>
+                          {batch.title}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="grid gap-4 md:grid-cols-2">
                 <label className="grid gap-2 text-sm">
                   <span className="font-medium">Session title</span>
                   <input name="title" required className="h-11 rounded-xl border border-zinc-200 px-3" placeholder="Week 1 Foundation Lab" />
@@ -1279,6 +1281,21 @@ export default async function ManagerOperationsPage({
               <label className="grid gap-2 text-sm">
                 <span className="font-medium">Agenda</span>
                 <textarea name="agenda" rows={3} className="rounded-xl border border-zinc-200 px-3 py-3" placeholder="Concept coverage, practicals, feedback checkpoints, blockers." />
+              </label>
+              <label className="grid gap-2 text-sm">
+                <span className="font-medium">Meeting / classroom link</span>
+                <input name="meeting_url" type="url" className="h-11 rounded-xl border border-zinc-200 px-3" placeholder="https://meet.google.com/abc-defg-hij or office room link" />
+              </label>
+              <label className="grid gap-2 text-sm">
+                <span className="font-medium">Session learners</span>
+                <select name="employee_ids" multiple size={Math.min(6, Math.max(3, employees.length || 3))} className="min-h-28 rounded-xl border border-zinc-200 px-3 py-2">
+                  {employees.map((employee: any) => (
+                    <option key={employee.id} value={employee.id}>
+                      {employee.full_name || employee.email} {employee.employee_id ? `(${employee.employee_id})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-xs text-zinc-500">Optional. Selected learners are enrolled into the target batch and receive the session allocation notice.</span>
               </label>
               <div className="grid gap-4 lg:grid-cols-3">
                 <label className="grid gap-2 text-sm">
@@ -1336,6 +1353,12 @@ export default async function ManagerOperationsPage({
                 </OpsSubmitButton>
               </div>
             </form>
+              </>
+            ) : (
+              <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
+                Trainers can update the join link, attendance requirement, and session status for assigned sessions below. New session allocation is handled by admin or training coordinator.
+              </div>
+            )}
 
             <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1347,7 +1370,7 @@ export default async function ManagerOperationsPage({
                   <EmptyState text="No sessions yet." compact />
                 ) : sessions.slice(0, 8).map((session: any) => (
                   <div key={session.id} className="grid gap-3 rounded-xl border border-zinc-200 bg-white p-3">
-                    <form action={updateTrainingSessionAction} className="grid gap-2 lg:grid-cols-[1.2fr_1fr_0.8fr_0.8fr_0.8fr_auto] lg:items-end">
+                    <form action={updateTrainingSessionAction} className="grid gap-2 lg:grid-cols-[1.1fr_0.9fr_0.9fr_0.8fr_0.75fr_0.75fr_auto] lg:items-end">
                       <input type="hidden" name="session_id" value={session.id} />
                       <label className="grid gap-1 text-xs">
                         <span className="font-medium">Title</span>
@@ -1363,6 +1386,10 @@ export default async function ManagerOperationsPage({
                           <option value="">Unassigned</option>
                           {trainers.map((trainer: any) => <option key={trainer.id} value={trainer.id}>{trainer.full_name || trainer.email}</option>)}
                         </select>
+                      </label>
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Meeting link</span>
+                        <input name="meeting_url" type="url" defaultValue={session.meeting_url || ''} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" placeholder="https://..." />
                       </label>
                       <label className="grid gap-1 text-xs">
                         <span className="font-medium">Mode</span>
@@ -1386,7 +1413,17 @@ export default async function ManagerOperationsPage({
                         <input type="checkbox" name="attendance_required" defaultChecked={session.attendance_required} className="h-4 w-4 rounded border-zinc-300" />
                         Attendance required
                       </label>
-                      <p className="text-xs text-zinc-500 lg:col-span-3">{session.batch?.title || 'Batch'} - {session.trainer?.full_name || session.trainer?.email || 'Trainer TBD'}</p>
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500 lg:col-span-4">
+                        <span>{session.batch?.title || 'Batch'} - {session.trainer?.full_name || session.trainer?.email || 'Trainer TBD'}</span>
+                        {session.meeting_url ? (
+                          <a href={session.meeting_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full border border-blue-100 bg-blue-50 px-2 py-1 font-semibold text-blue-700">
+                            <ArrowUpRight className="h-3 w-3" />
+                            Open link
+                          </a>
+                        ) : (
+                          <span className="rounded-full border border-amber-100 bg-amber-50 px-2 py-1 font-semibold text-amber-700">Link pending</span>
+                        )}
+                      </div>
                     </form>
                     <form action={deleteTrainingSessionAction} className="flex justify-end">
                       <input type="hidden" name="session_id" value={session.id} />

@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireManagerForApi } from '@/lib/rbac'
 import { NextRequest, NextResponse } from 'next/server'
+import { backfillAttendanceForBatchMembers } from '@/lib/training-session-sync'
 
 const VALID_ENROLLMENT = new Set(['invited', 'active', 'completed', 'dropped', 'discontinued', 'not_cleared', 'offered', 'onboarded'])
 const VALID_SUPPORT = new Set(['on_track', 'needs_support', 'critical'])
@@ -100,6 +101,11 @@ export async function POST(request: NextRequest) {
     for (let i = 0; i < rows.length; i += 500) {
       const { error } = await admin.from('batch_members').upsert(rows.slice(i, i + 500), { onConflict: 'batch_id,user_id' })
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    const attendanceBackfill = await backfillAttendanceForBatchMembers(admin, batchId, rows.map((row) => row.user_id), userId)
+    if (attendanceBackfill.warnings.length) {
+      return NextResponse.json({ error: `Candidate rows were saved, but attendance setup failed: ${attendanceBackfill.warnings.join('; ')}` }, { status: 500 })
     }
 
     const previousByUser = new Map((previousRows || []).map((row: any) => [row.user_id, row]))

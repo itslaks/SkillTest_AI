@@ -75,6 +75,7 @@ It is built for training managers and HR teams who need **training execution evi
 |---------|-------------|
 | Batch Management | Create batches, assign trainers and learners, link assessments |
 | Attendance | Cutoff enforcement, late reasons, version history, bulk import |
+| Session Wiring | Admin and AI-created sessions sync trainer access, selected learners, meeting links, attendance placeholders, and employee/trainer notifications |
 | Project Evaluations | Trainer-submitted evaluation forms per batch |
 | Email Automation | Assignment, completion, and proctoring alert emails via SMTP or Resend |
 
@@ -400,6 +401,8 @@ Private. All rights reserved.
 | AI Command | Added confirmation previews, audit logs, CSV/PDF chat exports, saved templates, schedule storage, scoped data access, and recent-command history. |
 | AI Command | Quiz creation prompts now require complete compliance details before preview: assignees/team, difficulty, question count, passing score, time limit, certificate rule, and AI proctoring decision. |
 | AI Command | Added a numbered Quiz Launchpad for create-and-assign or existing-quiz assignment, with searchable bulk recipients, rule controls, review, and confirmation preview. |
+| AI Command | Trainer-scoped roster questions such as "how many employees are there" now return deterministic counts from assigned batches instead of a generic clarification. |
+| Training Ops | Session allocations now support professional meeting links, learner-specific allocation notices, and 15-second live refresh on trainer/admin/employee consoles. |
 | AI Command | Parser moved into a tested library and now handles broken-English quiz prompts such as "plz make hard python quiz 12 mcq give to Ram by tomorrow". |
 | Readiness | Quiz readiness and predicted score now use direct topic history, related domain evidence, difficulty, recency, streak, and training tenure. The UI shows confidence and evidence count so predictions are not presented as random values. |
 | AI Command | Admin AI Command can shortlist candidates for role openings such as Java, RAG/data engineering, cloud, frontend, AI, and testing using assessment evidence, domain fit, credentials, attendance, and recency. |

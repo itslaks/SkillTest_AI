@@ -44,8 +44,14 @@ export async function getAccessibleTrainingBatchIds(userId: string, role: UserRo
     .select('batch_id')
     .eq('trainer_id', userId)
 
+  const { data: sessionBatches } = await admin
+    .from('training_sessions')
+    .select('batch_id')
+    .eq('trainer_id', userId)
+
   return Array.from(new Set([
     ...(ownedBatches || []).map((batch: any) => batch.id as string),
     ...(assignedBatches || []).map((assignment: any) => assignment.batch_id as string),
+    ...(sessionBatches || []).map((session: any) => session.batch_id as string),
   ]))
 }

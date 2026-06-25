@@ -9,6 +9,7 @@ import { createEmployeeWithSetupEmail, deleteEmployeeAccount } from '@/lib/emplo
 import type { DifficultyLevel, QuizAnswer } from '@/lib/types/database'
 import { cleanEntity, classifyCopilotIntent, normalizeDifficultyArg, resolveAdminCommand } from '@/lib/ai-command-parser'
 import { formatQuizAssignmentEmailSummary, notifyQuizAssigned } from '@/lib/quiz-assignment-notifications'
+import { backfillAttendanceForBatchMembers, syncTrainingSessionVisibility } from '@/lib/training-session-sync'
 import { revalidatePath } from 'next/cache'
 
 export async function POST(request: NextRequest) {
@@ -153,7 +154,7 @@ export async function POST(request: NextRequest) {
       .limit(2000), 'batch_members'),
     safeSelect(admin
       .from('training_sessions')
-      .select('id, batch_id, title, session_date, status, attendance_required')
+      .select('id, batch_id, title, session_date, status, attendance_required, meeting_url')
       .limit(1000), 'training_sessions'),
     safeSelect(admin
       .from('assessment_results')
@@ -958,10 +959,10 @@ async function executeAdminCommand(admin: ReturnType<typeof createAdminClient>, 
         return deleteBatchCommand(admin, args)
       case 'add batch member':
       case 'add member':
-        return updateBatchMemberCommand(admin, args, true)
+        return updateBatchMemberCommand(admin, actorId, args, true)
       case 'remove batch member':
       case 'remove member':
-        return updateBatchMemberCommand(admin, args, false)
+        return updateBatchMemberCommand(admin, actorId, args, false)
       case 'assign trainer':
       case 'add trainer':
         return assignTrainerCommand(admin, actorId, args)
@@ -974,7 +975,7 @@ async function executeAdminCommand(admin: ReturnType<typeof createAdminClient>, 
         return createSessionCommand(admin, actorId, args)
       case 'update session':
       case 'update roadmap':
-        return updateSessionCommand(admin, args)
+        return updateSessionCommand(admin, actorId, args)
       case 'delete session':
       case 'delete roadmap':
         return deleteSessionCommand(admin, args)
@@ -1364,6 +1365,8 @@ async function createBatchCommand(admin: ReturnType<typeof createAdminClient>, a
     const { data: employees } = await admin.from('profiles').select('id, email').in('email', employeeEmails)
     if (employees?.length) {
       await admin.from('batch_members').upsert(employees.map((employee: any) => ({ batch_id: batch.id, user_id: employee.id, enrollment_status: 'active' })), { onConflict: 'batch_id,user_id' })
+      const backfill = await backfillAttendanceForBatchMembers(admin, batch.id, employees.map((employee: any) => employee.id), actorId)
+      if (backfill.warnings.length) return { error: `Batch created, but learner attendance wiring failed: ${backfill.warnings.join('; ')}` }
     }
   }
   revalidateManagerPaths()
@@ -1400,7 +1403,7 @@ async function deleteBatchCommand(admin: ReturnType<typeof createAdminClient>, a
   return { message: `Batch "${batch.title}" deleted.` }
 }
 
-async function updateBatchMemberCommand(admin: ReturnType<typeof createAdminClient>, args: Record<string, string>, add: boolean) {
+async function updateBatchMemberCommand(admin: ReturnType<typeof createAdminClient>, actorId: string, args: Record<string, string>, add: boolean) {
   const batch = await findBatchByArgs(admin, args)
   const employeeEmails = splitList(args.employee_emails || args.employees || args.email)
   if (!batch || !employeeEmails.length) return { error: `Use: run ${add ? 'add' : 'remove'} batch member batch="..." email=person@company.com` }
@@ -1417,6 +1420,8 @@ async function updateBatchMemberCommand(admin: ReturnType<typeof createAdminClie
       { onConflict: 'batch_id,user_id' }
     )
     if (error) return { error: error.message }
+    const backfill = await backfillAttendanceForBatchMembers(admin, batch.id, employees.map((employee: any) => employee.id), actorId)
+    if (backfill.warnings.length) return { error: `Member(s) added, but attendance setup failed: ${backfill.warnings.join('; ')}` }
   } else {
     const { error } = await admin.from('batch_members').delete().eq('batch_id', batch.id).in('user_id', employees.map((employee: any) => employee.id))
     if (error) return { error: error.message }
@@ -1451,10 +1456,13 @@ async function createSessionCommand(admin: ReturnType<typeof createAdminClient>,
   const batch = await findBatchByArgs(admin, args)
   if (!batch || !args.title || !args.date) return { error: 'Use: run create session batch="..." title="..." date=2026-06-10T10:00 trainer_email=...' }
   const trainer = args.trainer_email ? await findProfileByArgs(admin, { email: args.trainer_email }) : null
+  const meetingUrl = args.meeting_url || args.join_url || args.link || null
+  const employeeEmails = splitList(args.employee_emails || args.employees || args.assigned_to)
   const { data, error } = await admin.from('training_sessions').insert({
     batch_id: batch.id,
     title: args.title,
     agenda: args.agenda || null,
+    meeting_url: meetingUrl,
     session_date: args.date,
     mode: args.mode || 'virtual',
     status: args.status || 'scheduled',
@@ -1463,21 +1471,69 @@ async function createSessionCommand(admin: ReturnType<typeof createAdminClient>,
     created_by: actorId,
   }).select('id, title').single()
   if (error) return { error: error.message }
+  if (employeeEmails.length) {
+    const { data: employees } = await admin.from('profiles').select('id, email').in('email', employeeEmails).eq('role', 'employee')
+    if (!employees?.length) return { error: 'Session created, but no employee emails matched profiles.' }
+    const { error: memberError } = await admin.from('batch_members').upsert(
+      employees.map((employee: any) => ({
+        batch_id: batch.id,
+        user_id: employee.id,
+        enrollment_status: 'active',
+        support_status: 'on_track',
+      })),
+      { onConflict: 'batch_id,user_id' }
+    )
+    if (memberError) return { error: `Session created, but learner allocation failed: ${memberError.message}` }
+  }
+  const sync = await syncTrainingSessionVisibility(admin, {
+    batchId: batch.id,
+    sessionId: data.id,
+    title: data.title,
+    sessionDate: args.date,
+    mode: args.mode || 'virtual',
+    meetingUrl,
+    trainerId: trainer?.id || null,
+    actorId,
+    attendanceRequired: args.attendance_required !== 'false',
+  })
+  if (sync.warnings.length) return { error: `Session created, but training ops wiring failed: ${sync.warnings.join('; ')}` }
   revalidateManagerPaths()
-  return { message: `Session "${data.title}" created for ${batch.title}.`, data }
+  return { message: `Session "${data.title}" created for ${batch.title}. Visible to ${sync.memberCount} learner(s)${trainer ? ` and trainer ${trainer.email}` : ''}.`, data }
 }
 
-async function updateSessionCommand(admin: ReturnType<typeof createAdminClient>, args: Record<string, string>) {
+async function updateSessionCommand(admin: ReturnType<typeof createAdminClient>, actorId: string, args: Record<string, string>) {
   const session = await findSessionByArgs(admin, args)
   if (!session) return { error: 'No session matched id/title.' }
   const update: Record<string, any> = { updated_at: new Date().toISOString() }
+  let trainerId = session.trainer_id
+  if (args.trainer_email) {
+    const trainer = await findProfileByArgs(admin, { email: args.trainer_email })
+    if (!trainer) return { error: 'Trainer email did not match a profile.' }
+    trainerId = trainer.id
+    update.trainer_id = trainer.id
+  }
   if (args.title) update.title = args.title
   if (args.date) update.session_date = args.date
+  if (args.meeting_url || args.join_url || args.link) update.meeting_url = args.meeting_url || args.join_url || args.link
   if (args.status) update.status = args.status
   if (args.mode) update.mode = args.mode
   if (args.agenda) update.agenda = args.agenda
   const { error } = await admin.from('training_sessions').update(update).eq('id', session.id)
   if (error) return { error: error.message }
+  if (update.title || update.session_date || update.meeting_url || update.mode || update.trainer_id) {
+    const sync = await syncTrainingSessionVisibility(admin, {
+      batchId: session.batch_id,
+      sessionId: session.id,
+      title: update.title || session.title,
+      sessionDate: update.session_date || session.session_date,
+      mode: update.mode || session.mode,
+      meetingUrl: update.meeting_url ?? session.meeting_url ?? null,
+      trainerId,
+      actorId,
+      attendanceRequired: session.attendance_required !== false,
+    })
+    if (sync.warnings.length) return { error: `Session updated, but allocation notification failed: ${sync.warnings.join('; ')}` }
+  }
   revalidateManagerPaths()
   return { message: `Session "${session.title}" updated.` }
 }
@@ -1970,6 +2026,10 @@ function buildChatbotContext(data: Record<string, any[]>) {
     const members = data.batchMembers.filter((member) => member.batch_id === batch.id)
     return `${batch.title}|${batch.domain || 'General'}|status=${batch.status}|members=${members.length}|start=${batch.start_date || 'none'}|end=${batch.end_date || 'none'}`
   })
+  const batchById = new Map(data.batches.map((batch) => [batch.id, batch]))
+  const sessionSummary = data.sessions.slice(0, 100).map((session) =>
+    `${session.title}|batch=${batchById.get(session.batch_id)?.title || session.batch_id}|date=${session.session_date}|status=${session.status}|link=${session.meeting_url || 'pending'}`
+  )
   const assessmentSummary = data.assessmentResults.slice(0, 100).map((result) =>
     `${result.candidate_name || result.candidate_email}|${result.test_name || result.quiz_id || 'Assessment'}|${result.percentage ?? result.test_score ?? 'N/A'}%|status=${result.test_status || 'unknown'}|proctor=${result.proctoring_flag || 'none'}`
   )
@@ -1992,6 +2052,8 @@ function buildChatbotContext(data: Record<string, any[]>) {
     assignmentSummary.join('\n') || 'none',
     'BATCHES title|domain|status|members|start|end',
     batchSummary.join('\n') || 'none',
+    'SESSIONS title|batch|date|status|link',
+    sessionSummary.join('\n') || 'none',
     'IMPORTED_ASSESSMENTS candidate|test|score|status|proctor',
     assessmentSummary.join('\n') || 'none',
     'PROCTORING employee|quiz|violation|severity|risk|time',
@@ -2001,6 +2063,9 @@ function buildChatbotContext(data: Record<string, any[]>) {
 
 function buildDeterministicAnswer(message: string, data: Record<string, any[]>) {
   const lower = normalize(message)
+  const rosterCount = summarizeRosterCount(message, data)
+  if (rosterCount) return rosterCount
+
   const proactive = summarizeProactiveBriefing(message, data)
   if (proactive) return proactive
 
@@ -2097,6 +2162,29 @@ function buildDeterministicAnswer(message: string, data: Record<string, any[]>) 
   }
 
   return null
+}
+
+function summarizeRosterCount(message: string, data: Record<string, any[]>) {
+  const lower = normalize(message)
+  const asksForCount = /\b(how many|count|total|number of|no\.? of)\b/.test(lower)
+  const asksForEmployees = /\b(employee|employees|learner|learners|candidate|candidates)\b/.test(lower)
+  if (!asksForCount || !asksForEmployees) return null
+  if (/\b(inactive|failed|below|above|top|best|risk|absent|present|attendance|quiz|assessment|certificate)\b/.test(lower)) return null
+
+  const employees = (data.profiles || []).filter((profile) => profile.role === 'employee')
+  const activeMembers = (data.batchMembers || []).filter((member) => ['invited', 'active', 'onboarded', 'offered'].includes(member.enrollment_status))
+  const uniqueMemberIds = new Set(activeMembers.map((member) => member.user_id).filter(Boolean))
+  const batchCount = (data.batches || []).length
+  const sessionCount = (data.sessions || []).filter((session) => session.status !== 'cancelled').length
+  const rosterCount = uniqueMemberIds.size || employees.length
+
+  return [
+    `Employees in your current training scope: ${rosterCount}.`,
+    `Visible employee profiles: ${employees.length}.`,
+    `Active batch memberships: ${uniqueMemberIds.size}.`,
+    `Visible batches: ${batchCount}.`,
+    `Scheduled/completed sessions: ${sessionCount}.`,
+  ].join('\n')
 }
 
 function summarizeInactiveEmployees(message: string, data: Record<string, any[]>) {

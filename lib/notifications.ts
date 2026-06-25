@@ -13,7 +13,7 @@ export type StaffNotification = {
   sent_at?: string | null
   scheduled_for?: string | null
   batch?: { id: string; title: string; domain?: string | null } | null
-  session?: { id: string; title: string; session_date?: string | null } | null
+  session?: { id: string; title: string; session_date?: string | null; meeting_url?: string | null } | null
   recipient?: { id: string; full_name?: string | null; email?: string | null } | null
   creator?: { id: string; full_name?: string | null; email?: string | null; role?: string | null } | null
 }
@@ -108,7 +108,7 @@ function baseNotificationQuery(admin: AdminClient) {
       is_read,
       metadata,
       batch:batch_id(id,title,domain),
-      session:session_id(id,title,session_date),
+      session:session_id(id,title,session_date,meeting_url),
       recipient:recipient_user_id(id,full_name,email),
       creator:created_by(id,full_name,email,role)
     `)
