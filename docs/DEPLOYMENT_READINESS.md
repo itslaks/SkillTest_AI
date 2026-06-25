@@ -35,7 +35,7 @@ Production validation fails loudly when mandatory email configuration is missing
 4. Alert when projected monthly uptime falls below 99.5%.
 5. Run the governance cron at least every 15 minutes during training hours.
 6. Run failed BRD email retry every 15 minutes.
-7. Review admin diagnostics daily for failed mandatory email delivery.
+7. Review admin diagnostics daily for failed mandatory email delivery, especially `session_allocated` rows after new Training Ops sessions are created.
 
 ## Release Checklist
 
@@ -46,7 +46,8 @@ Production validation fails loudly when mandatory email configuration is missing
 5. Run `npm run build`.
 6. Open `/manager/diagnostics` and verify email, database, notification, and BRD email checks.
 7. Send a real test email through `/api/admin/email-test`.
-8. Confirm storage bucket visibility in `/api/ready`.
+8. Create a Training Ops session with one trainer and one learner, then confirm `brd_email_notification_logs` has `session_allocated` rows marked `sent`.
+9. Confirm storage bucket visibility in `/api/ready`.
 
 ## Remaining Risk
 

@@ -6,6 +6,7 @@ export type BrdEmailEventType =
   | 'assessment_reminder'
   | 'feedback_request'
   | 'quiz_assigned'
+  | 'session_allocated'
   | 'email_configuration_test'
 
 export type BrdEmailConfiguration = {
@@ -84,12 +85,17 @@ export async function sendMandatoryBrdEmailCore(input: MandatoryBrdEmailInput) {
     return fail(config.errors.join(' '))
   }
 
-  const result = await input.transport({
-    to: input.to,
-    subject: input.subject,
-    html: input.html,
-    text: input.text,
-  })
+  let result: Awaited<ReturnType<BrdEmailTransport>>
+  try {
+    result = await input.transport({
+      to: input.to,
+      subject: input.subject,
+      html: input.html,
+      text: input.text,
+    })
+  } catch (error: any) {
+    result = { success: false, error: error?.message || 'Email provider threw an unexpected delivery error.' }
+  }
 
   await admin
     .from('brd_email_notification_logs')

@@ -1,5 +1,5 @@
 import type { createAdminClient } from '@/lib/supabase/server'
-import { sendEmail } from '@/lib/email'
+import { sendMandatoryBrdEmail } from '@/lib/brd-notifications'
 
 type AdminClient = ReturnType<typeof createAdminClient>
 
@@ -149,14 +149,20 @@ export async function syncTrainingSessionVisibility(admin: AdminClient, input: S
 
     const email = buildSessionAllocationEmail({
       recipientName: profile.full_name || profile.email,
+      recipientRole: String(notification.metadata?.recipient_role || profile.role || 'employee'),
       sessionTitle: input.title,
       sessionDate: readableDate,
       mode: input.mode,
       meetingUrl,
     })
-    const result = await sendEmail({
+    const result = await sendMandatoryBrdEmail({
+      admin,
+      eventType: 'session_allocated',
       to: profile.email,
-      subject: `Training session allocated: ${input.title}`,
+      recipientRole: String(notification.metadata?.recipient_role || profile.role || 'employee'),
+      relatedBatchId: input.batchId,
+      relatedNotificationId: notification.id,
+      subject: email.subject,
       html: email.html,
       text: email.text,
     })
@@ -192,32 +198,46 @@ function escapeHtml(value: string | null | undefined) {
 
 function buildSessionAllocationEmail(input: {
   recipientName: string
+  recipientRole: string
   sessionTitle: string
   sessionDate: string
   mode: string
   meetingUrl: string | null
 }) {
+  const isTrainer = input.recipientRole === 'trainer'
   const safeName = escapeHtml(input.recipientName)
   const safeTitle = escapeHtml(input.sessionTitle)
   const safeDate = escapeHtml(input.sessionDate)
   const safeMode = escapeHtml(input.mode)
   const safeUrl = input.meetingUrl ? escapeHtml(input.meetingUrl) : ''
-  const joinText = input.meetingUrl
-    ? `Join link: ${input.meetingUrl}`
-    : 'Join link: Not set yet. The admin or trainer will add it before the session.'
+  const subject = isTrainer
+    ? `Trainer session scheduled: ${input.sessionTitle}`
+    : `Training session scheduled: ${input.sessionTitle}`
+  const heading = isTrainer ? 'Trainer Session Brief' : 'Training Session Invitation'
+  const intro = isTrainer
+    ? 'You have been assigned to facilitate the following training session.'
+    : 'You have been scheduled to attend the following training session.'
+  const actionText = isTrainer
+    ? 'Please review the learner list, keep the meeting link ready, and join early to start the session on time.'
+    : 'Please join the meeting 10 minutes before the scheduled time so attendance and setup can be completed smoothly.'
+  const missingLinkText = isTrainer
+    ? 'The join link is not set yet. Please add or confirm the meeting link before the session.'
+    : 'The join link is not set yet. You will be notified once the admin or trainer adds it.'
+  const joinText = input.meetingUrl ? `Join link: ${input.meetingUrl}` : `Join link: ${missingLinkText}`
 
   return {
+    subject,
     text: [
       `Hello ${input.recipientName},`,
       '',
-      'You have been allocated to a training session.',
+      intro,
       '',
       `Session: ${input.sessionTitle}`,
       `Date and time: ${input.sessionDate}`,
       `Mode: ${input.mode}`,
       joinText,
       '',
-      'Please be available on time and use SkillTest_AI to track attendance and follow-up actions.',
+      actionText,
       '',
       'Regards,',
       'SkillTest_AI Training Team',
@@ -226,22 +246,22 @@ function buildSessionAllocationEmail(input: {
       <div style="font-family:Arial,Helvetica,sans-serif;background:#f6f7fb;padding:28px;">
         <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:18px;overflow:hidden;">
           <div style="background:#111827;color:#ffffff;padding:24px 28px;">
-            <p style="margin:0;color:#93c5fd;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;">Training Session Allocation</p>
+            <p style="margin:0;color:#93c5fd;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;">${heading}</p>
             <h1 style="margin:10px 0 0;font-size:22px;line-height:1.25;">${safeTitle}</h1>
           </div>
           <div style="padding:26px 28px;color:#1f2937;">
             <p style="margin:0 0 18px;">Hello ${safeName},</p>
-            <p style="margin:0 0 18px;line-height:1.6;">You have been allocated to the following training session.</p>
+            <p style="margin:0 0 18px;line-height:1.6;">${intro}</p>
             <table style="width:100%;border-collapse:collapse;margin:0 0 22px;">
               <tr><td style="padding:10px;border-bottom:1px solid #e5e7eb;color:#6b7280;">Session</td><td style="padding:10px;border-bottom:1px solid #e5e7eb;font-weight:700;">${safeTitle}</td></tr>
               <tr><td style="padding:10px;border-bottom:1px solid #e5e7eb;color:#6b7280;">Date and time</td><td style="padding:10px;border-bottom:1px solid #e5e7eb;">${safeDate}</td></tr>
               <tr><td style="padding:10px;border-bottom:1px solid #e5e7eb;color:#6b7280;">Mode</td><td style="padding:10px;border-bottom:1px solid #e5e7eb;text-transform:capitalize;">${safeMode}</td></tr>
             </table>
             ${input.meetingUrl
-              ? `<a href="${safeUrl}" style="display:inline-block;background:#111827;color:#ffffff;padding:12px 18px;border-radius:999px;text-decoration:none;font-weight:700;">Join training session</a>
+              ? `<a href="${safeUrl}" style="display:inline-block;background:#111827;color:#ffffff;padding:12px 18px;border-radius:999px;text-decoration:none;font-weight:700;">${isTrainer ? 'Open host link' : 'Join training session'}</a>
                  <p style="margin:14px 0 0;color:#6b7280;font-size:13px;word-break:break-all;">${safeUrl}</p>`
-              : '<p style="margin:0;padding:14px 16px;border-radius:12px;background:#fff7ed;color:#9a3412;">The join link is not set yet. The admin or trainer will add it before the session.</p>'}
-            <p style="margin:24px 0 0;color:#4b5563;line-height:1.6;">Please be available on time and use SkillTest_AI to track attendance and follow-up actions.</p>
+              : `<p style="margin:0;padding:14px 16px;border-radius:12px;background:#fff7ed;color:#9a3412;">${missingLinkText}</p>`}
+            <p style="margin:24px 0 0;color:#4b5563;line-height:1.6;">${actionText}</p>
           </div>
         </div>
       </div>

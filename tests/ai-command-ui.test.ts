@@ -56,6 +56,13 @@ test('training session creation syncs trainer, learner attendance, meeting links
   const operationsPage = read('app/manager/operations/page.tsx')
 
   assert.match(syncSource, /syncTrainingSessionVisibility/)
+  assert.match(syncSource, /sendMandatoryBrdEmail/)
+  assert.match(syncSource, /eventType: 'session_allocated'/)
+  assert.match(syncSource, /relatedNotificationId: notification\.id/)
+  assert.match(syncSource, /Trainer Session Brief/)
+  assert.match(syncSource, /Training Session Invitation/)
+  assert.match(syncSource, /join the meeting 10 minutes before/)
+  assert.match(syncSource, /assigned to facilitate/)
   assert.match(syncSource, /training_batch_trainers/)
   assert.match(syncSource, /session_attendance/)
   assert.match(syncSource, /buildSessionAllocationEmail/)

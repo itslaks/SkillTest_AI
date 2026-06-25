@@ -75,9 +75,9 @@ It is built for training managers and HR teams who need **training execution evi
 |---------|-------------|
 | Batch Management | Create batches, assign trainers and learners, link assessments |
 | Attendance | Cutoff enforcement, late reasons, version history, bulk import |
-| Session Wiring | Admin and AI-created sessions sync trainer access, selected learners, meeting links, attendance placeholders, and employee/trainer notifications |
+| Session Wiring | Admin and AI-created sessions sync trainer access, selected learners, meeting links, attendance placeholders, and mandatory employee/trainer email delivery logs |
 | Project Evaluations | Trainer-submitted evaluation forms per batch |
-| Email Automation | Assignment, completion, and proctoring alert emails via SMTP or Resend |
+| Email Automation | Quiz assignment, session allocation, completion, and proctoring alert emails via SMTP or Resend |
 
 ---
 

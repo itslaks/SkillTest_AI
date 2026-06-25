@@ -18,6 +18,7 @@ The Maverick Execution Platform / TMS implements the BRD training lifecycle requ
 | Assessment reminder email | Implemented | `runTrainingAutomationSweep` |
 | Feedback request email | Implemented | `createFeedbackWindow`, feedback reminder sweep |
 | Quiz assignment email | Implemented | `notifyQuizAssigned`, `brd_email_notification_logs.event_type = quiz_assigned` |
+| Training session allocation email | Implemented | `syncTrainingSessionVisibility`, `brd_email_notification_logs.event_type = session_allocated` |
 | Feedback collection and reporting | Implemented | `training_feedback`, export routes |
 | Dashboard metrics | Implemented | `app/manager/operations/page.tsx`, `app/manager/reports/page.tsx` |
 | Excel/PDF reports | Implemented | `app/api/export/*`, `components/manager/tms-batch-downloads.tsx` |
@@ -32,6 +33,8 @@ The Maverick Execution Platform / TMS implements the BRD training lifecycle requ
 BRD mandatory emails use `lib/brd-notifications.ts`. Every BRD event attempts email delivery and writes `brd_email_notification_logs` with event type, recipient, role, batch, provider, status, error, and timestamps. If SMTP or Resend is missing, the log is marked `failed` with a configuration error. Failed messages can be retried through `/api/cron/retry-brd-email`.
 
 Quiz assignment emails are routed through `lib/quiz-assignment-notifications.ts` for manager UI assignment, AI Command `assign quiz`, and AI Command create-and-assign flows. Each recipient gets one `brd_email_notification_logs` row with `event_type = quiz_assigned`, then the provider result updates the row to `sent` or `failed`.
+
+Training session allocation emails are routed through `lib/training-session-sync.ts` for manager Training Ops session creation/update and AI Command session creation/update. Each trainer and learner recipient gets one `brd_email_notification_logs` row with `event_type = session_allocated`, linked back to the Training Ops notification row. SMTP or Resend failures update both the BRD log and the visible Training Ops delivery status. Trainer recipients receive a facilitator brief, while employee recipients receive a learner invitation that asks them to join 10 minutes before the session.
 
 ## Value Added Features Beyond BRD
 
