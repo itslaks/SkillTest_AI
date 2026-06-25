@@ -201,6 +201,23 @@ async function validateTrainerSessionLearners(
   return null
 }
 
+async function resolveSessionLearnerIds(
+  admin: ReturnType<typeof createAdminClient>,
+  trainerId: string | null | undefined,
+  selectedEmployeeIds: string[]
+) {
+  const explicitEmployeeIds = Array.from(new Set(selectedEmployeeIds.filter(Boolean)))
+  if (explicitEmployeeIds.length || !trainerId) return explicitEmployeeIds
+
+  const { data, error } = await admin
+    .from('trainer_employee_assignments')
+    .select('employee_id')
+    .eq('trainer_id', trainerId)
+
+  if (error) throw new Error(`Could not load employees assigned under the selected trainer: ${error.message}`)
+  return Array.from(new Set((data || []).map((assignment: any) => assignment.employee_id).filter(Boolean)))
+}
+
 async function attendanceRowsForSession(admin: ReturnType<typeof createAdminClient>, sessionId: string) {
   const { count } = await admin
     .from('session_attendance')
@@ -1350,7 +1367,7 @@ export async function createTrainingSession(formData: FormData): Promise<ApiResp
   const agenda = asOptionalString(formData.get('agenda'))
   const meetingUrl = asOptionalString(formData.get('meeting_url'))
   const trainerId = asOptionalString(formData.get('trainer_id'))
-  const employeeIds = parseIds(formData.getAll('employee_ids'))
+  const selectedEmployeeIds = parseIds(formData.getAll('employee_ids'))
   const sessionDate = asRequiredString(formData.get('session_date'))
   const mode = (asRequiredString(formData.get('mode'), 'virtual') || 'virtual') as SessionMode
   const status = (asRequiredString(formData.get('status'), 'scheduled') || 'scheduled') as SessionStatus
@@ -1358,6 +1375,16 @@ export async function createTrainingSession(formData: FormData): Promise<ApiResp
 
   if (!batchId || !title || !sessionDate) {
     return { error: 'Batch, title, and session date are required.' }
+  }
+
+  let employeeIds: string[] = []
+  try {
+    employeeIds = await resolveSessionLearnerIds(admin, trainerId, selectedEmployeeIds)
+  } catch (error: any) {
+    return { error: error.message || 'Could not resolve session learners.' }
+  }
+  if (trainerId && selectedEmployeeIds.length === 0 && employeeIds.length === 0) {
+    return { error: 'No employees are assigned under the selected trainer. Assign employees to this trainer in Admin before scheduling the session.' }
   }
 
   const learnerScopeError = await validateTrainerSessionLearners(admin, trainerId, employeeIds)
@@ -1405,6 +1432,7 @@ export async function createTrainingSession(formData: FormData): Promise<ApiResp
     mode,
     meetingUrl,
     trainerId,
+    learnerIds: employeeIds,
     actorId: userId,
     attendanceRequired,
   })

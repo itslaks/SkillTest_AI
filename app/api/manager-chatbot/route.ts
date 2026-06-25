@@ -1465,6 +1465,18 @@ async function createSessionCommand(admin: ReturnType<typeof createAdminClient>,
     const learnerScopeError = await validateTrainerSessionLearnersForCommand(admin, trainer?.id || null, employees.map((employee: any) => employee.id))
     if (learnerScopeError) return { error: learnerScopeError }
     selectedEmployees = employees
+  } else if (trainer?.id) {
+    const { data: assignments, error: assignmentError } = await admin
+      .from('trainer_employee_assignments')
+      .select('employee_id')
+      .eq('trainer_id', trainer.id)
+    if (assignmentError) return { error: `Could not load employees assigned under ${trainer.email}: ${assignmentError.message}` }
+    const employeeIds = Array.from(new Set((assignments || []).map((assignment: any) => assignment.employee_id).filter(Boolean)))
+    if (employeeIds.length) {
+      const { data: employees } = await admin.from('profiles').select('id, email').in('id', employeeIds).eq('role', 'employee')
+      selectedEmployees = employees || []
+    }
+    if (!selectedEmployees.length) return { error: `No employees are assigned under ${trainer.email}. Assign employees to this trainer in Admin before scheduling the session.` }
   }
   const { data, error } = await admin.from('training_sessions').insert({
     batch_id: batch.id,
@@ -1499,6 +1511,7 @@ async function createSessionCommand(admin: ReturnType<typeof createAdminClient>,
     mode: args.mode || 'virtual',
     meetingUrl,
     trainerId: trainer?.id || null,
+    learnerIds: selectedEmployees.map((employee: any) => employee.id),
     actorId,
     attendanceRequired: args.attendance_required !== 'false',
   })

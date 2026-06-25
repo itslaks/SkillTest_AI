@@ -11,6 +11,7 @@ type SyncSessionInput = {
   mode: string
   meetingUrl?: string | null
   trainerId?: string | null
+  learnerIds?: string[]
   actorId: string
   attendanceRequired: boolean
 }
@@ -43,7 +44,11 @@ export async function syncTrainingSessionVisibility(admin: AdminClient, input: S
     warnings.push(`member lookup: ${memberError.message}`)
   }
 
-  const activeMembers = members || []
+  const requestedLearnerIds = Array.from(new Set((input.learnerIds || []).filter(Boolean)))
+  const memberRows = members || []
+  const activeMembers = requestedLearnerIds.length
+    ? requestedLearnerIds.map((userId) => ({ user_id: userId, enrollment_status: 'active' }))
+    : memberRows
   const recipientIds = Array.from(new Set([
     ...activeMembers.map((member: any) => member.user_id).filter(Boolean),
     input.trainerId || '',

@@ -117,7 +117,7 @@ export function SessionAllocationForm({
         <span className="text-xs text-zinc-500">
           {trainerId
             ? visibleEmployees.length
-              ? `Showing only employees assigned under ${selectedTrainerName}.`
+              ? `Showing only employees assigned under ${selectedTrainerName}. If none are selected, all visible employees will receive the session mail.`
               : `No employees are assigned under ${selectedTrainerName}. Assign employees to this trainer in Admin first.`
             : 'Select a trainer to narrow learners to only that trainer roster.'}
         </span>
