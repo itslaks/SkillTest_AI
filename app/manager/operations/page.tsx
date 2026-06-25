@@ -1318,72 +1318,77 @@ export default async function ManagerOperationsPage({
                   <Badge variant="outline" className="bg-white">{sessions.length} total</Badge>
                 </div>
               </div>
-              <div className="mt-3 grid gap-3">
+              <div className="mt-4 grid gap-4">
                 {sessions.length === 0 ? (
                   <EmptyState text="No sessions yet." compact />
                 ) : sessions.slice(0, 8).map((session: any) => (
-                  <div key={session.id} className="grid gap-3 rounded-xl border border-zinc-200 bg-white p-3">
-                    <form action={updateTrainingSessionAction} className="grid gap-2 lg:grid-cols-[1.1fr_0.9fr_0.9fr_0.8fr_0.75fr_0.75fr_auto] lg:items-end">
+                  <div key={session.id} className="grid gap-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+                    <form action={updateTrainingSessionAction} className="grid gap-4">
                       <input type="hidden" name="session_id" value={session.id} />
-                      <label className="grid gap-1 text-xs">
-                        <span className="font-medium">Title</span>
-                        <input name="title" defaultValue={session.title} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
-                      </label>
-                      <label className="grid gap-1 text-xs">
-                        <span className="font-medium">Date</span>
-                        <input name="session_date" type="datetime-local" defaultValue={toDateTimeLocal(session.session_date)} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" />
-                      </label>
-                      <label className="grid gap-1 text-xs">
-                        <span className="font-medium">Trainer</span>
-                        <select name="trainer_id" defaultValue={session.trainer_id || ''} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm">
-                          <option value="">Unassigned</option>
-                          {trainers.map((trainer: any) => <option key={trainer.id} value={trainer.id}>{trainer.full_name || trainer.email}</option>)}
-                        </select>
-                      </label>
-                      <label className="grid gap-1 text-xs">
-                        <span className="font-medium">Meeting link</span>
-                        <input name="meeting_url" type="url" defaultValue={session.meeting_url || ''} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm" placeholder="https://..." />
-                      </label>
-                      <label className="grid gap-1 text-xs">
-                        <span className="font-medium">Mode</span>
-                        <select name="mode" defaultValue={session.mode} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm">
-                          <option value="virtual">Virtual</option>
-                          <option value="classroom">Classroom</option>
-                          <option value="hybrid">Hybrid</option>
-                        </select>
-                      </label>
-                      <label className="grid gap-1 text-xs">
-                        <span className="font-medium">Status</span>
-                        <select name="status" defaultValue={session.status} className="h-9 rounded-lg border border-zinc-200 px-2 text-sm">
-                          <option value="scheduled">Scheduled</option>
-                          <option value="completed">Completed</option>
-                          <option value="cancelled">Cancelled</option>
-                        </select>
-                      </label>
-                      <OpsSubmitButton pendingLabel="Saving..." size="sm" className="h-9 rounded-full bg-black text-white hover:bg-zinc-800">
-                        <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                        Save
-                      </OpsSubmitButton>
+                      <div className="manager-responsive-grid">
+                        <label className="grid gap-2 text-sm md:col-span-2">
+                          <span className="font-medium text-zinc-700">Title</span>
+                          <input name="title" defaultValue={session.title} className="h-11 rounded-xl border border-zinc-200 px-3 text-sm" />
+                        </label>
+                        <label className="grid gap-2 text-sm">
+                          <span className="font-medium text-zinc-700">Date and time</span>
+                          <input name="session_date" type="datetime-local" defaultValue={toDateTimeLocal(session.session_date)} className="h-11 rounded-xl border border-zinc-200 px-3 text-sm" />
+                        </label>
+                        <label className="grid gap-2 text-sm">
+                          <span className="font-medium text-zinc-700">Trainer</span>
+                          <select name="trainer_id" defaultValue={session.trainer_id || ''} className="h-11 rounded-xl border border-zinc-200 px-3 text-sm">
+                            <option value="">Unassigned</option>
+                            {trainers.map((trainer: any) => <option key={trainer.id} value={trainer.id}>{trainer.full_name || trainer.email}</option>)}
+                          </select>
+                        </label>
+                        <label className="grid gap-2 text-sm md:col-span-2">
+                          <span className="font-medium text-zinc-700">Meeting link</span>
+                          <input name="meeting_url" type="url" defaultValue={session.meeting_url || ''} className="h-11 rounded-xl border border-zinc-200 px-3 text-sm" placeholder="https://..." />
+                        </label>
+                        <label className="grid gap-2 text-sm">
+                          <span className="font-medium text-zinc-700">Mode</span>
+                          <select name="mode" defaultValue={session.mode} className="h-11 rounded-xl border border-zinc-200 px-3 text-sm">
+                            <option value="virtual">Virtual</option>
+                            <option value="classroom">Classroom</option>
+                            <option value="hybrid">Hybrid</option>
+                          </select>
+                        </label>
+                        <label className="grid gap-2 text-sm">
+                          <span className="font-medium text-zinc-700">Status</span>
+                          <select name="status" defaultValue={session.status} className="h-11 rounded-xl border border-zinc-200 px-3 text-sm">
+                            <option value="scheduled">Scheduled</option>
+                            <option value="completed">Completed</option>
+                            <option value="cancelled">Cancelled</option>
+                          </select>
+                        </label>
+                      </div>
                       <input type="hidden" name="agenda" value={session.agenda || ''} />
-                      <label className="flex items-center gap-2 text-xs lg:col-span-2">
-                        <input type="checkbox" name="attendance_required" defaultChecked={session.attendance_required} className="h-4 w-4 rounded border-zinc-300" />
-                        Attendance required
-                      </label>
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500 lg:col-span-4">
-                        <span>{session.batch?.title || 'Batch'} - {session.trainer?.full_name || session.trainer?.email || 'Trainer TBD'}</span>
-                        {session.meeting_url ? (
-                          <a href={session.meeting_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full border border-blue-100 bg-blue-50 px-2 py-1 font-semibold text-blue-700">
-                            <ArrowUpRight className="h-3 w-3" />
-                            Open link
-                          </a>
-                        ) : (
-                          <span className="rounded-full border border-amber-100 bg-amber-50 px-2 py-1 font-semibold text-amber-700">Link pending</span>
-                        )}
+                      <div className="manager-action-row justify-between rounded-xl bg-zinc-50 px-3 py-3">
+                        <div className="manager-action-row text-sm text-zinc-600">
+                          <label className="inline-flex items-center gap-2 font-medium text-zinc-800">
+                            <input type="checkbox" name="attendance_required" defaultChecked={session.attendance_required} className="h-4 w-4 rounded border-zinc-300" />
+                            Attendance required
+                          </label>
+                          <span className="text-zinc-400">|</span>
+                          <span>{session.batch?.title || 'Batch'} - {session.trainer?.full_name || session.trainer?.email || 'Trainer TBD'}</span>
+                          {session.meeting_url ? (
+                            <a href={session.meeting_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 font-semibold text-blue-700">
+                              <ArrowUpRight className="h-3 w-3" />
+                              Open link
+                            </a>
+                          ) : (
+                            <span className="rounded-full border border-amber-100 bg-amber-50 px-2.5 py-1 font-semibold text-amber-700">Link pending</span>
+                          )}
+                        </div>
+                        <OpsSubmitButton pendingLabel="Saving..." size="sm" className="h-10 rounded-full bg-black px-4 text-white hover:bg-zinc-800">
+                          <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                          Save changes
+                        </OpsSubmitButton>
                       </div>
                     </form>
-                    <div className="flex flex-wrap justify-end gap-2">
+                    <div className="manager-action-row justify-end">
                       {session.meeting_url ? (
-                        <Button asChild size="sm" variant="outline" className="h-8 rounded-full border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100">
+                        <Button asChild size="sm" variant="outline" className="h-9 rounded-full border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100">
                           <a href={session.meeting_url} target="_blank" rel="noreferrer">
                             <ArrowUpRight className="mr-1.5 h-3.5 w-3.5" />
                             Open link
@@ -1392,7 +1397,7 @@ export default async function ManagerOperationsPage({
                       ) : null}
                       <form action={deleteTrainingSessionAction}>
                       <input type="hidden" name="session_id" value={session.id} />
-                        <OpsSubmitButton pendingLabel="Deleting..." size="sm" variant="outline" className="h-8 rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">
+                        <OpsSubmitButton pendingLabel="Deleting..." size="sm" variant="outline" className="h-9 rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">
                           <Trash2 className="mr-1.5 h-3.5 w-3.5" />
                           Delete
                         </OpsSubmitButton>

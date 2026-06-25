@@ -115,8 +115,13 @@
   textarea::placeholder {
     color: oklch(0.46 0 0);
   }
-  main :where(h1, h2, h3, p, a, span, td, th, label, button) {
-    overflow-wrap: anywhere;
+  main :where(h1, h2, h3, p, a, span, td, th, label) {
+    overflow-wrap: break-word;
+    word-break: normal;
+  }
+  main :where(button, [role='button']) {
+    overflow-wrap: normal;
+    word-break: normal;
   }
 
   .chatbot-scrollbar {
@@ -513,6 +518,45 @@
   .visible-action:hover {
     background: #f8fafc;
     color: #020617;
+  }
+
+  .maverick-ops-shell main {
+    min-width: 0;
+  }
+
+  .maverick-ops-shell :where([data-slot='card'], .manager-comfort-card) {
+    overflow: hidden;
+  }
+
+  .maverick-ops-shell :where(form, .manager-comfort-stack) {
+    min-width: 0;
+  }
+
+  .maverick-ops-shell :where(label) {
+    min-width: 0;
+    line-height: 1.35;
+  }
+
+  .maverick-ops-shell :where(input, select, textarea) {
+    min-height: 2.5rem;
+    width: 100%;
+  }
+
+  .maverick-ops-shell :where(button, .visible-action, [data-slot='button']) {
+    min-width: max-content;
+  }
+
+  .manager-responsive-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+    gap: 1rem;
+  }
+
+  .manager-action-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
   }
 
   .maverick-rail-card {

@@ -67,7 +67,7 @@ export function SessionAllocationForm({
         </select>
       </label>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="manager-responsive-grid">
         <label className="grid gap-2 text-sm">
           <span className="font-medium">Session title</span>
           <input name="title" required className="h-11 rounded-xl border border-zinc-200 px-3" placeholder="Week 1 Foundation Lab" />
@@ -123,7 +123,7 @@ export function SessionAllocationForm({
         </span>
       </label>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="manager-responsive-grid">
         <label className="grid gap-2 text-sm">
           <span className="font-medium">Session date & time</span>
           <input name="session_date" type="datetime-local" required className="h-11 w-full min-w-0 rounded-xl border border-zinc-200 px-3" />
