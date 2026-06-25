@@ -1458,6 +1458,14 @@ async function createSessionCommand(admin: ReturnType<typeof createAdminClient>,
   const trainer = args.trainer_email ? await findProfileByArgs(admin, { email: args.trainer_email }) : null
   const meetingUrl = args.meeting_url || args.join_url || args.link || null
   const employeeEmails = splitList(args.employee_emails || args.employees || args.assigned_to)
+  let selectedEmployees: any[] = []
+  if (employeeEmails.length) {
+    const { data: employees } = await admin.from('profiles').select('id, email').in('email', employeeEmails).eq('role', 'employee')
+    if (!employees?.length) return { error: 'No employee emails matched profiles.' }
+    const learnerScopeError = await validateTrainerSessionLearnersForCommand(admin, trainer?.id || null, employees.map((employee: any) => employee.id))
+    if (learnerScopeError) return { error: learnerScopeError }
+    selectedEmployees = employees
+  }
   const { data, error } = await admin.from('training_sessions').insert({
     batch_id: batch.id,
     title: args.title,
@@ -1471,11 +1479,9 @@ async function createSessionCommand(admin: ReturnType<typeof createAdminClient>,
     created_by: actorId,
   }).select('id, title').single()
   if (error) return { error: error.message }
-  if (employeeEmails.length) {
-    const { data: employees } = await admin.from('profiles').select('id, email').in('email', employeeEmails).eq('role', 'employee')
-    if (!employees?.length) return { error: 'Session created, but no employee emails matched profiles.' }
+  if (selectedEmployees.length) {
     const { error: memberError } = await admin.from('batch_members').upsert(
-      employees.map((employee: any) => ({
+      selectedEmployees.map((employee: any) => ({
         batch_id: batch.id,
         user_id: employee.id,
         enrollment_status: 'active',
@@ -1499,6 +1505,26 @@ async function createSessionCommand(admin: ReturnType<typeof createAdminClient>,
   if (sync.warnings.length) return { error: `Session created, but training ops wiring failed: ${sync.warnings.join('; ')}` }
   revalidateManagerPaths()
   return { message: `Session "${data.title}" created for ${batch.title}. Visible to ${sync.memberCount} learner(s)${trainer ? ` and trainer ${trainer.email}` : ''}.`, data }
+}
+
+async function validateTrainerSessionLearnersForCommand(admin: ReturnType<typeof createAdminClient>, trainerId: string | null, employeeIds: string[]) {
+  const uniqueEmployeeIds = Array.from(new Set(employeeIds.filter(Boolean)))
+  if (!trainerId || !uniqueEmployeeIds.length) return null
+
+  const { data: assignments, error } = await admin
+    .from('trainer_employee_assignments')
+    .select('employee_id')
+    .eq('trainer_id', trainerId)
+
+  if (error) return `Could not validate trainer learner roster: ${error.message}`
+
+  const allowedEmployeeIds = new Set((assignments || []).map((assignment: any) => assignment.employee_id))
+  if (!allowedEmployeeIds.size) return 'No employees are assigned under the selected trainer. Assign employees to this trainer from Admin first.'
+
+  const invalidEmployeeIds = uniqueEmployeeIds.filter((employeeId) => !allowedEmployeeIds.has(employeeId))
+  if (invalidEmployeeIds.length) return 'Some requested employees are not assigned under the selected trainer.'
+
+  return null
 }
 
 async function updateSessionCommand(admin: ReturnType<typeof createAdminClient>, actorId: string, args: Record<string, string>) {

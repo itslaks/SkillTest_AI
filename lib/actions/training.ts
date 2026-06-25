@@ -173,6 +173,34 @@ async function activeBatchMemberCount(admin: ReturnType<typeof createAdminClient
   return count || 0
 }
 
+async function validateTrainerSessionLearners(
+  admin: ReturnType<typeof createAdminClient>,
+  trainerId: string | null | undefined,
+  employeeIds: string[]
+) {
+  const uniqueEmployeeIds = Array.from(new Set(employeeIds.filter(Boolean)))
+  if (!trainerId || uniqueEmployeeIds.length === 0) return null
+
+  const { data: assignments, error } = await admin
+    .from('trainer_employee_assignments')
+    .select('employee_id')
+    .eq('trainer_id', trainerId)
+
+  if (error) return `Could not validate trainer learner roster: ${error.message}`
+
+  const allowedEmployeeIds = new Set((assignments || []).map((assignment: any) => assignment.employee_id))
+  if (!allowedEmployeeIds.size) {
+    return 'No employees are assigned under the selected trainer. Assign employees to this trainer from Admin before scheduling the session.'
+  }
+
+  const invalidEmployeeIds = uniqueEmployeeIds.filter((employeeId) => !allowedEmployeeIds.has(employeeId))
+  if (invalidEmployeeIds.length) {
+    return 'Selected learners include employees who are not assigned under the selected trainer. Refresh the page and select from the trainer-filtered learner list.'
+  }
+
+  return null
+}
+
 async function attendanceRowsForSession(admin: ReturnType<typeof createAdminClient>, sessionId: string) {
   const { count } = await admin
     .from('session_attendance')
@@ -254,7 +282,7 @@ export async function getTrainingOpsManagerData() {
 
   const batchIds = batches.map((batch: any) => batch.id)
 
-  const [membersRes, sessionsRes, notificationsRes, feedbackRes, feedbackWindowsRes, quizzesRes, batchTrainersRes, assessmentSetupsRes, projectEvaluationsRes, automationRunsRes, attendanceVersionsRes, assessmentUploadsRes, batchChangeAuditRes] = await Promise.all([
+  const [membersRes, sessionsRes, notificationsRes, feedbackRes, feedbackWindowsRes, quizzesRes, batchTrainersRes, assessmentSetupsRes, projectEvaluationsRes, automationRunsRes, attendanceVersionsRes, assessmentUploadsRes, batchChangeAuditRes, trainerEmployeeAssignmentsRes] = await Promise.all([
     batchIds.length
       ? admin
           .from('batch_members')
@@ -372,6 +400,9 @@ export async function getTrainingOpsManagerData() {
           .order('changed_at', { ascending: false })
           .limit(25)
       : Promise.resolve({ data: [] }),
+    admin
+      .from('trainer_employee_assignments')
+      .select('trainer_id, employee_id'),
   ])
 
   const members = membersRes.data || []
@@ -387,6 +418,7 @@ export async function getTrainingOpsManagerData() {
   const attendanceVersions = attendanceVersionsRes.data || []
   const assessmentUploads = assessmentUploadsRes.data || []
   const batchChangeAudit = batchChangeAuditRes.data || []
+  const trainerEmployeeAssignments = trainerEmployeeAssignmentsRes.data || []
   const notificationIds = notifications.map((notification: any) => notification.id).filter(Boolean)
   const notificationDispatchLogsRes = notificationIds.length
     ? await admin
@@ -494,6 +526,7 @@ export async function getTrainingOpsManagerData() {
     attendanceVersions,
     assessmentUploads,
     batchChangeAudit,
+    trainerEmployeeAssignments,
     notificationDispatchLogs,
     governanceSettings,
   }
@@ -1326,6 +1359,9 @@ export async function createTrainingSession(formData: FormData): Promise<ApiResp
   if (!batchId || !title || !sessionDate) {
     return { error: 'Batch, title, and session date are required.' }
   }
+
+  const learnerScopeError = await validateTrainerSessionLearners(admin, trainerId, employeeIds)
+  if (learnerScopeError) return { error: learnerScopeError }
 
   const { data: session, error } = await admin
     .from('training_sessions')

@@ -40,6 +40,7 @@ import { OpsAutoRefresh } from '@/components/manager/ops-auto-refresh'
 import { OpsResultToast } from '@/components/manager/ops-result-toast'
 import { OpsSubmitButton } from '@/components/manager/ops-submit-button'
 import { FeedbackSentimentChart } from '@/components/manager/feedback-sentiment-chart'
+import { SessionAllocationForm } from '@/components/manager/session-allocation-form'
 import { createAdminClient } from '@/lib/supabase/server'
 import {
   Activity,
@@ -267,6 +268,7 @@ export default async function ManagerOperationsPage({
     attendanceVersions,
     assessmentUploads,
     batchChangeAudit,
+    trainerEmployeeAssignments,
     notificationDispatchLogs,
     governanceSettings,
   } = await getTrainingOpsManagerData()
@@ -1249,82 +1251,23 @@ export default async function ManagerOperationsPage({
           <CardContent className="space-y-6">
             {canCoordinate ? (
               <>
-                <form action={createTrainingSessionAction} className="grid gap-4">
-                  <label className="grid gap-2 text-sm">
-                    <span className="font-medium">Target batch</span>
-                    <select name="batch_id" required className="h-11 rounded-xl border border-zinc-200 px-3">
-                      <option value="">Select batch</option>
-                      {batches.map((batch: any) => (
-                        <option key={batch.id} value={batch.id}>
-                          {batch.title}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <div className="grid gap-4 md:grid-cols-2">
-                <label className="grid gap-2 text-sm">
-                  <span className="font-medium">Session title</span>
-                  <input name="title" required className="h-11 rounded-xl border border-zinc-200 px-3" placeholder="Week 1 Foundation Lab" />
-                </label>
-                <label className="grid gap-2 text-sm">
-                  <span className="font-medium">Trainer</span>
-                  <select name="trainer_id" className="h-11 rounded-xl border border-zinc-200 px-3">
-                    <option value="">Auto/Unassigned</option>
-                    {trainers.map((trainer: any) => (
-                      <option key={trainer.id} value={trainer.id}>
-                        {trainer.full_name || trainer.email}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <label className="grid gap-2 text-sm">
-                <span className="font-medium">Agenda</span>
-                <textarea name="agenda" rows={3} className="rounded-xl border border-zinc-200 px-3 py-3" placeholder="Concept coverage, practicals, feedback checkpoints, blockers." />
-              </label>
-              <label className="grid gap-2 text-sm">
-                <span className="font-medium">Meeting / classroom link</span>
-                <input name="meeting_url" type="url" className="h-11 rounded-xl border border-zinc-200 px-3" placeholder="https://meet.google.com/abc-defg-hij or office room link" />
-              </label>
-              <label className="grid gap-2 text-sm">
-                <span className="font-medium">Session learners</span>
-                <select name="employee_ids" multiple size={Math.min(6, Math.max(3, employees.length || 3))} className="min-h-28 rounded-xl border border-zinc-200 px-3 py-2">
-                  {employees.map((employee: any) => (
-                    <option key={employee.id} value={employee.id}>
-                      {employee.full_name || employee.email} {employee.employee_id ? `(${employee.employee_id})` : ''}
-                    </option>
-                  ))}
-                </select>
-                <span className="text-xs text-zinc-500">Optional. Selected learners are enrolled into the target batch and receive the session allocation notice.</span>
-              </label>
-              <div className="grid gap-4 lg:grid-cols-3">
-                <label className="grid gap-2 text-sm">
-                  <span className="font-medium">Session date & time</span>
-                  <input name="session_date" type="datetime-local" required className="h-11 w-full min-w-0 rounded-xl border border-zinc-200 px-3" />
-                </label>
-                <label className="grid gap-2 text-sm">
-                  <span className="font-medium">Mode</span>
-                  <select name="mode" defaultValue="virtual" className="h-11 rounded-xl border border-zinc-200 px-3">
-                    <option value="virtual">Virtual</option>
-                    <option value="classroom">Classroom</option>
-                    <option value="hybrid">Hybrid</option>
-                  </select>
-                </label>
-                <label className="grid gap-2 text-sm">
-                  <span className="font-medium">Status</span>
-                  <select name="status" defaultValue="scheduled" className="h-11 rounded-xl border border-zinc-200 px-3">
-                    <option value="scheduled">Scheduled</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                </label>
-              </div>
-              <label className="flex items-center gap-3 rounded-xl border border-zinc-200 px-4 py-3 text-sm font-medium">
-                <input type="checkbox" name="attendance_required" defaultChecked className="h-4 w-4 rounded border-zinc-300" />
-                Attendance required for this session
-              </label>
-              <OpsSubmitButton pendingLabel="Scheduling..." className="rounded-full bg-black text-white hover:bg-zinc-800">Schedule session</OpsSubmitButton>
-            </form>
+                <SessionAllocationForm
+                  action={createTrainingSessionAction}
+                  batches={batches.map((batch: any) => ({ id: batch.id, title: batch.title }))}
+                  trainers={trainers.map((trainer: any) => ({ id: trainer.id, full_name: trainer.full_name, email: trainer.email }))}
+                  employees={employees.map((employee: any) => ({
+                    id: employee.id,
+                    full_name: employee.full_name,
+                    email: employee.email,
+                    employee_id: employee.employee_id,
+                    department: employee.department,
+                    domain: employee.domain,
+                  }))}
+                  trainerEmployeeAssignments={(trainerEmployeeAssignments || []).map((assignment: any) => ({
+                    trainer_id: assignment.trainer_id,
+                    employee_id: assignment.employee_id,
+                  }))}
+                />
 
             <form action={clearScheduledTrainingSessionsAction} className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">

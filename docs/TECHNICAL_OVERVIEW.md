@@ -93,6 +93,7 @@ The command chatbot is intentionally conservative:
 - The full AI Command console includes a numbered Quiz Launchpad that constructs validated create/assign commands from structured controls. The floating AI Command preserves pending-action previews and exposes Confirm/Cancel, so chat-initiated assignments can complete.
 - AI-created training sessions use the same Training Ops sync as the admin form: trainer batch access is upserted, selected learners are enrolled, learner attendance placeholders are created, meeting links are persisted, and employee/trainer notifications are inserted.
 - Session allocation notifications use a professional email template and store the join link in notification metadata so trainer/admin logs and employee training screens expose the same link.
+- Session allocation uses `trainer_employee_assignments` as the real-world roster source: after an admin selects a trainer, only employees assigned under that trainer are selectable, and server validation rejects out-of-roster learner IDs.
 - Training Ops consoles use short live-refresh intervals on manager/trainer dashboards, operations, notifications, reports, and employee training pages so scheduled sessions and roster counts do not remain stale.
 - Roster-count prompts such as `how many employees are there` are answered deterministically from the current role scope before falling back to an AI provider.
 - AI prompts are instructed to use only supplied database context and keep responses under 60 words.
