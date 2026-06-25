@@ -14,6 +14,9 @@ test('AI Command exposes numbered quiz launchpad with structured assignment cont
   assert.match(consoleSource, /Assign existing/)
   assert.match(consoleSource, /selectedEmails/)
   assert.match(consoleSource, /Build confirmation preview/)
+  assert.match(consoleSource, /Scheduling training session/)
+  assert.match(consoleSource, /run update session/)
+  assert.match(consoleSource, /run delete session/)
 })
 
 test('floating AI Command preserves previews and can confirm quiz assignment', () => {
@@ -21,6 +24,9 @@ test('floating AI Command preserves previews and can confirm quiz assignment', (
   assert.match(chatbotSource, /preview:\s*payload\.preview/)
   assert.match(chatbotSource, /confirmToken:\s*preview\.confirmToken/)
   assert.match(chatbotSource, /decidePreview\(entry\.preview!, 'confirm'\)/)
+  assert.match(chatbotSource, /Creating training batch/)
+  assert.match(chatbotSource, /Scheduling training session/)
+  assert.doesNotMatch(chatbotSource, /Working on live data/)
 })
 
 test('create quiz command accepts structured bulk recipient arguments', () => {
@@ -64,5 +70,7 @@ test('training session creation syncs trainer, learner attendance, meeting links
   assert.match(sessionForm, /employeesByTrainer/)
   assert.match(sessionForm, /Showing only employees assigned under/)
   assert.match(operationsPage, /trainerEmployeeAssignments/)
+  assert.match(operationsPage, /Create session/)
+  assert.match(operationsPage, /Delete/)
   assert.match(candidateImport, /backfillAttendanceForBatchMembers/)
 })

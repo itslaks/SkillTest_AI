@@ -2140,6 +2140,9 @@ function buildDeterministicAnswer(message: string, data: Record<string, any[]>) 
   const topPerformers = summarizeTopPerformers(message, data)
   if (topPerformers) return topPerformers
 
+  const sessionRead = summarizeSessionOperations(message, data)
+  if (sessionRead) return sessionRead
+
   const batchAnalysis = summarizeBatchOperations(message, data)
   if (batchAnalysis) return batchAnalysis
 
@@ -2671,7 +2674,8 @@ function summarizeTopPerformers(message: string, data: Record<string, any[]>) {
 
 function summarizeBatchOperations(message: string, data: Record<string, any[]>) {
   const lower = normalize(message)
-  if (!/\bbatch|batches\b/.test(lower) || !/\b(completion|highest|lowest|performing|poorly|status|summary|compare|at risk|risk)\b/.test(lower)) return null
+  const asksBatchRead = /\b(list|show|view|read|all|current)\b/.test(lower) && /\b(batch|batches)\b/.test(lower)
+  if (!asksBatchRead && (!/\b(batch|batches)\b/.test(lower) || !/\b(completion|highest|lowest|performing|poorly|status|summary|compare|at risk|risk)\b/.test(lower))) return null
   if (!data.batches.length) return 'I could not find any matching batch records.'
   const attemptsByUser = groupBy(data.attempts, 'user_id')
   const rows = data.batches.map((batch) => {
@@ -2692,6 +2696,29 @@ function summarizeBatchOperations(message: string, data: Record<string, any[]>) 
     ...rows.slice(0, 10).map((row, index) => `${index + 1}. ${row.batch.title} - status ${row.batch.status}, members ${row.members}, completion ${row.completion}%, avg score ${row.avg || 'N/A'}%, attendance ${row.attendanceRate}%`),
     'Recommendation: prioritize batches with low completion plus low attendance for trainer follow-up.',
   ].join('\n')
+}
+
+function summarizeSessionOperations(message: string, data: Record<string, any[]>) {
+  const lower = normalize(message)
+  if (!/\b(list|show|view|read|all|current|upcoming|scheduled)\b/.test(lower) || !/\b(session|sessions|roadmap|roadmaps)\b/.test(lower)) return null
+  if (!data.sessions.length) return 'I could not find any matching session records.'
+
+  const batchById = new Map(data.batches.map((batch) => [batch.id, batch]))
+  const rows = data.sessions
+    .filter((session) => !/\bscheduled|upcoming\b/.test(lower) || session.status === 'scheduled')
+    .sort((left, right) => new Date(left.session_date || 0).getTime() - new Date(right.session_date || 0).getTime())
+
+  if (!rows.length) return 'No scheduled session records are currently visible in your scope.'
+
+  return [
+    `Training sessions (${rows.length} visible):`,
+    ...rows.slice(0, 10).map((session, index) => {
+      const batch = batchById.get(session.batch_id)
+      const link = session.meeting_url ? 'link set' : 'link pending'
+      return `${index + 1}. ${session.title} - ${batch?.title || 'Batch'} - ${new Date(session.session_date).toLocaleString()} - ${session.status} - ${link}`
+    }),
+    rows.length > 10 ? `Showing first 10; ${rows.length - 10} more session(s) not shown.` : '',
+  ].filter(Boolean).join('\n')
 }
 
 function summarizeDomainPerformance(message: string, data: Record<string, any[]>) {

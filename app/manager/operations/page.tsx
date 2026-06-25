@@ -1305,8 +1305,18 @@ export default async function ManagerOperationsPage({
 
             <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-zinc-950">Session CRUD</p>
-                <Badge variant="outline" className="bg-white">{sessions.length} total</Badge>
+                <div>
+                  <p className="text-sm font-semibold text-zinc-950">Session CRUD</p>
+                  <p className="mt-1 text-xs text-zinc-500">Create, update, open, and delete session allocations from explicit action buttons.</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {canCoordinate && (
+                    <Button asChild size="sm" className="h-8 rounded-full bg-black text-white hover:bg-zinc-800">
+                      <a href="#schedule-session">Create session</a>
+                    </Button>
+                  )}
+                  <Badge variant="outline" className="bg-white">{sessions.length} total</Badge>
+                </div>
               </div>
               <div className="mt-3 grid gap-3">
                 {sessions.length === 0 ? (
@@ -1350,7 +1360,10 @@ export default async function ManagerOperationsPage({
                           <option value="cancelled">Cancelled</option>
                         </select>
                       </label>
-                      <OpsSubmitButton pendingLabel="Updating..." size="sm" variant="outline" className="h-9 rounded-full bg-white">Update</OpsSubmitButton>
+                      <OpsSubmitButton pendingLabel="Saving..." size="sm" className="h-9 rounded-full bg-black text-white hover:bg-zinc-800">
+                        <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                        Save
+                      </OpsSubmitButton>
                       <input type="hidden" name="agenda" value={session.agenda || ''} />
                       <label className="flex items-center gap-2 text-xs lg:col-span-2">
                         <input type="checkbox" name="attendance_required" defaultChecked={session.attendance_required} className="h-4 w-4 rounded border-zinc-300" />
@@ -1368,10 +1381,23 @@ export default async function ManagerOperationsPage({
                         )}
                       </div>
                     </form>
-                    <form action={deleteTrainingSessionAction} className="flex justify-end">
+                    <div className="flex flex-wrap justify-end gap-2">
+                      {session.meeting_url ? (
+                        <Button asChild size="sm" variant="outline" className="h-8 rounded-full border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100">
+                          <a href={session.meeting_url} target="_blank" rel="noreferrer">
+                            <ArrowUpRight className="mr-1.5 h-3.5 w-3.5" />
+                            Open link
+                          </a>
+                        </Button>
+                      ) : null}
+                      <form action={deleteTrainingSessionAction}>
                       <input type="hidden" name="session_id" value={session.id} />
-                      <OpsSubmitButton pendingLabel="Deleting..." size="sm" variant="outline" className="h-8 rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">Delete session</OpsSubmitButton>
+                        <OpsSubmitButton pendingLabel="Deleting..." size="sm" variant="outline" className="h-8 rounded-full border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">
+                          <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                          Delete
+                        </OpsSubmitButton>
                     </form>
+                    </div>
                   </div>
                 ))}
               </div>

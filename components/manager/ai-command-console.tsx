@@ -109,8 +109,13 @@ const commandPacks = [
     icon: Workflow,
     prompts: [
       'run create batch title="Week 1 Java" domain=Java trainer_email=trainer@company.com employee_emails=person@company.com',
+      'List training batches',
       'run update batch batch="Week 1 Java" status=running',
+      'run delete batch title="Week 1 Java"',
       'run create session batch="Week 1 Java" title="Day 1 Orientation" date=2026-06-10T10:00 trainer_email=trainer@company.com',
+      'List scheduled sessions',
+      'run update session title="Day 1 Orientation" status=completed link=https://meet.google.com/abc-defg-hij',
+      'run delete session title="Day 1 Orientation"',
       'run mark attendance session="Day 1 Orientation" email=person@company.com status=present',
       'run delete scheduled confirmation="DELETE SCHEDULED"',
     ],
@@ -158,6 +163,7 @@ export function AICommandConsole({ employees = [], quizzes = [] }: { employees?:
   const router = useRouter()
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [processingPrompt, setProcessingPrompt] = useState('')
   const [listening, setListening] = useState(false)
   const [activePack, setActivePack] = useState(commandPacks[0].title)
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -207,6 +213,7 @@ export function AICommandConsole({ employees = [], quizzes = [] }: { employees?:
     if (!trimmed || loading) return
     setInput('')
     setLoading(true)
+    setProcessingPrompt(trimmed)
     setMessages((previous) => [...previous, { role: 'user', content: trimmed }])
 
     try {
@@ -229,12 +236,14 @@ export function AICommandConsole({ employees = [], quizzes = [] }: { employees?:
       setMessages((previous) => [...previous, { role: 'assistant', content: 'AI Command could not reach the server. Refresh and try again.', ok: false }])
     } finally {
       setLoading(false)
+      setProcessingPrompt('')
     }
   }
 
   async function decidePreview(preview: AiActionPreview, decision: 'confirm' | 'cancel', messageOverride?: string) {
     if (!preview.confirmToken || loading) return
     setLoading(true)
+    setProcessingPrompt(`${decision} ${preview.actionType || 'pending action'}`)
     setMessages((previous) => [...previous, { role: 'user', content: decision === 'confirm' ? 'Confirm' : 'Cancel' }])
     try {
       const response = await fetch('/api/manager-chatbot', {
@@ -256,6 +265,7 @@ export function AICommandConsole({ employees = [], quizzes = [] }: { employees?:
       setMessages((previous) => [...previous, { role: 'assistant', content: 'AI Command could not confirm the action. Try again.', ok: false }])
     } finally {
       setLoading(false)
+      setProcessingPrompt('')
     }
   }
 
@@ -421,15 +431,36 @@ export function AICommandConsole({ employees = [], quizzes = [] }: { employees?:
         ))}
 
         {loading && (
-          <div className="inline-flex items-center gap-2 rounded-xl border border-sky-200/20 bg-sky-300/10 px-3 py-2 text-xs text-sky-50">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            Executing command against live data
+          <div className="rounded-xl border border-sky-200/20 bg-sky-300/10 px-3 py-2 text-xs text-sky-50">
+            <div className="flex items-center gap-2 font-semibold">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              {processingStatus(processingPrompt).title}
+            </div>
+            <p className="mt-1 text-sky-50/75">{processingStatus(processingPrompt).detail}</p>
           </div>
         )}
         <div ref={scrollRef} />
       </div>
     </RuixenMoonChat>
   )
+}
+
+function processingStatus(prompt: string) {
+  const lower = prompt.toLowerCase()
+  if (/\bconfirm\b/.test(lower)) return { title: 'Confirming approved operation', detail: 'Applying the reviewed action, refreshing affected consoles, and writing the audit result.' }
+  if (/\bcancel\b/.test(lower)) return { title: 'Cancelling pending operation', detail: 'Closing the pending action without changing training data.' }
+  if (/\bcreate\s+batch\b/.test(lower)) return { title: 'Creating training batch', detail: 'Validating trainer, enrolling requested learners, syncing batch links, and logging governance evidence.' }
+  if (/\bupdate\s+batch\b/.test(lower)) return { title: 'Updating training batch', detail: 'Finding the batch, checking lifecycle fields, syncing trainer assignments, and refreshing Training Ops.' }
+  if (/\b(delete|remove)\s+batch\b/.test(lower)) return { title: 'Deleting training batch', detail: 'Checking safeguards, removing linked sessions and roster rows, then writing the audit trail.' }
+  if (/\b(create|schedule)\s+session\b/.test(lower)) return { title: 'Scheduling training session', detail: 'Checking batch, selected trainer roster, learner scope, meeting link, email notices, and attendance setup.' }
+  if (/\bupdate\s+session\b/.test(lower)) return { title: 'Updating training session', detail: 'Finding the session, applying status/link changes, and re-sending allocation details when needed.' }
+  if (/\b(delete|remove)\s+session\b/.test(lower)) return { title: 'Deleting training session', detail: 'Removing session attendance, linked notifications, feedback references, and audit records.' }
+  if (/\bcreate\s+quiz\b/.test(lower)) return { title: 'Preparing quiz command', detail: 'Parsing quiz settings, assignees, certificate rule, and AI proctoring choice before preview.' }
+  if (/\bassign\s+quiz\b/.test(lower)) return { title: 'Assigning quiz', detail: 'Validating recipients, creating assignments, and sending/logging assignment emails.' }
+  if (/\b(export|download|report)\b/.test(lower)) return { title: 'Preparing report export', detail: 'Collecting current scoped data and formatting the requested download.' }
+  if (/\b(attendance|absent|present|late)\b/.test(lower)) return { title: 'Checking attendance records', detail: 'Reading sessions, learner roster, attendance rows, and risk signals.' }
+  if (/\b(employee|employees|learner|learners)\b/.test(lower)) return { title: 'Reading employee roster', detail: 'Using your current role scope, trainer assignments, quiz activity, and profile records.' }
+  return { title: 'Interpreting command', detail: 'Classifying the prompt, loading scoped records, and choosing the safest matching operation.' }
 }
 
 function QuizLaunchpad({
