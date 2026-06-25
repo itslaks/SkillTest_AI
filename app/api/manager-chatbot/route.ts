@@ -2700,7 +2700,11 @@ function summarizeBatchOperations(message: string, data: Record<string, any[]>) 
 
 function summarizeSessionOperations(message: string, data: Record<string, any[]>) {
   const lower = normalize(message)
-  if (!/\b(list|show|view|read|all|current|upcoming|scheduled)\b/.test(lower) || !/\b(session|sessions|roadmap|roadmaps)\b/.test(lower)) return null
+  const asksSession = /\b(session|sessions|roadmap|roadmaps)\b/.test(lower)
+  const asksRead = /\b(list|show|view|read|all|current|upcoming|scheduled)\b/.test(lower)
+  const asksCount = /\b(how many|count|total|number of|no\.? of)\b/.test(lower)
+  const asksAssigned = /\b(assign|assigned|allocated|allocation)\b/.test(lower)
+  if (!asksSession || (!asksRead && !asksCount && !asksAssigned)) return null
   if (!data.sessions.length) return 'I could not find any matching session records.'
 
   const batchById = new Map(data.batches.map((batch) => [batch.id, batch]))
@@ -2709,6 +2713,22 @@ function summarizeSessionOperations(message: string, data: Record<string, any[]>
     .sort((left, right) => new Date(left.session_date || 0).getTime() - new Date(right.session_date || 0).getTime())
 
   if (!rows.length) return 'No scheduled session records are currently visible in your scope.'
+
+  if (asksCount || asksAssigned) {
+    const scheduled = rows.filter((session) => session.status === 'scheduled').length
+    const completed = rows.filter((session) => session.status === 'completed').length
+    const cancelled = rows.filter((session) => session.status === 'cancelled').length
+    const trainerAssigned = rows.filter((session) => Boolean(session.trainer_id)).length
+    const linkSet = rows.filter((session) => Boolean(session.meeting_url)).length
+    const attendanceRequired = rows.filter((session) => session.attendance_required !== false).length
+
+    return [
+      `Sessions assigned in your current scope: ${rows.length}.`,
+      `Scheduled: ${scheduled}. Completed: ${completed}. Cancelled: ${cancelled}.`,
+      `Trainer-linked sessions: ${trainerAssigned}. Meeting links set: ${linkSet}.`,
+      `Attendance-required sessions: ${attendanceRequired}.`,
+    ].join('\n')
+  }
 
   return [
     `Training sessions (${rows.length} visible):`,

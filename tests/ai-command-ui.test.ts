@@ -41,6 +41,8 @@ test('AI Command answers scoped employee-count prompts deterministically', () =>
   assert.match(routeSource, /summarizeRosterCount\(message, data\)/)
   assert.match(routeSource, /Employees in your current training scope/)
   assert.match(routeSource, /Visible employee profiles/)
+  assert.match(routeSource, /Sessions assigned in your current scope/)
+  assert.match(routeSource, /Trainer-linked sessions/)
 })
 
 test('training session creation syncs trainer, learner attendance, meeting links, and notifications', () => {
