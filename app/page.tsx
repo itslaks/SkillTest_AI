@@ -12,6 +12,7 @@ import { TestimonialsSection } from "@/components/landing/testimonials-section";
 import { PricingSection } from "@/components/landing/pricing-section";
 import { CTASection } from "@/components/landing/cta-section";
 import { FooterSection } from "@/components/landing/footer-section";
+import { LandingMotion } from "@/components/landing/landing-motion";
 
 type SearchParamValue = string | string[] | undefined
 
@@ -42,7 +43,8 @@ export default async function Home({
   }
 
   return (
-    <main className="relative min-h-screen overflow-x-hidden noise-overlay">
+    <main className="landing-motion-root relative min-h-screen overflow-x-hidden noise-overlay">
+      <LandingMotion />
       <Navigation />
       <HeroSection />
       <FeaturesSection />

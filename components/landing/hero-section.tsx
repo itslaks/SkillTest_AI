@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { ArrowRight } from "lucide-react";
+import { ArrowDown, ArrowRight } from "lucide-react";
 import { HeroShowcase } from "./hero-showcase";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand/brand-logo";
@@ -7,7 +7,7 @@ import { BrandLogo } from "@/components/brand/brand-logo";
 export function HeroSection() {
   return (
     <section className="relative flex min-h-[96vh] flex-col justify-center overflow-hidden pt-24 md:pt-28">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-30">
+      <div className="hero-kinetic-bg pointer-events-none absolute inset-0 overflow-hidden opacity-30">
         {[...Array(8)].map((_, i) => (
           <div
             key={`h-${i}`}
@@ -32,7 +32,13 @@ export function HeroSection() {
         ))}
       </div>
 
-      <div className="pointer-events-none absolute left-1/2 top-10 z-0 -translate-x-1/2 select-none font-display text-[clamp(5rem,18vw,18rem)] leading-none text-violet-500/10 blur-[0.5px]">
+      <div className="pointer-events-none absolute inset-x-0 top-24 z-0 h-[42vh] overflow-hidden">
+        <div className="hero-current hero-current-a" />
+        <div className="hero-current hero-current-b" />
+        <div className="hero-current hero-current-c" />
+      </div>
+
+      <div className="hero-title-shadow pointer-events-none absolute left-1/2 top-10 z-0 -translate-x-1/2 select-none font-display text-[clamp(5rem,18vw,18rem)] leading-none text-violet-500/10 blur-[0.5px]">
         SkillTest_AI
       </div>
 
@@ -73,7 +79,7 @@ export function HeroSection() {
                 { label: "Operations", value: "End-to-End" },
                 { label: "Insights", value: "Real-time" },
               ].map((item) => (
-                <div key={item.label} className="rounded-2xl glass-panel signal-card p-4">
+                <div key={item.label} className="rounded-2xl glass-panel signal-card cursor-parallax p-4">
                   <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">{item.label}</p>
                   <p className="mt-3 text-lg font-semibold text-zinc-950">{item.value}</p>
                 </div>
@@ -107,10 +113,22 @@ export function HeroSection() {
           </div>
 
           <div className="hidden hero-rise xl:block" style={{ animationDelay: "320ms" }}>
-            <HeroShowcase />
+            <div className="hero-visual-float">
+              <HeroShowcase />
+            </div>
           </div>
         </div>
       </div>
+
+      <a
+        href="#features"
+        className="scroll-cue group absolute bottom-8 left-1/2 z-20 hidden -translate-x-1/2 items-center gap-3 rounded-full border border-slate-200 bg-white/80 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 shadow-lg backdrop-blur-md transition hover:border-cyan-300 hover:text-slate-950 md:inline-flex"
+        aria-label="Scroll to features"
+      >
+        <span className="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_18px_rgba(34,211,238,0.9)]" />
+        Scroll
+        <ArrowDown className="h-4 w-4 transition-transform group-hover:translate-y-1" />
+      </a>
 
       <div className="relative z-10 mt-2 marquee-container">
         <div className="flex gap-16 marquee whitespace-nowrap">
