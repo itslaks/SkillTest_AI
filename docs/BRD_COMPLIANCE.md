@@ -18,6 +18,7 @@ The Maverick Execution Platform / TMS implements the BRD training lifecycle requ
 | Assessment reminder email | Implemented | `runTrainingAutomationSweep` |
 | Feedback request email | Implemented | `createFeedbackWindow`, feedback reminder sweep |
 | Quiz assignment email | Implemented | `notifyQuizAssigned`, `brd_email_notification_logs.event_type = quiz_assigned` |
+| Quiz result AI analysis email | Implemented | `submitQuiz`, `brd_email_notification_logs.event_type = quiz_result_analysis` |
 | Training session allocation email | Implemented | `syncTrainingSessionVisibility`, `brd_email_notification_logs.event_type = session_allocated` |
 | Feedback collection and reporting | Implemented | `training_feedback`, export routes |
 | Dashboard metrics | Implemented | `app/manager/operations/page.tsx`, `app/manager/reports/page.tsx` |
@@ -34,6 +35,8 @@ BRD mandatory emails use `lib/brd-notifications.ts`. Every BRD event attempts em
 
 Quiz assignment emails are routed through `lib/quiz-assignment-notifications.ts` for manager UI assignment, AI Command `assign quiz`, and AI Command create-and-assign flows. Each recipient gets one `brd_email_notification_logs` row with `event_type = quiz_assigned`, then the provider result updates the row to `sent` or `failed`.
 
+Quiz result AI analysis emails are routed through `sendMandatoryBrdEmail` after a completed quiz attempt. Employees receive the AI coaching report with weak topics, strong topics, feedback, and suggested practice. Trainers/coordinators tied to the quiz or batch receive a separate coaching brief that names the employee and highlights topics to reinforce. Each recipient gets a `brd_email_notification_logs` row with `event_type = quiz_result_analysis`, and SMTP/Resend failures are retained for retry instead of being silently ignored.
+
 Training session allocation emails are routed through `lib/training-session-sync.ts` for manager Training Ops session creation/update and AI Command session creation/update. Each trainer and learner recipient gets one `brd_email_notification_logs` row with `event_type = session_allocated`, linked back to the Training Ops notification row. SMTP or Resend failures update both the BRD log and the visible Training Ops delivery status. Trainer recipients receive a facilitator brief, while employee recipients receive a learner invitation that asks them to join 10 minutes before the session.
 
 ## Value Added Features Beyond BRD
@@ -41,12 +44,12 @@ Training session allocation emails are routed through `lib/training-session-sync
 These features increase scope and functionality but are not required for BRD compliance:
 
 - AI quiz generation and content extraction
-- AI Command operations copilot
+- AI Command operations copilot, including quiz-result AI insight questions for admins and trainers
 - AI proctoring with evidence and review gates
 - Certificates, badges, and leaderboards
 - Learner recommendations and readiness insights
 - SaaS, tenant, SSO, and billing foundation
-- Per-quiz topic performance visualization, weak-topic alerts, AI Insights weak-topic chart, and employee result-analysis emails
+- Per-quiz topic performance visualization, weak-topic alerts, AI Insights weak-topic chart, and employee/trainer result-analysis emails
 
 ## Remaining Risk
 

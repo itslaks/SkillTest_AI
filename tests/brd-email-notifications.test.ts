@@ -93,6 +93,44 @@ test('session allocation BRD email creates one auditable delivery row', async ()
   assert.equal(admin.updates[0].status, 'sent')
 })
 
+test('quiz result analysis BRD email creates auditable sent and failed rows', async () => {
+  const sentAdmin = createFakeBrdEmailAdmin()
+  const sent = await sendMandatoryBrdEmailCore({
+    admin: sentAdmin as any,
+    eventType: 'quiz_result_analysis',
+    to: 'learner@example.com',
+    recipientRole: 'employee',
+    relatedBatchId: '11111111-1111-4111-8111-111111111111',
+    subject: 'Quiz AI Analysis: SQL - 72%',
+    html: '<p>AI analysis</p>',
+    configuration: { valid: true, provider: 'smtp', errors: [], warnings: [] },
+    transport: async () => ({ success: true }),
+  })
+
+  assert.equal(sent.success, true)
+  assert.equal(sentAdmin.inserted[0].event_type, 'quiz_result_analysis')
+  assert.equal(sentAdmin.inserted[0].recipient_role, 'employee')
+  assert.equal(sentAdmin.updates[0].status, 'sent')
+
+  const failedAdmin = createFakeBrdEmailAdmin()
+  const failed = await sendMandatoryBrdEmailCore({
+    admin: failedAdmin as any,
+    eventType: 'quiz_result_analysis',
+    to: 'trainer@example.com',
+    recipientRole: 'trainer',
+    subject: 'Coaching insight: Lakshan - SQL',
+    html: '<p>Trainer insight</p>',
+    configuration: { valid: true, provider: 'smtp', errors: [], warnings: [] },
+    transport: async () => ({ success: false, error: 'SMTP unavailable' }),
+  })
+
+  assert.equal(failed.success, false)
+  assert.equal(failedAdmin.inserted[0].event_type, 'quiz_result_analysis')
+  assert.equal(failedAdmin.inserted[0].recipient_role, 'trainer')
+  assert.equal(failedAdmin.updates[0].status, 'failed')
+  assert.equal(failedAdmin.updates[0].error_message, 'SMTP unavailable')
+})
+
 test('mandatory BRD email marks failed when provider throws', async () => {
   const admin = createFakeBrdEmailAdmin()
   const result = await sendMandatoryBrdEmailCore({

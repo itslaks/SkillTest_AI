@@ -45,6 +45,16 @@ test('AI Command answers scoped employee-count prompts deterministically', () =>
   assert.match(routeSource, /Trainer-linked sessions/)
 })
 
+test('AI Command answers quiz AI insight and weak-topic prompts from question responses', () => {
+  const routeSource = read('app/api/manager-chatbot/route.ts')
+  assert.match(routeSource, /questions\(\*\)/)
+  assert.match(routeSource, /summarizeQuizInsightQuestions\(message, data\)/)
+  assert.match(routeSource, /analyzeAttemptTopicPerformance/)
+  assert.match(routeSource, /buildCohortWeakTopicInsights/)
+  assert.match(routeSource, /Areas to improve/)
+  assert.match(routeSource, /Trainer action/)
+})
+
 test('training session creation syncs trainer, learner attendance, meeting links, and notifications', () => {
   const syncSource = read('lib/training-session-sync.ts')
   const trainingActions = read('lib/actions/training.ts')

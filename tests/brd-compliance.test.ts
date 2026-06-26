@@ -51,3 +51,17 @@ test('quiz assignment uses BRD mandatory email logging', () => {
   assert.match(read('lib/actions/manager.ts'), /notifyQuizAssigned/)
   assert.match(read('app/api/manager-chatbot/route.ts'), /createQuizAssignmentsAndNotify/)
 })
+
+test('quiz result AI analysis emails are mandatory and trainer-visible', () => {
+  const employeeActions = read('lib/actions/employee.ts')
+  const emailTemplates = read('lib/email.ts')
+
+  assert.match(employeeActions, /eventType:\s*'quiz_result_analysis'/)
+  assert.match(employeeActions, /recipientRole:\s*'employee'/)
+  assert.match(employeeActions, /recipientRole:\s*recipient\.role \|\| 'trainer'/)
+  assert.match(employeeActions, /getQuizInsightTrainerRecipients/)
+  assert.match(employeeActions, /buildTrainerQuizInsightEmail/)
+  assert.match(emailTemplates, /Learner coaching signal/)
+  assert.match(emailTemplates, /Areas to coach/)
+  assert.match(read('lib/brd-notifications-core.ts'), /'quiz_result_analysis'/)
+})

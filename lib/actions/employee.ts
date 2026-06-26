@@ -11,7 +11,8 @@ import {
   getTopicAttempts,
 } from '@/lib/insights'
 import type { SubmitQuizInput, LeaderboardEntry, QuizAnswer, DifficultyLevel } from '@/lib/types/database'
-import { buildCandidateProctoringNoticeEmail, buildQuizCompletedEmail, buildQuizProctoringFlagEmail, sendEmail } from '@/lib/email'
+import { buildCandidateProctoringNoticeEmail, buildQuizCompletedEmail, buildQuizProctoringFlagEmail, buildTrainerQuizInsightEmail, sendEmail } from '@/lib/email'
+import { sendMandatoryBrdEmail } from '@/lib/brd-notifications'
 import { getAdminAlertEmail, getSiteUrl } from '@/lib/security/env'
 import { analyzeAttemptTopicPerformance } from '@/lib/quiz-performance-analysis'
 import { calculateProctoringRisk, shouldAutoSubmitForIntegrity } from '@/lib/proctoring'
@@ -377,15 +378,20 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
     if (!isProctoringFlagged) {
       try {
         const [{ data: profile }, { data: earnedBadges }, { data: certificate }] = await Promise.all([
-          adminClient.from('profiles').select('full_name, email').eq('id', user.id).maybeSingle(),
+          adminClient.from('profiles').select('full_name, email, employee_id').eq('id', user.id).maybeSingle(),
           adminClient.from('user_badges').select('id').eq('user_id', user.id),
           adminClient.from('certificates').select('id').eq('quiz_id', quiz_id).eq('user_id', user.id).maybeSingle(),
         ])
+        const baseUrl = getSiteUrl().replace(/\/$/, '')
+        const resultUrl = `${baseUrl}/employee/quizzes/${quiz_id}/results`
         if (profile?.email) {
-          const baseUrl = getSiteUrl().replace(/\/$/, '')
-          await sendEmail({
+          const emailResult = await sendMandatoryBrdEmail({
+            admin: adminClient,
+            eventType: 'quiz_result_analysis',
             to: profile.email,
-            subject: `Quiz Result: ${quiz.title} — ${score}%`,
+            recipientRole: 'employee',
+            relatedBatchId: quiz.batch_id || null,
+            subject: `Quiz AI Analysis: ${quiz.title} - ${score}%`,
             html: buildQuizCompletedEmail({
               employeeName: profile.full_name,
               quizTitle: quiz.title,
@@ -395,11 +401,44 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
               badgesEarned: earnedBadges?.length || 0,
               certificateIssued: Boolean(certificate),
               certificateUrl: certificate ? `${baseUrl}/certificates/${certificate.id}` : undefined,
-              resultUrl: `${baseUrl}/employee/quizzes/${quiz_id}/results`,
+              resultUrl,
               analysis: attemptTopicAnalysis,
             }),
           })
+          if (!emailResult.success) {
+            console.warn('Quiz AI analysis email failed for employee:', emailResult.error)
+          }
         }
+
+        const trainerRecipients = await getQuizInsightTrainerRecipients(adminClient, quiz)
+        await Promise.all(trainerRecipients.map(async (recipient: {
+          id: string
+          full_name?: string | null
+          email: string
+          role?: string | null
+        }) => {
+          const trainerResult = await sendMandatoryBrdEmail({
+            admin: adminClient,
+            eventType: 'quiz_result_analysis',
+            to: recipient.email,
+            recipientRole: recipient.role || 'trainer',
+            relatedBatchId: quiz.batch_id || null,
+            subject: `Coaching insight: ${profile?.full_name || profile?.email || 'Learner'} - ${quiz.title}`,
+            html: buildTrainerQuizInsightEmail({
+              trainerName: recipient.full_name,
+              employeeName: profile?.full_name,
+              employeeEmail: profile?.email,
+              quizTitle: quiz.title,
+              score,
+              passingScore: quiz.passing_score ?? 60,
+              resultUrl: `${baseUrl}/manager/analytics`,
+              analysis: attemptTopicAnalysis,
+            }),
+          })
+          if (!trainerResult.success) {
+            console.warn(`Quiz AI analysis email failed for trainer ${recipient.email}:`, trainerResult.error)
+          }
+        }))
       } catch (mailError) {
         console.warn('Quiz completion email failed (non-fatal):', mailError)
       }
@@ -631,6 +670,40 @@ async function getTopicRiskStaffRecipientIds(adminClient: any, quiz: any) {
   for (const trainer of trainers || []) if (trainer.trainer_id) recipientIds.add(trainer.trainer_id)
 
   return [...recipientIds]
+}
+
+async function getQuizInsightTrainerRecipients(adminClient: any, quiz: any) {
+  const recipientIds = new Set<string>()
+  if (quiz.created_by) recipientIds.add(quiz.created_by)
+
+  const [{ data: batch }, { data: trainers }] = await Promise.all([
+    quiz.batch_id
+      ? adminClient.from('training_batches').select('trainer_id, coordinator_id').eq('id', quiz.batch_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    quiz.batch_id
+      ? adminClient.from('training_batch_trainers').select('trainer_id').eq('batch_id', quiz.batch_id)
+      : Promise.resolve({ data: [] }),
+  ])
+
+  if (batch?.trainer_id) recipientIds.add(batch.trainer_id)
+  if (batch?.coordinator_id) recipientIds.add(batch.coordinator_id)
+  for (const trainer of trainers || []) if (trainer.trainer_id) recipientIds.add(trainer.trainer_id)
+
+  if (!recipientIds.size) return []
+
+  const { data: profiles } = await adminClient
+    .from('profiles')
+    .select('id, full_name, email, role')
+    .in('id', [...recipientIds])
+
+  return (profiles || [])
+    .filter((profile: any) => profile.email && ['trainer', 'training_coordinator', 'manager', 'admin'].includes(profile.role))
+    .map((profile: any) => ({
+      id: profile.id,
+      full_name: profile.full_name,
+      email: profile.email,
+      role: profile.role,
+    }))
 }
 
 async function createTopicRiskNotifications({

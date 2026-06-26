@@ -29,6 +29,7 @@ npm run brd:dashboard-benchmark
 | 10 | Feedback email triggered and logged | `createFeedbackWindow`, `brd_email_notification_logs` |
 | 10a | Quiz assignment email triggered and logged | `notifyQuizAssigned`, `quiz_assigned` rows in `brd_email_notification_logs` |
 | 10b | Training session allocation email triggered and logged | `syncTrainingSessionVisibility`, `session_allocated` rows in `brd_email_notification_logs`; role-specific trainer and employee templates |
+| 10c | Quiz result AI analysis email triggered and logged | `submitQuiz`, `quiz_result_analysis` rows in `brd_email_notification_logs`; employee report plus trainer coaching brief |
 | 11 | Dashboard shows near real-time metrics | operations/report dashboards query live training tables |
 | 12 | Reports export in Excel and PDF | `app/api/export/*` |
 | 13 | Topper list uses configurable weights | `training_system_settings`, `lib/topper.ts` |
@@ -46,6 +47,8 @@ npm run brd:dashboard-benchmark
 - Added quiz assignment mandatory email tests for `quiz_assigned` log creation, sent status, and failed status.
 - Added training session allocation mandatory email coverage for `session_allocated` log creation and sent status.
 - Added quiz performance analysis tests for per-attempt weak/strong topics and cohort weak-topic AI Insights data.
+- Added quiz result AI analysis mandatory email coverage for employee/trainer `quiz_result_analysis` log creation, sent status, and failed status.
+- Added AI Command source coverage for question-response topic insight prompts.
 
 ## Remaining Manual Validation
 

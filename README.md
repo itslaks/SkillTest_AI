@@ -77,7 +77,7 @@ It is built for training managers and HR teams who need **training execution evi
 | Attendance | Cutoff enforcement, late reasons, version history, bulk import |
 | Session Wiring | Admin and AI-created sessions sync trainer access, selected learners, meeting links, attendance placeholders, and mandatory employee/trainer email delivery logs |
 | Project Evaluations | Trainer-submitted evaluation forms per batch |
-| Email Automation | Quiz assignment, session allocation, AI result-analysis, completion, and proctoring alert emails via SMTP or Resend |
+| Email Automation | Quiz assignment, session allocation, AI result-analysis, completion, and proctoring alert emails via SMTP or Resend with BRD delivery logs |
 
 ---
 

@@ -6,6 +6,7 @@ export type BrdEmailEventType =
   | 'assessment_reminder'
   | 'feedback_request'
   | 'quiz_assigned'
+  | 'quiz_result_analysis'
   | 'session_allocated'
   | 'email_configuration_test'
 

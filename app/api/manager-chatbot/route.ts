@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getAccessibleTrainingBatchIds } from '@/lib/training-access'
 import { callAI, stripCodeFences } from '@/lib/ai'
 import { analyzeAttemptPattern } from '@/lib/insights'
+import { analyzeAttemptTopicPerformance, buildCohortWeakTopicInsights } from '@/lib/quiz-performance-analysis'
 import { buildAdminGuideSearchIndex, findAdminGuideAnswer } from '@/lib/manager-docs'
 import { createEmployeeWithSetupEmail, deleteEmployeeAccount } from '@/lib/employee-onboarding'
 import type { DifficultyLevel, QuizAnswer } from '@/lib/types/database'
@@ -110,7 +111,7 @@ export async function POST(request: NextRequest) {
   ] = await Promise.all([
     safeSelect(admin
       .from('quizzes')
-      .select('id, title, topic, difficulty, passing_score, created_by, batch_id, status, is_active')
+      .select('id, title, topic, difficulty, passing_score, created_by, batch_id, status, is_active, questions(*)')
       .or(`created_by.eq.${auth.userId}${batchIds.length ? `,batch_id.in.(${batchIds.join(',')})` : ''}`)
       .limit(120), 'quizzes'),
     safeSelect(admin
@@ -2199,6 +2200,9 @@ function buildDeterministicAnswer(message: string, data: Record<string, any[]>) 
     return summarizeCertificates(data.profiles, data.attempts, data.certificateRules, data.certificates)
   }
 
+  const quizInsight = summarizeQuizInsightQuestions(message, data)
+  if (quizInsight) return quizInsight
+
   if (lower.includes('weak') || lower.includes('lowest') || lower.includes('risk')) {
     return summarizeWeakAreas(data.attempts)
   }
@@ -3062,6 +3066,65 @@ function summarizeWeakAreas(attempts: any[]) {
     .sort((a, b) => a.avg - b.avg)[0]
   if (!weakest) return 'No completed attempts found to identify weak areas.'
   return `Weakest loaded topic: ${weakest.topic}, average ${weakest.avg}% across ${weakest.count} attempt(s).`
+}
+
+function summarizeQuizInsightQuestions(message: string, data: Record<string, any[]>) {
+  const lower = normalize(message)
+  const asksForInsights =
+    /\b(ai\s+insights?|insights?|weak\s+topics?|areas?\s+to\s+improve|improvement|coach|coaching|feedback|suggestion|strong\s+areas?)\b/.test(lower)
+    && /\b(quiz|assessment|employee|learner|performance|topic|topics?|result|trainer)\b/.test(lower)
+  if (!asksForInsights) return null
+
+  const quizById = new Map((data.quizzes || []).map((quiz) => [quiz.id, quiz]))
+  const profile = findProfile(lower, data.profiles || [])
+  const quiz = findQuiz(lower, data.quizzes || [], data.attempts || [])
+
+  if (profile) {
+    const attempts = (data.attempts || [])
+      .filter((attempt) => attempt.user_id === profile.id && (!quiz || attempt.quiz_id === quiz.id))
+      .sort(byLatest)
+    const attempt = attempts[0]
+    if (!attempt) return `No completed quiz attempts found for ${displayName(profile)} in the loaded AI insight data.`
+    const quizRow = quizById.get(attempt.quiz_id) || quiz || attempt.quizzes || {}
+    const analysis = analyzeAttemptTopicPerformance({
+      quiz: quizRow,
+      answers: Array.isArray(attempt.answers) ? attempt.answers : [],
+      score: Number(attempt.score || 0),
+    })
+    const weak = analysis.weakTopics.length
+      ? analysis.weakTopics.slice(0, 4).map((topic) => `- ${topic.topic}: ${topic.accuracy}% accuracy (${topic.wrong}/${topic.total} missed)`)
+      : ['- No weak topic crossed the current threshold in the loaded answers.']
+    const strong = analysis.strongTopics.length
+      ? analysis.strongTopics.slice(0, 3).map((topic) => `- ${topic.topic}: ${topic.accuracy}% accuracy`)
+      : ['- No strong topic signal yet; use the completed attempt as the baseline.']
+    return [
+      `AI insight for ${displayName(profile)}:`,
+      `Quiz: ${quizRow.title || attempt.quizzes?.title || 'Quiz'} | Score: ${attempt.score}% | Completed: ${formatDateTime(attempt.completed_at)}`,
+      'Areas to improve:',
+      ...weak,
+      'Strong areas:',
+      ...strong,
+      `AI feedback: ${analysis.feedback}`,
+      `Trainer action: ${analysis.suggestion}`,
+    ].join('\n')
+  }
+
+  const cohort = buildCohortWeakTopicInsights({
+    attempts: data.attempts || [],
+    quizzes: data.quizzes || [],
+  })
+  if (!cohort.length) {
+    const fallback = summarizeWeakAreas(data.attempts || [])
+    return `${fallback}\nTopic-level AI insight needs completed attempts with saved question answers.`
+  }
+
+  return [
+    'AI weak-topic insights across visible quiz attempts:',
+    ...cohort.slice(0, 8).map((item, index) =>
+      `${index + 1}. ${item.topic} in ${item.quizTitle}: ${item.wrongRate}% wrong (${item.wrongAnswers}/${item.questionsAnswered}), ${item.affectedEmployees} employee(s) affected.`
+    ),
+    'Trainer action: prioritize the highest wrong-rate topics for reinforcement, then assign a short follow-up quiz.',
+  ].join('\n')
 }
 
 function findProfile(query: string, profiles: any[]) {

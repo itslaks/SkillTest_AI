@@ -564,6 +564,65 @@ export function buildQuizCompletedEmail(opts: {
   </div>`
 }
 
+export function buildTrainerQuizInsightEmail(opts: {
+  trainerName?: string | null
+  employeeName?: string | null
+  employeeEmail?: string | null
+  quizTitle: string
+  score: number
+  passingScore?: number
+  resultUrl?: string
+  analysis?: {
+    areasToImprove?: string[]
+    strengths?: string[]
+    feedback?: string
+    suggestion?: string
+    weakTopics?: Array<{ topic: string; accuracy: number; wrong: number; total: number }>
+    strongTopics?: Array<{ topic: string; accuracy: number }>
+  }
+}) {
+  const baseUrl = getSiteUrl().replace(/\/$/, '')
+  const resultUrl = escapeHtml(opts.resultUrl || `${baseUrl}/manager/analytics`)
+  const passingScore = opts.passingScore ?? 60
+  const needsCoaching = opts.score < passingScore || Boolean(opts.analysis?.weakTopics?.length)
+  const weakTopics = opts.analysis?.weakTopics || []
+  const strongTopics = opts.analysis?.strongTopics || []
+  const improvementList = opts.analysis?.areasToImprove?.length
+    ? opts.analysis.areasToImprove
+    : weakTopics.map((topic) => `${topic.topic}: ${topic.wrong}/${topic.total} missed (${topic.accuracy}% accuracy)`)
+  const strengths = opts.analysis?.strengths?.length
+    ? opts.analysis.strengths
+    : strongTopics.map((topic) => `${topic.topic}: ${topic.accuracy}% accuracy`)
+
+  return `
+  <div style="font-family:system-ui,sans-serif;max-width:680px;margin:0 auto;padding:24px;background:#f8fafc;">
+    <div style="background:#111827;color:#fff;padding:24px;border-radius:18px 18px 0 0;">
+      <p style="margin:0;color:#93c5fd;font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;">SkillTest_AI Trainer Insight</p>
+      <h1 style="margin:10px 0 0;font-size:24px;">Learner coaching signal</h1>
+    </div>
+    <div style="background:#fff;border:1px solid #e5e7eb;border-top:0;padding:24px;border-radius:0 0 18px 18px;">
+      <p>Hi ${escapeHtml(opts.trainerName || 'Trainer')},</p>
+      <p><strong>${escapeHtml(opts.employeeName || 'Learner')}</strong>${opts.employeeEmail ? ` (${escapeHtml(opts.employeeEmail)})` : ''} has completed <strong>${escapeHtml(opts.quizTitle)}</strong>.</p>
+      <div style="display:flex;gap:12px;margin:18px 0;flex-wrap:wrap;">
+        <div style="flex:1;min-width:180px;padding:18px;border-radius:14px;background:${needsCoaching ? '#fff7ed' : '#ecfdf5'};color:${needsCoaching ? '#9a3412' : '#065f46'};text-align:center;">
+          <strong style="font-size:30px;">${opts.score}%</strong><br/><span style="font-size:13px;">Learner score</span>
+        </div>
+        <div style="flex:1;min-width:180px;padding:18px;border-radius:14px;background:#eef2ff;color:#3730a3;text-align:center;">
+          <strong style="font-size:30px;">${passingScore}%</strong><br/><span style="font-size:13px;">Passing score</span>
+        </div>
+      </div>
+      ${improvementList.length ? `<p style="margin:0 0 8px;font-weight:800;color:#991b1b;">Areas to coach</p><ul style="margin:0 0 16px 18px;color:#4b5563;">${improvementList.slice(0, 5).map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
+      ${strengths.length ? `<p style="margin:0 0 8px;font-weight:800;color:#166534;">Strong areas to reinforce</p><ul style="margin:0 0 16px 18px;color:#4b5563;">${strengths.slice(0, 4).map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
+      <div style="padding:16px;border-radius:14px;background:#f9fafb;border:1px solid #e5e7eb;margin:18px 0;">
+        <p style="margin:0 0 10px;color:#374151;"><strong>AI feedback:</strong> ${escapeHtml(opts.analysis?.feedback || 'Review this learner with the topic breakdown and assign short targeted practice.')}</p>
+        <p style="margin:0;color:#374151;"><strong>Trainer action:</strong> ${escapeHtml(opts.analysis?.suggestion || 'Use the next coaching session to discuss missed concepts, then retest with similar questions.')}</p>
+      </div>
+      <a href="${resultUrl}" style="display:inline-block;background:#111827;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:700;font-size:14px;">Open AI Insights</a>
+      <p style="color:#6b7280;font-size:12px;margin-top:16px;">If the button does not open, paste this link in your browser:<br/><span style="color:#374151;word-break:break-all;">${resultUrl}</span></p>
+    </div>
+  </div>`
+}
+
 export function buildQuizProctoringFlagEmail(opts: {
   employeeName?: string | null
   employeeEmail?: string | null
