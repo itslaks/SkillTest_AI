@@ -32,7 +32,7 @@ export function HeroSection() {
         ))}
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 top-24 z-0 h-[42vh] overflow-hidden">
+      <div className="pointer-events-none absolute inset-x-0 top-4 z-0 h-[48vh] overflow-hidden md:top-6">
         <div className="hero-current hero-current-a" />
         <div className="hero-current hero-current-b" />
         <div className="hero-current hero-current-c" />
