@@ -1,8 +1,27 @@
 import { Button } from "@/components/ui/button";
-import { ArrowDown, ArrowRight } from "lucide-react";
+import { ArrowDown, ArrowRight, BadgeCheck, FileCheck2, ShieldCheck } from "lucide-react";
 import { HeroShowcase } from "./hero-showcase";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand/brand-logo";
+import type { CSSProperties } from "react";
+
+const proofTrail = [
+  {
+    label: "Assess",
+    detail: "Adaptive quiz signal",
+    icon: BadgeCheck,
+  },
+  {
+    label: "Verify",
+    detail: "Integrity evidence",
+    icon: ShieldCheck,
+  },
+  {
+    label: "Certify",
+    detail: "Export-ready proof",
+    icon: FileCheck2,
+  },
+]
 
 export function HeroSection() {
   return (
@@ -115,6 +134,23 @@ export function HeroSection() {
           <div className="hidden hero-rise xl:block xl:-mt-4" style={{ animationDelay: "320ms" }}>
             <div className="hero-visual-float">
               <HeroShowcase />
+            </div>
+            <div className="proof-trail -mt-9">
+              <div className="proof-trail-line" />
+              {proofTrail.map((item, index) => {
+                const Icon = item.icon
+                return (
+                  <div key={item.label} className="proof-trail-node" style={{ "--node": index } as CSSProperties}>
+                    <span className="proof-trail-icon">
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span>
+                      <span className="block text-sm font-semibold text-slate-950">{item.label}</span>
+                      <span className="mt-0.5 block text-xs font-medium text-slate-500">{item.detail}</span>
+                    </span>
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>
