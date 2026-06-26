@@ -268,7 +268,8 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    Trigger["Trigger:\nAttempt completed\nor staff approves"] --> Builder["lib/email.ts\nbuildQuizCompletedEmail()"]
+    Trigger["Trigger:\nAttempt completed\nor staff approves"] --> Analysis["lib/quiz-performance-analysis.ts\nquestion-response topic analysis"]
+    Analysis --> Builder["lib/email.ts\nbuildQuizCompletedEmail()\nAI coaching section"]
     Builder --> Provider{"Email\nprovider"}
     Provider -->|SMTP_HOST set| SMTP["Nodemailer\nSMTP"]
     Provider -->|RESEND_API_KEY set| Resend["Resend API"]

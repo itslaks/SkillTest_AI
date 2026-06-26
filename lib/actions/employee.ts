@@ -13,6 +13,7 @@ import {
 import type { SubmitQuizInput, LeaderboardEntry, QuizAnswer, DifficultyLevel } from '@/lib/types/database'
 import { buildCandidateProctoringNoticeEmail, buildQuizCompletedEmail, buildQuizProctoringFlagEmail, sendEmail } from '@/lib/email'
 import { getAdminAlertEmail, getSiteUrl } from '@/lib/security/env'
+import { analyzeAttemptTopicPerformance } from '@/lib/quiz-performance-analysis'
 import { calculateProctoringRisk, shouldAutoSubmitForIntegrity } from '@/lib/proctoring'
 import {
   buildProctoringSummary,
@@ -248,6 +249,11 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
     const correctAnswers = enrichedAnswers.filter((answer) => answer.isCorrect).length
     const score = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0
     const rawInsight = analyzeAttemptPattern(enrichedAnswers, quiz.difficulty, topicAttempts)
+    const attemptTopicAnalysis = analyzeAttemptTopicPerformance({
+      quiz,
+      answers: enrichedAnswers,
+      score,
+    })
 
     const { data: activeAttempt, error: activeAttemptError } = await adminClient
       .from('quiz_attempts')
@@ -390,6 +396,7 @@ export async function submitQuizAttempt(input: SubmitQuizInput) {
               certificateIssued: Boolean(certificate),
               certificateUrl: certificate ? `${baseUrl}/certificates/${certificate.id}` : undefined,
               resultUrl: `${baseUrl}/employee/quizzes/${quiz_id}/results`,
+              analysis: attemptTopicAnalysis,
             }),
           })
         }

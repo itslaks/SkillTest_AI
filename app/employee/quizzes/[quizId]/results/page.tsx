@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { getQuizLeaderboard } from '@/lib/actions/employee'
 import { analyzeAttemptPattern, buildRetentionChecks, getTopicAttempts } from '@/lib/insights'
+import { analyzeAttemptTopicPerformance } from '@/lib/quiz-performance-analysis'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { FeedbackRequiredExit } from '@/components/quiz/feedback-required-exit'
@@ -68,6 +69,11 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
   const isPassing = attempt.score >= (quiz.passing_score || 60)
   const topicAttempts = getTopicAttempts(history || [], quiz.topic)
   const behavior = analyzeAttemptPattern(attempt.answers || [], quiz.difficulty, topicAttempts)
+  const topicAnalysis = analyzeAttemptTopicPerformance({
+    quiz,
+    answers: attempt.answers || [],
+    score: attempt.score || 0,
+  })
   const retentionCheck = buildRetentionChecks(topicAttempts).find((item) => item.topic.toLowerCase() === (quiz.topic || '').toLowerCase())
   const questionMap = new Map<string, any>((quiz.questions || []).map((question: any) => [question.id, question]))
   const isUnderReview = attempt.status === 'suspicious' || attempt.proctoring_status === 'suspicious'
@@ -268,6 +274,51 @@ export default async function QuizResultsPage({ params }: { params: Promise<{ qu
         </Card>
 
         <div className="space-y-6">
+          <Card className="border-blue-100 bg-gradient-to-br from-blue-50 to-slate-50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Brain className="h-4 w-4 text-blue-700" />
+                AI topic coach
+              </CardTitle>
+              <CardDescription>Personalized from your question responses.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              {topicAnalysis.weakTopics.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="font-semibold text-rose-900">Areas to improve</p>
+                  {topicAnalysis.weakTopics.slice(0, 3).map((topic) => (
+                    <div key={topic.topic} className="rounded-2xl border border-rose-100 bg-white p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-semibold text-zinc-900">{topic.topic}</span>
+                        <Badge className="bg-rose-100 text-rose-800">{topic.accuracy}%</Badge>
+                      </div>
+                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-rose-100">
+                        <div className="h-full rounded-full bg-rose-500" style={{ width: `${Math.max(6, topic.wrongRate)}%` }} />
+                      </div>
+                      <p className="mt-2 text-xs text-zinc-500">{topic.wrong}/{topic.total} missed. Average time {topic.avgTime}s.</p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              <div className="rounded-2xl border border-emerald-100 bg-white p-3">
+                <p className="font-semibold text-emerald-900">Strong areas</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {topicAnalysis.strongTopics.length > 0
+                    ? topicAnalysis.strongTopics.map((topic) => (
+                      <Badge key={topic.topic} className="bg-emerald-100 text-emerald-800">{topic.topic} - {topic.accuracy}%</Badge>
+                    ))
+                    : <span className="text-xs text-zinc-500">{topicAnalysis.strengths[0]}</span>}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-blue-100 bg-white p-3 text-zinc-700">
+                <p><span className="font-semibold text-zinc-950">AI feedback:</span> {topicAnalysis.feedback}</p>
+                <p className="mt-2"><span className="font-semibold text-zinc-950">Suggestion:</span> {topicAnalysis.suggestion}</p>
+              </div>
+            </CardContent>
+          </Card>
+
           {certificate && (
             <Card className="border-amber-300 bg-gradient-to-br from-amber-50 to-yellow-50">
               <CardHeader>

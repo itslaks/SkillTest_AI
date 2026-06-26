@@ -8,6 +8,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import type { RetentionCheck, TopicStrengthPoint, TrainerImpactPoint } from '@/lib/types/database'
+import type { CohortWeakTopicPoint } from '@/lib/quiz-performance-analysis'
 import { TrendingDown, TrendingUp, Minus, AlertTriangle, ShieldAlert, BarChart2, Target } from 'lucide-react'
 
 interface ScoreBand { range: string; count: number; color: string }
@@ -20,6 +21,7 @@ interface IntelligenceDashboardProps {
   antiGamingWatch: Array<{ trainee: string; topic: string; signal: string }>
   scoreDistribution: ScoreBand[]
   topicPerformance: TopicPerf[]
+  weakTopicInsights: CohortWeakTopicPoint[]
 }
 
 // Colour helpers
@@ -59,6 +61,7 @@ export function IntelligenceDashboard({
   antiGamingWatch,
   scoreDistribution,
   topicPerformance,
+  weakTopicInsights,
 }: IntelligenceDashboardProps) {
 
   const totalAttempts = scoreDistribution.reduce((s, b) => s + b.count, 0)
@@ -164,6 +167,71 @@ export function IntelligenceDashboard({
           </CardContent>
         </Card>
       </div>
+
+      <Card className="border-slate-200 bg-white shadow-sm">
+        <CardHeader className="pb-2">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <BrainMarker />
+                AI Weak-Topic Analysis
+              </CardTitle>
+              <CardDescription className="mt-1">
+                Question and response analysis showing where employees need focused coaching.
+              </CardDescription>
+            </div>
+            <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-700">
+              {weakTopicInsights.length} signal(s)
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {weakTopicInsights.length === 0 ? (
+            <div className="flex h-40 items-center justify-center rounded-2xl border border-dashed border-slate-200 text-sm text-slate-400">
+              No weak-topic signals yet
+            </div>
+          ) : (
+            <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+              <ResponsiveContainer width="100%" height={Math.max(220, weakTopicInsights.length * 34)}>
+                <BarChart
+                  data={weakTopicInsights}
+                  layout="vertical"
+                  margin={{ top: 0, right: 48, left: 8, bottom: 0 }}
+                >
+                  <CartesianGrid horizontal={false} stroke="#f1f5f9" />
+                  <XAxis type="number" domain={[0, 100]} tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} unit="%" />
+                  <YAxis type="category" dataKey="topic" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#475569' }} width={130} />
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
+                  <Bar dataKey="wrongRate" name="Wrong Rate" radius={[0, 8, 8, 0]} maxBarSize={24}>
+                    {weakTopicInsights.map((entry, i) => (
+                      <Cell key={i} fill={entry.wrongRate > 50 ? '#ef4444' : entry.wrongRate > 25 ? '#f59e0b' : '#3b82f6'} />
+                    ))}
+                    <LabelList dataKey="wrongRate" position="right" formatter={(v: number) => `${v}%`} style={{ fontSize: 11, fontWeight: 700, fill: '#475569' }} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+              <div className="space-y-3">
+                {weakTopicInsights.slice(0, 4).map((item) => (
+                  <div key={`${item.quizTitle}-${item.topic}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-slate-950">{item.topic}</p>
+                        <p className="mt-1 text-xs text-slate-500">{item.quizTitle}</p>
+                      </div>
+                      <Badge className={item.wrongRate > 50 ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'}>
+                        {item.wrongRate}% wrong
+                      </Badge>
+                    </div>
+                    <p className="mt-3 text-xs leading-5 text-slate-600">
+                      {item.wrongAnswers}/{item.questionsAnswered} responses were incorrect across {item.affectedEmployees} employee(s).
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Row 2: Trainer Impact + Knowledge Decay + Anti-Gaming */}
       <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr_0.9fr]">
@@ -310,5 +378,13 @@ export function IntelligenceDashboard({
         </Card>
       </div>
     </div>
+  )
+}
+
+function BrainMarker() {
+  return (
+    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-violet-100">
+      <span className="h-2 w-2 rounded-full bg-violet-600" />
+    </span>
   )
 }

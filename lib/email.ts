@@ -492,11 +492,35 @@ export function buildQuizCompletedEmail(opts: {
   certificateIssued?: boolean
   certificateUrl?: string
   resultUrl?: string
+  analysis?: {
+    areasToImprove?: string[]
+    strengths?: string[]
+    feedback?: string
+    suggestion?: string
+    weakTopics?: Array<{ topic: string; accuracy: number; wrong: number; total: number }>
+    strongTopics?: Array<{ topic: string; accuracy: number }>
+  }
 }) {
   const baseUrl = getSiteUrl().replace(/\/$/, '')
   const resultUrl = escapeHtml(opts.resultUrl || `${baseUrl}/employee/quizzes`)
   const certificateUrl = opts.certificateUrl ? escapeHtml(opts.certificateUrl) : null
   const isPassing = opts.score >= (opts.passingScore ?? 60)
+  const weakTopics = opts.analysis?.weakTopics || []
+  const strongTopics = opts.analysis?.strongTopics || []
+  const areasToImprove = opts.analysis?.areasToImprove || []
+  const strengths = opts.analysis?.strengths || []
+  const coachingRows = [
+    ...weakTopics.slice(0, 3).map((topic) => `
+      <tr>
+        <td style="padding:10px;border-bottom:1px solid #fee2e2;font-weight:700;color:#991b1b;">${escapeHtml(topic.topic)}</td>
+        <td style="padding:10px;border-bottom:1px solid #fee2e2;color:#7f1d1d;">${topic.accuracy}% accuracy (${topic.wrong}/${topic.total} missed)</td>
+      </tr>`),
+    ...strongTopics.slice(0, 2).map((topic) => `
+      <tr>
+        <td style="padding:10px;border-bottom:1px solid #dcfce7;font-weight:700;color:#166534;">${escapeHtml(topic.topic)}</td>
+        <td style="padding:10px;border-bottom:1px solid #dcfce7;color:#166534;">Strong area at ${topic.accuracy}% accuracy</td>
+      </tr>`),
+  ].join('')
   return `
   <div style="font-family:system-ui,sans-serif;max-width:620px;margin:0 auto;padding:24px;background:#f8fafc;">
     <div style="background:#111827;color:#fff;padding:24px;border-radius:18px 18px 0 0;">
@@ -516,6 +540,21 @@ export function buildQuizCompletedEmail(opts: {
       </div>
       ${opts.badgesEarned ? `<p style="color:#374151;">You unlocked <strong>${opts.badgesEarned} badge(s)</strong> for this attempt.</p>` : ''}
       ${opts.certificateIssued ? '<p style="color:#b45309;font-weight:700;background:#fffbeb;padding:12px 16px;border-radius:10px;border:1px solid #fde68a;">🏆 A certificate of completion has been issued for this quiz.</p>' : ''}
+      ${opts.analysis ? `
+        <div style="margin-top:20px;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;">
+          <div style="background:#111827;color:#fff;padding:16px 18px;">
+            <p style="margin:0;color:#93c5fd;font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;">AI Performance Analysis</p>
+            <h2 style="margin:6px 0 0;font-size:18px;">Your coaching report</h2>
+          </div>
+          <div style="padding:18px;background:#ffffff;">
+            ${coachingRows ? `<table style="width:100%;border-collapse:collapse;margin-bottom:16px;">${coachingRows}</table>` : ''}
+            ${areasToImprove.length ? `<p style="margin:0 0 8px;font-weight:800;color:#991b1b;">Areas to improve</p><ul style="margin:0 0 16px 18px;color:#4b5563;">${areasToImprove.slice(0, 4).map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
+            ${strengths.length ? `<p style="margin:0 0 8px;font-weight:800;color:#166534;">Strong areas</p><ul style="margin:0 0 16px 18px;color:#4b5563;">${strengths.slice(0, 4).map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
+            <p style="margin:0 0 10px;color:#374151;"><strong>AI feedback:</strong> ${escapeHtml(opts.analysis.feedback || 'Review your answer explanations and repeat the weakest topics with timed practice.')}</p>
+            <p style="margin:0;color:#374151;"><strong>Suggested improvement plan:</strong> ${escapeHtml(opts.analysis.suggestion || 'Practice five similar questions and explain the reasoning before checking the answer.')}</p>
+          </div>
+        </div>
+      ` : ''}
       <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;">
         <a href="${resultUrl}" style="display:inline-block;background:#111827;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:700;font-size:14px;">View Full Results &amp; Score Breakdown</a>
         ${certificateUrl ? `<a href="${certificateUrl}" style="display:inline-block;background:#d97706;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:700;font-size:14px;">Download Certificate</a>` : ''}

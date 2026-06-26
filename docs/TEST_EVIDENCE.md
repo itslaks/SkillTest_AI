@@ -45,6 +45,7 @@ npm run brd:dashboard-benchmark
 - Added mandatory email delivery audit and retry support.
 - Added quiz assignment mandatory email tests for `quiz_assigned` log creation, sent status, and failed status.
 - Added training session allocation mandatory email coverage for `session_allocated` log creation and sent status.
+- Added quiz performance analysis tests for per-attempt weak/strong topics and cohort weak-topic AI Insights data.
 
 ## Remaining Manual Validation
 

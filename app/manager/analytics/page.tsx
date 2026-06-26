@@ -10,6 +10,7 @@ import {
   buildTrainerImpact,
   getTopicAttempts,
 } from '@/lib/insights'
+import { buildCohortWeakTopicInsights } from '@/lib/quiz-performance-analysis'
 
 export default async function AnalyticsPage() {
   const { userId } = await requireManager()
@@ -18,7 +19,7 @@ export default async function AnalyticsPage() {
 
   const { data: quizzes } = await supabase
     .from('quizzes')
-    .select('id, title, topic, difficulty, created_by, is_active')
+    .select('id, title, topic, difficulty, created_by, is_active, questions(*)')
     .eq('created_by', userId)
     .order('created_at', { ascending: false })
 
@@ -73,6 +74,10 @@ export default async function AnalyticsPage() {
     profiles: trainerProfiles || [],
   })
   const retentionChecks = buildRetentionChecks(attempts || [])
+  const weakTopicInsights = buildCohortWeakTopicInsights({
+    attempts: attempts || [],
+    quizzes: quizzes || [],
+  })
 
   // Score distribution across 5 bands
   const BANDS = [
@@ -135,6 +140,7 @@ export default async function AnalyticsPage() {
         antiGamingWatch={antiGamingWatch}
         scoreDistribution={scoreDistribution}
         topicPerformance={topicPerformance}
+        weakTopicInsights={weakTopicInsights}
       />
 
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">

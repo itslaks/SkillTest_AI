@@ -56,14 +56,14 @@ It is built for training managers and HR teams who need **training execution evi
 | Certificates | Auto-issued on pass; downloadable with custom title, message, and template |
 | Badge Universe | 250+ badges across 12 categories earned from quiz performance and streaks |
 | Leaderboard | Live and cumulative rankings with points and streaks |
-| AI Learner Coach | Personalized recommendations based on quiz history and retention signals |
+| AI Learner Coach | Personalized recommendations plus post-result topic coaching based on question responses |
 
 ### Manager Features
 | Feature | Description |
 |---------|-------------|
 | AI Quiz Generation | Generate MCQs from a topic, uploaded file, or natural-language command |
 | Integrity Center | Review flagged attempts with evidence thumbnails, approve/reject/retest |
-| AI Insights | Batch health, trainer performance, and quiz outcome coaching |
+| AI Insights | Batch health, trainer performance, quiz outcome coaching, and weak-topic visualizations from employee responses |
 | Assessment Analyzer | Upload score sheets and chat with AI about weak areas |
 | Command Chatbot | "Create quiz on Python, assign to Ram" -> quiz created |
 | Import Workflows | Employees, quiz questions, attendance, scores - CSV/TXT/XLSX/DOCX/PDF/XML/JSON |
@@ -77,7 +77,7 @@ It is built for training managers and HR teams who need **training execution evi
 | Attendance | Cutoff enforcement, late reasons, version history, bulk import |
 | Session Wiring | Admin and AI-created sessions sync trainer access, selected learners, meeting links, attendance placeholders, and mandatory employee/trainer email delivery logs |
 | Project Evaluations | Trainer-submitted evaluation forms per batch |
-| Email Automation | Quiz assignment, session allocation, completion, and proctoring alert emails via SMTP or Resend |
+| Email Automation | Quiz assignment, session allocation, AI result-analysis, completion, and proctoring alert emails via SMTP or Resend |
 
 ---
 

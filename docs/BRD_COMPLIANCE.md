@@ -46,7 +46,7 @@ These features increase scope and functionality but are not required for BRD com
 - Certificates, badges, and leaderboards
 - Learner recommendations and readiness insights
 - SaaS, tenant, SSO, and billing foundation
-- Per-quiz topic performance visualization and weak-topic alerts
+- Per-quiz topic performance visualization, weak-topic alerts, AI Insights weak-topic chart, and employee result-analysis emails
 
 ## Remaining Risk
 
