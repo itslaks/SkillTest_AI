@@ -23,6 +23,12 @@ const proofTrail = [
   },
 ]
 
+const evidencePackets = [
+  { label: "Face integrity", value: "98%", tone: "cyan" },
+  { label: "Score sync", value: "Live", tone: "violet" },
+  { label: "Certificate proof", value: "Queued", tone: "amber" },
+]
+
 export function HeroSection() {
   return (
     <section className="relative flex min-h-[96vh] flex-col justify-center overflow-hidden pt-24 md:pt-28">
@@ -61,7 +67,7 @@ export function HeroSection() {
         SkillTest_AI
       </div>
 
-      <div className="relative z-10 max-w-[1400px] mx-auto px-6 lg:px-12 pb-16 pt-8 lg:pb-20 lg:pt-10">
+      <div className="relative z-10 max-w-[1400px] mx-auto px-6 lg:px-12 pb-10 pt-8 lg:pb-12 lg:pt-10">
         <div className="mb-8 hero-rise" style={{ animationDelay: "80ms" }}>
           <span className="inline-flex items-center gap-3 rounded-full border border-violet-200 bg-white/90 py-1.5 pl-2 pr-4 text-sm font-semibold text-slate-700 shadow-sm">
             <BrandLogo variant="mark" tone="light" className="w-8" imageClassName="aspect-square" />
@@ -69,10 +75,10 @@ export function HeroSection() {
           </span>
         </div>
 
-        <div className="grid gap-12 xl:grid-cols-[0.82fr_1.18fr] xl:items-start">
-          <div className="space-y-8 hero-rise" style={{ animationDelay: "240ms" }}>
+        <div className="grid gap-10 xl:grid-cols-[0.95fr_1.05fr] xl:items-start">
+          <div className="space-y-7 hero-rise" style={{ animationDelay: "240ms" }}>
             <div>
-              <h1 className="max-w-[780px] text-[clamp(3rem,8.2vw,7rem)] font-display leading-[0.94] tracking-tight text-slate-950">
+              <h1 className="max-w-[840px] text-[clamp(3rem,7vw,6.15rem)] font-display leading-[0.94] tracking-tight text-slate-950">
                 <span className="block">Execute, Assess,</span>
                 <span className="block bg-gradient-to-r from-violet-600 via-blue-600 to-cyan-500 bg-clip-text text-transparent">and Prove Learning Outcomes.</span>
               </h1>
@@ -135,7 +141,7 @@ export function HeroSection() {
             <div className="hero-visual-float">
               <HeroShowcase />
             </div>
-            <div className="proof-trail -mt-9">
+            <div className="proof-trail mt-4">
               <div className="proof-trail-line" />
               {proofTrail.map((item, index) => {
                 const Icon = item.icon
@@ -151,6 +157,25 @@ export function HeroSection() {
                   </div>
                 )
               })}
+            </div>
+            <div className="evidence-ledger mt-4">
+              <div className="evidence-ledger-orbit" />
+              <div className="relative z-10 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-cyan-200">Evidence stream</p>
+                  <p className="mt-2 max-w-sm text-sm leading-6 text-slate-300">Assessment activity becomes reviewable proof as the session runs.</p>
+                </div>
+                <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-cyan-100">Active</div>
+              </div>
+              <div className="relative z-10 mt-5 grid gap-3">
+                {evidencePackets.map((packet, index) => (
+                  <div key={packet.label} className="evidence-packet" style={{ "--packet": index } as CSSProperties}>
+                    <span className={`evidence-dot evidence-dot-${packet.tone}`} />
+                    <span className="min-w-0 flex-1 text-sm font-medium text-slate-200">{packet.label}</span>
+                    <span className="text-xs font-semibold text-slate-400">{packet.value}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
