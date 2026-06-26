@@ -50,7 +50,7 @@ export function HeroSection() {
           </span>
         </div>
 
-        <div className="grid gap-12 xl:grid-cols-[0.82fr_1.18fr] xl:items-center">
+        <div className="grid gap-12 xl:grid-cols-[0.82fr_1.18fr] xl:items-start">
           <div className="space-y-8 hero-rise" style={{ animationDelay: "240ms" }}>
             <div>
               <h1 className="max-w-[780px] text-[clamp(3rem,8.2vw,7rem)] font-display leading-[0.94] tracking-tight text-slate-950">
@@ -112,7 +112,7 @@ export function HeroSection() {
             </p>
           </div>
 
-          <div className="hidden hero-rise xl:block" style={{ animationDelay: "320ms" }}>
+          <div className="hidden hero-rise xl:block xl:-mt-4" style={{ animationDelay: "320ms" }}>
             <div className="hero-visual-float">
               <HeroShowcase />
             </div>
